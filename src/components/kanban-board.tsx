@@ -103,11 +103,24 @@ export function KanbanBoard() {
     [currentMember]
   );
 
+  // CST week window (Sun-Sat)
+  const thisWeekStart = useMemo(() => {
+    const now = new Date();
+    const cstOffset = -6 * 60;
+    const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
+    const cstNow = new Date(utcMs + cstOffset * 60000);
+    const day = cstNow.getDay();
+    const sunday = new Date(cstNow);
+    sunday.setDate(cstNow.getDate() - day);
+    sunday.setHours(0, 0, 0, 0);
+    return sunday;
+  }, [cards]);
+
   const sortedColumnCards = useMemo(() => {
     const map: Record<string, ContentCardType[]> = {};
     PIPELINE_COLUMNS.forEach((col) => {
       let colCards = cards.filter((c) => c.stage === col.id);
-      // Posted column only shows this week's posts — older ones go to archive
+      // Posted column only shows this week's posts — older ones auto-archive
       if (col.id === "posted") {
         colCards = colCards.filter((c) => !c.scheduledDate || new Date(c.scheduledDate) >= thisWeekStart);
       }
@@ -116,25 +129,7 @@ export function KanbanBoard() {
     return map;
   }, [cards, thisWeekStart]);
 
-  // Archive = posted cards outside this week (Sun-Sat in CST)
-  const { thisWeekStart } = useMemo(() => {
-    // Get current time in CST (UTC-6)
-    const now = new Date();
-    const cstOffset = -6 * 60;
-    const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
-    const cstNow = new Date(utcMs + cstOffset * 60000);
-    // Find Sunday of this week
-    const day = cstNow.getDay(); // 0=Sun
-    const sunday = new Date(cstNow);
-    sunday.setDate(cstNow.getDate() - day);
-    sunday.setHours(0, 0, 0, 0);
-    // Saturday end of this week
-    const saturday = new Date(sunday);
-    saturday.setDate(sunday.getDate() + 6);
-    saturday.setHours(23, 59, 59, 999);
-    return { thisWeekStart: sunday, thisWeekEnd: saturday };
-  }, [cards]);
-
+  // Archive = posted cards before this week
   const archivedCards = useMemo(() => {
     return cards
       .filter((c) => c.stage === "posted" && c.scheduledDate && new Date(c.scheduledDate) < thisWeekStart)
