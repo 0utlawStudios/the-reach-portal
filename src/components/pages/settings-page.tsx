@@ -283,7 +283,7 @@ export function SettingsPage() {
               <div key={p} className="flex items-center gap-3 px-4 py-2.5 border-b border-gray-50 dark:border-white/[0.03] last:border-0">
                 <span className="text-gray-600 dark:text-gray-400"><PlatformIcon platform={p} className="w-4.5 h-4.5" /></span>
                 <span className="flex-1 text-[12px] font-medium text-gray-700 dark:text-gray-300 capitalize">{p === "x" ? "X (Twitter)" : p}</span>
-                <Button size="sm" variant="outline" className="h-7 text-[10px] rounded-lg px-3 cursor-pointer">Connect</Button>
+                <Button size="sm" variant="outline" onClick={() => addToast(`${p === "x" ? "X" : p.charAt(0).toUpperCase() + p.slice(1)} integration coming soon`, "info")} className="h-7 text-[10px] rounded-lg px-3 cursor-pointer">Connect</Button>
               </div>
             ))}
           </Section>
@@ -291,8 +291,8 @@ export function SettingsPage() {
           <Section title="Publishing" icon={<Zap className="w-3.5 h-3.5 text-amber-500" />}>
             <SettingRow icon={Clock} label="Auto-publish" desc="Publish approved posts at scheduled time"><Toggle /></SettingRow>
             <SettingRow icon={BarChart3} label="Analytics tracking" desc="Track engagement after publishing"><Toggle defaultOn /></SettingRow>
-            <SettingRow icon={FileText} label="Hashtag sets" desc="Reusable hashtag groups"><Button size="sm" variant="outline" className="h-7 text-[10px] rounded-lg px-3 cursor-pointer">Manage</Button></SettingRow>
-            <SettingRow icon={Smartphone} label="Caption templates" desc="Saved caption formats"><Button size="sm" variant="outline" className="h-7 text-[10px] rounded-lg px-3 cursor-pointer">Manage</Button></SettingRow>
+            <SettingRow icon={FileText} label="Hashtag sets" desc="Reusable hashtag groups"><Button size="sm" variant="outline" onClick={() => addToast("Hashtag set management coming soon", "info")} className="h-7 text-[10px] rounded-lg px-3 cursor-pointer">Manage</Button></SettingRow>
+            <SettingRow icon={Smartphone} label="Caption templates" desc="Saved caption formats"><Button size="sm" variant="outline" onClick={() => addToast("Caption templates coming soon", "info")} className="h-7 text-[10px] rounded-lg px-3 cursor-pointer">Manage</Button></SettingRow>
           </Section>
 
           <Section title="Notifications" icon={<Bell className="w-3.5 h-3.5 text-violet-500" />}>
@@ -309,7 +309,7 @@ export function SettingsPage() {
           </Section>
 
           <Section title="Data" icon={<Shield className="w-3.5 h-3.5 text-rose-500" />}>
-            <SettingRow icon={Download} label="Export data" desc="Download posts, media, analytics as CSV"><Button size="sm" variant="outline" className="h-7 text-[10px] rounded-lg px-3 cursor-pointer">Export</Button></SettingRow>
+            <SettingRow icon={Download} label="Export data" desc="Download posts, media, analytics as CSV"><Button size="sm" variant="outline" onClick={() => addToast("Data export coming soon", "info")} className="h-7 text-[10px] rounded-lg px-3 cursor-pointer">Export</Button></SettingRow>
           </Section>
         </div>
       ) : (

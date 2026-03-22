@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { X, Image as ImageIcon, Film, Layers, PlayCircle, Upload, FileVideo, Plus } from "lucide-react";
 import { PlatformIcon } from "./platform-icons";
+import { useToast } from "@/lib/toast-context";
 import { MentionTextarea } from "./mention-textarea";
 
 const contentTypes: { id: ContentType; label: string; icon: React.ReactNode }[] = [
@@ -33,6 +34,7 @@ interface Props {
 
 export function CreatePostModal({ open, onClose }: Props) {
   const { createCard } = usePipeline();
+  const { addToast } = useToast();
   const [title, setTitle] = useState("");
   const [caption, setCaption] = useState("");
   const [hook, setHook] = useState("");
@@ -77,7 +79,14 @@ export function CreatePostModal({ open, onClose }: Props) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || platforms.length === 0 || !scheduledDate || !scheduledTime || !hook.trim() || !caption.trim()) return;
+    const missing: string[] = [];
+    if (!title.trim()) missing.push("title");
+    if (platforms.length === 0) missing.push("platform");
+    if (!scheduledDate) missing.push("date");
+    if (!scheduledTime) missing.push("time");
+    if (!hook.trim()) missing.push("hook");
+    if (!caption.trim()) missing.push("caption");
+    if (missing.length > 0) { addToast(`Missing required fields: ${missing.join(", ")}`, "error"); return; }
 
     createCard({
       title: title.trim(),

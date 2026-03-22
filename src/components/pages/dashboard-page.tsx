@@ -17,7 +17,7 @@ export function DashboardPage() {
   const { currentUser } = useAuth();
   const [mounted, setMounted] = useState(false);
 
-  useEffect(() => { setMounted(false); const t = requestAnimationFrame(() => setMounted(true)); return () => cancelAnimationFrame(t); }, []);
+  useEffect(() => { setMounted(true); }, []);
 
   const totalCards = cards.length;
   const pendingApproval = cards.filter((c) => c.stage === "awaiting_approval").length;
@@ -82,9 +82,9 @@ export function DashboardPage() {
       </div>
 
       {/* Row 1: Funnel + Scorecard + Platforms — cards instant, bars/numbers animate */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-2.5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-2.5">
         {/* Pipeline funnel */}
-        <div className="lg:col-span-5 bg-white dark:bg-[#151518] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-4 shadow-sm h-full">
+        <div className="md:col-span-1 lg:col-span-5 bg-white dark:bg-[#151518] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-4 shadow-sm h-full">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-[12px] font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2"><BarChart3 className="w-4 h-4 text-orange-500" />Pipeline Funnel</h2>
             <span className="text-[9px] text-gray-400 bg-gray-50 dark:bg-white/[0.04] px-2 py-0.5 rounded-full font-medium uppercase tracking-wider">This week</span>

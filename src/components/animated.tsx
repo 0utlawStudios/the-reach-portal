@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 
-// ─── Animated Counter: counts from 0 to target ───
+// ─── Animated Counter: counts from 0 to target (no flash-to-zero) ───
 export function AnimatedCounter({ value, duration = 700, suffix = "", prefix = "", className = "" }: {
   value: number;
   duration?: number;
@@ -10,20 +10,27 @@ export function AnimatedCounter({ value, duration = 700, suffix = "", prefix = "
   prefix?: string;
   className?: string;
 }) {
-  const [display, setDisplay] = useState(0);
+  const [display, setDisplay] = useState(value);
   const frameRef = useRef<number>(0);
   const startRef = useRef<number>(0);
+  const fromRef = useRef(0);
+  const initialRender = useRef(true);
 
   useEffect(() => {
-    setDisplay(0);
+    // On first render, animate from 0. On subsequent, animate from current.
+    if (initialRender.current) {
+      fromRef.current = 0;
+      initialRender.current = false;
+    } else {
+      fromRef.current = display;
+    }
     startRef.current = performance.now();
 
     const animate = (now: number) => {
       const elapsed = now - startRef.current;
       const progress = Math.min(elapsed / duration, 1);
-      // easeOutExpo for snappy feel
       const eased = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
-      setDisplay(Math.round(eased * value));
+      setDisplay(Math.round(fromRef.current + (value - fromRef.current) * eased));
       if (progress < 1) frameRef.current = requestAnimationFrame(animate);
     };
 
@@ -34,7 +41,7 @@ export function AnimatedCounter({ value, duration = 700, suffix = "", prefix = "
   return <span className={className}>{prefix}{display}{suffix}</span>;
 }
 
-// ─── Animated Bar: fills from 0 to target width ───
+// ─── Animated Bar: fills from 0 to target width (CSS transition, no reset) ───
 export function AnimatedBar({ width, color, delay = 0, duration = 600, className = "" }: {
   width: number;
   color: string;
@@ -43,10 +50,8 @@ export function AnimatedBar({ width, color, delay = 0, duration = 600, className
   className?: string;
 }) {
   const [currentWidth, setCurrentWidth] = useState(0);
-  const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setCurrentWidth(0);
     const timer = setTimeout(() => {
       setCurrentWidth(width);
     }, delay);
@@ -55,7 +60,6 @@ export function AnimatedBar({ width, color, delay = 0, duration = 600, className
 
   return (
     <div
-      ref={ref}
       className={`h-full rounded-full ${className}`}
       style={{
         width: `${Math.max(currentWidth, 0)}%`,
@@ -102,7 +106,6 @@ export function AnimatedRing({ percentage, duration = 800, className = "" }: {
   const [current, setCurrent] = useState(0);
 
   useEffect(() => {
-    setCurrent(0);
     const timer = setTimeout(() => setCurrent(percentage), 50);
     return () => clearTimeout(timer);
   }, [percentage]);
