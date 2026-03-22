@@ -50,7 +50,7 @@ export function DashboardPage() {
   }));
 
   return (
-    <div className="p-3 sm:p-4 space-y-2.5 w-full h-full overflow-y-auto overflow-x-hidden">
+    <div className="p-3 sm:p-4 space-y-2.5 w-full h-full overflow-y-auto overflow-x-hidden flex flex-col">
       {/* Welcome Banner */}
       <div className="relative bg-white dark:bg-[#151518] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-4 sm:p-5 shadow-sm overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-orange-50 via-orange-50/30 to-transparent dark:from-orange-500/[0.04] dark:via-transparent pointer-events-none" />
@@ -81,8 +81,8 @@ export function DashboardPage() {
         </div>
       </div>
 
-      {/* Row 1: Funnel + Scorecard + Platforms — cards instant, bars/numbers animate */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-2.5">
+      {/* Row 1: Funnel + Scorecard + Platforms */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-2.5 flex-1 min-h-0">
         {/* Pipeline funnel */}
         <div className="md:col-span-1 lg:col-span-5 bg-white dark:bg-[#151518] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-4 shadow-sm h-full">
           <div className="flex items-center justify-between mb-4">
@@ -93,12 +93,10 @@ export function DashboardPage() {
             {stageCounts.map((col, i) => {
               const Icon = stageIcons[i];
               return (
-                <button key={col.id} onClick={() => navigate("pipeline")} className="w-full flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-white/[0.02] -mx-2 px-2 py-1 rounded-lg transition-all duration-200 cursor-pointer">
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: `${col.color}12` }}>
-                    <Icon className="w-3.5 h-3.5" style={{ color: col.color }} />
-                  </div>
-                  <span className="text-[11px] text-gray-600 dark:text-gray-400 w-28 shrink-0 font-medium text-left">{col.title.split("/")[0].trim()}</span>
-                  <div className="flex-1 h-3 rounded-full bg-gray-100 dark:bg-white/[0.04] overflow-hidden">
+                <button key={col.id} onClick={() => navigate("pipeline")} className="w-full flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-white/[0.02] -mx-2 px-2 py-0.5 rounded-lg transition-all duration-200 cursor-pointer">
+                  <span style={{ color: col.color }} className="shrink-0"><Icon className="w-4 h-4" /></span>
+                  <span className="text-[11px] text-gray-600 dark:text-gray-400 w-24 shrink-0 font-medium text-left">{col.title.split("/")[0].trim()}</span>
+                  <div className="flex-1 h-2.5 rounded-full bg-gray-100 dark:bg-white/[0.04] overflow-hidden">
                     {mounted && <AnimatedBar width={Math.max(col.pct, 3)} color={`linear-gradient(90deg, ${col.color}, ${col.color}aa)`} delay={i * 100} duration={2000} />}
                   </div>
                   <span className="text-[13px] text-gray-800 dark:text-gray-200 tabular-nums w-5 text-right font-bold">
@@ -175,7 +173,7 @@ export function DashboardPage() {
       </div>
 
       {/* Row 2: Upcoming + Calendar + Recently Published + Quick Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-2.5">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-2.5 flex-1 min-h-0">
         {/* Upcoming */}
         <div className="lg:col-span-5 bg-white dark:bg-[#151518] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-4 shadow-sm h-full">
           <div className="flex items-center justify-between mb-3">
