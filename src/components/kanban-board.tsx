@@ -3,7 +3,7 @@
 import { useCallback, useState, useMemo, useEffect } from "react";
 import {
   DndContext, DragEndEvent, DragOverEvent, DragStartEvent, DragOverlay,
-  PointerSensor, TouchSensor, useSensor, useSensors, closestCorners,
+  PointerSensor, TouchSensor, useSensor, useSensors, pointerWithin, rectIntersection,
 } from "@dnd-kit/core";
 import { usePipeline } from "@/lib/pipeline-context";
 import { useAuth } from "@/lib/auth-context";
@@ -192,10 +192,8 @@ export function KanbanBoard() {
     moveCard(cardId, targetStage);
   }, [cards, moveCard, requestKickback, userIsApprover, addToast]);
 
-  // No cross-column moves during drag — prevents modal-during-drag freeze
   const handleDragOver = useCallback((_event: DragOverEvent) => {
-    // Intentionally empty: all moves happen on drop (handleDragEnd).
-    // DragOverlay provides visual feedback during drag.
+    // Empty: all moves on drop. DragOverlay provides visual feedback.
   }, []);
 
   return (
@@ -215,7 +213,11 @@ export function KanbanBoard() {
       </div>
 
       {view === "pipeline" ? (
-        <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
+        <DndContext sensors={sensors} collisionDetection={(args) => {
+          const pw = pointerWithin(args);
+          if (pw.length > 0) return pw;
+          return rectIntersection(args);
+        }} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
           <div className="flex gap-3 p-4 overflow-x-auto min-h-0 flex-1 snap-x snap-mandatory md:snap-none touch-pan-x">
             {PIPELINE_COLUMNS.map((column) => (
               <PipelineColumn key={column.id} column={column} cards={sortedColumnCards[column.id] || []} />
