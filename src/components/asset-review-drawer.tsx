@@ -600,6 +600,19 @@ export function AssetReviewDrawer() {
               )}
               {nextStage && nextColumn && selectedCard.stage !== "posted" && (
                 <Button size="sm" onClick={() => {
+                  if (selectedCard.stage === "ideas") {
+                    const missing: string[] = [];
+                    if (!selectedCard.scheduledDate) missing.push("scheduled date");
+                    if (!selectedCard.scheduledTime) missing.push("scheduled time");
+                    if (!selectedCard.thumbnailUrl) missing.push("thumbnail/media");
+                    if (!selectedCard.caption?.trim()) missing.push("caption");
+                    const unchecked = selectedCard.checklist.filter((c) => !c.checked).length;
+                    if (unchecked > 0) missing.push(`${unchecked} checklist item${unchecked > 1 ? "s" : ""}`);
+                    if (missing.length > 0) {
+                      addToast(`Cannot move — missing: ${missing.join(", ")}`, "error");
+                      return;
+                    }
+                  }
                   moveCard(selectedCard.id, nextStage);
                   addToast(nextStage === "awaiting_approval" ? `Notification & Email dispatched to ${currentUser.name} — Post sent for approval` : `Post moved to ${nextColumn.title}`, nextStage === "awaiting_approval" ? "success" : "info");
                 }} className="flex-1 h-9 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-[12px] shadow-sm transition-all duration-150">
