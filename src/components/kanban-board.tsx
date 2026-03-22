@@ -143,15 +143,17 @@ export function KanbanBoard() {
 
     if (!targetStage || sourceCard.stage === targetStage) return;
 
-    // ── Ideas gate: card must have required fields to leave Ideas ──
+    // ── Ideas gate: card must have required fields + full checklist to leave Ideas ──
     if (sourceCard.stage === "ideas") {
       const missing: string[] = [];
       if (!sourceCard.scheduledDate) missing.push("scheduled date");
       if (!sourceCard.scheduledTime) missing.push("scheduled time");
       if (!sourceCard.thumbnailUrl) missing.push("thumbnail/media");
       if (!sourceCard.caption?.trim()) missing.push("caption");
+      const unchecked = sourceCard.checklist.filter((c) => !c.checked).length;
+      if (unchecked > 0) missing.push(`${unchecked} checklist item${unchecked > 1 ? "s" : ""}`);
       if (missing.length > 0) {
-        addToast(`Cannot move from Ideas — missing: ${missing.join(", ")}. Click the card to add them.`, "error");
+        addToast(`Cannot move from Ideas — missing: ${missing.join(", ")}. Click the card to complete them.`, "error");
         return;
       }
     }
