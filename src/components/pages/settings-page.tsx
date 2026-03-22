@@ -191,7 +191,14 @@ function EditProfileModal({ member, onClose }: { member: TeamMember; onClose: ()
   );
 }
 
-// ─── Coming Soon Badge ───
+function ConnectedBadge() {
+  return (
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-500/20">
+      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />Connected
+    </span>
+  );
+}
+
 function ComingSoonBadge() {
   return (
     <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-gradient-to-r from-gray-100 to-gray-50 dark:from-white/[0.06] dark:to-white/[0.03] text-gray-400 dark:text-gray-500 border border-gray-200/60 dark:border-white/[0.06]">
@@ -295,10 +302,10 @@ export function SettingsPage() {
           </Section>
 
           <Section title="Integrations" icon={<Webhook className="w-3.5 h-3.5 text-sky-500" />}>
-            <SettingRow icon={Database} label="Supabase" desc="Persistent storage, auth, real-time sync"><ComingSoonBadge /></SettingRow>
-            <SettingRow icon={HardDrive} label="Google Drive" desc="60TB video/image cloud storage"><ComingSoonBadge /></SettingRow>
+            <SettingRow icon={Database} label="Supabase" desc="Persistent storage, auth, real-time sync"><ConnectedBadge /></SettingRow>
+            <SettingRow icon={HardDrive} label="Google Drive" desc="Video/image cloud storage"><ComingSoonBadge /></SettingRow>
             <SettingRow icon={ExternalLink} label="Notion" desc="Sync content ideas and briefs"><ComingSoonBadge /></SettingRow>
-            <SettingRow icon={Key} label="API Keys" desc="Custom integrations and automations"><ComingSoonBadge /></SettingRow>
+            <SettingRow icon={Key} label="API Keys" desc="Custom integrations and automations"><ConnectedBadge /></SettingRow>
           </Section>
 
           <Section title="Data" icon={<Shield className="w-3.5 h-3.5 text-rose-500" />}>
