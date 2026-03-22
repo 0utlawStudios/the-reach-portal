@@ -1,0 +1,120 @@
+═══════════════════════════════════════════════════════════════
+  TEN80TEN — SOCIAL MEDIA MANAGEMENT PLATFORM
+  Demo Walkthrough Script
+  Duration: ~4 minutes
+
+  TIPS:
+  - Use "—" for natural pauses
+  - Use "..." for longer, thoughtful pauses
+  - Short sentences = better pacing
+  - Line breaks = natural breath pauses
+═══════════════════════════════════════════════════════════════
+
+
+Welcome to your new content command center.
+
+This is the Ten80Ten Social Media Management Platform — built specifically for your business. No more Notion boards. No more scattered Google Docs. Everything your team needs — in one place.
+
+Let me walk you through it.
+
+—
+
+DASHBOARD
+
+When you log in, this is the first thing you see.
+
+Right at the top — your Action Center. It tells you exactly what needs your attention. Right now — you have four posts waiting for your approval. One click — and you're in the pipeline reviewing them.
+
+Below that — your Pipeline Funnel. These bars fill in live, showing you how content is distributed across your workflow. Ideas... Awaiting Approval... Revision... Scheduled... Posted. You can see the health of your pipeline at a glance.
+
+On the right — your Weekly Scorecard. Approval rate. Posts published. Content in review. And how many platforms you're active on. All of it — animated, real-time.
+
+Further down — Platform Split shows which platforms are getting the most content. Instagram. TikTok. YouTube. Facebook. LinkedIn. You can see if any platform is being neglected.
+
+And at the bottom — This Week at a Glance. A quick seven-day view showing which days have content scheduled — and which are free.
+
+—
+
+CONTENT PIPELINE
+
+This is the heart of the system.
+
+Five columns — Ideas, Awaiting Approval, Revision Needed, Approved Scheduled, and Posted. Each card shows a thumbnail, the platforms it's targeting, the scheduled date, and a checklist progress bar.
+
+You can drag and drop cards between columns. The cards automatically sort by date — nearest deadline at the top. So the most urgent content is always right in front of you.
+
+Click any card — and a detailed review drawer slides out from the right.
+
+Here's where it gets powerful. Every text field is click-to-edit. Title... hook... caption — just click and type. Changes save instantly. No edit buttons. No save buttons. Just... type.
+
+Below that — a comment thread. Your team can leave notes, tag each other with at-mentions, and every comment gets a timestamp.
+
+—
+
+THE APPROVAL WORKFLOW
+
+When a post is in Awaiting Approval — you see two buttons. Approve Post — in green. Or — Request Revision — in red.
+
+If you approve — it moves to Scheduled. Done. Toast notification confirms it.
+
+If you request a revision — a text box appears. You type what needs to change. Hit submit. Your feedback gets stamped with your name and timestamp... the post moves to Revision Needed... and the team gets notified instantly.
+
+Clean. Fast. No back-and-forth emails.
+
+—
+
+ARCHIVE AND REPURPOSE
+
+Scroll to the Archive tab in the pipeline.
+
+Any post that was published more than seven days ago — it shows up here. And next to each one — a Repurpose button.
+
+Click it — and you get three options. Repost as-is — same content, new date. Rewrite for a new platform — adapt the message for a different audience. Or — Update for the current season — refresh the copy with new messaging.
+
+Pick one, set a new schedule, and it drops right back into your Ideas pipeline. Nothing goes to waste.
+
+—
+
+POST PREVIEW
+
+Before anything goes live — you can see exactly how it'll look.
+
+Pick a post from the left. Then toggle between platforms — Facebook, Instagram, X, LinkedIn, YouTube, TikTok. Each one renders a pixel-perfect mockup of how the post will appear on that specific platform.
+
+The Instagram preview looks like Instagram. The TikTok preview — vertical, with the sound bar, the engagement icons, the whole thing. YouTube shows the thumbnail with the play button and view count.
+
+This is your quality check before publishing.
+
+—
+
+MEDIA LIBRARY
+
+All your assets in one place.
+
+Organized by folders — General, Marketing, Team, Raw Footage. Your team members can upload files directly from their devices.
+
+You can switch between grid view and list view. Filter by images or videos. Search by filename. And every file shows who uploaded it, when, and whether it's currently being used in a post.
+
+Click any thumbnail — and a full-screen preview opens.
+
+—
+
+CONTENT CALENDAR
+
+A full monthly calendar showing every scheduled post.
+
+Click any day to see what's going out. Navigate between months. Posts are color-coded by their pipeline status. And the calendar fills the entire screen — no wasted space.
+
+—
+
+SETTINGS
+
+Workspace preferences — theme, timezone, week start day. Connected accounts for all six platforms. Publishing controls like auto-publish and analytics tracking. Notification settings. And your team roster — with the ability to edit profiles, change roles, and invite new members.
+
+—
+
+That's the full platform.
+
+Everything your team creates... everything you approve... every asset, every caption, every scheduled post — it's all here. One login. One view. Total control.
+
+If you have any questions — the Ten80Ten team is one message away. Let's make your social media unstoppable.

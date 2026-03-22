@@ -1,0 +1,24 @@
+{
+  "name": "Ten80Ten SMM",
+  "short_name": "Ten80Ten SMM",
+  "description": "Social Media Management Platform for Ten80Ten",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fafbfc",
+  "theme_color": "#e5e7eb",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
