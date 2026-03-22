@@ -50,7 +50,7 @@ export function DashboardPage() {
   }));
 
   return (
-    <div className="p-3 sm:p-4 space-y-2.5 w-full h-full overflow-y-auto overflow-x-hidden flex flex-col">
+    <div className="p-3 sm:p-4 space-y-2.5 w-full overflow-y-auto overflow-x-hidden pb-12 bg-slate-50/50 dark:bg-[#0a0a0b]">
       {/* Welcome Banner */}
       <div className="relative bg-white dark:bg-[#151518] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-4 sm:p-5 shadow-sm overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-orange-50 via-orange-50/30 to-transparent dark:from-orange-500/[0.04] dark:via-transparent pointer-events-none" />
@@ -82,14 +82,14 @@ export function DashboardPage() {
       </div>
 
       {/* Row 1: Funnel + Scorecard + Platforms */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-2.5 flex-1 min-h-0">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-2.5">
         {/* Pipeline funnel */}
-        <div className="md:col-span-1 lg:col-span-5 bg-white dark:bg-[#151518] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-4 shadow-sm h-full">
+        <div className="md:col-span-1 lg:col-span-5 bg-white dark:bg-[#151518] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-4 shadow-sm flex flex-col">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-[12px] font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2"><BarChart3 className="w-4 h-4 text-orange-500" />Pipeline Funnel</h2>
             <span className="text-[9px] text-gray-400 bg-gray-50 dark:bg-white/[0.04] px-2 py-0.5 rounded-full font-medium uppercase tracking-wider">This week</span>
           </div>
-          <div className="space-y-3">
+          <div className="space-y-3 flex-1">
             {stageCounts.map((col, i) => {
               const Icon = stageIcons[i];
               return (
@@ -109,9 +109,9 @@ export function DashboardPage() {
         </div>
 
         {/* Weekly Scorecard */}
-        <div className="lg:col-span-3 bg-white dark:bg-[#151518] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-4 shadow-sm h-full">
+        <div className="lg:col-span-3 bg-white dark:bg-[#151518] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-4 shadow-sm flex flex-col">
           <h2 className="text-[12px] font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2 mb-4"><Target className="w-4 h-4 text-orange-500" />Weekly Scorecard</h2>
-          <div className="space-y-3">
+          <div className="space-y-3 flex-1 flex flex-col justify-center">
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">Approval Rate</span>
@@ -142,9 +142,9 @@ export function DashboardPage() {
         </div>
 
         {/* Platform distribution */}
-        <div className="lg:col-span-4 bg-white dark:bg-[#151518] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-4 shadow-sm h-full">
+        <div className="lg:col-span-4 bg-white dark:bg-[#151518] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-4 shadow-sm flex flex-col">
           <h2 className="text-[12px] font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2 mb-4"><TrendingUp className="w-4 h-4 text-yellow-600" />Platform Split</h2>
-          <div className="space-y-3">
+          <div className="space-y-3 flex-1 flex flex-col justify-center">
             {platformCounts.map(([platform, count], i) => {
               const brandColors: Record<string, string> = {
                 instagram: "#E4405F",
@@ -173,12 +173,11 @@ export function DashboardPage() {
       </div>
 
       {/* Row 2: Upcoming + Calendar + Recently Published + Quick Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-2.5 flex-1 min-h-0">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-2.5">
         {/* Upcoming */}
-        <div className="lg:col-span-5 bg-white dark:bg-[#151518] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-4 shadow-sm h-full">
+        <div className="lg:col-span-5 bg-white dark:bg-[#151518] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-4 shadow-sm flex flex-col">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-[12px] font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2"><Zap className="w-4 h-4 text-orange-500" />Upcoming Posts</h2>
-            <button onClick={() => navigate("calendar")} className="text-[10px] text-orange-500 hover:text-orange-600 cursor-pointer font-semibold transition-colors">Calendar →</button>
           </div>
           {upcomingPosts.length > 0 ? (
             <div className="space-y-1">
@@ -201,16 +200,18 @@ export function DashboardPage() {
               })}
             </div>
           ) : <p className="text-[11px] text-gray-400 text-center py-8">No upcoming posts</p>}
+          <div className="mt-auto pt-3 border-t border-gray-100 dark:border-white/[0.05] text-right">
+            <button onClick={() => navigate("pipeline")} className="text-[10px] text-orange-500 hover:text-orange-600 hover:underline cursor-pointer font-semibold transition-colors">View full pipeline →</button>
+          </div>
         </div>
 
         {/* Mini Calendar */}
         <MiniCalendar cards={cards} navigate={navigate} />
 
         {/* Recently Published */}
-        <div className="lg:col-span-4 bg-white dark:bg-[#151518] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-4 shadow-sm h-full">
+        <div className="lg:col-span-4 bg-white dark:bg-[#151518] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-4 shadow-sm flex flex-col">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-[12px] font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2"><Eye className="w-4 h-4 text-yellow-600" />Recently Published</h2>
-            <button onClick={() => { sessionStorage.setItem("t10_open_archive", "true"); navigate("pipeline"); }} className="text-[10px] text-orange-500 hover:text-orange-600 cursor-pointer font-semibold transition-colors">Archive →</button>
           </div>
           <div className="space-y-1">
             {recentPosted.map((card) => (
@@ -226,6 +227,9 @@ export function DashboardPage() {
                 <div className="w-2 h-2 rounded-full bg-sky-500 shrink-0" />
               </div>
             ))}
+          </div>
+          <div className="mt-auto pt-3 border-t border-gray-100 dark:border-white/[0.05] text-right">
+            <button onClick={() => { sessionStorage.setItem("t10_open_archive", "true"); navigate("pipeline"); }} className="text-[10px] text-orange-500 hover:text-orange-600 hover:underline cursor-pointer font-semibold transition-colors">Go to archive →</button>
           </div>
         </div>
       </div>
@@ -269,7 +273,7 @@ function MiniCalendar({ cards, navigate }: { cards: any[]; navigate: (page: any)
   const isToday = (day: number) => today.getFullYear() === year && today.getMonth() === month && today.getDate() === day;
 
   return (
-    <div onClick={() => navigate("calendar")} className="lg:col-span-3 bg-white dark:bg-[#151518] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-4 shadow-sm h-full cursor-pointer hover:shadow-md hover:border-gray-200 dark:hover:border-white/[0.1] transition-all duration-200 group">
+    <div onClick={() => navigate("calendar")} className="lg:col-span-3 bg-white dark:bg-[#151518] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-4 shadow-sm cursor-pointer hover:shadow-md hover:border-gray-200 dark:hover:border-white/[0.1] transition-all duration-200 group flex flex-col">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-[12px] font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2"><Calendar className="w-4 h-4 text-blue-500" />Calendar</h2>
         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
@@ -333,7 +337,7 @@ function MiniCalendar({ cards, navigate }: { cards: any[]; navigate: (page: any)
         ))}
       </div>
 
-      <p className="text-[9px] text-gray-300 dark:text-gray-600 text-center mt-1.5 group-hover:text-blue-400 transition-colors">Click to open full calendar →</p>
+      <p className="text-[9px] text-gray-300 dark:text-gray-600 text-center mt-auto pt-2 group-hover:text-blue-400 transition-colors">Click to open full calendar →</p>
     </div>
   );
 }

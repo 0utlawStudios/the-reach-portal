@@ -58,7 +58,7 @@ export function ContentCard({ card, isDragOverlay, stageColor }: Props) {
         {card.revised && !overdue && <div className="absolute bottom-1.5 left-1.5 px-2 py-[3px] rounded-full bg-violet-600 text-[8px] font-bold text-white uppercase tracking-wider shadow-md shadow-violet-500/30 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-white/80 animate-pulse" />Revised</div>}
         {card.notes && !card.revised && <div className="absolute top-1.5 left-1.5 w-4 h-4 rounded-full bg-amber-500 flex items-center justify-center" title="Has revision notes"><AlertCircle className="w-2.5 h-2.5 text-white" /></div>}
       </div>
-      <div className="p-2.5 space-y-1.5">
+      <div className="px-2.5 pt-2 pb-1.5 space-y-1">
         <h3 className="text-[11px] font-semibold text-gray-800 dark:text-gray-200 leading-tight line-clamp-2">{card.title}</h3>
         <div className="flex items-center gap-1.5 flex-wrap">
           {card.platforms.map((p) => (

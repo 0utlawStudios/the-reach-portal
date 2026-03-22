@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { usePipeline } from "@/lib/pipeline-context";
 import { PIPELINE_COLUMNS, PipelineStage } from "@/lib/types";
 import { SOCIAL_PROFILES } from "@/lib/social-profiles";
@@ -21,6 +21,7 @@ import { PlatformIcon } from "./platform-icons";
 import { MentionTextarea } from "./mention-textarea";
 import { InlineEdit } from "./inline-edit";
 import { useAuth } from "@/lib/auth-context";
+import { useTeam } from "@/lib/team-context";
 import { useToast } from "@/lib/toast-context";
 
 const useSupabase = !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
@@ -31,6 +32,14 @@ export function AssetReviewDrawer() {
   const { selectedCard, isDrawerOpen, isEditingOnOpen, closeDrawer, moveCard, requestReapproval, updateCard, deleteCard } = usePipeline();
   const { addToast } = useToast();
   const { currentUser } = useAuth();
+  const { members } = useTeam();
+  const userIsApprover = useMemo(() => {
+    const me = members.find((m) => m.email === currentUser.email);
+    if (!me) return false;
+    if (me.role === "owner" || me.role === "admin") return true;
+    if (me.secondaryRole?.includes("Approver")) return true;
+    return false;
+  }, [members, currentUser.email]);
   const [revisionMode, setRevisionMode] = useState(false);
   const [revisionFeedback, setRevisionFeedback] = useState("");
   const [editDate, setEditDate] = useState("");
@@ -572,15 +581,21 @@ export function AssetReviewDrawer() {
           )}
 
           {!revisionMode && selectedCard.stage === "awaiting_approval" && (
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setRevisionMode(true)} className="flex-1 h-9 rounded-lg border-red-200 text-red-600 hover:bg-red-50 dark:border-red-500/20 dark:text-red-400 dark:hover:bg-red-500/10 bg-white dark:bg-transparent text-[12px] transition-all duration-150">
-                <ArrowRightLeft className="w-3.5 h-3.5 mr-1.5" />Request Revision
-              </Button>
-              <Button size="sm" onClick={() => { moveCard(selectedCard.id, "approved_scheduled"); addToast("Post approved and scheduled.", "success"); }}
-                className="flex-1 h-9 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[12px] shadow-sm shadow-emerald-500/20 transition-all duration-150">
-                <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />Approve Post
-              </Button>
-            </div>
+            userIsApprover ? (
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setRevisionMode(true)} className="flex-1 h-9 rounded-lg border-red-200 text-red-600 hover:bg-red-50 dark:border-red-500/20 dark:text-red-400 dark:hover:bg-red-500/10 bg-white dark:bg-transparent text-[12px] transition-all duration-150">
+                  <ArrowRightLeft className="w-3.5 h-3.5 mr-1.5" />Request Revision
+                </Button>
+                <Button size="sm" onClick={() => { moveCard(selectedCard.id, "approved_scheduled"); addToast("Post approved and scheduled.", "success"); }}
+                  className="flex-1 h-9 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[12px] shadow-sm shadow-emerald-500/20 transition-all duration-150">
+                  <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />Approve Post
+                </Button>
+              </div>
+            ) : (
+              <div className="text-center py-1">
+                <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">Awaiting approver review</p>
+              </div>
+            )
           )}
 
           {!revisionMode && selectedCard.stage === "revision_needed" && (
@@ -599,25 +614,31 @@ export function AssetReviewDrawer() {
                 </Button>
               )}
               {nextStage && nextColumn && selectedCard.stage !== "posted" && (
-                <Button size="sm" onClick={() => {
-                  if (selectedCard.stage === "ideas") {
-                    const missing: string[] = [];
-                    if (!selectedCard.scheduledDate) missing.push("scheduled date");
-                    if (!selectedCard.scheduledTime) missing.push("scheduled time");
-                    if (!selectedCard.thumbnailUrl) missing.push("thumbnail/media");
-                    if (!selectedCard.caption?.trim()) missing.push("caption");
-                    const unchecked = selectedCard.checklist.filter((c) => !c.checked).length;
-                    if (unchecked > 0) missing.push(`${unchecked} checklist item${unchecked > 1 ? "s" : ""}`);
-                    if (missing.length > 0) {
-                      addToast(`Cannot move — missing: ${missing.join(", ")}`, "error");
-                      return;
+                (["approved_scheduled", "posted"] as PipelineStage[]).includes(nextStage) && !userIsApprover ? (
+                  <div className="flex-1 text-center py-1">
+                    <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">Approver permission required</p>
+                  </div>
+                ) : (
+                  <Button size="sm" onClick={() => {
+                    if (selectedCard.stage === "ideas") {
+                      const missing: string[] = [];
+                      if (!selectedCard.scheduledDate) missing.push("scheduled date");
+                      if (!selectedCard.scheduledTime) missing.push("scheduled time");
+                      if (!selectedCard.thumbnailUrl) missing.push("thumbnail/media");
+                      if (!selectedCard.caption?.trim()) missing.push("caption");
+                      const unchecked = selectedCard.checklist.filter((c) => !c.checked).length;
+                      if (unchecked > 0) missing.push(`${unchecked} checklist item${unchecked > 1 ? "s" : ""}`);
+                      if (missing.length > 0) {
+                        addToast(`Cannot move — missing: ${missing.join(", ")}`, "error");
+                        return;
+                      }
                     }
-                  }
-                  moveCard(selectedCard.id, nextStage);
-                  addToast(nextStage === "awaiting_approval" ? `Notification & Email dispatched to ${currentUser.name} — Post sent for approval` : `Post moved to ${nextColumn.title}`, nextStage === "awaiting_approval" ? "success" : "info");
-                }} className="flex-1 h-9 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-[12px] shadow-sm transition-all duration-150">
-                  Move to {nextColumn.title}<ChevronRight className="w-3.5 h-3.5 ml-1" />
-                </Button>
+                    moveCard(selectedCard.id, nextStage);
+                    addToast(nextStage === "awaiting_approval" ? `Notification & Email dispatched to ${currentUser.name} — Post sent for approval` : `Post moved to ${nextColumn.title}`, nextStage === "awaiting_approval" ? "success" : "info");
+                  }} className="flex-1 h-9 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-[12px] shadow-sm transition-all duration-150">
+                    Move to {nextColumn.title}<ChevronRight className="w-3.5 h-3.5 ml-1" />
+                  </Button>
+                )
               )}
             </div>
           )}
