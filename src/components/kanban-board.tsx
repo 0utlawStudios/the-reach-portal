@@ -106,19 +106,40 @@ export function KanbanBoard() {
   const sortedColumnCards = useMemo(() => {
     const map: Record<string, ContentCardType[]> = {};
     PIPELINE_COLUMNS.forEach((col) => {
-      map[col.id] = sortForColumn(cards.filter((c) => c.stage === col.id), col.id);
+      let colCards = cards.filter((c) => c.stage === col.id);
+      // Posted column only shows this week's posts — older ones go to archive
+      if (col.id === "posted") {
+        colCards = colCards.filter((c) => !c.scheduledDate || new Date(c.scheduledDate) >= thisWeekStart);
+      }
+      map[col.id] = sortForColumn(colCards, col.id);
     });
     return map;
+  }, [cards, thisWeekStart]);
+
+  // Archive = posted cards outside this week (Sun-Sat in CST)
+  const { thisWeekStart, thisWeekEnd } = useMemo(() => {
+    // Get current time in CST (UTC-6)
+    const now = new Date();
+    const cstOffset = -6 * 60;
+    const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
+    const cstNow = new Date(utcMs + cstOffset * 60000);
+    // Find Sunday of this week
+    const day = cstNow.getDay(); // 0=Sun
+    const sunday = new Date(cstNow);
+    sunday.setDate(cstNow.getDate() - day);
+    sunday.setHours(0, 0, 0, 0);
+    // Saturday end of this week
+    const saturday = new Date(sunday);
+    saturday.setDate(sunday.getDate() + 6);
+    saturday.setHours(23, 59, 59, 999);
+    return { thisWeekStart: sunday, thisWeekEnd: saturday };
   }, [cards]);
 
-  // Archive = posted cards older than 7 days
   const archivedCards = useMemo(() => {
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     return cards
-      .filter((c) => c.stage === "posted" && c.scheduledDate && new Date(c.scheduledDate) < sevenDaysAgo)
+      .filter((c) => c.stage === "posted" && c.scheduledDate && new Date(c.scheduledDate) < thisWeekStart)
       .sort((a, b) => (b.scheduledDate || "").localeCompare(a.scheduledDate || ""));
-  }, [cards]);
+  }, [cards, thisWeekStart]);
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const card = cards.find((c) => c.id === event.active.id);
@@ -216,7 +237,7 @@ export function KanbanBoard() {
         /* Archive view */
         <div className="flex-1 overflow-y-auto p-4">
           <div className="max-w-[800px] mx-auto text-center">
-            <p className="text-[12px] text-gray-400 dark:text-gray-500 mb-6">Posts published more than 7 days ago. Repurpose them to create new content.</p>
+            <p className="text-[12px] text-gray-400 dark:text-gray-500 mb-6">Posts published before this week (Sun–Sat CST). Repurpose them to create new content.</p>
             {archivedCards.length > 0 ? (
               <div className="space-y-2">
                 {archivedCards.map((card) => (
@@ -245,7 +266,7 @@ export function KanbanBoard() {
               <div className="text-center py-12">
                 <Archive className="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
                 <p className="text-[13px] text-gray-400">No archived posts yet</p>
-                <p className="text-[11px] text-gray-300 dark:text-gray-600 mt-1">Posts move here 7 days after publishing</p>
+                <p className="text-[11px] text-gray-300 dark:text-gray-600 mt-1">Posts move here automatically after this week ends</p>
               </div>
             )}
           </div>

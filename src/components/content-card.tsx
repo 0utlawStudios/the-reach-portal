@@ -19,6 +19,13 @@ function isUrgent(dateStr?: string): boolean {
   return diff <= 2 && diff >= 0;
 }
 
+function isOverdue(dateStr?: string): boolean {
+  if (!dateStr) return false;
+  const now = new Date();
+  const scheduled = new Date(dateStr);
+  return scheduled < now;
+}
+
 export function ContentCard({ card, isDragOverlay, stageColor }: Props) {
   const { selectCard, selectCardForEditing } = usePipeline();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -38,15 +45,17 @@ export function ContentCard({ card, isDragOverlay, stageColor }: Props) {
   const checkedCount = card.checklist.filter((c) => c.checked).length;
   const totalChecklist = card.checklist.length;
   const urgent = isUrgent(card.scheduledDate);
+  const overdue = card.stage !== "posted" && card.stage !== "ideas" && isOverdue(card.scheduledDate);
 
   const cardContent = (
     <>
       {/* Colored top accent bar */}
-      <div className="h-[3px] w-full" style={{ backgroundColor: stageColor || "#3b82f6" }} />
+      <div className="h-[3px] w-full" style={{ backgroundColor: overdue ? "#dc2626" : (stageColor || "#3b82f6") }} />
       <div className="relative h-[76px] w-full overflow-hidden bg-gray-50 dark:bg-white/[0.03]">
         <img src={card.thumbnailUrl} alt={card.title} className="w-full h-full object-cover" />
         <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded bg-black/50 backdrop-blur-sm text-white text-[9px] font-medium capitalize">{card.contentType}</div>
-        {card.revised && <div className="absolute bottom-1.5 left-1.5 px-2 py-[3px] rounded-full bg-violet-600 text-[8px] font-bold text-white uppercase tracking-wider shadow-md shadow-violet-500/30 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-white/80 animate-pulse" />Revised</div>}
+        {overdue && <div className="absolute bottom-1.5 left-1.5 px-2 py-[3px] rounded-full bg-red-600 text-[8px] font-bold text-white uppercase tracking-wider shadow-md shadow-red-500/30 flex items-center gap-1 animate-pulse"><span className="w-1.5 h-1.5 rounded-full bg-white" />Action Needed</div>}
+        {card.revised && !overdue && <div className="absolute bottom-1.5 left-1.5 px-2 py-[3px] rounded-full bg-violet-600 text-[8px] font-bold text-white uppercase tracking-wider shadow-md shadow-violet-500/30 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-white/80 animate-pulse" />Revised</div>}
         {card.notes && !card.revised && <div className="absolute top-1.5 left-1.5 w-4 h-4 rounded-full bg-amber-500 flex items-center justify-center" title="Has revision notes"><AlertCircle className="w-2.5 h-2.5 text-white" /></div>}
       </div>
       <div className="p-2.5 space-y-1.5">
@@ -61,7 +70,7 @@ export function ContentCard({ card, isDragOverlay, stageColor }: Props) {
             onClick={(e) => { e.stopPropagation(); selectCardForEditing(card); }}
             className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md cursor-pointer hover:ring-1 hover:ring-orange-300 transition-all ${
               card.scheduledDate
-                ? urgent ? "text-red-500 font-semibold bg-red-50 dark:bg-red-500/10" : "text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-white/[0.04]"
+                ? overdue ? "text-red-600 font-bold bg-red-50 dark:bg-red-500/10 ring-1 ring-red-200 dark:ring-red-500/20" : urgent ? "text-red-500 font-semibold bg-red-50 dark:bg-red-500/10" : "text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-white/[0.04]"
                 : "text-orange-400 bg-orange-50 dark:bg-orange-500/10 border border-dashed border-orange-200 dark:border-orange-500/20"
             }`}
           >
@@ -70,7 +79,8 @@ export function ContentCard({ card, isDragOverlay, stageColor }: Props) {
               <>
                 {new Date(card.scheduledDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                 {card.scheduledTime && <span className="text-gray-400 dark:text-gray-500">{card.scheduledTime}</span>}
-                {urgent && <span className="text-[8px] bg-red-200 dark:bg-red-500/20 text-red-600 dark:text-red-400 px-1 rounded font-bold">SOON</span>}
+                {overdue && <span className="text-[8px] bg-red-200 dark:bg-red-500/20 text-red-600 dark:text-red-400 px-1 rounded font-bold">OVERDUE</span>}
+                {urgent && !overdue && <span className="text-[8px] bg-red-200 dark:bg-red-500/20 text-red-600 dark:text-red-400 px-1 rounded font-bold">SOON</span>}
               </>
             ) : (
               <span>Set date</span>
@@ -102,7 +112,7 @@ export function ContentCard({ card, isDragOverlay, stageColor }: Props) {
       {...attributes}
       {...listeners}
       onClick={() => !isDragging && selectCard(card)}
-      className={`group rounded-xl overflow-hidden cursor-pointer bg-white dark:bg-[#151518] border border-gray-200/80 dark:border-white/[0.06] hover:border-gray-300 dark:hover:border-white/[0.12] hover:shadow-md transition-all duration-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${isDragging ? "opacity-20 scale-[0.97]" : "hover:-translate-y-0.5"}`}
+      className={`group rounded-xl overflow-hidden cursor-pointer bg-white dark:bg-[#151518] border hover:shadow-md transition-all duration-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${isDragging ? "opacity-20 scale-[0.97]" : "hover:-translate-y-0.5"} ${overdue ? "border-red-300 dark:border-red-500/30 shadow-red-100 dark:shadow-red-500/5" : "border-gray-200/80 dark:border-white/[0.06] hover:border-gray-300 dark:hover:border-white/[0.12]"}`}
     >
       {cardContent}
     </div>
