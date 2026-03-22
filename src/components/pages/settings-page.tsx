@@ -340,30 +340,32 @@ export function SettingsPage() {
               const role = roleConfig[member.role];
               return (
                 <button key={member.id} onClick={() => setEditingMember(member)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors cursor-pointer text-left ${i > 0 ? "border-t border-gray-50 dark:border-white/[0.03]" : ""}`}>
+                  className={`w-full flex items-start gap-3 px-4 py-3.5 hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors cursor-pointer text-left ${i > 0 ? "border-t border-gray-50 dark:border-white/[0.03]" : ""}`}>
                   {member.avatar ? (
-                    <img src={member.avatar} alt={member.name} className="w-9 h-9 rounded-full object-cover shrink-0" />
+                    <img src={member.avatar} alt={member.name} className="w-9 h-9 rounded-full object-cover shrink-0 mt-0.5" />
                   ) : (
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-[11px] font-bold text-white shrink-0">
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-[11px] font-bold text-white shrink-0 mt-0.5">
                     {member.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
                   </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-medium text-gray-800 dark:text-gray-200">{member.name}</p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-[13px] font-medium text-gray-800 dark:text-gray-200">{member.name}</p>
+                      <Pencil className="w-3.5 h-3.5 text-gray-300 shrink-0 ml-2" />
+                    </div>
                     <p className="text-[11px] text-gray-400 mt-0.5">{member.email}</p>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                      <Badge variant="outline" className={`text-[10px] h-5 px-2 border ${role?.color || "text-gray-500 bg-gray-50 border-gray-200"}`}>{role?.icon}<span className="ml-1">{role?.label || member.role}</span></Badge>
+                      {member.secondaryRole && member.secondaryRole.split(" / ").map((badge) => {
+                        const badgeColor =
+                          badge === "Developer" ? "text-emerald-600 bg-emerald-50 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20" :
+                          badge === "Approver" ? "text-violet-600 bg-violet-50 border-violet-200 dark:bg-violet-500/10 dark:text-violet-400 dark:border-violet-500/20" :
+                          badge === "Lead Tech" ? "text-sky-600 bg-sky-50 border-sky-200 dark:bg-sky-500/10 dark:text-sky-400 dark:border-sky-500/20" :
+                          "text-gray-500 bg-gray-50 border-gray-200 dark:bg-white/[0.04] dark:text-gray-400 dark:border-white/[0.08]";
+                        return <Badge key={badge} variant="outline" className={`text-[10px] h-5 px-2 border ${badgeColor}`}>{badge}</Badge>;
+                      })}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <Badge variant="outline" className={`text-[10px] h-5 px-2 border ${role?.color || "text-gray-500 bg-gray-50 border-gray-200"}`}>{role?.icon}<span className="ml-1">{role?.label || member.role}</span></Badge>
-                    {member.secondaryRole && member.secondaryRole.split(" / ").map((badge) => {
-                      const badgeColor =
-                        badge === "Developer" ? "text-emerald-600 bg-emerald-50 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20" :
-                        badge === "Approver" ? "text-violet-600 bg-violet-50 border-violet-200 dark:bg-violet-500/10 dark:text-violet-400 dark:border-violet-500/20" :
-                        badge === "Lead Tech" ? "text-sky-600 bg-sky-50 border-sky-200 dark:bg-sky-500/10 dark:text-sky-400 dark:border-sky-500/20" :
-                        "text-gray-500 bg-gray-50 border-gray-200 dark:bg-white/[0.04] dark:text-gray-400 dark:border-white/[0.08]";
-                      return <Badge key={badge} variant="outline" className={`text-[10px] h-5 px-2 border ${badgeColor}`}>{badge}</Badge>;
-                    })}
-                  </div>
-                  <Pencil className="w-3.5 h-3.5 text-gray-300 group-hover:text-gray-500 shrink-0" />
                 </button>
               );
             })}
