@@ -117,7 +117,7 @@ export function KanbanBoard() {
   }, [cards, thisWeekStart]);
 
   // Archive = posted cards outside this week (Sun-Sat in CST)
-  const { thisWeekStart, thisWeekEnd } = useMemo(() => {
+  const { thisWeekStart } = useMemo(() => {
     // Get current time in CST (UTC-6)
     const now = new Date();
     const cstOffset = -6 * 60;
