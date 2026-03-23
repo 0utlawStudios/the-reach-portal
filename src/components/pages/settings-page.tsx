@@ -9,7 +9,7 @@ import { useAuth } from "@/lib/auth-context";
 import { usePresence, PresenceStatus } from "@/lib/use-presence";
 import { usePipeline } from "@/lib/pipeline-context";
 import { logAudit, fetchAllAuditLogs, AuditEntry } from "@/lib/audit";
-import { History, ArrowUpRight, SlidersHorizontal, Search, FileText as FileTextIcon, Shield as ShieldIcon, AtSign, ArrowUpDown, Filter } from "lucide-react";
+import { History, ArrowUpRight, SlidersHorizontal, Search, FileText as FileTextIcon, Shield as ShieldIcon, AtSign, ArrowUpDown, Filter, ChevronRight, CheckCircle, Activity, Clock as ClockIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -270,6 +270,7 @@ export function SettingsPage() {
   const [inviteRole, setInviteRole] = useState<UserRole>("viewer");
   const [inviting, setInviting] = useState(false);
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
+  const [activeIntegration, setActiveIntegration] = useState<string | null>(null);
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -375,10 +376,19 @@ export function SettingsPage() {
 
           {isAdmin && (
             <Section title="Integrations" icon={<Webhook className="w-3.5 h-3.5 text-sky-500" />}>
-              <SettingRow icon={Database} label="Supabase" desc="Persistent storage, auth, real-time sync"><ConnectedBadge /></SettingRow>
-              <SettingRow icon={HardDrive} label="Google Drive" desc="Video/image cloud storage (60TB)"><ConnectedBadge /></SettingRow>
-              <SettingRow icon={ExternalLink} label="Notion" desc="Sync content ideas and briefs"><ComingSoonBadge /></SettingRow>
-              <SettingRow icon={Key} label="API Keys" desc="Custom integrations and automations"><ConnectedBadge /></SettingRow>
+              {INTEGRATIONS.map((intg) => (
+                <button key={intg.id} onClick={() => setActiveIntegration(intg.id)} className="w-full flex items-center gap-3 px-4 py-3 border-b border-gray-50 dark:border-white/[0.03] last:border-0 hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors cursor-pointer text-left group">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${intg.iconBg}`}>
+                    <intg.icon className={`w-4 h-4 ${intg.iconColor}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[12px] font-medium text-gray-700 dark:text-gray-300">{intg.name}</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">{intg.desc}</p>
+                  </div>
+                  {intg.status === "connected" ? <ConnectedBadge /> : <ComingSoonBadge />}
+                  <ChevronRight className="w-3.5 h-3.5 text-gray-200 dark:text-gray-700 group-hover:text-orange-400 transition-colors shrink-0" />
+                </button>
+              ))}
             </Section>
           )}
 
@@ -481,7 +491,191 @@ export function SettingsPage() {
           onDelete={() => { removeMember(editingMember.id); logAudit("system", currentUser.name, "member_removed", `Removed ${editingMember.name} (${editingMember.email})`); addToast(`${editingMember.name} removed from team`, "success"); }}
         />
       )}
+
+      {/* Integration Detail Panel */}
+      {activeIntegration && (
+        <IntegrationDetailPanel
+          integration={INTEGRATIONS.find((i) => i.id === activeIntegration)!}
+          onClose={() => setActiveIntegration(null)}
+        />
+      )}
     </div>
+  );
+}
+
+// ─── Integration Data ───
+
+const INTEGRATIONS = [
+  {
+    id: "supabase",
+    name: "Supabase",
+    desc: "Persistent storage, auth, real-time sync",
+    icon: Database,
+    iconBg: "bg-emerald-50 dark:bg-emerald-500/10",
+    iconColor: "text-emerald-600 dark:text-emerald-400",
+    status: "connected" as const,
+    details: {
+      version: "supabase-js v2",
+      region: "Asia-Pacific (Singapore)",
+      features: ["PostgreSQL Database", "Row Level Security", "Realtime Subscriptions", "Auth & Magic Links", "Storage Buckets"],
+      tables: ["posts", "team_members", "post_audit_logs", "media_assets", "brand_playbook"],
+      lastSync: "Live — real-time enabled",
+    },
+  },
+  {
+    id: "google-drive",
+    name: "Google Drive",
+    desc: "Video/image cloud storage (60TB)",
+    icon: HardDrive,
+    iconBg: "bg-blue-50 dark:bg-blue-500/10",
+    iconColor: "text-blue-600 dark:text-blue-400",
+    status: "connected" as const,
+    details: {
+      version: "Drive API v3",
+      region: "Google Workspace — Super Admin",
+      features: ["Resumable Uploads", "Video Streaming Proxy", "Automatic Subfolders", "Public File Serving", "60TB Storage"],
+      tables: ["thumbnails/", "raw-files/", "media-library/"],
+      lastSync: "On-demand — per upload",
+    },
+  },
+  {
+    id: "notion",
+    name: "Notion",
+    desc: "Sync content ideas and briefs",
+    icon: ExternalLink,
+    iconBg: "bg-gray-50 dark:bg-white/[0.04]",
+    iconColor: "text-gray-500 dark:text-gray-400",
+    status: "coming_soon" as const,
+    details: {
+      version: "Notion API v1",
+      region: "—",
+      features: ["Content Brief Sync", "Idea Database Import", "Two-way Sync", "Template Library"],
+      tables: [],
+      lastSync: "Not connected",
+    },
+  },
+  {
+    id: "api-keys",
+    name: "API Keys",
+    desc: "Custom integrations and automations",
+    icon: Key,
+    iconBg: "bg-amber-50 dark:bg-amber-500/10",
+    iconColor: "text-amber-600 dark:text-amber-400",
+    status: "connected" as const,
+    details: {
+      version: "REST + Service Account",
+      region: "Vercel Edge Network",
+      features: ["Team Invite API", "Mention Notifications", "Drive Upload Sessions", "Audit Log Queries"],
+      tables: ["/api/team/invite", "/api/drive/upload", "/api/drive/stream", "/api/notifications/mention"],
+      lastSync: "Active — 4 endpoints",
+    },
+  },
+];
+
+// ─── Integration Detail Panel ───
+
+function IntegrationDetailPanel({ integration, onClose }: { integration: (typeof INTEGRATIONS)[number]; onClose: () => void }) {
+  const connected = integration.status === "connected";
+  const Icon = integration.icon;
+
+  return (
+    <>
+      <div onClick={onClose} className="fixed inset-0 bg-black/30 dark:bg-black/60 z-50 transition-opacity" />
+      <div className="fixed right-0 top-0 bottom-0 w-full max-w-[440px] z-50 bg-white dark:bg-[#0e0e11] border-l border-gray-200 dark:border-white/[0.08] shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
+        {/* Header */}
+        <div className="px-6 py-5 border-b border-gray-100 dark:border-white/[0.06] shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${integration.iconBg}`}>
+                <Icon className={`w-5 h-5 ${integration.iconColor}`} />
+              </div>
+              <div>
+                <h2 className="text-[15px] font-bold text-gray-900 dark:text-white">{integration.name}</h2>
+                <p className="text-[11px] text-gray-400 mt-0.5">{integration.desc}</p>
+              </div>
+            </div>
+            <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-400 cursor-pointer transition-colors">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* Status card */}
+          <div className={`rounded-xl border p-4 ${connected ? "bg-emerald-50/50 dark:bg-emerald-500/5 border-emerald-200 dark:border-emerald-500/20" : "bg-gray-50 dark:bg-white/[0.02] border-gray-200 dark:border-white/[0.08]"}`}>
+            <div className="flex items-center gap-3">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${connected ? "bg-emerald-100 dark:bg-emerald-500/20" : "bg-gray-100 dark:bg-white/[0.06]"}`}>
+                {connected ? <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> : <ClockIcon className="w-4 h-4 text-gray-400" />}
+              </div>
+              <div className="flex-1">
+                <p className={`text-[13px] font-semibold ${connected ? "text-emerald-700 dark:text-emerald-400" : "text-gray-500"}`}>
+                  {connected ? "Connected & Active" : "Coming Soon"}
+                </p>
+                <p className="text-[11px] text-gray-400 mt-0.5">{integration.details.lastSync}</p>
+              </div>
+              {connected && <Activity className="w-4 h-4 text-emerald-500 animate-pulse" />}
+            </div>
+          </div>
+
+          {/* Technical details */}
+          <div className="space-y-3">
+            <h3 className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Configuration</h3>
+            <div className="bg-gray-50 dark:bg-white/[0.02] rounded-xl border border-gray-100 dark:border-white/[0.06] divide-y divide-gray-100 dark:divide-white/[0.04]">
+              <div className="flex items-center justify-between px-4 py-2.5">
+                <span className="text-[11px] text-gray-500">SDK / API</span>
+                <span className="text-[11px] font-medium text-gray-700 dark:text-gray-300">{integration.details.version}</span>
+              </div>
+              <div className="flex items-center justify-between px-4 py-2.5">
+                <span className="text-[11px] text-gray-500">Region</span>
+                <span className="text-[11px] font-medium text-gray-700 dark:text-gray-300">{integration.details.region}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Features */}
+          <div className="space-y-3">
+            <h3 className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Features</h3>
+            <div className="space-y-1.5">
+              {integration.details.features.map((feature) => (
+                <div key={feature} className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-gray-50 dark:bg-white/[0.02] border border-gray-100 dark:border-white/[0.04]">
+                  <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${connected ? "bg-emerald-500" : "bg-gray-300 dark:bg-gray-600"}`} />
+                  <span className="text-[11px] text-gray-600 dark:text-gray-400 font-medium">{feature}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Resources / endpoints */}
+          {integration.details.tables.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">
+                {integration.id === "api-keys" ? "Endpoints" : integration.id === "google-drive" ? "Folders" : "Resources"}
+              </h3>
+              <div className="flex flex-wrap gap-1.5">
+                {integration.details.tables.map((t) => (
+                  <span key={t} className="text-[10px] font-mono px-2.5 py-1 rounded-md bg-slate-100 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.06] text-gray-600 dark:text-gray-400">{t}</span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-gray-100 dark:border-white/[0.06] shrink-0">
+          {connected ? (
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-gray-400">Managed by workspace admin</span>
+              <Button size="sm" variant="outline" className="h-8 rounded-lg text-[11px] border-red-200 text-red-500 hover:bg-red-50 dark:border-red-500/20 dark:hover:bg-red-500/10 cursor-pointer">Disconnect</Button>
+            </div>
+          ) : (
+            <Button size="sm" className="w-full h-9 rounded-lg bg-gray-900 dark:bg-white dark:text-gray-900 text-white text-[12px] cursor-pointer">
+              Enable Integration
+            </Button>
+          )}
+        </div>
+      </div>
+    </>
   );
 }
 
