@@ -8,7 +8,7 @@ import { useToast } from "@/lib/toast-context";
 import { useAuth } from "@/lib/auth-context";
 import { usePresence, PresenceStatus } from "@/lib/use-presence";
 import { usePipeline } from "@/lib/pipeline-context";
-import { fetchAllAuditLogs, AuditEntry } from "@/lib/audit";
+import { logAudit, fetchAllAuditLogs, AuditEntry } from "@/lib/audit";
 import { History, ArrowUpRight, SlidersHorizontal } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -82,10 +82,13 @@ function EditProfileModal({ member, onClose, onDelete, canDelete }: { member: Te
   };
 
   const handleSave = () => {
+    const roleChanged = role !== member.role;
     updateMember(member.id, { name, email, role, avatar: avatarUrl || undefined, secondaryRole: secondaryRoles.length > 0 ? secondaryRoles.join(" / ") : undefined });
-    // Sync avatar to auth context if editing the current logged-in user
     if (member.email === currentUser.email) {
       updateCurrentUserAvatar(avatarUrl || undefined);
+    }
+    if (roleChanged) {
+      logAudit("system", currentUser.name, "role_changed", `Changed ${name}'s role from ${member.role} to ${role}`);
     }
     addToast(`Profile updated for ${name}`, "success");
     onClose();
@@ -289,6 +292,7 @@ export function SettingsPage() {
         return;
       }
       addToast(`Secure invite link sent to ${inviteEmail.trim()}`, "success");
+      logAudit("system", currentUser.name, "invite_sent", `Invited ${inviteName.trim()} (${inviteEmail.trim()}) as ${inviteRole}`);
       setInviteEmail(""); setInviteName(""); setShowInvite(false);
     } catch {
       addToast("Network error — invite not sent", "error");
@@ -474,7 +478,7 @@ export function SettingsPage() {
             (currentUser.email !== editingMember.email) &&
             members.some((m) => m.email === currentUser.email && (m.role === "owner" || m.role === "admin"))
           }
-          onDelete={() => { removeMember(editingMember.id); addToast(`${editingMember.name} removed from team`, "success"); }}
+          onDelete={() => { removeMember(editingMember.id); logAudit("system", currentUser.name, "member_removed", `Removed ${editingMember.name} (${editingMember.email})`); addToast(`${editingMember.name} removed from team`, "success"); }}
         />
       )}
     </div>
@@ -498,11 +502,15 @@ function AuditLogTab({ auditLogs, auditLoading, setAuditLogs, setAuditLoading }:
     stage_change: "bg-blue-500", revision_submitted: "bg-violet-500", revision_requested: "bg-red-500",
     content_edited: "bg-amber-500", asset_replaced: "bg-emerald-500", card_viewed: "bg-gray-400",
     comment_added: "bg-orange-500", vault_updated: "bg-sky-500", raw_file_uploaded: "bg-purple-500", title_edited: "bg-amber-500",
+    mention_sent: "bg-pink-500", license_uploaded: "bg-teal-500",
+    invite_sent: "bg-indigo-500", role_changed: "bg-cyan-500", member_removed: "bg-red-600", settings_changed: "bg-gray-500",
   };
   const actionLabels: Record<string, string> = {
     stage_change: "Stage Changed", revision_submitted: "Fix Submitted", revision_requested: "Revision Requested",
     content_edited: "Content Edited", asset_replaced: "Asset Replaced", card_viewed: "Viewed",
     comment_added: "Comment Added", vault_updated: "Vault Updated", raw_file_uploaded: "File Uploaded", title_edited: "Title Edited",
+    mention_sent: "Mention Sent", license_uploaded: "License Uploaded",
+    invite_sent: "Invite Sent", role_changed: "Role Changed", member_removed: "Member Removed", settings_changed: "Settings Changed",
   };
 
   const FILTER_OPTIONS = [
@@ -513,11 +521,15 @@ function AuditLogTab({ auditLogs, auditLoading, setAuditLogs, setAuditLoading }:
     { value: "revision_requested", label: "Revisions Requested" },
     { value: "content_edited", label: "Content Edits" },
     { value: "comment_added", label: "Comments" },
+    { value: "mention_sent", label: "Mentions" },
+    { value: "system", label: "System Events" },
   ];
 
   const filteredLogs = useMemo(() => {
+    const SYSTEM_ACTIONS = ["invite_sent", "role_changed", "member_removed", "settings_changed", "mention_sent"];
     let logs = [...auditLogs];
     if (filterAction === "no_views") logs = logs.filter((l) => l.action_type !== "card_viewed");
+    else if (filterAction === "system") logs = logs.filter((l) => SYSTEM_ACTIONS.includes(l.action_type));
     else if (filterAction !== "all") logs = logs.filter((l) => l.action_type === filterAction);
     if (sortOrder === "oldest") logs.reverse();
     return logs;

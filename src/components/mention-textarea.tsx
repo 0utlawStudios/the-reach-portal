@@ -50,8 +50,8 @@ export function MentionTextarea({ value, onChange, placeholder, className, rows 
     onChange(newVal);
     setShowDropdown(false);
 
-    // Trigger notification toast
-    addToast(`Notification & Email dispatched to ${name}`, "success");
+    // Mention inserted — email will be sent when comment is saved
+    addToast(`@${name} will be notified when you post this comment`, "info");
 
     // Refocus
     setTimeout(() => {

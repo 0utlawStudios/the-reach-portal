@@ -128,12 +128,28 @@ export function AssetReviewDrawer() {
 
   const addComment = () => {
     if (!newComment.trim()) return;
+    const trimmed = newComment.trim();
     const timestamp = new Date().toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-    const comment = `${currentUser.name} (${timestamp}): ${newComment.trim()}`;
+    const comment = `${currentUser.name} (${timestamp}): ${trimmed}`;
     const existing = selectedCard.notes ? selectedCard.notes + "\n\n" : "";
     updateCard(selectedCard.id, { notes: existing + comment });
-    logAudit(selectedCard.id, currentUser.name, "comment_added", newComment.trim());
+    logAudit(selectedCard.id, currentUser.name, "comment_added", trimmed);
     setNewComment("");
+
+    // Fire @mention notifications in background
+    if (trimmed.includes("@")) {
+      fetch("/api/notifications/mention", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          comment: trimmed,
+          postTitle: selectedCard.title,
+          postId: selectedCard.id,
+          authorName: currentUser.name,
+          authorEmail: currentUser.email,
+        }),
+      }).catch(() => {});
+    }
   };
 
   const saveDate = () => {
@@ -633,12 +649,20 @@ export function AssetReviewDrawer() {
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" onClick={() => { setRevisionMode(false); setRevisionFeedback(""); }} className="flex-1 h-9 rounded-lg text-[12px]">Cancel</Button>
                 <Button size="sm" disabled={!revisionFeedback.trim()} onClick={() => {
+                  const feedback = revisionFeedback.trim();
                   const ts = new Date().toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-                  const note = `${currentUser.name} (${ts}): ${revisionFeedback.trim()}`;
+                  const note = `${currentUser.name} (${ts}): ${feedback}`;
                   updateCard(selectedCard.id, { notes: (selectedCard.notes ? selectedCard.notes + "\n\n" : "") + note });
                   moveCard(selectedCard.id, "revision_needed");
                   addToast("Revision requested. Agency team notified.", "warning");
                   setRevisionMode(false); setRevisionFeedback("");
+                  if (feedback.includes("@")) {
+                    fetch("/api/notifications/mention", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ comment: feedback, postTitle: selectedCard.title, postId: selectedCard.id, authorName: currentUser.name, authorEmail: currentUser.email }),
+                    }).catch(() => {});
+                  }
                 }} className="flex-1 h-9 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[12px] shadow-sm disabled:opacity-40 transition-all duration-150">
                   Submit Revision Request
                 </Button>
