@@ -103,7 +103,7 @@ interface PipelineContextType {
   submitKickback: (cardId: string, note: string, attachmentUrl?: string) => void;
   cancelKickback: () => void;
   updateCard: (cardId: string, updates: Partial<ContentCard>) => void;
-  createCard: (card: Omit<ContentCard, "id" | "createdAt" | "updatedAt" | "checklist">) => void;
+  createCard: (card: Partial<Pick<ContentCard, "checklist">> & Omit<ContentCard, "id" | "createdAt" | "updatedAt" | "checklist">) => void;
   deleteCard: (cardId: string) => void;
 }
 
@@ -334,7 +334,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     }
   }, [useSupabase]);
 
-  const createCard = useCallback((card: Omit<ContentCard, "id" | "createdAt" | "updatedAt" | "checklist">) => {
+  const createCard = useCallback((card: Partial<Pick<ContentCard, "checklist">> & Omit<ContentCard, "id" | "createdAt" | "updatedAt" | "checklist">) => {
     const now = new Date().toISOString().split("T")[0];
     const tempId = Date.now().toString();
     const newCard: ContentCard = {
@@ -342,7 +342,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
       id: tempId,
       createdAt: now,
       updatedAt: now,
-      checklist: DEFAULT_CHECKLIST.map((c) => ({ ...c })),
+      checklist: card.checklist || DEFAULT_CHECKLIST.map((c) => ({ ...c })),
     };
     setCards((prev) => [newCard, ...prev]);
 

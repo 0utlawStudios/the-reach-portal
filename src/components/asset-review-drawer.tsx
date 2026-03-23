@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { usePipeline } from "@/lib/pipeline-context";
-import { PIPELINE_COLUMNS, PipelineStage } from "@/lib/types";
+import { PIPELINE_COLUMNS, PipelineStage, ALL_PLATFORMS, Platform } from "@/lib/types";
 import { SOCIAL_PROFILES } from "@/lib/social-profiles";
 import { logAudit, fetchAuditLogs, AuditEntry } from "@/lib/audit";
 import { Badge } from "@/components/ui/badge";
@@ -285,17 +285,26 @@ export function AssetReviewDrawer() {
               <span>{selectedCard.createdAt ? new Date(selectedCard.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""}</span>
             </div>
 
-            {/* Platforms */}
-            <div className="flex flex-wrap gap-2">
-              {selectedCard.platforms.map((p) => {
-                const profile = SOCIAL_PROFILES[p];
+            {/* Platforms — editable */}
+            <div className="flex flex-wrap gap-1.5">
+              {ALL_PLATFORMS.map((p) => {
+                const active = selectedCard.platforms.includes(p.id);
                 return (
-                  <a key={p} href={profile?.url || "#"} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-white/[0.04] border border-gray-100 dark:border-white/[0.06] text-[11px] text-gray-600 dark:text-gray-300 hover:border-orange-200 dark:hover:border-orange-500/20 hover:bg-orange-50/50 dark:hover:bg-orange-500/5 transition-all duration-150">
-                    <PlatformIcon platform={p} className="w-3.5 h-3.5" />
-                    <span className="capitalize font-medium">{p}</span>
-                    {profile?.url && <ExternalLink className="w-2.5 h-2.5 text-gray-400" />}
-                  </a>
+                  <button key={p.id} onClick={() => {
+                    const updated = active
+                      ? selectedCard.platforms.filter((x) => x !== p.id)
+                      : [...selectedCard.platforms, p.id];
+                    if (updated.length === 0) return; // Must have at least 1
+                    updateCard(selectedCard.id, { platforms: updated as Platform[] });
+                  }}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all cursor-pointer ${
+                      active
+                        ? "bg-orange-50 border-orange-200 text-orange-700 dark:bg-orange-500/10 dark:border-orange-500/30 dark:text-orange-400"
+                        : "bg-white border-gray-200 text-gray-400 hover:bg-gray-50 dark:bg-transparent dark:border-white/[0.06] dark:text-gray-500 hover:text-gray-600"
+                    }`}>
+                    <PlatformIcon platform={p.id} className="w-3.5 h-3.5" />
+                    <span>{p.label}</span>
+                  </button>
                 );
               })}
             </div>

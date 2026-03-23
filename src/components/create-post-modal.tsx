@@ -53,6 +53,7 @@ export function CreatePostModal({ open, onClose }: Props) {
   const [designLink, setDesignLink] = useState("");
   const [driveFolder, setDriveFolder] = useState("");
   const [notes, setNotes] = useState("");
+  const [licenseFileId, setLicenseFileId] = useState("");
   const [activeTab, setActiveTab] = useState<ModalTab>("content");
   const [checklist, setChecklist] = useState(() => DEFAULT_CHECKLIST.map((c) => ({ ...c })));
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -157,6 +158,8 @@ export function CreatePostModal({ open, onClose }: Props) {
       scheduledTime: scheduledTime || undefined,
       createdBy: currentUser.name,
       assetSource: assetSource || undefined,
+      checklist,
+      licenseFileId: licenseFileId || undefined,
       notes: notes.trim() ? `${currentUser.name} (${new Date().toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}): ${notes.trim()}` : undefined,
       sourceVault: (designLink || driveFolder || rawFiles.length > 0) ? {
         designLink: designLink || undefined,
@@ -167,7 +170,7 @@ export function CreatePostModal({ open, onClose }: Props) {
 
     rawFilesRef.current.clear();
     setTitle(""); setCaption(""); setHook(""); setPlatforms([]); setContentType("video");
-    setScheduledDate(""); setScheduledTime(""); setFiles([]); setAssetSource(""); setAssetSourceOther(false);
+    setScheduledDate(""); setScheduledTime(""); setFiles([]); setAssetSource(""); setAssetSourceOther(false); setLicenseFileId("");
     setDesignLink(""); setDriveFolder(""); setNotes(""); setActiveTab("content");
     setChecklist(DEFAULT_CHECKLIST.map((c) => ({ ...c })));
     setSubmitting(false);
@@ -349,6 +352,37 @@ export function CreatePostModal({ open, onClose }: Props) {
                       className={`${inputClass} border-orange-200 dark:border-orange-500/20`}
                       autoFocus
                     />
+                  )}
+                </div>
+
+                {/* License upload */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">License / Release <span className="text-gray-300 dark:text-gray-600 text-[8px] normal-case">Optional</span></label>
+                  {licenseFileId ? (
+                    <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-500/5 border border-emerald-200 dark:border-emerald-500/20 rounded-lg px-3 py-2">
+                      <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium flex-1">License uploaded</span>
+                      <button type="button" onClick={() => setLicenseFileId("")} className="text-[10px] text-gray-400 hover:text-red-500 cursor-pointer">Remove</button>
+                    </div>
+                  ) : (
+                    <button type="button" onClick={async () => {
+                      const input = document.createElement("input");
+                      input.type = "file";
+                      input.accept = "image/*,.pdf,.txt";
+                      input.onchange = async (ev) => {
+                        const file = (ev.target as HTMLInputElement).files?.[0];
+                        if (!file) return;
+                        addToast("Uploading license...", "info");
+                        try {
+                          const { uploadToDrive } = await import("@/lib/drive-upload");
+                          const result = await uploadToDrive(file, "raw-files");
+                          setLicenseFileId(result.fileId);
+                          addToast("License uploaded", "success");
+                        } catch { addToast("License upload failed", "error"); }
+                      };
+                      input.click();
+                    }} className="w-full border border-dashed border-gray-200 dark:border-white/[0.08] rounded-lg py-2.5 flex items-center justify-center gap-2 text-gray-400 dark:text-gray-500 hover:text-orange-500 hover:border-orange-300 dark:hover:border-orange-500/30 transition-all cursor-pointer text-[11px]">
+                      <Upload className="w-3.5 h-3.5" />Upload license (PDF or screenshot)
+                    </button>
                   )}
                 </div>
 
