@@ -60,6 +60,7 @@ export function AssetReviewDrawer() {
   // Asset replacement state
   const assetInputRef = useRef<HTMLInputElement>(null);
   const rawFileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     if (selectedCard && isEditingOnOpen && prevCardRef.current !== selectedCard.id) {
@@ -160,7 +161,6 @@ export function AssetReviewDrawer() {
   };
 
   // ─── Replace primary asset ───
-  const [uploading, setUploading] = useState(false);
   const handleAssetReplace = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || uploading) return;

@@ -43,16 +43,15 @@ export function CreatePostModal({ open, onClose }: Props) {
   const [scheduledDate, setScheduledDate] = useState("");
   const [scheduledTime, setScheduledTime] = useState("");
   const [files, setFiles] = useState<UploadedFile[]>([]);
+  const [submitting, setSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const rawFilesRef = useRef<Map<string, File>>(new Map());
 
   if (!open) return null;
 
   const togglePlatform = (p: Platform) => {
     setPlatforms((prev) => prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]);
   };
-
-  // Keep raw File objects for Drive upload on submit
-  const rawFilesRef = useRef<Map<string, File>>(new Map());
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files;
@@ -84,8 +83,6 @@ export function CreatePostModal({ open, onClose }: Props) {
       return prev.filter((f) => f.id !== id);
     });
   };
-
-  const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
