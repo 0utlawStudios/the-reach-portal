@@ -2,11 +2,9 @@
 
 import { useState, useRef } from "react";
 import { usePipeline } from "@/lib/pipeline-context";
-import { Platform, ContentType, ALL_PLATFORMS } from "@/lib/types";
+import { Platform, ContentType, ALL_PLATFORMS, DEFAULT_CHECKLIST } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { X, Image as ImageIcon, Film, Layers, PlayCircle, Upload, FileVideo, Plus } from "lucide-react";
+import { X, Image as ImageIcon, Film, Layers, PlayCircle, Upload, FileVideo, Plus, CheckSquare, FileText, Link2, MessageSquare } from "lucide-react";
 import { PlatformIcon } from "./platform-icons";
 import { useToast } from "@/lib/toast-context";
 import { useAuth } from "@/lib/auth-context";
@@ -19,6 +17,8 @@ const contentTypes: { id: ContentType; label: string; icon: React.ReactNode }[] 
   { id: "carousel", label: "Carousel", icon: <Layers className="w-3.5 h-3.5" /> },
   { id: "story", label: "Story", icon: <Film className="w-3.5 h-3.5" /> },
 ];
+
+const ASSET_SOURCES = ["Envato Elements", "Pexels", "Shot by Team", "Client Provided", "Google Images", "AI Generated", "Other"];
 
 interface UploadedFile {
   id: string;
@@ -33,6 +33,8 @@ interface Props {
   onClose: () => void;
 }
 
+type ModalTab = "content" | "checklist" | "details";
+
 export function CreatePostModal({ open, onClose }: Props) {
   const { createCard } = usePipeline();
   const { addToast } = useToast();
@@ -46,6 +48,12 @@ export function CreatePostModal({ open, onClose }: Props) {
   const [scheduledTime, setScheduledTime] = useState("");
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [assetSource, setAssetSource] = useState("");
+  const [designLink, setDesignLink] = useState("");
+  const [driveFolder, setDriveFolder] = useState("");
+  const [notes, setNotes] = useState("");
+  const [activeTab, setActiveTab] = useState<ModalTab>("content");
+  const [checklist, setChecklist] = useState(() => DEFAULT_CHECKLIST.map((c) => ({ ...c })));
   const fileInputRef = useRef<HTMLInputElement>(null);
   const rawFilesRef = useRef<Map<string, File>>(new Map());
 
@@ -55,24 +63,24 @@ export function CreatePostModal({ open, onClose }: Props) {
     setPlatforms((prev) => prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]);
   };
 
+  const toggleChecklist = (id: string) => {
+    setChecklist((prev) => prev.map((c) => c.id === id ? { ...c, checked: !c.checked } : c));
+  };
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files;
     if (!selected) return;
-
     const newFiles: UploadedFile[] = Array.from(selected).map((file) => {
       const id = Date.now().toString() + Math.random().toString(36).slice(2);
       rawFilesRef.current.set(id, file);
       return {
         id,
         name: file.name,
-        size: file.size < 1024 * 1024
-          ? `${(file.size / 1024).toFixed(0)} KB`
-          : `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+        size: file.size < 1024 * 1024 ? `${(file.size / 1024).toFixed(0)} KB` : `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
         type: file.type.startsWith("video") ? "video" : "image",
         preview: URL.createObjectURL(file),
       };
     });
-
     setFiles((prev) => [...prev, ...newFiles]);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -99,21 +107,22 @@ export function CreatePostModal({ open, onClose }: Props) {
 
     setSubmitting(true);
 
-    // Use blob preview initially, upload to Drive in background
-    let thumbnailUrl = files.length > 0
-      ? files[0].preview
-      : "https://images.unsplash.com/photo-1497366216548-37526070297c?w=400&fit=crop";
+    let thumbnailUrl = files.length > 0 ? files[0].preview : "https://images.unsplash.com/photo-1497366216548-37526070297c?w=400&fit=crop";
 
-    // Upload first file to Drive if available
+    // Upload first file to Drive as both the publishable content and thumbnail
+    const rawFiles: { name: string; url: string; uploadedAt: string }[] = [];
     if (files.length > 0) {
-      const rawFile = rawFilesRef.current.get(files[0].id);
-      if (rawFile) {
+      for (const f of files) {
+        const rawFile = rawFilesRef.current.get(f.id);
+        if (!rawFile) continue;
         try {
           const { uploadToDrive } = await import("@/lib/drive-upload");
-          const result = await uploadToDrive(rawFile, "thumbnails");
-          thumbnailUrl = result.url;
+          const result = await uploadToDrive(rawFile, "raw-files");
+          rawFiles.push({ name: rawFile.name, url: result.url, uploadedAt: new Date().toISOString() });
+          // First file also becomes the thumbnail
+          if (f.id === files[0].id) thumbnailUrl = result.url;
         } catch {
-          addToast("Drive upload failed — using local preview", "warning");
+          rawFiles.push({ name: rawFile.name, url: f.preview, uploadedAt: new Date().toISOString() });
         }
       }
     }
@@ -129,137 +138,228 @@ export function CreatePostModal({ open, onClose }: Props) {
       scheduledDate: scheduledDate || undefined,
       scheduledTime: scheduledTime || undefined,
       createdBy: currentUser.name,
+      assetSource: assetSource || undefined,
+      notes: notes.trim() ? `${currentUser.name} (${new Date().toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}): ${notes.trim()}` : undefined,
+      sourceVault: (designLink || driveFolder || rawFiles.length > 0) ? {
+        designLink: designLink || undefined,
+        driveFolder: driveFolder || undefined,
+        rawFiles: rawFiles.length > 0 ? rawFiles : undefined,
+      } : undefined,
     });
 
     rawFilesRef.current.clear();
-    setTitle(""); setCaption(""); setHook(""); setPlatforms([]); setContentType("video"); setScheduledDate(""); setScheduledTime(""); setFiles([]);
+    setTitle(""); setCaption(""); setHook(""); setPlatforms([]); setContentType("video");
+    setScheduledDate(""); setScheduledTime(""); setFiles([]); setAssetSource("");
+    setDesignLink(""); setDriveFolder(""); setNotes(""); setActiveTab("content");
+    setChecklist(DEFAULT_CHECKLIST.map((c) => ({ ...c })));
     setSubmitting(false);
     onClose();
   };
+
+  const inputClass = "w-full h-9 px-3 rounded-lg bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-[12px] text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 dark:focus:ring-orange-500/10 transition-all";
+
+  const tabs: { id: ModalTab; label: string; icon: React.ReactNode }[] = [
+    { id: "content", label: "Content", icon: <FileText className="w-3 h-3" /> },
+    { id: "checklist", label: "Checklist", icon: <CheckSquare className="w-3 h-3" /> },
+    { id: "details", label: "Details", icon: <Link2 className="w-3 h-3" /> },
+  ];
+
+  const checkedCount = checklist.filter((c) => c.checked).length;
 
   return (
     <>
       <div onClick={onClose} className="fixed inset-0 bg-black/30 dark:bg-black/60 z-50" />
       <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-        <div className="bg-white dark:bg-[#151518] rounded-2xl border border-gray-200 dark:border-white/[0.08] shadow-2xl w-full max-w-[560px] max-h-[90vh] flex flex-col">
+        <div className="bg-white dark:bg-[#151518] rounded-2xl border border-gray-200 dark:border-white/[0.08] shadow-2xl w-full max-w-[580px] max-h-[90vh] flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-white/[0.06] shrink-0">
             <h2 className="text-[15px] font-semibold text-gray-900 dark:text-white">Create New Post</h2>
             <button onClick={onClose} className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-400 cursor-pointer"><X className="w-4 h-4" /></button>
           </div>
 
+          {/* Tab bar */}
+          <div className="flex items-center gap-0.5 px-5 border-b border-gray-100 dark:border-white/[0.06] shrink-0">
+            {tabs.map((tab) => (
+              <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-1.5 px-3.5 py-2.5 text-[11px] font-medium border-b-2 -mb-px transition-colors cursor-pointer ${
+                  activeTab === tab.id ? "border-orange-500 text-orange-600 dark:text-orange-400" : "border-transparent text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                }`}>
+                {tab.icon}{tab.label}
+                {tab.id === "checklist" && <span className="text-[9px] bg-gray-100 dark:bg-white/[0.06] text-gray-500 dark:text-gray-400 px-1.5 rounded-full">{checkedCount}/{checklist.length}</span>}
+              </button>
+            ))}
+          </div>
+
           <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-4">
-            {/* Title */}
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Title <span className="text-red-400">*</span></label>
-              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Product Launch Reel, BTS Shoot Day" className="h-10 bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[13px]" autoFocus />
-            </div>
 
-            {/* File Upload */}
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Media Files</label>
-              <input ref={fileInputRef} type="file" multiple accept="image/*,video/*" onChange={handleFileSelect} className="hidden" />
+            {/* ── Content Tab ── */}
+            {activeTab === "content" && (
+              <>
+                {/* Title */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Title <span className="text-red-400">*</span></label>
+                  <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Product Launch Reel, BTS Shoot Day" className={inputClass} autoFocus />
+                </div>
 
-              {files.length > 0 && (
-                <div className="grid grid-cols-3 gap-2 mb-2">
-                  {files.map((file) => (
-                    <div key={file.id} className="relative group rounded-lg overflow-hidden border border-gray-200 dark:border-white/[0.08] bg-gray-50 dark:bg-white/[0.03]">
-                      {file.type === "image" ? (
-                        <img src={file.preview} alt={file.name} className="w-full aspect-square object-cover" />
-                      ) : (
-                        <div className="w-full aspect-square flex flex-col items-center justify-center bg-gray-100 dark:bg-white/[0.04]">
-                          <FileVideo className="w-6 h-6 text-gray-400" />
-                          <p className="text-[8px] text-gray-400 mt-1 truncate max-w-full px-1">{file.name}</p>
+                {/* Content for Publishing */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Content for Publishing</label>
+                    <span className="text-[8px] text-emerald-500 font-medium bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-500/20">Pulled by n8n</span>
+                  </div>
+                  <input ref={fileInputRef} type="file" multiple accept="image/*,video/*" onChange={handleFileSelect} className="hidden" />
+
+                  {files.length > 0 && (
+                    <div className="grid grid-cols-3 gap-2 mb-2">
+                      {files.map((file) => (
+                        <div key={file.id} className="relative group rounded-lg overflow-hidden border border-gray-200 dark:border-white/[0.08] bg-gray-50 dark:bg-white/[0.03]">
+                          {file.type === "image" ? (
+                            <img src={file.preview} alt={file.name} className="w-full aspect-square object-cover" />
+                          ) : (
+                            <div className="w-full aspect-square flex flex-col items-center justify-center bg-gray-100 dark:bg-white/[0.04]">
+                              <FileVideo className="w-6 h-6 text-gray-400 dark:text-gray-500" />
+                              <p className="text-[8px] text-gray-400 dark:text-gray-500 mt-1 truncate max-w-full px-1">{file.name}</p>
+                            </div>
+                          )}
+                          <div className="absolute bottom-0 left-0 right-0 bg-black/60 backdrop-blur-sm px-1.5 py-1">
+                            <p className="text-[8px] text-white truncate">{file.name}</p>
+                            <p className="text-[7px] text-white/60">{file.size}</p>
+                          </div>
+                          <button type="button" onClick={() => removeFile(file.id)} className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                            <X className="w-3 h-3" />
+                          </button>
                         </div>
-                      )}
-                      <div className="absolute bottom-0 left-0 right-0 bg-black/60 backdrop-blur-sm px-1.5 py-1">
-                        <p className="text-[8px] text-white truncate">{file.name}</p>
-                        <p className="text-[7px] text-white/60">{file.size}</p>
-                      </div>
-                      <button type="button" onClick={() => removeFile(file.id)} className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                        <X className="w-3 h-3" />
+                      ))}
+                      <button type="button" onClick={() => fileInputRef.current?.click()} className="w-full aspect-square rounded-lg border-2 border-dashed border-gray-200 dark:border-white/[0.1] flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 hover:text-orange-500 hover:border-orange-300 dark:hover:border-orange-500/30 transition-colors cursor-pointer">
+                        <Plus className="w-5 h-5" />
+                        <span className="text-[9px] mt-1">Add more</span>
                       </button>
                     </div>
-                  ))}
-                  {/* Add more */}
-                  <button type="button" onClick={() => fileInputRef.current?.click()} className="w-full aspect-square rounded-lg border-2 border-dashed border-gray-200 dark:border-white/[0.1] flex flex-col items-center justify-center text-gray-400 hover:text-blue-500 hover:border-blue-300 transition-colors cursor-pointer">
-                    <Plus className="w-5 h-5" />
-                    <span className="text-[9px] mt-1">Add more</span>
-                  </button>
+                  )}
+
+                  {files.length === 0 && (
+                    <button type="button" onClick={() => fileInputRef.current?.click()} className="w-full p-6 rounded-xl border-2 border-dashed border-gray-200 dark:border-white/[0.1] flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 hover:text-orange-500 hover:border-orange-300 dark:hover:border-orange-500/30 transition-colors cursor-pointer group">
+                      <div className="w-10 h-10 rounded-xl bg-gray-50 dark:bg-white/[0.04] flex items-center justify-center mb-2 group-hover:bg-orange-50 dark:group-hover:bg-orange-500/10 transition-colors">
+                        <Upload className="w-5 h-5" />
+                      </div>
+                      <p className="text-[12px] font-medium text-gray-600 dark:text-gray-400">Upload the actual content to publish</p>
+                      <p className="text-[10px] text-gray-300 dark:text-gray-600 mt-0.5">First file becomes the card thumbnail</p>
+                    </button>
+                  )}
                 </div>
-              )}
 
-              {files.length === 0 && (
-                <button type="button" onClick={() => fileInputRef.current?.click()} className="w-full p-6 rounded-xl border-2 border-dashed border-gray-200 dark:border-white/[0.1] flex flex-col items-center justify-center text-gray-400 hover:text-blue-500 hover:border-blue-300 dark:hover:border-blue-500/30 transition-colors cursor-pointer group">
-                  <div className="w-10 h-10 rounded-xl bg-gray-50 dark:bg-white/[0.04] flex items-center justify-center mb-2 group-hover:bg-blue-50 dark:group-hover:bg-blue-500/10 transition-colors">
-                    <Upload className="w-5 h-5" />
+                {/* Platforms */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Platforms <span className="text-red-400">*</span></label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {ALL_PLATFORMS.map((p) => (
+                      <button key={p.id} type="button" onClick={() => togglePlatform(p.id)}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-colors cursor-pointer ${
+                          platforms.includes(p.id)
+                            ? "bg-orange-50 border-orange-200 text-orange-700 dark:bg-orange-500/10 dark:border-orange-500/30 dark:text-orange-400"
+                            : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50 dark:bg-transparent dark:border-white/[0.08] dark:text-gray-400"
+                        }`}>
+                        <PlatformIcon platform={p.id} className="w-3.5 h-3.5" />{p.label}
+                      </button>
+                    ))}
                   </div>
-                  <p className="text-[12px] font-medium">Upload images or videos</p>
-                  <p className="text-[10px] text-gray-300 dark:text-gray-600 mt-0.5">Drag & drop or click to browse</p>
-                </button>
-              )}
-            </div>
+                </div>
 
-            {/* Platforms */}
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Platforms <span className="text-red-400">*</span></label>
-              <div className="flex flex-wrap gap-1.5">
-                {ALL_PLATFORMS.map((p) => (
-                  <button key={p.id} type="button" onClick={() => togglePlatform(p.id)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-colors cursor-pointer ${
-                      platforms.includes(p.id)
-                        ? "bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-500/10 dark:border-blue-500/30 dark:text-blue-400"
-                        : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50 dark:bg-transparent dark:border-white/[0.08] dark:text-gray-400"
+                {/* Content type */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Content Type</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {contentTypes.map((ct) => (
+                      <button key={ct.id} type="button" onClick={() => setContentType(ct.id)}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-colors cursor-pointer ${
+                          contentType === ct.id
+                            ? "bg-gray-900 border-gray-900 text-white dark:bg-white dark:border-white dark:text-gray-900"
+                            : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50 dark:bg-transparent dark:border-white/[0.08] dark:text-gray-400"
+                        }`}>
+                        {ct.icon}{ct.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Hook */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Hook (First 3 Seconds) <span className="text-red-400">*</span></label>
+                  <input value={hook} onChange={(e) => setHook(e.target.value)} placeholder="What grabs attention?" className={inputClass} />
+                </div>
+
+                {/* Caption */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Caption <span className="text-red-400">*</span></label>
+                  <MentionTextarea value={caption} onChange={setCaption} placeholder="Write your caption... Type @ to mention team members" className="min-h-[70px] w-full bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-lg text-[12px] text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-600 resize-none p-3 outline-none focus:ring-2 focus:ring-orange-100 dark:focus:ring-orange-500/10 focus:border-orange-400 transition-all" rows={3} />
+                </div>
+
+                {/* Schedule */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Schedule Date & Time <span className="text-red-400">*</span></label>
+                  <div className="flex gap-2">
+                    <input type="date" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} className={`${inputClass} flex-1`} required />
+                    <input type="time" value={scheduledTime} onChange={(e) => setScheduledTime(e.target.value)} className={`${inputClass} w-28`} required />
+                  </div>
+                </div>
+
+                {/* Asset Source */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Asset Source</label>
+                  <select value={assetSource} onChange={(e) => setAssetSource(e.target.value)} className={`${inputClass} cursor-pointer`}>
+                    <option value="">Select source...</option>
+                    {ASSET_SOURCES.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+
+                {/* Notes */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em] flex items-center gap-1.5"><MessageSquare className="w-3 h-3 text-orange-400" />Notes</label>
+                  <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Any notes for the team..." className={`${inputClass} h-auto min-h-[60px] resize-none py-2`} rows={2} />
+                </div>
+              </>
+            )}
+
+            {/* ── Checklist Tab ── */}
+            {activeTab === "checklist" && (
+              <div className="space-y-2">
+                <p className="text-[11px] text-gray-400 dark:text-gray-500">Complete before submitting for approval.</p>
+                {checklist.map((item) => (
+                  <button key={item.id} type="button" onClick={() => toggleChecklist(item.id)}
+                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg border transition-colors cursor-pointer text-left ${
+                      item.checked
+                        ? "bg-emerald-50 dark:bg-emerald-500/5 border-emerald-200 dark:border-emerald-500/20"
+                        : "bg-white dark:bg-white/[0.02] border-gray-200 dark:border-white/[0.06] hover:bg-gray-50 dark:hover:bg-white/[0.03]"
                     }`}>
-                    <PlatformIcon platform={p.id} className="w-3.5 h-3.5" />{p.label}
+                    <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${
+                      item.checked ? "bg-emerald-500 border-emerald-500" : "border-gray-300 dark:border-gray-600"
+                    }`}>
+                      {item.checked && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+                    </div>
+                    <span className={`text-[12px] font-medium ${item.checked ? "text-emerald-700 dark:text-emerald-400 line-through" : "text-gray-700 dark:text-gray-300"}`}>{item.label}</span>
                   </button>
                 ))}
               </div>
-            </div>
+            )}
 
-            {/* Content type */}
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Content Type</label>
-              <div className="flex flex-wrap gap-1.5">
-                {contentTypes.map((ct) => (
-                  <button key={ct.id} type="button" onClick={() => setContentType(ct.id)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-colors cursor-pointer ${
-                      contentType === ct.id
-                        ? "bg-gray-900 border-gray-900 text-white dark:bg-white dark:border-white dark:text-gray-900"
-                        : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50 dark:bg-transparent dark:border-white/[0.08] dark:text-gray-400"
-                    }`}>
-                    {ct.icon}{ct.label}
-                  </button>
-                ))}
+            {/* ── Details Tab (Source Vault + Links) ── */}
+            {activeTab === "details" && (
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Design File Link</label>
+                  <input value={designLink} onChange={(e) => setDesignLink(e.target.value)} placeholder="e.g. Figma, Canva, or Adobe link" className={`${inputClass} font-mono text-[11px]`} />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Google Drive Folder</label>
+                  <input value={driveFolder} onChange={(e) => setDriveFolder(e.target.value)} placeholder="e.g. drive.google.com/drive/folders/..." className={`${inputClass} font-mono text-[11px]`} />
+                </div>
               </div>
-            </div>
-
-            {/* Hook */}
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Hook (First 3 Seconds) <span className="text-red-400">*</span></label>
-              <Input value={hook} onChange={(e) => setHook(e.target.value)} placeholder="What grabs attention?" className="h-9 bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[12px]" />
-            </div>
-
-            {/* Caption */}
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Caption <span className="text-red-400">*</span></label>
-              <MentionTextarea value={caption} onChange={setCaption} placeholder="Write your caption... Type @ to mention team members" className="min-h-[70px] w-full bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-lg text-[12px] resize-none p-3 outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-500/30" rows={3} />
-            </div>
-
-            {/* Schedule */}
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Schedule Date & Time <span className="text-red-400">*</span></label>
-              <div className="flex gap-2">
-                <Input type="date" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} className="h-9 flex-1 bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[12px]" required />
-                <Input type="time" value={scheduledTime} onChange={(e) => setScheduledTime(e.target.value)} className="h-9 w-28 bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[12px]" required />
-              </div>
-              {(!scheduledDate || !scheduledTime) && <p className="text-[10px] text-amber-500">Required — this is when your post goes live</p>}
-            </div>
+            )}
 
             {/* Actions */}
             <div className="flex gap-2 pt-2">
               <Button type="button" variant="outline" onClick={onClose} className="flex-1 h-10 rounded-lg text-[12px]">Cancel</Button>
-              <Button type="submit" disabled={submitting || !title.trim() || platforms.length === 0 || !scheduledDate || !scheduledTime || !hook.trim() || !caption.trim()} className="flex-1 h-10 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-[12px] disabled:opacity-40 shadow-sm">
+              <Button type="submit" disabled={submitting || !title.trim() || platforms.length === 0 || !scheduledDate || !scheduledTime || !hook.trim() || !caption.trim()} className="flex-1 h-10 rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white text-[12px] disabled:opacity-40 shadow-sm">
                 {submitting ? "Uploading..." : "Create Post"}
               </Button>
             </div>
