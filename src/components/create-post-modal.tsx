@@ -98,6 +98,7 @@ export function CreatePostModal({ open, onClose }: Props) {
     e.preventDefault();
     const missing: string[] = [];
     if (!title.trim()) missing.push("title");
+    if (files.length === 0) missing.push("content file");
     if (platforms.length === 0) missing.push("platform");
     if (!scheduledDate) missing.push("date");
     if (!scheduledTime) missing.push("time");
@@ -359,7 +360,7 @@ export function CreatePostModal({ open, onClose }: Props) {
             {/* Actions */}
             <div className="flex gap-2 pt-2">
               <Button type="button" variant="outline" onClick={onClose} className="flex-1 h-10 rounded-lg text-[12px]">Cancel</Button>
-              <Button type="submit" disabled={submitting || !title.trim() || platforms.length === 0 || !scheduledDate || !scheduledTime || !hook.trim() || !caption.trim()} className="flex-1 h-10 rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white text-[12px] disabled:opacity-40 shadow-sm">
+              <Button type="submit" disabled={submitting || !title.trim() || files.length === 0 || platforms.length === 0 || !scheduledDate || !scheduledTime || !hook.trim() || !caption.trim()} className="flex-1 h-10 rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white text-[12px] disabled:opacity-40 shadow-sm">
                 {submitting ? "Uploading..." : "Create Post"}
               </Button>
             </div>

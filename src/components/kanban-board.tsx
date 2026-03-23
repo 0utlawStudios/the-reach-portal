@@ -165,7 +165,8 @@ export function KanbanBoard() {
       const missing: string[] = [];
       if (!sourceCard.scheduledDate) missing.push("scheduled date");
       if (!sourceCard.scheduledTime) missing.push("scheduled time");
-      if (!sourceCard.thumbnailUrl) missing.push("thumbnail/media");
+      if (!sourceCard.thumbnailUrl) missing.push("thumbnail");
+      if (!sourceCard.sourceVault?.rawFiles?.length) missing.push("content for publishing");
       if (!sourceCard.caption?.trim()) missing.push("caption");
       if (!sourceCard.assetSource?.trim()) missing.push("asset source");
       const unchecked = sourceCard.checklist.filter((c) => !c.checked).length;

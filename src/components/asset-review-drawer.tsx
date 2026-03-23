@@ -330,7 +330,7 @@ export function AssetReviewDrawer() {
           {/* ══ SECTION 2: Media Hero ══ */}
           <div className="px-5 md:px-7 pb-4 md:pb-5 space-y-3">
             <div className="flex items-center justify-between mb-1">
-              <p className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.1em]">Card Thumbnail</p>
+              <p className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.1em]">Card Thumbnail <span className="text-red-400">*</span></p>
               <span className="text-[8px] text-gray-400 dark:text-gray-600 font-medium">Preview only — not posted</span>
             </div>
             <div className="relative w-full rounded-2xl overflow-hidden bg-gray-50 dark:bg-white/[0.03] group shadow-sm">
@@ -421,10 +421,17 @@ export function AssetReviewDrawer() {
 
             {/* Dropzone */}
             <input ref={rawFileInputRef} type="file" accept="image/*,video/*,.pdf,.psd,.ai,.prproj,.aep,.sketch,.fig" onChange={handleRawFileUpload} className="hidden" />
-            <button disabled={uploading} onClick={() => rawFileInputRef.current?.click()} className="w-full border border-dashed border-gray-200 dark:border-white/[0.08] rounded-xl py-3.5 flex items-center justify-center gap-2 text-gray-400 dark:text-gray-500 hover:text-orange-500 hover:border-orange-300 dark:hover:border-orange-500/30 hover:bg-orange-50/30 dark:hover:bg-orange-500/[0.02] transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+            <button disabled={uploading} onClick={() => rawFileInputRef.current?.click()} className={`w-full border border-dashed rounded-xl py-3.5 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+              !(selectedCard.sourceVault?.rawFiles?.length)
+                ? "border-red-300 dark:border-red-500/20 text-red-400 dark:text-red-400/70 hover:border-red-400 hover:bg-red-50/30 dark:hover:bg-red-500/[0.02]"
+                : "border-gray-200 dark:border-white/[0.08] text-gray-400 dark:text-gray-500 hover:text-orange-500 hover:border-orange-300 dark:hover:border-orange-500/30 hover:bg-orange-50/30 dark:hover:bg-orange-500/[0.02]"
+            }`}>
               <Upload className="w-3.5 h-3.5" />
-              <span className="text-[11px]">Upload content for publishing</span>
+              <span className="text-[11px]">{(selectedCard.sourceVault?.rawFiles?.length) ? "Upload more content" : "Upload content for publishing *"}</span>
             </button>
+            {!(selectedCard.sourceVault?.rawFiles?.length) && (
+              <p className="text-[9px] text-red-400/80 flex items-center gap-1"><AlertCircle className="w-2.5 h-2.5" />At least 1 file required — this is what gets posted to social platforms</p>
+            )}
           </div>
 
           {/* ══ TAB BAR ══ */}
@@ -815,7 +822,8 @@ export function AssetReviewDrawer() {
                       const missing: string[] = [];
                       if (!selectedCard.scheduledDate) missing.push("scheduled date");
                       if (!selectedCard.scheduledTime) missing.push("scheduled time");
-                      if (!selectedCard.thumbnailUrl) missing.push("thumbnail/media");
+                      if (!selectedCard.thumbnailUrl) missing.push("thumbnail");
+                      if (!selectedCard.sourceVault?.rawFiles?.length) missing.push("content for publishing");
                       if (!selectedCard.caption?.trim()) missing.push("caption");
                       if (!selectedCard.assetSource?.trim()) missing.push("asset source");
                       const unchecked = checklist.filter((c) => !c.checked).length;
