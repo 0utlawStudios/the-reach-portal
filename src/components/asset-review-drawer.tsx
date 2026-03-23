@@ -171,7 +171,7 @@ export function AssetReviewDrawer() {
     setUploadProgress(0);
     const prevUrl = selectedCard.thumbnailUrl;
     const blobUrl = URL.createObjectURL(file);
-    updateCard(selectedCard.id, { thumbnailUrl: blobUrl });
+    updateCard(selectedCard.id, { thumbnailUrl: blobUrl }); // Optimistic preview
     try {
       const { uploadToDrive } = await import("@/lib/drive-upload");
       const result = await uploadToDrive(file, "thumbnails", selectedCard.id, setUploadProgress);
@@ -179,7 +179,10 @@ export function AssetReviewDrawer() {
       updateCard(selectedCard.id, { thumbnailUrl: result.url });
       addToast("Cover image uploaded to Drive", "success");
     } catch (err) {
-      addToast(`Cover upload failed: ${err instanceof Error ? err.message : "unknown error"}`, "error");
+      // REVERT — never persist blob URL
+      URL.revokeObjectURL(blobUrl);
+      updateCard(selectedCard.id, { thumbnailUrl: prevUrl });
+      addToast(`Cover upload failed: ${err instanceof Error ? err.message : "unknown error"}. Try again.`, "error");
     }
     if (prevUrl?.startsWith("blob:")) URL.revokeObjectURL(prevUrl);
     logAudit(selectedCard.id, currentUser.name, "asset_replaced", `Replaced cover with ${file.name}`);
@@ -199,28 +202,35 @@ export function AssetReviewDrawer() {
     setVaultSaving(false);
   };
 
-  // ─── Raw file upload (→ raw-files/) ───
+  // ─── Raw file upload (→ raw-files/) — NEVER stores blob URLs ───
   const handleRawFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || uploading) return;
     setUploading(true);
     setUploadingFileName(file.name);
     setUploadProgress(0);
-    let fileUrl = URL.createObjectURL(file);
-    let driveSuccess = false;
     try {
       const { uploadToDrive } = await import("@/lib/drive-upload");
       const result = await uploadToDrive(file, "raw-files", selectedCard.id, setUploadProgress);
-      fileUrl = result.url;
-      driveSuccess = true;
+      const existingFiles = selectedCard.sourceVault?.rawFiles || [];
+      const isFirstFile = existingFiles.length === 0;
+      const newFile = {
+        name: file.name,
+        url: result.url,
+        fileId: result.fileId,
+        usageType: (isFirstFile ? "master" : "supplementary") as "master" | "supplementary",
+        mimeType: result.mimeType || file.type,
+        size: result.size || file.size,
+        uploadedAt: new Date().toISOString(),
+      };
+      const rawFiles = [...existingFiles, newFile];
+      updateCard(selectedCard.id, { sourceVault: { ...selectedCard.sourceVault, rawFiles } });
+      logAudit(selectedCard.id, currentUser.name, "raw_file_uploaded", `Uploaded ${file.name} (${newFile.usageType})`);
+      addToast(`${file.name} uploaded to Drive`, "success");
     } catch (err) {
-      console.error("[raw-upload]", err);
+      // NO BLOB FALLBACK — show error, let user retry
+      addToast(`Upload failed: ${err instanceof Error ? err.message : "unknown error"}. Try again.`, "error");
     }
-    const rawFiles = [...(selectedCard.sourceVault?.rawFiles || []), { name: file.name, url: fileUrl, uploadedAt: new Date().toISOString() }];
-    const vault = { ...selectedCard.sourceVault, rawFiles };
-    updateCard(selectedCard.id, { sourceVault: vault });
-    logAudit(selectedCard.id, currentUser.name, "raw_file_uploaded", `Uploaded ${file.name}`);
-    addToast(driveSuccess ? `${file.name} uploaded to Drive` : `${file.name} saved locally`, driveSuccess ? "success" : "warning");
     if (rawFileInputRef.current) rawFileInputRef.current.value = "";
     setUploading(false);
     setUploadProgress(0);

@@ -109,24 +109,40 @@ export function CreatePostModal({ open, onClose }: Props) {
 
     setSubmitting(true);
 
-    let thumbnailUrl = files.length > 0 ? files[0].preview : "https://images.unsplash.com/photo-1497366216548-37526070297c?w=400&fit=crop";
+    let thumbnailUrl = "https://images.unsplash.com/photo-1497366216548-37526070297c?w=400&fit=crop";
+    const rawFiles: import("@/lib/types").RawFile[] = [];
+    let uploadFailed = false;
 
-    // Upload first file to Drive as both the publishable content and thumbnail
-    const rawFiles: { name: string; url: string; uploadedAt: string }[] = [];
+    // Upload all files to Drive — NO BLOB FALLBACK
     if (files.length > 0) {
-      for (const f of files) {
+      const { uploadToDrive } = await import("@/lib/drive-upload");
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
         const rawFile = rawFilesRef.current.get(f.id);
         if (!rawFile) continue;
         try {
-          const { uploadToDrive } = await import("@/lib/drive-upload");
           const result = await uploadToDrive(rawFile, "raw-files");
-          rawFiles.push({ name: rawFile.name, url: result.url, uploadedAt: new Date().toISOString() });
-          // First file also becomes the thumbnail
-          if (f.id === files[0].id) thumbnailUrl = result.url;
-        } catch {
-          rawFiles.push({ name: rawFile.name, url: f.preview, uploadedAt: new Date().toISOString() });
+          rawFiles.push({
+            name: rawFile.name,
+            url: result.url,
+            fileId: result.fileId,
+            usageType: i === 0 ? "master" : "supplementary",
+            mimeType: result.mimeType || rawFile.type,
+            size: result.size || rawFile.size,
+            uploadedAt: new Date().toISOString(),
+          });
+          if (i === 0) thumbnailUrl = result.url;
+        } catch (err) {
+          addToast(`Failed to upload ${rawFile.name}: ${err instanceof Error ? err.message : "error"}`, "error");
+          uploadFailed = true;
+          break;
         }
       }
+    }
+
+    if (uploadFailed) {
+      setSubmitting(false);
+      return; // Don't create card with missing files
     }
 
     createCard({

@@ -50,47 +50,64 @@ async function driveFetch(url: string, init?: RequestInit): Promise<Response> {
 
 // ─── Subfolder cache ───
 
+// Folder cache + mutex: prevents duplicate folder creation on parallel requests
 const folderCache = new Map<string, string>();
+const folderLocks = new Map<string, Promise<string>>();
 
 export async function ensureSubfolder(name: string, parentId: string): Promise<string> {
   const cacheKey = `${parentId}/${name}`;
+
+  // Fast path: already resolved
   if (folderCache.has(cacheKey)) return folderCache.get(cacheKey)!;
 
-  // Check if folder already exists
-  const q = encodeURIComponent(
-    `name='${name}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
-  );
-  const listRes = await driveFetch(`${DRIVE_API}/files?q=${q}&fields=files(id)&spaces=drive`);
-  if (!listRes.ok) {
-    const err = await listRes.text();
-    throw new Error(`Failed to list folders: ${listRes.status} ${err}`);
-  }
-  const listData = await listRes.json();
+  // Mutex: if another request is already creating this folder, wait for it
+  if (folderLocks.has(cacheKey)) return folderLocks.get(cacheKey)!;
 
-  if (listData.files && listData.files.length > 0) {
-    const id = listData.files[0].id;
+  const promise = (async () => {
+    // Check if folder already exists on Drive
+    const q = encodeURIComponent(
+      `name='${name}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
+    );
+    const listRes = await driveFetch(`${DRIVE_API}/files?q=${q}&fields=files(id)&spaces=drive`);
+    if (!listRes.ok) {
+      const err = await listRes.text();
+      throw new Error(`Failed to list folders: ${listRes.status} ${err}`);
+    }
+    const listData = await listRes.json();
+
+    if (listData.files && listData.files.length > 0) {
+      const id = listData.files[0].id;
+      folderCache.set(cacheKey, id);
+      return id;
+    }
+
+    // Create the subfolder (only one request will reach here per cacheKey)
+    const createRes = await driveFetch(`${DRIVE_API}/files`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name,
+        mimeType: "application/vnd.google-apps.folder",
+        parents: [parentId],
+      }),
+    });
+    if (!createRes.ok) {
+      const err = await createRes.text();
+      throw new Error(`Failed to create folder: ${createRes.status} ${err}`);
+    }
+    const createData = await createRes.json();
+    const id = createData.id;
     folderCache.set(cacheKey, id);
     return id;
-  }
+  })();
 
-  // Create the subfolder
-  const createRes = await driveFetch(`${DRIVE_API}/files`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      name,
-      mimeType: "application/vnd.google-apps.folder",
-      parents: [parentId],
-    }),
-  });
-  if (!createRes.ok) {
-    const err = await createRes.text();
-    throw new Error(`Failed to create folder: ${createRes.status} ${err}`);
+  // Store the pending promise so parallel callers wait on it
+  folderLocks.set(cacheKey, promise);
+  try {
+    return await promise;
+  } finally {
+    folderLocks.delete(cacheKey);
   }
-  const createData = await createRes.json();
-  const id = createData.id;
-  folderCache.set(cacheKey, id);
-  return id;
 }
 
 // ─── Resumable upload session ───

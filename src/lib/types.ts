@@ -15,10 +15,20 @@ export interface ChecklistItem {
   checked: boolean;
 }
 
+export interface RawFile {
+  name: string;
+  url: string;
+  fileId?: string;
+  usageType: "master" | "supplementary";
+  mimeType?: string;
+  size?: number;
+  uploadedAt: string;
+}
+
 export interface SourceVault {
   designLink?: string;
   driveFolder?: string;
-  rawFiles?: { name: string; url: string; uploadedAt: string }[];
+  rawFiles?: RawFile[];
 }
 
 export interface ContentCard {
