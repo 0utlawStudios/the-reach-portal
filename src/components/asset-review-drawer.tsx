@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { PlatformIcon } from "./platform-icons";
 import { MentionTextarea } from "./mention-textarea";
+import { RichComment } from "./rich-comment";
 import { InlineEdit } from "./inline-edit";
 import { useAuth } from "@/lib/auth-context";
 import { useTeam } from "@/lib/team-context";
@@ -568,7 +569,7 @@ export function AssetReviewDrawer() {
                                   {timestamp && <span className={`text-[9px] ${isRevisionNote ? "text-violet-600/60 dark:text-violet-400/40" : "text-amber-600/60 dark:text-amber-400/40"}`}>{timestamp}</span>}
                                 </div>
                               )}
-                              <p className={`text-[12px] leading-relaxed ${isRevisionNote ? "text-violet-900 dark:text-violet-200" : "text-amber-900 dark:text-amber-200"}`}>{content}</p>
+                              <RichComment text={content} className={`text-[12px] leading-relaxed ${isRevisionNote ? "text-violet-900 dark:text-violet-200" : "text-amber-900 dark:text-amber-200"}`} />
                             </div>
                           </div>
                         );
@@ -753,8 +754,23 @@ export function AssetReviewDrawer() {
                   const note = `${currentUser.name} (${ts}): ${feedback}`;
                   updateCard(selectedCard.id, { notes: (selectedCard.notes ? selectedCard.notes + "\n\n" : "") + note });
                   moveCard(selectedCard.id, "revision_needed");
-                  addToast("Revision requested. Agency team notified.", "warning");
+                  addToast("Revision requested. Creator & Creative Director notified.", "warning");
                   setRevisionMode(false); setRevisionFeedback("");
+
+                  // Fire revision email to Creator + Creative Director
+                  fetch("/api/notifications/revision", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      postId: selectedCard.id,
+                      postTitle: selectedCard.title,
+                      revisionNote: feedback,
+                      requestedBy: currentUser.email,
+                      createdBy: selectedCard.createdBy,
+                    }),
+                  }).catch(() => {});
+
+                  // Also fire @mention notifications if present
                   if (feedback.includes("@")) {
                     fetch("/api/notifications/mention", {
                       method: "POST",
