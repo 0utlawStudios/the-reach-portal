@@ -42,6 +42,7 @@ export interface ContentCard {
   sourceVault?: SourceVault;
   assetSource?: string;
   licenseFileId?: string;
+  createdBy?: string;
 }
 
 export interface MediaAsset {

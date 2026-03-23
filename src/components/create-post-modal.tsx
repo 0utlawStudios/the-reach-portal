@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { X, Image as ImageIcon, Film, Layers, PlayCircle, Upload, FileVideo, Plus } from "lucide-react";
 import { PlatformIcon } from "./platform-icons";
 import { useToast } from "@/lib/toast-context";
+import { useAuth } from "@/lib/auth-context";
 import { MentionTextarea } from "./mention-textarea";
 
 const contentTypes: { id: ContentType; label: string; icon: React.ReactNode }[] = [
@@ -35,6 +36,7 @@ interface Props {
 export function CreatePostModal({ open, onClose }: Props) {
   const { createCard } = usePipeline();
   const { addToast } = useToast();
+  const { currentUser } = useAuth();
   const [title, setTitle] = useState("");
   const [caption, setCaption] = useState("");
   const [hook, setHook] = useState("");
@@ -126,6 +128,7 @@ export function CreatePostModal({ open, onClose }: Props) {
       hook: hook.trim() || undefined,
       scheduledDate: scheduledDate || undefined,
       scheduledTime: scheduledTime || undefined,
+      createdBy: currentUser.name,
     });
 
     rawFilesRef.current.clear();

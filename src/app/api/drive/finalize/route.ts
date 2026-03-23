@@ -19,11 +19,15 @@ export async function POST(request: NextRequest) {
     const isImage = meta.mimeType.startsWith("image/");
     const isVideo = meta.mimeType.startsWith("video/");
 
+    // Always use our stream proxy as primary URL — it's authenticated server-side
+    // and works immediately (lh3 URLs break during Google permission propagation)
+    const proxyUrl = getStreamUrl(fileId);
+
     return NextResponse.json({
       fileId,
-      imageUrl: isImage ? getImageUrl(fileId) : null,
-      streamUrl: isVideo ? getStreamUrl(fileId) : null,
-      url: isImage ? getImageUrl(fileId) : isVideo ? getStreamUrl(fileId) : `https://drive.google.com/uc?id=${fileId}`,
+      imageUrl: isImage ? proxyUrl : null,
+      streamUrl: isVideo ? proxyUrl : null,
+      url: proxyUrl,
       mimeType: meta.mimeType,
       size: meta.size,
     });

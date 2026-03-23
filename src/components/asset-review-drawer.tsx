@@ -261,6 +261,19 @@ export function AssetReviewDrawer() {
               inputClassName="text-[18px] font-bold"
             />
 
+            {/* Creator + date */}
+            <div className="flex items-center gap-2 text-[10px] text-gray-400 dark:text-gray-500">
+              {selectedCard.createdBy && (
+                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/[0.05] font-medium text-gray-500 dark:text-gray-400">
+                  <span className="w-4 h-4 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-[7px] font-bold text-white shrink-0">
+                    {selectedCard.createdBy.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                  </span>
+                  {selectedCard.createdBy}
+                </span>
+              )}
+              <span>{selectedCard.createdAt ? new Date(selectedCard.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""}</span>
+            </div>
+
             {/* Platforms */}
             <div className="flex flex-wrap gap-2">
               {selectedCard.platforms.map((p) => {
@@ -358,10 +371,13 @@ export function AssetReviewDrawer() {
               </div>
             )}
 
-            {/* Uploaded files list */}
+            {/* Publishable files — what n8n pulls for posting */}
             {(selectedCard.sourceVault?.rawFiles || []).length > 0 && (
               <div className="space-y-1.5">
-                <p className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.1em]">Attached Files</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.1em]">Content for Publishing</p>
+                  <span className="text-[8px] text-emerald-500 dark:text-emerald-400 font-medium bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-500/20">Auto-posted by n8n</span>
+                </div>
                 {(selectedCard.sourceVault?.rawFiles || []).map((file, i) => {
                   const isImage = /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(file.name);
                   const isVideo = /\.(mp4|mov|avi|webm|mkv)$/i.test(file.name);
@@ -403,7 +419,7 @@ export function AssetReviewDrawer() {
             <input ref={rawFileInputRef} type="file" accept="image/*,video/*,.pdf,.psd,.ai,.prproj,.aep,.sketch,.fig" onChange={handleRawFileUpload} className="hidden" />
             <button disabled={uploading} onClick={() => rawFileInputRef.current?.click()} className="w-full border border-dashed border-gray-200 dark:border-white/[0.08] rounded-xl py-3.5 flex items-center justify-center gap-2 text-gray-400 dark:text-gray-500 hover:text-orange-500 hover:border-orange-300 dark:hover:border-orange-500/30 hover:bg-orange-50/30 dark:hover:bg-orange-500/[0.02] transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
               <Upload className="w-3.5 h-3.5" />
-              <span className="text-[11px]">Upload additional files</span>
+              <span className="text-[11px]">Upload content for publishing</span>
             </button>
           </div>
 
