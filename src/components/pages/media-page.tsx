@@ -37,20 +37,30 @@ export function MediaPage() {
     return items.sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
   }, [media, activeFolder, activeType, statusFilter, search]);
 
-  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
-    const newAssets: MediaAsset[] = Array.from(files).map((file) => ({
-      id: `m-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      name: file.name,
-      url: URL.createObjectURL(file),
-      type: file.type.startsWith("video") ? "video" : "image",
-      folder: "Uploads",
-      uploadedAt: new Date().toISOString().split("T")[0],
-      uploadedTime: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
-      addedBy: "Admin",
-    }));
-    setMedia((prev) => [...newAssets, ...prev]);
+    const { uploadToDrive } = await import("@/lib/drive-upload");
+    for (const file of Array.from(files)) {
+      const id = `m-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      // Add with blob preview immediately
+      const blobUrl = URL.createObjectURL(file);
+      const asset: MediaAsset = {
+        id,
+        name: file.name,
+        url: blobUrl,
+        type: file.type.startsWith("video") ? "video" : "image",
+        folder: "Uploads",
+        uploadedAt: new Date().toISOString().split("T")[0],
+        uploadedTime: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+        addedBy: "Admin",
+      };
+      setMedia((prev) => [asset, ...prev]);
+      // Upload to Drive in background, then swap URL
+      uploadToDrive(file, "media-library").then((result) => {
+        setMedia((prev) => prev.map((m) => m.id === id ? { ...m, url: result.url } : m));
+      }).catch(() => { /* keep blob preview on failure */ });
+    }
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 

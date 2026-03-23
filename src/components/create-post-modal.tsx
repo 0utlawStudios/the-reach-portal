@@ -51,25 +51,33 @@ export function CreatePostModal({ open, onClose }: Props) {
     setPlatforms((prev) => prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]);
   };
 
+  // Keep raw File objects for Drive upload on submit
+  const rawFilesRef = useRef<Map<string, File>>(new Map());
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files;
     if (!selected) return;
 
-    const newFiles: UploadedFile[] = Array.from(selected).map((file) => ({
-      id: Date.now().toString() + Math.random().toString(36).slice(2),
-      name: file.name,
-      size: file.size < 1024 * 1024
-        ? `${(file.size / 1024).toFixed(0)} KB`
-        : `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
-      type: file.type.startsWith("video") ? "video" : "image",
-      preview: URL.createObjectURL(file),
-    }));
+    const newFiles: UploadedFile[] = Array.from(selected).map((file) => {
+      const id = Date.now().toString() + Math.random().toString(36).slice(2);
+      rawFilesRef.current.set(id, file);
+      return {
+        id,
+        name: file.name,
+        size: file.size < 1024 * 1024
+          ? `${(file.size / 1024).toFixed(0)} KB`
+          : `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+        type: file.type.startsWith("video") ? "video" : "image",
+        preview: URL.createObjectURL(file),
+      };
+    });
 
     setFiles((prev) => [...prev, ...newFiles]);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const removeFile = (id: string) => {
+    rawFilesRef.current.delete(id);
     setFiles((prev) => {
       const file = prev.find((f) => f.id === id);
       if (file) URL.revokeObjectURL(file.preview);
@@ -77,7 +85,9 @@ export function CreatePostModal({ open, onClose }: Props) {
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const missing: string[] = [];
     if (!title.trim()) missing.push("title");
@@ -88,21 +98,42 @@ export function CreatePostModal({ open, onClose }: Props) {
     if (!caption.trim()) missing.push("caption");
     if (missing.length > 0) { addToast(`Missing required fields: ${missing.join(", ")}`, "error"); return; }
 
+    setSubmitting(true);
+
+    // Use blob preview initially, upload to Drive in background
+    let thumbnailUrl = files.length > 0
+      ? files[0].preview
+      : "https://images.unsplash.com/photo-1497366216548-37526070297c?w=400&fit=crop";
+
+    // Upload first file to Drive if available
+    if (files.length > 0) {
+      const rawFile = rawFilesRef.current.get(files[0].id);
+      if (rawFile) {
+        try {
+          const { uploadToDrive } = await import("@/lib/drive-upload");
+          const result = await uploadToDrive(rawFile, "thumbnails");
+          thumbnailUrl = result.url;
+        } catch {
+          addToast("Drive upload failed — using local preview", "warning");
+        }
+      }
+    }
+
     createCard({
       title: title.trim(),
       stage: "ideas",
       platforms,
       contentType,
-      thumbnailUrl: files.length > 0
-        ? files[0].preview
-        : "https://images.unsplash.com/photo-1497366216548-37526070297c?w=400&fit=crop",
+      thumbnailUrl,
       caption: caption.trim() || undefined,
       hook: hook.trim() || undefined,
       scheduledDate: scheduledDate || undefined,
       scheduledTime: scheduledTime || undefined,
     });
 
+    rawFilesRef.current.clear();
     setTitle(""); setCaption(""); setHook(""); setPlatforms([]); setContentType("video"); setScheduledDate(""); setScheduledTime(""); setFiles([]);
+    setSubmitting(false);
     onClose();
   };
 
@@ -228,8 +259,8 @@ export function CreatePostModal({ open, onClose }: Props) {
             {/* Actions */}
             <div className="flex gap-2 pt-2">
               <Button type="button" variant="outline" onClick={onClose} className="flex-1 h-10 rounded-lg text-[12px]">Cancel</Button>
-              <Button type="submit" disabled={!title.trim() || platforms.length === 0 || !scheduledDate || !scheduledTime || !hook.trim() || !caption.trim()} className="flex-1 h-10 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-[12px] disabled:opacity-40 shadow-sm">
-                Create Post
+              <Button type="submit" disabled={submitting || !title.trim() || platforms.length === 0 || !scheduledDate || !scheduledTime || !hook.trim() || !caption.trim()} className="flex-1 h-10 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-[12px] disabled:opacity-40 shadow-sm">
+                {submitting ? "Uploading..." : "Create Post"}
               </Button>
             </div>
           </form>

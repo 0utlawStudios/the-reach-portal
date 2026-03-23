@@ -148,19 +148,19 @@ export function AssetReviewDrawer() {
   const handleAssetReplace = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    let newUrl = URL.createObjectURL(file);
-    if (useSupabase) {
-      const ext = file.name.split(".").pop();
-      const path = `assets/${selectedCard.id}-${Date.now()}.${ext}`;
-      const { error } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
-      if (!error) {
-        const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
-        newUrl = urlData.publicUrl;
-      }
+    // Show blob preview immediately, then upload to Drive in background
+    const blobUrl = URL.createObjectURL(file);
+    updateCard(selectedCard.id, { thumbnailUrl: blobUrl });
+    addToast("Uploading to Drive...", "info");
+    try {
+      const { uploadToDrive } = await import("@/lib/drive-upload");
+      const result = await uploadToDrive(file, "thumbnails", selectedCard.id);
+      updateCard(selectedCard.id, { thumbnailUrl: result.url });
+      addToast("Primary asset uploaded to Drive", "success");
+    } catch {
+      addToast("Drive upload failed — using local preview", "warning");
     }
-    updateCard(selectedCard.id, { thumbnailUrl: newUrl });
     logAudit(selectedCard.id, currentUser.name, "asset_replaced", `Replaced primary asset with ${file.name}`);
-    addToast("Primary asset replaced", "success");
     if (assetInputRef.current) assetInputRef.current.value = "";
   };
 
@@ -178,21 +178,20 @@ export function AssetReviewDrawer() {
   const handleRawFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    addToast(`Uploading ${file.name}...`, "info");
     let fileUrl = URL.createObjectURL(file);
-    if (useSupabase) {
-      const ext = file.name.split(".").pop();
-      const path = `raw-files/${selectedCard.id}-${Date.now()}.${ext}`;
-      const { error } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
-      if (!error) {
-        const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
-        fileUrl = urlData.publicUrl;
-      }
+    try {
+      const { uploadToDrive } = await import("@/lib/drive-upload");
+      const result = await uploadToDrive(file, "raw-files", selectedCard.id);
+      fileUrl = result.url;
+    } catch {
+      addToast("Drive upload failed — using local preview", "warning");
     }
     const rawFiles = [...(selectedCard.sourceVault?.rawFiles || []), { name: file.name, url: fileUrl, uploadedAt: new Date().toISOString() }];
     const vault = { ...selectedCard.sourceVault, rawFiles };
     updateCard(selectedCard.id, { sourceVault: vault });
     logAudit(selectedCard.id, currentUser.name, "raw_file_uploaded", `Uploaded ${file.name}`);
-    addToast(`${file.name} uploaded`, "success");
+    addToast(`${file.name} uploaded to Drive`, "success");
     if (rawFileInputRef.current) rawFileInputRef.current.value = "";
   };
 
