@@ -329,6 +329,10 @@ export function AssetReviewDrawer() {
 
           {/* ══ SECTION 2: Media Hero ══ */}
           <div className="px-5 md:px-7 pb-4 md:pb-5 space-y-3">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.1em]">Card Thumbnail</p>
+              <span className="text-[8px] text-gray-400 dark:text-gray-600 font-medium">Preview only — not posted</span>
+            </div>
             <div className="relative w-full rounded-2xl overflow-hidden bg-gray-50 dark:bg-white/[0.03] group shadow-sm">
               {(selectedCard.contentType === "video" || selectedCard.contentType === "reel") ? (
                 <video src={selectedCard.thumbnailUrl} controls poster={selectedCard.thumbnailUrl} className="w-full aspect-video rounded-2xl bg-black object-contain" />
