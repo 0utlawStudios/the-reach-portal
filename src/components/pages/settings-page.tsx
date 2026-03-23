@@ -421,6 +421,11 @@ export function SettingsPage() {
                           "text-gray-500 bg-gray-50 border-gray-200 dark:bg-white/[0.04] dark:text-gray-400 dark:border-white/[0.08]";
                         return <Badge key={badge} variant="outline" className={`text-[10px] h-5 px-2 border ${badgeColor}`}>{badge}</Badge>;
                       })}
+                      {member.status === "pending" && (
+                        <Badge variant="outline" className="text-[10px] h-5 px-2 border text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20 animate-pulse">
+                          <Mail className="w-2.5 h-2.5 mr-1" />Pending Invite
+                        </Badge>
+                      )}
                     </div>
                   </div>
                 </button>
