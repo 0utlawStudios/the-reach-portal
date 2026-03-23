@@ -210,7 +210,8 @@ function ComingSoonBadge() {
 // ─── Main Settings Page ───
 export function SettingsPage() {
   const { theme, toggleTheme } = useTheme();
-  const { members, inviteMember, removeMember } = useTeam();
+  const { members, removeMember } = useTeam();
+  const { currentUser } = useAuth();
   const { addToast } = useToast();
   const [activeTab, setActiveTab] = useState<"general" | "team" | "audit">("general");
   const [auditLogs, setAuditLogs] = useState<AuditEntry[]>([]);
@@ -219,14 +220,36 @@ export function SettingsPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteName, setInviteName] = useState("");
   const [inviteRole, setInviteRole] = useState<UserRole>("viewer");
+  const [inviting, setInviting] = useState(false);
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
 
-  const handleInvite = (e: React.FormEvent) => {
+  const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inviteEmail.trim() || !inviteName.trim()) return;
-    inviteMember(inviteEmail.trim(), inviteName.trim(), inviteRole);
-    addToast(`Invitation sent to ${inviteName.trim()}`, "success");
-    setInviteEmail(""); setInviteName(""); setShowInvite(false);
+    if (!inviteEmail.trim() || !inviteName.trim() || inviting) return;
+    setInviting(true);
+    try {
+      const res = await fetch("/api/team/invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: inviteEmail.trim(),
+          name: inviteName.trim(),
+          role: inviteRole,
+          requestedBy: currentUser.email,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        addToast(data.error || "Invite failed", "error");
+        return;
+      }
+      addToast(`Secure invite link sent to ${inviteEmail.trim()}`, "success");
+      setInviteEmail(""); setInviteName(""); setShowInvite(false);
+    } catch {
+      addToast("Network error — invite not sent", "error");
+    } finally {
+      setInviting(false);
+    }
   };
 
   return (
@@ -323,19 +346,23 @@ export function SettingsPage() {
           </div>
 
           {showInvite && (
-            <form onSubmit={handleInvite} className="bg-white dark:bg-[#151518] rounded-xl border border-gray-200 dark:border-white/[0.08] p-4 space-y-2 shadow-sm">
+            <form onSubmit={handleInvite} className="bg-white dark:bg-[#151518] rounded-xl border border-blue-200 dark:border-blue-500/20 p-4 space-y-2.5 shadow-sm shadow-blue-500/5">
               <div className="flex items-center justify-between">
-                <h3 className="text-[12px] font-semibold text-gray-600 dark:text-gray-300">Invite New Member</h3>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center"><UserPlus className="w-3 h-3 text-blue-600 dark:text-blue-400" /></div>
+                  <h3 className="text-[12px] font-semibold text-gray-700 dark:text-gray-200">Invite Team Member</h3>
+                </div>
                 <button type="button" onClick={() => setShowInvite(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer"><X className="w-4 h-4" /></button>
               </div>
+              <p className="text-[10px] text-gray-400 dark:text-gray-500 -mt-1">A secure magic link will be sent to their email. No temporary passwords.</p>
               <Input placeholder="Full name" value={inviteName} onChange={(e) => setInviteName(e.target.value)} className="h-9 bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[12px]" autoFocus />
               <Input type="email" placeholder="email@example.com" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} className="h-9 bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[12px]" />
               <div className="flex gap-2">
                 <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value as UserRole)} className="h-9 px-3 rounded-lg bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-[12px] text-gray-600 dark:text-gray-300 outline-none cursor-pointer flex-1">
                   <option value="viewer">Viewer</option><option value="editor">Editor</option><option value="specialist">Specialist</option><option value="technician">Field Tech</option><option value="admin">Admin</option>
                 </select>
-                <Button type="submit" size="sm" disabled={!inviteEmail.trim() || !inviteName.trim()} className="h-9 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[12px] px-4 cursor-pointer">
-                  <Send className="w-3 h-3 mr-1.5" />Send
+                <Button type="submit" size="sm" disabled={inviting || !inviteEmail.trim() || !inviteName.trim()} className="h-9 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-[12px] px-5 cursor-pointer shadow-sm disabled:opacity-40">
+                  {inviting ? <span className="flex items-center gap-1.5"><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Sending...</span> : <><Send className="w-3 h-3 mr-1.5" />Send Invite</>}
                 </Button>
               </div>
             </form>
