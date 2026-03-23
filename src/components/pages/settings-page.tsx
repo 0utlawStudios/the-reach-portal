@@ -131,13 +131,13 @@ function EditProfileModal({ member, onClose, onDelete, canDelete }: { member: Te
             {/* Name */}
             <div className="space-y-1">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.08em]">Full Name</label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} className="h-9 bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[13px]" />
+              <Input value={name} onChange={(e) => setName(e.target.value)} className="h-9 bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[13px] text-gray-800 dark:text-gray-200" />
             </div>
 
             {/* Email */}
             <div className="space-y-1">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.08em]">Email</label>
-              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="h-9 bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[13px]" />
+              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="h-9 bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[13px] text-gray-800 dark:text-gray-200" />
             </div>
 
             {/* Role */}
