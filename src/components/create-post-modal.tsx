@@ -149,7 +149,7 @@ export function CreatePostModal({ open, onClose }: Props) {
             {/* Title */}
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Title <span className="text-red-400">*</span></label>
-              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Spring Cleaning Tips" className="h-10 bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[13px]" autoFocus />
+              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Product Launch Reel, BTS Shoot Day" className="h-10 bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[13px]" autoFocus />
             </div>
 
             {/* File Upload */}
