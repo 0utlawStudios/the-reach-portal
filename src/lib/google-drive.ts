@@ -68,7 +68,7 @@ export async function ensureSubfolder(name: string, parentId: string): Promise<s
     const q = encodeURIComponent(
       `name='${name}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
     );
-    const listRes = await driveFetch(`${DRIVE_API}/files?q=${q}&fields=files(id)&spaces=drive`);
+    const listRes = await driveFetch(`${DRIVE_API}/files?q=${q}&fields=files(id)&spaces=drive&supportsAllDrives=true&includeItemsFromAllDrives=true`);
     if (!listRes.ok) {
       const err = await listRes.text();
       throw new Error(`Failed to list folders: ${listRes.status} ${err}`);
@@ -82,7 +82,7 @@ export async function ensureSubfolder(name: string, parentId: string): Promise<s
     }
 
     // Create the subfolder (only one request will reach here per cacheKey)
-    const createRes = await driveFetch(`${DRIVE_API}/files`, {
+    const createRes = await driveFetch(`${DRIVE_API}/files?supportsAllDrives=true`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -149,7 +149,7 @@ export async function createResumableUploadSession(
 // ─── Permissions ───
 
 export async function setPublicPermission(fileId: string): Promise<void> {
-  const res = await driveFetch(`${DRIVE_API}/files/${fileId}/permissions`, {
+  const res = await driveFetch(`${DRIVE_API}/files/${fileId}/permissions?supportsAllDrives=true`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ role: "reader", type: "anyone" }),
@@ -173,7 +173,7 @@ export function getStreamUrl(fileId: string): string {
 // ─── File metadata ───
 
 export async function getFileMetadata(fileId: string) {
-  const res = await driveFetch(`${DRIVE_API}/files/${fileId}?fields=id,name,mimeType,size`);
+  const res = await driveFetch(`${DRIVE_API}/files/${fileId}?fields=id,name,mimeType,size&supportsAllDrives=true`);
   if (!res.ok) {
     const err = await res.text();
     throw new Error(`Failed to get file metadata: ${res.status} ${err}`);

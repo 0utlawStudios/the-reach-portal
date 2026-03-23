@@ -1,10 +1,11 @@
 /**
- * Client-side Google Drive upload with retry logic + progress tracking.
+ * Client-side Google Drive upload via server proxy.
  *
- * Flow:
- * 1. POST /api/drive/upload → get resumable uploadUri (with retry)
- * 2. PUT file to Google's uploadUri via XHR (progress events)
- * 3. POST /api/drive/finalize → set permissions, get serving URLs (with retry)
+ * Flow: Client → /api/drive/proxy-upload (FormData) → Google Drive → returns fileId + URL
+ *
+ * Why proxy: Google Drive's resumable upload URIs don't support CORS for
+ * browser uploads initiated by service accounts. Proxying through our API
+ * eliminates CORS entirely — the upload is same-origin.
  *
  * Guarantees:
  * - Never returns a blob: URL
@@ -21,7 +22,6 @@ export interface DriveUploadResult {
 
 export type ProgressCallback = (percent: number) => void;
 
-// Exponential backoff: 2s, 8s, 32s
 const RETRY_DELAYS = [2000, 8000, 32000];
 
 async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
@@ -31,7 +31,6 @@ async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
       return await fn();
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
-      // Don't retry client errors (4xx)
       if (lastError.message.includes("400") || lastError.message.includes("401") || lastError.message.includes("403") || lastError.message.includes("404")) {
         throw lastError;
       }
@@ -51,82 +50,63 @@ export async function uploadToDrive(
   onProgress?: ProgressCallback
 ): Promise<DriveUploadResult> {
   if (file.size === 0) throw new Error("Cannot upload empty file");
-  if (file.size > 5 * 1024 * 1024 * 1024) throw new Error("File exceeds 5GB limit");
+  if (file.size > 25 * 1024 * 1024) throw new Error("File exceeds 25MB limit. Contact admin for larger files.");
 
-  // Step 1: Get resumable upload URI (with retry)
   onProgress?.(0);
-  const { uploadUri } = await withRetry(async () => {
-    const res = await fetch("/api/drive/upload", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        fileName: file.name,
-        mimeType: file.type || "application/octet-stream",
-        folder,
-        cardId,
-      }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-      throw new Error(err.error || `Upload init failed (${res.status})`);
-    }
-    return res.json();
-  }, "Upload init");
 
-  onProgress?.(5);
-
-  // Step 2: Upload file directly to Google via XHR (no retry — resumable handles this)
-  const fileId = await new Promise<string>((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("PUT", uploadUri, true);
-    xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
-
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) {
-        onProgress?.(Math.round(5 + (e.loaded / e.total) * 80));
-      }
-    };
-
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        onProgress?.(85);
-        try {
-          const data = JSON.parse(xhr.responseText);
-          resolve(data.id);
-        } catch {
-          reject(new Error("Upload completed but response missing file ID"));
-        }
-      } else {
-        reject(new Error(`Google Drive upload failed: ${xhr.status}`));
-      }
-    };
-
-    xhr.onerror = () => reject(new Error("Network error during upload to Google"));
-    xhr.ontimeout = () => reject(new Error("Upload to Google timed out"));
-    xhr.send(file);
-  });
-
-  // Step 3: Finalize — set permissions and get URLs (with retry)
-  onProgress?.(90);
   const result = await withRetry(async () => {
-    const res = await fetch("/api/drive/finalize", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fileId }),
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("folder", folder);
+    formData.append("fileName", file.name);
+    formData.append("mimeType", file.type || "application/octet-stream");
+    if (cardId) formData.append("cardId", cardId);
+
+    // Use XHR for progress tracking on same-origin request
+    return new Promise<DriveUploadResult>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", "/api/drive/proxy-upload", true);
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          onProgress?.(Math.round((e.loaded / e.total) * 90));
+        }
+      };
+
+      xhr.onload = () => {
+        onProgress?.(95);
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const data = JSON.parse(xhr.responseText);
+            if (data.error) {
+              reject(new Error(data.error));
+            } else {
+              onProgress?.(100);
+              resolve({
+                fileId: data.fileId,
+                url: data.url,
+                mimeType: data.mimeType,
+                size: data.size,
+              });
+            }
+          } catch {
+            reject(new Error("Invalid response from upload server"));
+          }
+        } else {
+          try {
+            const data = JSON.parse(xhr.responseText);
+            reject(new Error(data.error || `Upload failed: ${xhr.status}`));
+          } catch {
+            reject(new Error(`Upload failed: ${xhr.status}`));
+          }
+        }
+      };
+
+      xhr.onerror = () => reject(new Error("Network error during upload"));
+      xhr.ontimeout = () => reject(new Error("Upload timed out"));
+      xhr.send(formData);
     });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-      throw new Error(err.error || `Finalize failed (${res.status})`);
-    }
-    return res.json();
-  }, "Finalize");
+  }, "Upload");
 
-  onProgress?.(100);
-
-  return {
-    fileId: result.fileId || fileId,
-    url: result.url,
-    mimeType: result.mimeType,
-    size: result.size,
-  };
+  return result;
 }
