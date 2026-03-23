@@ -49,6 +49,7 @@ export function CreatePostModal({ open, onClose }: Props) {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [assetSource, setAssetSource] = useState("");
+  const [assetSourceOther, setAssetSourceOther] = useState(false);
   const [designLink, setDesignLink] = useState("");
   const [driveFolder, setDriveFolder] = useState("");
   const [notes, setNotes] = useState("");
@@ -150,7 +151,7 @@ export function CreatePostModal({ open, onClose }: Props) {
 
     rawFilesRef.current.clear();
     setTitle(""); setCaption(""); setHook(""); setPlatforms([]); setContentType("video");
-    setScheduledDate(""); setScheduledTime(""); setFiles([]); setAssetSource("");
+    setScheduledDate(""); setScheduledTime(""); setFiles([]); setAssetSource(""); setAssetSourceOther(false);
     setDesignLink(""); setDriveFolder(""); setNotes(""); setActiveTab("content");
     setChecklist(DEFAULT_CHECKLIST.map((c) => ({ ...c })));
     setSubmitting(false);
@@ -307,10 +308,32 @@ export function CreatePostModal({ open, onClose }: Props) {
                 {/* Asset Source */}
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Asset Source</label>
-                  <select value={assetSource} onChange={(e) => setAssetSource(e.target.value)} className={`${inputClass} cursor-pointer`}>
+                  <select
+                    value={assetSourceOther ? "__other__" : assetSource}
+                    onChange={(e) => {
+                      if (e.target.value === "__other__") {
+                        setAssetSourceOther(true);
+                        setAssetSource("");
+                      } else {
+                        setAssetSourceOther(false);
+                        setAssetSource(e.target.value);
+                      }
+                    }}
+                    className={`${inputClass} cursor-pointer`}
+                  >
                     <option value="">Select source...</option>
                     {ASSET_SOURCES.map((s) => <option key={s} value={s}>{s}</option>)}
+                    <option value="__other__">Other (specify below)</option>
                   </select>
+                  {assetSourceOther && (
+                    <input
+                      value={assetSource}
+                      onChange={(e) => setAssetSource(e.target.value)}
+                      placeholder="Specify the asset source..."
+                      className={`${inputClass} border-orange-200 dark:border-orange-500/20`}
+                      autoFocus
+                    />
+                  )}
                 </div>
 
                 {/* Notes */}

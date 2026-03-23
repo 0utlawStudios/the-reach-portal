@@ -482,32 +482,13 @@ export function AssetReviewDrawer() {
                 {/* ── Compliance Block ── */}
                 <div className="bg-white dark:bg-white/[0.02] rounded-xl border border-gray-200/60 dark:border-white/[0.06] shadow-sm overflow-hidden">
                   {/* Asset Source */}
-                  <div className="p-4 border-b border-gray-100 dark:border-white/[0.04]">
-                    <label className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.1em] flex items-center gap-1.5 mb-2.5">
-                      <FileText className="w-3 h-3 text-orange-400" />Asset Source
-                      {!selectedCard.assetSource?.trim() && <span className="text-red-400 text-[8px] normal-case ml-auto">Required</span>}
-                    </label>
-                    <select
-                      value={selectedCard.assetSource || ""}
-                      onChange={(e) => {
-                        updateCard(selectedCard.id, { assetSource: e.target.value || undefined });
-                        logAudit(selectedCard.id, currentUser.name, "content_edited", `Asset source: ${e.target.value}`);
-                      }}
-                      className="w-full h-9 px-3 rounded-lg bg-slate-50 dark:bg-white/[0.03] border border-gray-200 dark:border-white/[0.08] text-[12px] text-gray-700 dark:text-gray-300 outline-none cursor-pointer focus:border-orange-400 focus:ring-2 focus:ring-orange-100 dark:focus:ring-orange-500/10 transition-all"
-                    >
-                      <option value="">Select source...</option>
-                      <option value="Envato Elements">Envato Elements</option>
-                      <option value="Pexels">Pexels</option>
-                      <option value="Shot by Team">Shot by Team</option>
-                      <option value="Client Provided">Client Provided</option>
-                      <option value="Google Images">Google Images</option>
-                      <option value="AI Generated">AI Generated</option>
-                      <option value="Other">Other</option>
-                    </select>
-                    {!selectedCard.assetSource?.trim() && (
-                      <p className="text-[9px] text-amber-500/80 mt-1.5 flex items-center gap-1"><AlertCircle className="w-2.5 h-2.5" />Fill before submitting for approval</p>
-                    )}
-                  </div>
+                  <AssetSourceBlock
+                    value={selectedCard.assetSource || ""}
+                    onChange={(v) => {
+                      updateCard(selectedCard.id, { assetSource: v || undefined });
+                      logAudit(selectedCard.id, currentUser.name, "content_edited", `Asset source: ${v}`);
+                    }}
+                  />
 
                   {/* License upload */}
                   <div className="p-4">
@@ -898,6 +879,52 @@ function MediaPickerGrid({ onSelect }: { onSelect: (url: string) => void }) {
           <img src={url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
         </button>
       ))}
+    </div>
+  );
+}
+
+// ─── Asset Source with "Other" conditional input ───
+const PRESET_SOURCES = ["Envato Elements", "Pexels", "Shot by Team", "Client Provided", "Google Images", "AI Generated"];
+
+function AssetSourceBlock({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const isOther = !!value && !PRESET_SOURCES.includes(value);
+
+  return (
+    <div className="p-4 border-b border-gray-100 dark:border-white/[0.04]">
+      <label className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.1em] flex items-center gap-1.5 mb-2.5">
+        <FileText className="w-3 h-3 text-orange-400" />Asset Source
+        {!value?.trim() && <span className="text-red-400 text-[8px] normal-case ml-auto">Required</span>}
+      </label>
+      <select
+        value={isOther ? "__other__" : value}
+        onChange={(e) => {
+          if (e.target.value === "__other__") {
+            onChange("");
+          } else {
+            onChange(e.target.value);
+          }
+        }}
+        className="w-full h-9 px-3 rounded-lg bg-slate-50 dark:bg-white/[0.03] border border-gray-200 dark:border-white/[0.08] text-[12px] text-gray-700 dark:text-gray-300 outline-none cursor-pointer focus:border-orange-400 focus:ring-2 focus:ring-orange-100 dark:focus:ring-orange-500/10 transition-all"
+      >
+        <option value="">Select source...</option>
+        {PRESET_SOURCES.map((s) => <option key={s} value={s}>{s}</option>)}
+        <option value="__other__">Other (specify below)</option>
+      </select>
+
+      {isOther && (
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Specify the asset source..."
+          className="w-full h-9 px-3 mt-2 rounded-lg bg-slate-50 dark:bg-white/[0.03] border border-orange-200 dark:border-orange-500/20 text-[12px] text-gray-700 dark:text-gray-300 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 dark:focus:ring-orange-500/10 transition-all"
+          autoFocus
+        />
+      )}
+
+      {!value?.trim() && (
+        <p className="text-[9px] text-amber-500/80 mt-1.5 flex items-center gap-1"><AlertCircle className="w-2.5 h-2.5" />Fill before submitting for approval</p>
+      )}
     </div>
   );
 }
