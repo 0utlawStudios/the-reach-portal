@@ -82,9 +82,13 @@ export function MentionTextarea({ value, onChange, placeholder, className, rows 
               onClick={() => insertMention(member.name)}
               className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 dark:hover:bg-white/[0.04] transition-colors cursor-pointer text-left"
             >
-              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-[9px] font-bold text-white shrink-0">
-                {member.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
-              </div>
+              {member.avatar ? (
+                <img src={member.avatar} alt={member.name} className="w-7 h-7 rounded-full object-cover shrink-0" />
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-[9px] font-bold text-white shrink-0">
+                  {member.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                </div>
+              )}
               <div>
                 <p className="text-[12px] font-medium text-gray-800 dark:text-gray-200">{member.name}</p>
                 <p className="text-[9px] text-gray-400">{member.role}{member.secondaryRole ? ` · ${member.secondaryRole}` : ""}</p>
