@@ -18,7 +18,7 @@ import {
   Shield, Download, Sun, Moon, Mail,
   Smartphone, Calendar, BarChart3, Zap, Link2, Webhook, FileText,
   UserPlus, ShieldCheck, Pencil, Eye, Crown, X, Send, Megaphone, Code, Users, Settings as SettingsIcon,
-  Camera, Save, Upload,
+  Camera, Save, Upload, Trash2,
 } from "lucide-react";
 
 const roleConfig: Record<UserRole, { label: string; icon: React.ReactNode; color: string }> = {
@@ -32,10 +32,11 @@ const roleConfig: Record<UserRole, { label: string; icon: React.ReactNode; color
 };
 
 // ─── Edit Profile Modal ───
-function EditProfileModal({ member, onClose }: { member: TeamMember; onClose: () => void }) {
+function EditProfileModal({ member, onClose, onDelete, canDelete }: { member: TeamMember; onClose: () => void; onDelete?: () => void; canDelete?: boolean }) {
   const { updateMember } = useTeam();
   const { addToast } = useToast();
   const { currentUser, updateCurrentUserAvatar } = useAuth();
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [name, setName] = useState(member.name);
   const [email, setEmail] = useState(member.email);
   const [role, setRole] = useState<UserRole>(member.role);
@@ -184,6 +185,28 @@ function EditProfileModal({ member, onClose }: { member: TeamMember; onClose: ()
                 <Save className="w-3.5 h-3.5 mr-1.5" />Save Changes
               </Button>
             </div>
+
+            {/* Delete member — only shown for admins/owners, never for owners */}
+            {canDelete && onDelete && (
+              <div className="pt-3 mt-1 border-t border-gray-100 dark:border-white/[0.06]">
+                {!confirmDelete ? (
+                  <button onClick={() => setConfirmDelete(true)} className="w-full flex items-center justify-center gap-1.5 text-[11px] text-gray-400 hover:text-red-500 transition-colors cursor-pointer py-1.5">
+                    <Trash2 className="w-3 h-3" />Remove from team
+                  </button>
+                ) : (
+                  <div className="bg-red-50 dark:bg-red-500/5 rounded-lg border border-red-200 dark:border-red-500/20 p-3 space-y-2">
+                    <p className="text-[11px] text-red-700 dark:text-red-400 font-medium text-center">Remove {member.name} from the team?</p>
+                    <p className="text-[10px] text-red-500/70 dark:text-red-400/60 text-center">This will revoke their access immediately.</p>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setConfirmDelete(false)} className="flex-1 h-8 rounded-lg text-[11px]">Cancel</Button>
+                      <Button size="sm" onClick={() => { onDelete(); onClose(); }} className="flex-1 h-8 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[11px]">
+                        <Trash2 className="w-3 h-3 mr-1" />Remove
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -408,7 +431,18 @@ export function SettingsPage() {
       )}
 
       {/* Edit Profile Modal */}
-      {editingMember && <EditProfileModal member={editingMember} onClose={() => setEditingMember(null)} />}
+      {editingMember && (
+        <EditProfileModal
+          member={editingMember}
+          onClose={() => setEditingMember(null)}
+          canDelete={
+            editingMember.role !== "owner" &&
+            (currentUser.email !== editingMember.email) &&
+            members.some((m) => m.email === currentUser.email && (m.role === "owner" || m.role === "admin"))
+          }
+          onDelete={() => { removeMember(editingMember.id); addToast(`${editingMember.name} removed from team`, "success"); }}
+        />
+      )}
     </div>
   );
 }
