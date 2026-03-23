@@ -9,7 +9,7 @@ import { useAuth } from "@/lib/auth-context";
 import { usePresence, PresenceStatus } from "@/lib/use-presence";
 import { usePipeline } from "@/lib/pipeline-context";
 import { logAudit, fetchAllAuditLogs, AuditEntry } from "@/lib/audit";
-import { History, ArrowUpRight, SlidersHorizontal } from "lucide-react";
+import { History, ArrowUpRight, SlidersHorizontal, Search, FileText as FileTextIcon, Shield as ShieldIcon, AtSign, ArrowUpDown, Filter } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -485,55 +485,89 @@ export function SettingsPage() {
   );
 }
 
+function timeAgo(dateStr: string): string {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diff = now - then;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+const CONTENT_ACTIONS = ["stage_change", "revision_submitted", "revision_requested", "content_edited", "asset_replaced", "card_viewed", "comment_added", "vault_updated", "raw_file_uploaded", "title_edited", "license_uploaded"];
+const SYSTEM_ACTIONS = ["invite_sent", "role_changed", "member_removed", "settings_changed"];
+const MENTION_ACTIONS = ["mention_sent"];
+
+type AuditCategory = "all" | "content" | "system" | "mentions";
+
 function AuditLogTab({ auditLogs, auditLoading, setAuditLogs, setAuditLoading }: {
   auditLogs: AuditEntry[]; auditLoading: boolean;
   setAuditLogs: (logs: AuditEntry[]) => void; setAuditLoading: (v: boolean) => void;
 }) {
   const { cards, selectCard } = usePipeline();
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
-  const [filterAction, setFilterAction] = useState<string>("all");
+  const [category, setCategory] = useState<AuditCategory>("all");
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     setAuditLoading(true);
-    fetchAllAuditLogs(200).then((logs) => { setAuditLogs(logs); setAuditLoading(false); });
+    fetchAllAuditLogs(500).then((logs) => { setAuditLogs(logs); setAuditLoading(false); });
   }, []);
 
-  const actionColors: Record<string, string> = {
-    stage_change: "bg-blue-500", revision_submitted: "bg-violet-500", revision_requested: "bg-red-500",
-    content_edited: "bg-amber-500", asset_replaced: "bg-emerald-500", card_viewed: "bg-gray-400",
-    comment_added: "bg-orange-500", vault_updated: "bg-sky-500", raw_file_uploaded: "bg-purple-500", title_edited: "bg-amber-500",
-    mention_sent: "bg-pink-500", license_uploaded: "bg-teal-500",
-    invite_sent: "bg-indigo-500", role_changed: "bg-cyan-500", member_removed: "bg-red-600", settings_changed: "bg-gray-500",
+  const actionMeta: Record<string, { label: string; color: string; icon: "content" | "system" | "mention" }> = {
+    stage_change: { label: "Stage Changed", color: "bg-blue-500", icon: "content" },
+    revision_submitted: { label: "Fix Submitted", color: "bg-violet-500", icon: "content" },
+    revision_requested: { label: "Revision Requested", color: "bg-red-500", icon: "content" },
+    content_edited: { label: "Content Edited", color: "bg-amber-500", icon: "content" },
+    asset_replaced: { label: "Asset Replaced", color: "bg-emerald-500", icon: "content" },
+    card_viewed: { label: "Viewed", color: "bg-gray-300 dark:bg-gray-600", icon: "content" },
+    comment_added: { label: "Comment Added", color: "bg-orange-500", icon: "content" },
+    vault_updated: { label: "Vault Updated", color: "bg-sky-500", icon: "content" },
+    raw_file_uploaded: { label: "File Uploaded", color: "bg-purple-500", icon: "content" },
+    title_edited: { label: "Title Edited", color: "bg-amber-500", icon: "content" },
+    license_uploaded: { label: "License Uploaded", color: "bg-teal-500", icon: "content" },
+    mention_sent: { label: "Mention Sent", color: "bg-pink-500", icon: "mention" },
+    invite_sent: { label: "Invite Sent", color: "bg-indigo-500", icon: "system" },
+    role_changed: { label: "Role Changed", color: "bg-cyan-500", icon: "system" },
+    member_removed: { label: "Member Removed", color: "bg-red-600", icon: "system" },
+    settings_changed: { label: "Settings Changed", color: "bg-gray-500", icon: "system" },
   };
-  const actionLabels: Record<string, string> = {
-    stage_change: "Stage Changed", revision_submitted: "Fix Submitted", revision_requested: "Revision Requested",
-    content_edited: "Content Edited", asset_replaced: "Asset Replaced", card_viewed: "Viewed",
-    comment_added: "Comment Added", vault_updated: "Vault Updated", raw_file_uploaded: "File Uploaded", title_edited: "Title Edited",
-    mention_sent: "Mention Sent", license_uploaded: "License Uploaded",
-    invite_sent: "Invite Sent", role_changed: "Role Changed", member_removed: "Member Removed", settings_changed: "Settings Changed",
-  };
-
-  const FILTER_OPTIONS = [
-    { value: "all", label: "All Actions" },
-    { value: "no_views", label: "Hide Views" },
-    { value: "stage_change", label: "Stage Changes" },
-    { value: "revision_submitted", label: "Fixes Submitted" },
-    { value: "revision_requested", label: "Revisions Requested" },
-    { value: "content_edited", label: "Content Edits" },
-    { value: "comment_added", label: "Comments" },
-    { value: "mention_sent", label: "Mentions" },
-    { value: "system", label: "System Events" },
-  ];
 
   const filteredLogs = useMemo(() => {
-    const SYSTEM_ACTIONS = ["invite_sent", "role_changed", "member_removed", "settings_changed", "mention_sent"];
     let logs = [...auditLogs];
-    if (filterAction === "no_views") logs = logs.filter((l) => l.action_type !== "card_viewed");
-    else if (filterAction === "system") logs = logs.filter((l) => SYSTEM_ACTIONS.includes(l.action_type));
-    else if (filterAction !== "all") logs = logs.filter((l) => l.action_type === filterAction);
+
+    // Category filter
+    if (category === "content") logs = logs.filter((l) => CONTENT_ACTIONS.includes(l.action_type));
+    else if (category === "system") logs = logs.filter((l) => SYSTEM_ACTIONS.includes(l.action_type));
+    else if (category === "mentions") logs = logs.filter((l) => MENTION_ACTIONS.includes(l.action_type));
+
+    // Text search
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      logs = logs.filter((l) =>
+        l.user_name.toLowerCase().includes(q) ||
+        (l.details || "").toLowerCase().includes(q) ||
+        (actionMeta[l.action_type]?.label || l.action_type).toLowerCase().includes(q)
+      );
+    }
+
+    // Sort
     if (sortOrder === "oldest") logs.reverse();
     return logs;
-  }, [auditLogs, sortOrder, filterAction]);
+  }, [auditLogs, sortOrder, category, search]);
+
+  // Category counts
+  const counts = useMemo(() => ({
+    all: auditLogs.length,
+    content: auditLogs.filter((l) => CONTENT_ACTIONS.includes(l.action_type)).length,
+    system: auditLogs.filter((l) => SYSTEM_ACTIONS.includes(l.action_type)).length,
+    mentions: auditLogs.filter((l) => MENTION_ACTIONS.includes(l.action_type)).length,
+  }), [auditLogs]);
 
   const handleLogClick = (postId: string) => {
     const card = cards.find((c) => c.id === postId);
@@ -554,51 +588,110 @@ function AuditLogTab({ auditLogs, auditLoading, setAuditLogs, setAuditLoading }:
     );
   }
 
+  const categories: { id: AuditCategory; label: string; icon: React.ReactNode }[] = [
+    { id: "all", label: "All Events", icon: <Filter className="w-3 h-3" /> },
+    { id: "content", label: "Content", icon: <FileTextIcon className="w-3 h-3" /> },
+    { id: "system", label: "System & Team", icon: <ShieldIcon className="w-3 h-3" /> },
+    { id: "mentions", label: "Mentions", icon: <AtSign className="w-3 h-3" /> },
+  ];
+
   return (
     <div className="space-y-3">
-      {/* Controls bar */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2">
-          <select value={filterAction} onChange={(e) => setFilterAction(e.target.value)} className="h-8 px-3 rounded-lg bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-[11px] text-gray-600 dark:text-gray-300 outline-none cursor-pointer">
-            {FILTER_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-          </select>
-          <button onClick={() => setSortOrder((p) => p === "newest" ? "oldest" : "newest")} className="h-8 px-3 rounded-lg bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-[11px] text-gray-600 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-white/[0.06] transition-colors">
-            {sortOrder === "newest" ? "Newest First" : "Oldest First"}
-          </button>
+      {/* ── Premium Filter Bar ── */}
+      <div className="bg-white dark:bg-[#151518] rounded-2xl border border-gray-100 dark:border-white/[0.06] shadow-sm p-3 space-y-3">
+        {/* Category tabs */}
+        <div className="flex items-center gap-1">
+          {categories.map((cat) => (
+            <button key={cat.id} onClick={() => setCategory(cat.id)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all cursor-pointer ${
+                category === cat.id
+                  ? "bg-gray-900 text-white dark:bg-white dark:text-gray-900 shadow-sm"
+                  : "text-gray-400 hover:text-gray-600 hover:bg-gray-50 dark:hover:bg-white/[0.04]"
+              }`}>
+              {cat.icon}
+              {cat.label}
+              <span className={`text-[9px] tabular-nums px-1.5 py-0.5 rounded-full ${
+                category === cat.id
+                  ? "bg-white/20 dark:bg-gray-900/20"
+                  : "bg-gray-100 dark:bg-white/[0.06]"
+              }`}>{counts[cat.id]}</span>
+            </button>
+          ))}
         </div>
+
+        {/* Search + sort row */}
         <div className="flex items-center gap-2">
-          <span className="text-[12px] text-gray-400 tabular-nums">{filteredLogs.length} entries</span>
-          <Badge variant="outline" className="text-[9px] h-5 px-2 border-gray-200 dark:border-white/[0.08] text-gray-400">Read-Only</Badge>
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-300 dark:text-gray-600" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by user, action, or detail..."
+              className="w-full h-8 pl-9 pr-3 rounded-lg bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/[0.06] text-[11px] text-gray-700 dark:text-gray-300 placeholder:text-gray-300 dark:placeholder:text-gray-600 outline-none focus:border-orange-300 dark:focus:border-orange-500/30 focus:ring-1 focus:ring-orange-100 dark:focus:ring-orange-500/10 transition-all"
+            />
+          </div>
+          <button onClick={() => setSortOrder((p) => p === "newest" ? "oldest" : "newest")} className="h-8 px-3 rounded-lg bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/[0.06] text-[11px] text-gray-500 dark:text-gray-400 cursor-pointer hover:bg-gray-100 dark:hover:bg-white/[0.06] transition-colors flex items-center gap-1.5 shrink-0">
+            <ArrowUpDown className="w-3 h-3" />
+            {sortOrder === "newest" ? "Newest" : "Oldest"}
+          </button>
+          <span className="text-[10px] text-gray-300 dark:text-gray-600 tabular-nums shrink-0">{filteredLogs.length}</span>
         </div>
       </div>
-      {/* Log list */}
+
+      {/* ── Timeline Feed ── */}
       <div className="bg-white dark:bg-[#151518] rounded-2xl border border-gray-100 dark:border-white/[0.06] overflow-hidden shadow-sm">
         {filteredLogs.map((entry, i) => {
-          const date = new Date(entry.created_at);
-          const timeStr = date.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-          const dotColor = actionColors[entry.action_type] || "bg-gray-400";
-          const label = actionLabels[entry.action_type] || entry.action_type;
+          const meta = actionMeta[entry.action_type] || { label: entry.action_type, color: "bg-gray-400", icon: "content" as const };
+          const ago = timeAgo(entry.created_at);
+          const fullDate = new Date(entry.created_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+
+          // Category icon styling
+          const iconBg = meta.icon === "system"
+            ? "bg-violet-50 dark:bg-violet-500/10 text-violet-500"
+            : meta.icon === "mention"
+            ? "bg-orange-50 dark:bg-orange-500/10 text-orange-500"
+            : "bg-blue-50 dark:bg-blue-500/10 text-blue-500";
+
+          const IconEl = meta.icon === "system" ? ShieldIcon : meta.icon === "mention" ? AtSign : FileTextIcon;
+
           return (
             <button
               key={entry.id}
               onClick={() => handleLogClick(entry.post_id)}
-              className={`w-full flex items-start gap-3 px-4 py-3 hover:bg-orange-50/50 dark:hover:bg-orange-500/[0.03] transition-colors cursor-pointer text-left ${i > 0 ? "border-t border-gray-50 dark:border-white/[0.03]" : ""}`}
+              className={`w-full flex items-start gap-3 px-4 py-3.5 hover:bg-slate-50/80 dark:hover:bg-white/[0.02] transition-colors cursor-pointer text-left group ${i > 0 ? "border-t border-gray-50 dark:border-white/[0.03]" : ""}`}
             >
-              <div className={`w-2.5 h-2.5 rounded-full ${dotColor} shrink-0 mt-1.5`} />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-[12px] font-semibold text-gray-800 dark:text-gray-200">{entry.user_name}</span>
-                  <span className="text-[10px] text-gray-400">{timeStr}</span>
-                </div>
-                <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mt-0.5">{label}</p>
-                {entry.details && <p className="text-[11px] text-gray-400 mt-0.5 truncate">{entry.details}</p>}
+              {/* Category icon */}
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${iconBg}`}>
+                <IconEl className="w-3.5 h-3.5" />
               </div>
-              <ArrowUpRight className="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 shrink-0 mt-1" />
+
+              <div className="flex-1 min-w-0">
+                {/* Top line: user + action badge + time */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[12px] font-semibold text-gray-800 dark:text-gray-200">{entry.user_name}</span>
+                  <span className={`inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full text-white ${meta.color}`}>
+                    {meta.label}
+                  </span>
+                  <span className="text-[10px] text-gray-300 dark:text-gray-600 ml-auto shrink-0 tabular-nums" title={fullDate}>{ago}</span>
+                </div>
+
+                {/* Detail line */}
+                {entry.details && (
+                  <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1 leading-relaxed line-clamp-2">{entry.details}</p>
+                )}
+              </div>
+
+              <ArrowUpRight className="w-3.5 h-3.5 text-gray-200 dark:text-gray-700 group-hover:text-orange-400 shrink-0 mt-1.5 transition-colors" />
             </button>
           );
         })}
         {filteredLogs.length === 0 && (
-          <div className="py-8 text-center"><p className="text-[12px] text-gray-400">No entries match this filter</p></div>
+          <div className="py-12 text-center">
+            <Search className="w-6 h-6 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+            <p className="text-[12px] text-gray-400">No entries match your filters</p>
+            <button onClick={() => { setSearch(""); setCategory("all"); }} className="text-[11px] text-orange-500 hover:underline cursor-pointer mt-1">Clear filters</button>
+          </div>
         )}
       </div>
     </div>
