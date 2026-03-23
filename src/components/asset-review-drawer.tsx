@@ -14,7 +14,7 @@ import {
   X, Calendar, Clock, PlayCircle, ChevronRight, CheckCircle2, MessageSquare,
   ArrowRightLeft, Pencil, Save, ExternalLink, Hash, Type, Trash2, Send,
   Upload, FolderOpen, Link2, FileText, History, Image as ImageIcon,
-  FileVideo, Paperclip, ExternalLink as ExtLink, AlertCircle,
+  FileVideo, Paperclip, AlertCircle,
 } from "lucide-react";
 import { PlatformIcon } from "./platform-icons";
 import { MentionTextarea } from "./mention-textarea";
@@ -110,13 +110,14 @@ export function AssetReviewDrawer() {
   if (!selectedCard || !isDrawerOpen) return null;
 
   const currentColumn = PIPELINE_COLUMNS.find((c) => c.id === selectedCard.stage);
-  const checkedCount = selectedCard.checklist.filter((c) => c.checked).length;
-  const totalChecklist = selectedCard.checklist.length;
+  const checklist = selectedCard.checklist || [];
+  const checkedCount = checklist.filter((c) => c.checked).length;
+  const totalChecklist = checklist.length;
   const allChecked = checkedCount === totalChecklist;
-  const isRepurposed = selectedCard.title.startsWith("[Repurposed]");
+  const isRepurposed = selectedCard.title?.startsWith("[Repurposed]") || false;
 
   const toggleChecklistItem = (itemId: string) => {
-    updateCard(selectedCard.id, { checklist: selectedCard.checklist.map((c) => c.id === itemId ? { ...c, checked: !c.checked } : c) });
+    updateCard(selectedCard.id, { checklist: checklist.map((c) => c.id === itemId ? { ...c, checked: !c.checked } : c) });
   };
 
   const stages: PipelineStage[] = ["ideas", "awaiting_approval", "revision_needed", "approved_scheduled", "posted"];
@@ -500,7 +501,7 @@ export function AssetReviewDrawer() {
                     <div className="h-full rounded-full bg-gradient-to-r from-orange-500 to-yellow-500 transition-all duration-300" style={{ width: `${(checkedCount / totalChecklist) * 100}%` }} />
                   </div>
                   <div className="space-y-1">
-                    {selectedCard.checklist.map((item) => (
+                    {checklist.map((item) => (
                       <label key={item.id} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-white dark:hover:bg-white/[0.03] cursor-pointer transition-all duration-150">
                         <Checkbox checked={item.checked} onCheckedChange={() => toggleChecklistItem(item.id)} className="border-gray-300 dark:border-gray-600 data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500 transition-all duration-150" />
                         <span className={`text-[13px] transition-all duration-150 leading-snug ${item.checked ? "text-gray-300 dark:text-gray-600 line-through" : "text-gray-700 dark:text-gray-300"}`}>{item.label}</span>
@@ -520,7 +521,7 @@ export function AssetReviewDrawer() {
                     <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em] flex items-center gap-1.5"><Link2 className="w-3 h-3 text-blue-500" />Design Link <span className="text-[9px] font-normal normal-case text-gray-400">(Canva / Figma)</span></label>
                     <div className="flex gap-2">
                       <Input value={designLink} onChange={(e) => setDesignLink(e.target.value)} placeholder="https://www.canva.com/design/..." className="flex-1 h-9 bg-gray-50 dark:bg-white/[0.03] border-gray-200 dark:border-white/[0.08] rounded-lg text-[12px]" />
-                      {designLink && <a href={designLink} target="_blank" rel="noopener noreferrer" className="h-9 px-3 flex items-center rounded-lg bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[11px] hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors border border-blue-200 dark:border-blue-500/20"><ExtLink className="w-3 h-3" /></a>}
+                      {designLink && <a href={designLink} target="_blank" rel="noopener noreferrer" className="h-9 px-3 flex items-center rounded-lg bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[11px] hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors border border-blue-200 dark:border-blue-500/20"><ExternalLink className="w-3 h-3" /></a>}
                     </div>
                   </div>
 
@@ -529,7 +530,7 @@ export function AssetReviewDrawer() {
                     <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em] flex items-center gap-1.5"><FolderOpen className="w-3 h-3 text-amber-500" />Drive / Folder Link</label>
                     <div className="flex gap-2">
                       <Input value={driveFolder} onChange={(e) => setDriveFolder(e.target.value)} placeholder="https://drive.google.com/drive/folders/..." className="flex-1 h-9 bg-gray-50 dark:bg-white/[0.03] border-gray-200 dark:border-white/[0.08] rounded-lg text-[12px]" />
-                      {driveFolder && <a href={driveFolder} target="_blank" rel="noopener noreferrer" className="h-9 px-3 flex items-center rounded-lg bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[11px] hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors border border-amber-200 dark:border-amber-500/20"><ExtLink className="w-3 h-3" /></a>}
+                      {driveFolder && <a href={driveFolder} target="_blank" rel="noopener noreferrer" className="h-9 px-3 flex items-center rounded-lg bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[11px] hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors border border-amber-200 dark:border-amber-500/20"><ExternalLink className="w-3 h-3" /></a>}
                     </div>
                   </div>
 
@@ -561,7 +562,7 @@ export function AssetReviewDrawer() {
                             <p className="text-[12px] font-medium text-gray-700 dark:text-gray-300 truncate">{file.name}</p>
                             <p className="text-[9px] text-gray-400">{new Date(file.uploadedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</p>
                           </div>
-                          <a href={file.url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-500/10 text-gray-400 hover:text-blue-500 transition-colors"><ExtLink className="w-3.5 h-3.5" /></a>
+                          <a href={file.url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-500/10 text-gray-400 hover:text-blue-500 transition-colors"><ExternalLink className="w-3.5 h-3.5" /></a>
                         </div>
                       ))}
                     </div>
@@ -717,7 +718,7 @@ export function AssetReviewDrawer() {
                       if (!selectedCard.thumbnailUrl) missing.push("thumbnail/media");
                       if (!selectedCard.caption?.trim()) missing.push("caption");
                       if (!selectedCard.assetSource?.trim()) missing.push("asset source");
-                      const unchecked = selectedCard.checklist.filter((c) => !c.checked).length;
+                      const unchecked = checklist.filter((c) => !c.checked).length;
                       if (unchecked > 0) missing.push(`${unchecked} checklist item${unchecked > 1 ? "s" : ""}`);
                       if (missing.length > 0) {
                         addToast(`Cannot move — missing: ${missing.join(", ")}`, "error");
