@@ -24,10 +24,11 @@ export function PipelineColumn({ column, cards }: Props) {
       {/* Drop zone lane */}
       <div
         ref={setNodeRef}
+        style={!isOver ? { borderColor: `${column.color}18` } : undefined}
         className={`flex-1 rounded-xl p-2 transition-all duration-150 overflow-y-auto border ${
           isOver
             ? "bg-orange-50/50 dark:bg-orange-500/[0.04] border-orange-300/60 dark:border-orange-500/20 ring-2 ring-orange-200/50 dark:ring-orange-500/10"
-            : "bg-slate-50/50 dark:bg-white/[0.015] border-gray-100 dark:border-white/[0.04]"
+            : "bg-slate-50/50 dark:bg-white/[0.015]"
         }`}
       >
         <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>

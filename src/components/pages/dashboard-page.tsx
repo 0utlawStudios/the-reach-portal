@@ -50,9 +50,9 @@ export function DashboardPage() {
   }));
 
   return (
-    <div className="p-3 sm:p-4 space-y-2.5 w-full overflow-y-auto overflow-x-hidden pb-12 bg-slate-50/50 dark:bg-[#0a0a0b]">
+    <div className="p-4 sm:p-6 space-y-4 w-full overflow-y-auto overflow-x-hidden pb-16 bg-slate-50/50 dark:bg-[#0a0a0b]">
       {/* Welcome Banner */}
-      <div className="relative bg-white dark:bg-[#151518] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-4 sm:p-5 shadow-sm overflow-hidden">
+      <div className="relative bg-white dark:bg-[#151518] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-5 sm:p-6 shadow-sm overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-orange-50 via-orange-50/30 to-transparent dark:from-orange-500/[0.04] dark:via-transparent pointer-events-none" />
         <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3.5">
@@ -62,7 +62,7 @@ export function DashboardPage() {
               <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-orange-500 to-yellow-600 flex items-center justify-center text-white text-[14px] font-bold shadow-md shadow-orange-500/20">{currentUser.initials}</div>
             )}
             <div>
-              <h1 className="text-[18px] font-extrabold text-slate-900 dark:text-white tracking-tight">Welcome back, {currentUser.name.split(" ")[0]}</h1>
+              <h1 className="text-[20px] font-extrabold text-slate-900 dark:text-white tracking-tight">Welcome back, {currentUser.name.split(" ")[0]}</h1>
               {pendingApproval > 0 ? (
                 <p className="text-[13px] text-gray-500 dark:text-gray-400 mt-0.5 flex items-center gap-1.5">
                   <AlertCircle className="w-3.5 h-3.5 text-orange-500" />
@@ -82,9 +82,9 @@ export function DashboardPage() {
       </div>
 
       {/* Row 1: Funnel + Scorecard + Platforms */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-2.5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4">
         {/* Pipeline funnel */}
-        <div className="md:col-span-1 lg:col-span-5 bg-white dark:bg-[#151518] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-4 shadow-sm flex flex-col">
+        <div className="md:col-span-1 lg:col-span-5 bg-white dark:bg-[#151518] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-5 shadow-sm flex flex-col">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-[12px] font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2"><BarChart3 className="w-4 h-4 text-orange-500" />Pipeline Funnel</h2>
             <span className="text-[9px] text-gray-400 bg-gray-50 dark:bg-white/[0.04] px-2 py-0.5 rounded-full font-medium uppercase tracking-wider">This week</span>
@@ -109,13 +109,13 @@ export function DashboardPage() {
         </div>
 
         {/* Weekly Scorecard */}
-        <div className="lg:col-span-3 bg-white dark:bg-[#151518] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-4 shadow-sm flex flex-col">
+        <div className="lg:col-span-3 bg-white dark:bg-[#151518] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-5 shadow-sm flex flex-col">
           <h2 className="text-[12px] font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2 mb-4"><Target className="w-4 h-4 text-orange-500" />Weekly Scorecard</h2>
           <div className="space-y-3 flex-1 flex flex-col justify-center">
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">Approval Rate</span>
-                <span className="text-[15px] font-black text-gray-900 dark:text-white tabular-nums">
+                <span className="text-[18px] font-black text-gray-900 dark:text-white tabular-nums">
                   {mounted ? <AnimatedCounter value={completionPct} duration={2000} suffix="%" /> : "0%"}
                 </span>
               </div>
@@ -131,7 +131,7 @@ export function DashboardPage() {
                 { label: "Platforms", value: platformCounts.length, color: "text-slate-600 dark:text-gray-300" },
               ].map((s) => (
                 <div key={s.label} className="bg-gray-50 dark:bg-white/[0.03] rounded-xl p-2.5 text-center border border-gray-100 dark:border-white/[0.04]">
-                  <p className={`text-[18px] font-black tabular-nums ${s.color}`}>
+                  <p className={`text-[22px] font-black tabular-nums ${s.color}`}>
                     {mounted ? <AnimatedCounter value={s.value} duration={2000} /> : "0"}
                   </p>
                   <p className="text-[8px] text-gray-400 font-semibold uppercase tracking-wider">{s.label}</p>
@@ -142,7 +142,7 @@ export function DashboardPage() {
         </div>
 
         {/* Platform distribution */}
-        <div className="lg:col-span-4 bg-white dark:bg-[#151518] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-4 shadow-sm flex flex-col">
+        <div className="lg:col-span-4 bg-white dark:bg-[#151518] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-5 shadow-sm flex flex-col">
           <h2 className="text-[12px] font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2 mb-4"><TrendingUp className="w-4 h-4 text-yellow-600" />Platform Split</h2>
           <div className="space-y-3 flex-1 flex flex-col justify-center">
             {platformCounts.map(([platform, count], i) => {
@@ -173,9 +173,9 @@ export function DashboardPage() {
       </div>
 
       {/* Row 2: Upcoming + Calendar + Recently Published + Quick Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-2.5">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Upcoming */}
-        <div className="lg:col-span-5 bg-white dark:bg-[#151518] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-4 shadow-sm flex flex-col">
+        <div className="lg:col-span-5 bg-white dark:bg-[#151518] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-5 shadow-sm flex flex-col">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-[12px] font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2"><Zap className="w-4 h-4 text-orange-500" />Upcoming Posts</h2>
           </div>
@@ -209,7 +209,7 @@ export function DashboardPage() {
         <MiniCalendar cards={cards} navigate={navigate} />
 
         {/* Recently Published */}
-        <div className="lg:col-span-4 bg-white dark:bg-[#151518] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-4 shadow-sm flex flex-col">
+        <div className="lg:col-span-4 bg-white dark:bg-[#151518] rounded-2xl border border-gray-100 dark:border-white/[0.06] p-5 shadow-sm flex flex-col">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-[12px] font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2"><Eye className="w-4 h-4 text-yellow-600" />Recently Published</h2>
           </div>

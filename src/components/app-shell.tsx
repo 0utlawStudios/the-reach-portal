@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { NavigationProvider, useNavigation } from "@/lib/navigation-context";
 import { PipelineProvider } from "@/lib/pipeline-context";
@@ -73,10 +73,32 @@ function SidebarWithCreate({ onCreatePost }: { onCreatePost: () => void }) {
 }
 
 function SidebarWrapper({ onCreatePost }: { onCreatePost: () => void }) {
-  const { currentPage, navigate, sidebarCollapsed, toggleSidebar } = useNavigation();
+  const { currentPage, navigate, sidebarCollapsed, sidebarPinned, setSidebarCollapsed, togglePin } = useNavigation();
+  const autoCollapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hoverExpandRef = useRef(false);
   const {
-    LayoutDashboard, Kanban, CalendarDays, Eye, Users, FolderOpen, Settings, ChevronLeft, ChevronRight, Plus, Palette,
+    LayoutDashboard, Kanban, CalendarDays, Eye, Users, FolderOpen, Settings, ChevronLeft, ChevronRight, Plus, Palette, Pin, PinOff,
   } = require("lucide-react");
+
+  // Auto-collapse after 5 seconds on mount (unless pinned)
+  useEffect(() => {
+    if (sidebarPinned) return;
+    autoCollapseTimer.current = setTimeout(() => {
+      setSidebarCollapsed(true);
+    }, 5000);
+    return () => { if (autoCollapseTimer.current) clearTimeout(autoCollapseTimer.current); };
+  }, [sidebarPinned, setSidebarCollapsed]);
+
+  const handleMouseEnter = () => {
+    if (sidebarPinned) return;
+    if (autoCollapseTimer.current) { clearTimeout(autoCollapseTimer.current); autoCollapseTimer.current = null; }
+    if (sidebarCollapsed) { hoverExpandRef.current = true; setSidebarCollapsed(false); }
+  };
+
+  const handleMouseLeave = () => {
+    if (sidebarPinned) return;
+    if (hoverExpandRef.current) { hoverExpandRef.current = false; setSidebarCollapsed(true); }
+  };
 
 
   const NAV_ITEMS = [
@@ -99,7 +121,7 @@ function SidebarWrapper({ onCreatePost }: { onCreatePost: () => void }) {
     <>
     {/* Mobile backdrop */}
     <div id="mobile-sidebar-backdrop" className="hidden md:hidden fixed inset-0 bg-black/30 z-30" onClick={() => { document.getElementById("mobile-sidebar")?.classList.add("hidden"); document.getElementById("mobile-sidebar")?.classList.remove("flex"); document.getElementById("mobile-sidebar-backdrop")?.classList.add("hidden"); }} />
-    <aside id="mobile-sidebar" className={`hidden md:flex h-screen flex-col bg-white dark:bg-[#0c0c0f] shrink-0 overflow-hidden transition-[width] duration-200 ease-out shadow-[1px_0_0_rgba(0,0,0,0.04)] dark:shadow-[1px_0_0_rgba(255,255,255,0.04)] ${sidebarCollapsed ? "w-[56px]" : "w-[230px]"} max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:w-[270px] max-md:shadow-2xl`}>
+    <aside id="mobile-sidebar" onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave} className={`hidden md:flex h-screen flex-col bg-white dark:bg-[#0c0c0f] shrink-0 overflow-hidden transition-[width] duration-200 ease-out shadow-[1px_0_0_rgba(0,0,0,0.04)] dark:shadow-[1px_0_0_rgba(255,255,255,0.04)] ${sidebarCollapsed ? "w-[56px]" : "w-[230px]"} max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:w-[270px] max-md:shadow-2xl`}>
       {/* Logo */}
       <div className="relative flex items-center justify-center h-[60px] px-4 shrink-0">
         {!sidebarCollapsed ? (
@@ -157,10 +179,16 @@ function SidebarWrapper({ onCreatePost }: { onCreatePost: () => void }) {
         })}
       </nav>
 
-      {/* Collapse */}
+      {/* Pin / Collapse */}
       <div className="px-3 py-3 shrink-0 border-t border-gray-100 dark:border-white/[0.04]">
-        <button onClick={toggleSidebar} className="w-full flex items-center gap-2 rounded-lg px-2.5 py-[7px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-all duration-150 cursor-pointer">
-          {sidebarCollapsed ? <ChevronRight className="w-4 h-4 mx-auto" /> : <><ChevronLeft className="w-4 h-4" /><span className="text-[12px] font-medium">Collapse</span></>}
+        <button onClick={togglePin} className={`w-full flex items-center gap-2 rounded-lg px-2.5 py-[7px] transition-all duration-150 cursor-pointer ${sidebarPinned ? "text-orange-500 bg-orange-50 dark:bg-orange-500/10 hover:bg-orange-100 dark:hover:bg-orange-500/15" : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/[0.03]"}`}>
+          {sidebarCollapsed ? (
+            <Pin className="w-4 h-4 mx-auto" />
+          ) : sidebarPinned ? (
+            <><PinOff className="w-4 h-4" /><span className="text-[12px] font-medium">Unpin Sidebar</span></>
+          ) : (
+            <><Pin className="w-4 h-4" /><span className="text-[12px] font-medium">Pin Sidebar</span></>
+          )}
         </button>
       </div>
     </aside>

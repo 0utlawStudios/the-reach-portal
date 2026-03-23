@@ -8,27 +8,34 @@ export type Page = "dashboard" | "pipeline" | "calendar" | "preview" | "team" | 
 interface NavigationContextType {
   currentPage: Page;
   sidebarCollapsed: boolean;
+  sidebarPinned: boolean;
   pendingOpenPostId: string | null;
   navigate: (page: Page) => void;
   navigateToPost: (postId: string) => void;
   clearPendingPost: () => void;
   toggleSidebar: () => void;
+  setSidebarCollapsed: (v: boolean) => void;
+  togglePin: () => void;
 }
 
 const NavigationContext = createContext<NavigationContextType | null>(null);
 
 const PAGE_KEY = "nav_page";
 const SIDEBAR_KEY = "nav_sidebar";
+const PIN_KEY = "nav_sidebar_pinned";
 
 export function NavigationProvider({ children }: { children: ReactNode }) {
   const [currentPage, setCurrentPage] = useState<Page>("dashboard");
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsedState] = useState(false);
+  const [sidebarPinned, setSidebarPinned] = useState(false);
   const [pendingOpenPostId, setPendingOpenPostId] = useState<string | null>(null);
   const hydrated = useRef(false);
 
   useEffect(() => {
     setCurrentPage(loadState<Page>(PAGE_KEY, "dashboard"));
-    setSidebarCollapsed(loadState<boolean>(SIDEBAR_KEY, false));
+    const pinned = loadState<boolean>(PIN_KEY, false);
+    setSidebarPinned(pinned);
+    setSidebarCollapsedState(pinned ? false : loadState<boolean>(SIDEBAR_KEY, false));
     hydrated.current = true;
   }, []);
 
@@ -43,21 +50,36 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
     saveState(PAGE_KEY, "pipeline");
   }, []);
 
-  const clearPendingPost = useCallback(() => {
-    setPendingOpenPostId(null);
-  }, []);
+  const clearPendingPost = useCallback(() => { setPendingOpenPostId(null); }, []);
 
   const toggleSidebar = useCallback(() => {
-    setSidebarCollapsed((p) => {
+    setSidebarCollapsedState((p) => {
       const next = !p;
       saveState(SIDEBAR_KEY, next);
       return next;
     });
   }, []);
 
+  const setSidebarCollapsed = useCallback((v: boolean) => {
+    setSidebarCollapsedState(v);
+    saveState(SIDEBAR_KEY, v);
+  }, []);
+
+  const togglePin = useCallback(() => {
+    setSidebarPinned((p) => {
+      const next = !p;
+      saveState(PIN_KEY, next);
+      if (next) {
+        setSidebarCollapsedState(false);
+        saveState(SIDEBAR_KEY, false);
+      }
+      return next;
+    });
+  }, []);
+
   const value = useMemo(
-    () => ({ currentPage, sidebarCollapsed, pendingOpenPostId, navigate, navigateToPost, clearPendingPost, toggleSidebar }),
-    [currentPage, sidebarCollapsed, pendingOpenPostId, navigate, navigateToPost, clearPendingPost, toggleSidebar]
+    () => ({ currentPage, sidebarCollapsed, sidebarPinned, pendingOpenPostId, navigate, navigateToPost, clearPendingPost, toggleSidebar, setSidebarCollapsed, togglePin }),
+    [currentPage, sidebarCollapsed, sidebarPinned, pendingOpenPostId, navigate, navigateToPost, clearPendingPost, toggleSidebar, setSidebarCollapsed, togglePin]
   );
 
   return <NavigationContext.Provider value={value}>{children}</NavigationContext.Provider>;
