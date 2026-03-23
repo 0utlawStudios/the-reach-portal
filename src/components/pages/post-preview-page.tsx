@@ -59,7 +59,7 @@ function XPreview({ card }: { card: ContentCard }) {
       <div className="flex gap-3">
         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-[10px] font-bold text-white shrink-0">10</div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1"><span className="text-[13px] font-bold text-gray-900">Ten80Ten</span><span className="text-[12px] text-gray-500">@ten80tenwindows · 2h</span></div>
+          <div className="flex items-center gap-1"><span className="text-[13px] font-bold text-gray-900">Ten80Ten</span><span className="text-[12px] text-gray-500">@teneightyten · 2h</span></div>
           <p className="text-[14px] text-gray-900 leading-relaxed mt-1">{card.caption || "No caption..."}</p>
           <div className="mt-3 rounded-2xl overflow-hidden border border-gray-200"><img src={card.thumbnailUrl} alt="" className="w-full aspect-video object-cover" /></div>
           <div className="flex items-center justify-between mt-3 text-gray-500 max-w-[360px]">
@@ -117,7 +117,7 @@ function TikTokPreview({ card }: { card: ContentCard }) {
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
       {/* TikTok UI overlay */}
       <div className="absolute bottom-0 left-0 right-14 p-4">
-        <p className="text-[13px] font-bold text-white mb-1">@ten80tenwindows</p>
+        <p className="text-[13px] font-bold text-white mb-1">@teneightyten</p>
         <p className="text-[11px] text-white/90 line-clamp-3 leading-relaxed">{card.caption || "No caption..."}</p>
         <div className="flex items-center gap-2 mt-2"><div className="w-4 h-4 rounded-full bg-white/20" /><p className="text-[10px] text-white/70">Original Sound - Ten80Ten</p></div>
       </div>
