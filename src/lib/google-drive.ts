@@ -92,29 +92,42 @@ export async function createResumableUploadSession(
   mimeType: string,
   parentFolderId: string
 ): Promise<{ uploadUri: string; fileId: string }> {
-  const res = await driveFetch(
-    `${DRIVE_UPLOAD}/files?uploadType=resumable`,
+  // Step 1: Create file metadata (0-byte placeholder) to get the fileId
+  const createRes = await driveFetch(`${DRIVE_API}/files`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: fileName,
+      parents: [parentFolderId],
+      mimeType,
+    }),
+  });
+
+  if (!createRes.ok) {
+    const err = await createRes.text();
+    throw new Error(`Failed to create file metadata: ${createRes.status} ${err}`);
+  }
+
+  const createData = await createRes.json();
+  const fileId = createData.id as string;
+
+  // Step 2: Create resumable upload session to UPDATE the file's content
+  const uploadRes = await driveFetch(
+    `${DRIVE_UPLOAD}/files/${fileId}?uploadType=resumable`,
     {
-      method: "POST",
+      method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: fileName,
-        parents: [parentFolderId],
-        mimeType,
-      }),
+      body: JSON.stringify({ mimeType }),
     }
   );
 
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Failed to create resumable upload session: ${res.status} ${err}`);
+  if (!uploadRes.ok) {
+    const err = await uploadRes.text();
+    throw new Error(`Failed to create resumable upload session: ${uploadRes.status} ${err}`);
   }
 
-  const uploadUri = res.headers.get("location");
+  const uploadUri = uploadRes.headers.get("location");
   if (!uploadUri) throw new Error("No upload URI in response headers");
-
-  const body = await res.json();
-  const fileId = body.id as string;
 
   return { uploadUri, fileId };
 }
