@@ -359,7 +359,17 @@ export function AssetReviewDrawer() {
               ) : (
                 <img src={selectedCard.thumbnailUrl} alt={selectedCard.title} className="w-full aspect-video object-cover transition-transform duration-300 group-hover:scale-[1.02]" />
               )}
-              <div className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-black/50 backdrop-blur-sm text-[10px] text-white font-semibold capitalize tracking-wide">{selectedCard.contentType}</div>
+              <select
+                value={selectedCard.contentType}
+                onChange={(e) => updateCard(selectedCard.id, { contentType: e.target.value as import("@/lib/types").ContentType })}
+                className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-black/50 backdrop-blur-sm text-[10px] text-white font-semibold capitalize tracking-wide appearance-none cursor-pointer hover:bg-black/70 transition-colors outline-none border-none"
+              >
+                <option value="video" className="text-gray-900">Video</option>
+                <option value="image" className="text-gray-900">Image</option>
+                <option value="reel" className="text-gray-900">Reel</option>
+                <option value="carousel" className="text-gray-900">Carousel</option>
+                <option value="story" className="text-gray-900">Story</option>
+              </select>
               <input ref={assetInputRef} type="file" accept="image/*,video/*" onChange={handleAssetReplace} className="hidden" />
               <div className="absolute bottom-3 right-3 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                 <button onClick={() => setShowMediaPicker(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-black/60 backdrop-blur-sm text-white text-[10px] font-medium hover:bg-black/80 cursor-pointer">
