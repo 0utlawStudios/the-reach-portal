@@ -5,7 +5,6 @@ import { usePipeline } from "@/lib/pipeline-context";
 import { PIPELINE_COLUMNS, PipelineStage } from "@/lib/types";
 import { SOCIAL_PROFILES } from "@/lib/social-profiles";
 import { logAudit, fetchAuditLogs, AuditEntry } from "@/lib/audit";
-import { supabase } from "@/lib/supabaseClient";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,8 +22,6 @@ import { InlineEdit } from "./inline-edit";
 import { useAuth } from "@/lib/auth-context";
 import { useTeam } from "@/lib/team-context";
 import { useToast } from "@/lib/toast-context";
-
-const useSupabase = !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
 type DrawerTab = "content" | "vault" | "audit";
 
@@ -145,23 +142,29 @@ export function AssetReviewDrawer() {
   };
 
   // ─── Replace primary asset ───
+  const [uploading, setUploading] = useState(false);
   const handleAssetReplace = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    // Show blob preview immediately, then upload to Drive in background
+    if (!file || uploading) return;
+    setUploading(true);
+    const prevUrl = selectedCard.thumbnailUrl;
     const blobUrl = URL.createObjectURL(file);
     updateCard(selectedCard.id, { thumbnailUrl: blobUrl });
     addToast("Uploading to Drive...", "info");
     try {
       const { uploadToDrive } = await import("@/lib/drive-upload");
       const result = await uploadToDrive(file, "thumbnails", selectedCard.id);
+      URL.revokeObjectURL(blobUrl);
       updateCard(selectedCard.id, { thumbnailUrl: result.url });
       addToast("Primary asset uploaded to Drive", "success");
     } catch {
       addToast("Drive upload failed — using local preview", "warning");
     }
+    // Revoke old blob URL if it was one
+    if (prevUrl?.startsWith("blob:")) URL.revokeObjectURL(prevUrl);
     logAudit(selectedCard.id, currentUser.name, "asset_replaced", `Replaced primary asset with ${file.name}`);
     if (assetInputRef.current) assetInputRef.current.value = "";
+    setUploading(false);
   };
 
   // ─── Source Vault save ───

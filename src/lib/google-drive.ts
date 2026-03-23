@@ -61,6 +61,10 @@ export async function ensureSubfolder(name: string, parentId: string): Promise<s
     `name='${name}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
   );
   const listRes = await driveFetch(`${DRIVE_API}/files?q=${q}&fields=files(id)&spaces=drive`);
+  if (!listRes.ok) {
+    const err = await listRes.text();
+    throw new Error(`Failed to list folders: ${listRes.status} ${err}`);
+  }
   const listData = await listRes.json();
 
   if (listData.files && listData.files.length > 0) {
@@ -79,6 +83,10 @@ export async function ensureSubfolder(name: string, parentId: string): Promise<s
       parents: [parentId],
     }),
   });
+  if (!createRes.ok) {
+    const err = await createRes.text();
+    throw new Error(`Failed to create folder: ${createRes.status} ${err}`);
+  }
   const createData = await createRes.json();
   const id = createData.id;
   folderCache.set(cacheKey, id);

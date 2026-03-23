@@ -4,6 +4,7 @@ import { useState, useMemo, useRef } from "react";
 import { PLACEHOLDER_MEDIA } from "@/lib/placeholder-data";
 import { MediaAsset } from "@/lib/types";
 import { usePipeline } from "@/lib/pipeline-context";
+import { useToast } from "@/lib/toast-context";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
@@ -15,6 +16,7 @@ type StatusFilter = "all" | "unused" | "inuse";
 
 export function MediaPage() {
   const { cards } = usePipeline();
+  const { addToast } = useToast();
   const [media, setMedia] = useState<MediaAsset[]>(PLACEHOLDER_MEDIA);
   const [activeFolder, setActiveFolder] = useState<string>("all");
   const [activeType, setActiveType] = useState<"all" | "image" | "video">("all");
@@ -59,7 +61,7 @@ export function MediaPage() {
       // Upload to Drive in background, then swap URL
       uploadToDrive(file, "media-library").then((result) => {
         setMedia((prev) => prev.map((m) => m.id === id ? { ...m, url: result.url } : m));
-      }).catch(() => { /* keep blob preview on failure */ });
+      }).catch(() => { addToast(`Failed to upload ${file.name} to Drive`, "warning"); });
     }
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -68,7 +70,13 @@ export function MediaPage() {
     setSelectedIds((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   };
 
-  const deleteSelected = () => { setMedia((prev) => prev.filter((m) => !selectedIds.has(m.id))); setSelectedIds(new Set()); };
+  const deleteSelected = () => {
+    setMedia((prev) => {
+      prev.forEach((m) => { if (selectedIds.has(m.id) && m.url.startsWith("blob:")) URL.revokeObjectURL(m.url); });
+      return prev.filter((m) => !selectedIds.has(m.id));
+    });
+    setSelectedIds(new Set());
+  };
 
   const getUsageInfo = (asset: MediaAsset) => (!asset.usedIn || asset.usedIn.length === 0) ? null : asset.usedIn.map((id) => cards.find((c) => c.id === id)).filter(Boolean);
 

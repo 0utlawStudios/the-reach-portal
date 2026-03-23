@@ -38,7 +38,8 @@ export async function GET(request: NextRequest) {
     const driveHeaders: Record<string, string> = {
       Authorization: `Bearer ${token}`,
     };
-    if (rangeHeader) {
+    // Only forward well-formed Range headers
+    if (rangeHeader && /^bytes=\d*-\d*$/.test(rangeHeader)) {
       driveHeaders["Range"] = rangeHeader;
     }
 
@@ -68,7 +69,7 @@ export async function GET(request: NextRequest) {
 
     // Stream the response body — never buffer
     return new Response(driveRes.body, {
-      status: rangeHeader ? 206 : 200,
+      status: driveRes.status,
       headers: responseHeaders,
     });
   } catch (err: unknown) {

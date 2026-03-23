@@ -22,6 +22,9 @@ export async function uploadToDrive(
   folder: "thumbnails" | "raw-files" | "media-library",
   cardId?: string
 ): Promise<DriveUploadResult> {
+  if (file.size === 0) throw new Error("Cannot upload empty file");
+  if (file.size > 5 * 1024 * 1024 * 1024) throw new Error("File exceeds 5GB limit");
+
   // Step 1: Get upload session from our API
   const initRes = await fetch("/api/drive/upload", {
     method: "POST",
