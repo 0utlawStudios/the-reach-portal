@@ -14,7 +14,7 @@ import {
   X, Calendar, Clock, PlayCircle, ChevronRight, CheckCircle2, MessageSquare,
   ArrowRightLeft, Pencil, Save, ExternalLink, Hash, Type, Trash2, Send,
   Upload, FolderOpen, Link2, FileText, History, Image as ImageIcon,
-  FileVideo, Paperclip, ExternalLink as ExtLink,
+  FileVideo, Paperclip, ExternalLink as ExtLink, AlertCircle,
 } from "lucide-react";
 import { PlatformIcon } from "./platform-icons";
 import { MentionTextarea } from "./mention-textarea";
@@ -44,6 +44,7 @@ export function AssetReviewDrawer() {
   const [dateEditing, setDateEditing] = useState(false);
   const [newComment, setNewComment] = useState("");
   const [activeTab, setActiveTab] = useState<DrawerTab>("content");
+  const [showMediaPicker, setShowMediaPicker] = useState(false);
   const prevCardRef = useRef<string | null>(null);
   const viewLoggedRef = useRef<string | null>(null);
 
@@ -295,9 +296,14 @@ export function AssetReviewDrawer() {
               )}
               <div className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-black/50 backdrop-blur-sm text-[10px] text-white font-semibold capitalize tracking-wide">{selectedCard.contentType}</div>
               <input ref={assetInputRef} type="file" accept="image/*,video/*" onChange={handleAssetReplace} className="hidden" />
-              <button onClick={() => assetInputRef.current?.click()} className="absolute bottom-3 right-3 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-black/60 backdrop-blur-sm text-white text-[10px] font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-black/80 cursor-pointer">
-                <Upload className="w-3 h-3" />Replace Asset
-              </button>
+              <div className="absolute bottom-3 right-3 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                <button onClick={() => setShowMediaPicker(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-black/60 backdrop-blur-sm text-white text-[10px] font-medium hover:bg-black/80 cursor-pointer">
+                  <ImageIcon className="w-3 h-3" />Library
+                </button>
+                <button onClick={() => assetInputRef.current?.click()} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-black/60 backdrop-blur-sm text-white text-[10px] font-medium hover:bg-black/80 cursor-pointer">
+                  <Upload className="w-3 h-3" />Upload
+                </button>
+              </div>
             </div>
 
             {selectedCard.contentType === "carousel" && (
@@ -362,6 +368,64 @@ export function AssetReviewDrawer() {
                     className="text-[14px] text-gray-700 dark:text-gray-300 leading-[1.7] whitespace-pre-wrap"
                     inputClassName="text-[14px] leading-[1.7]"
                   />
+                </div>
+
+                {/* Asset Source (compliance) */}
+                <div className="bg-slate-50/70 dark:bg-white/[0.02] rounded-xl border border-gray-100 dark:border-white/[0.05] p-5">
+                  <label className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1.5 mb-3">
+                    <FileText className="w-3.5 h-3.5 text-orange-400" />Asset Source <span className="text-red-400 text-[9px] normal-case font-medium ml-1">Required for approval</span>
+                  </label>
+                  <InlineEdit
+                    value={selectedCard.assetSource || ""}
+                    onSave={(v) => { updateCard(selectedCard.id, { assetSource: v || undefined }); logAudit(selectedCard.id, currentUser.name, "content_edited", "Updated asset source"); }}
+                    placeholder="e.g. Envato Elements, Client provided, Shot by team..."
+                    className="text-[13px] text-gray-700 dark:text-gray-300"
+                    inputClassName="text-[13px]"
+                  />
+                  {!selectedCard.assetSource?.trim() && (
+                    <p className="text-[10px] text-amber-500 mt-2 flex items-center gap-1"><AlertCircle className="w-3 h-3" />Must be filled before this post can be approved</p>
+                  )}
+                </div>
+
+                {/* License upload (optional compliance) */}
+                <div className="bg-slate-50/70 dark:bg-white/[0.02] rounded-xl border border-gray-100 dark:border-white/[0.05] p-5">
+                  <label className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1.5 mb-3">
+                    <Paperclip className="w-3.5 h-3.5 text-orange-400" />License / Release <span className="text-gray-300 dark:text-gray-600 text-[9px] normal-case font-medium ml-1">Optional</span>
+                  </label>
+                  {selectedCard.licenseFileId ? (
+                    <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-500/5 border border-emerald-200 dark:border-emerald-500/20 rounded-lg px-3 py-2">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium flex-1">License uploaded</span>
+                      <button onClick={() => { updateCard(selectedCard.id, { licenseFileId: undefined }); }} className="text-[10px] text-gray-400 hover:text-red-500 cursor-pointer transition-colors">Remove</button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={async () => {
+                        const input = document.createElement("input");
+                        input.type = "file";
+                        input.accept = "image/*,.pdf";
+                        input.onchange = async (ev) => {
+                          const file = (ev.target as HTMLInputElement).files?.[0];
+                          if (!file) return;
+                          addToast("Uploading license...", "info");
+                          try {
+                            const { uploadToDrive } = await import("@/lib/drive-upload");
+                            const result = await uploadToDrive(file, "raw-files", selectedCard.id);
+                            updateCard(selectedCard.id, { licenseFileId: result.fileId });
+                            logAudit(selectedCard.id, currentUser.name, "license_uploaded", `Uploaded license: ${file.name}`);
+                            addToast("License uploaded", "success");
+                          } catch {
+                            addToast("License upload failed", "error");
+                          }
+                        };
+                        input.click();
+                      }}
+                      className="w-full border-2 border-dashed border-gray-200/80 dark:border-white/[0.05] rounded-lg py-3 flex items-center justify-center gap-2 text-gray-400 dark:text-gray-500 hover:text-gray-500 hover:border-gray-300 dark:hover:border-white/[0.1] transition-all cursor-pointer"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span className="text-[11px]">Upload license PDF or screenshot</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Notes & Comments */}
@@ -628,6 +692,7 @@ export function AssetReviewDrawer() {
                       if (!selectedCard.scheduledTime) missing.push("scheduled time");
                       if (!selectedCard.thumbnailUrl) missing.push("thumbnail/media");
                       if (!selectedCard.caption?.trim()) missing.push("caption");
+                      if (!selectedCard.assetSource?.trim()) missing.push("asset source");
                       const unchecked = selectedCard.checklist.filter((c) => !c.checked).length;
                       if (unchecked > 0) missing.push(`${unchecked} checklist item${unchecked > 1 ? "s" : ""}`);
                       if (missing.length > 0) {
@@ -646,6 +711,60 @@ export function AssetReviewDrawer() {
           )}
         </div>
       </div>
+
+      {/* ─── Media Library Picker ─── */}
+      {showMediaPicker && (
+        <>
+          <div onClick={() => setShowMediaPicker(false)} className="fixed inset-0 bg-black/40 z-[60]" />
+          <div className="fixed inset-4 md:inset-8 lg:inset-12 z-[60] bg-white dark:bg-[#151518] rounded-2xl border border-gray-200 dark:border-white/[0.08] shadow-2xl flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-white/[0.06] shrink-0">
+              <h3 className="text-[14px] font-semibold text-gray-800 dark:text-gray-200">Choose from Media Library</h3>
+              <button onClick={() => setShowMediaPicker(false)} className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-400 cursor-pointer"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              <MediaPickerGrid
+                onSelect={(url) => {
+                  updateCard(selectedCard.id, { thumbnailUrl: url });
+                  logAudit(selectedCard.id, currentUser.name, "asset_replaced", "Linked asset from media library");
+                  addToast("Asset linked from library", "success");
+                  setShowMediaPicker(false);
+                }}
+              />
+            </div>
+          </div>
+        </>
+      )}
     </>
+  );
+}
+
+// ─── Media Picker Grid (inline, uses placeholder data) ───
+function MediaPickerGrid({ onSelect }: { onSelect: (url: string) => void }) {
+  const { cards } = usePipeline();
+  // Collect all unique thumbnail URLs from existing cards
+  const existingUrls = Array.from(new Set(cards.map((c) => c.thumbnailUrl).filter(Boolean)));
+
+  if (existingUrls.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <ImageIcon className="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+        <p className="text-[13px] text-gray-400">No media assets yet</p>
+        <p className="text-[11px] text-gray-300 dark:text-gray-600 mt-1">Upload assets to posts first</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+      {existingUrls.map((url, i) => (
+        <button
+          key={i}
+          onClick={() => onSelect(url)}
+          className="aspect-square rounded-lg overflow-hidden border-2 border-transparent hover:border-orange-400 transition-all cursor-pointer group"
+        >
+          <img src={url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+        </button>
+      ))}
+    </div>
   );
 }

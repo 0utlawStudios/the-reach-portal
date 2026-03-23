@@ -40,6 +40,8 @@ export interface ContentCard {
   revised?: boolean;
   revisionHistory?: { note: string; by: string; at: string }[];
   sourceVault?: SourceVault;
+  assetSource?: string;
+  licenseFileId?: string;
 }
 
 export interface MediaAsset {

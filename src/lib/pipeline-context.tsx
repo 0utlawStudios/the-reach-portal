@@ -40,6 +40,8 @@ function dbToCard(row: any): ContentCard {
     revised,
     revisionHistory: revisionHistory.length > 0 ? revisionHistory : undefined,
     sourceVault: row.source_vault || undefined,
+    assetSource: row.asset_source || undefined,
+    licenseFileId: row.license_file_id || undefined,
     createdAt: row.created_at?.split("T")[0] || new Date().toISOString().split("T")[0],
     updatedAt: row.updated_at?.split("T")[0] || new Date().toISOString().split("T")[0],
   };
@@ -60,6 +62,8 @@ function cardToDb(card: Partial<ContentCard> & { id?: string }) {
   if (card.checklist !== undefined) obj.checklist = card.checklist;
   if (card.mediaIds !== undefined) obj.media_ids = card.mediaIds || [];
   if (card.sourceVault !== undefined) obj.source_vault = card.sourceVault || {};
+  if (card.assetSource !== undefined) obj.asset_source = card.assetSource || null;
+  if (card.licenseFileId !== undefined) obj.license_file_id = card.licenseFileId || null;
   return obj;
 }
 
