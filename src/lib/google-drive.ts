@@ -1,9 +1,12 @@
-import { google, drive_v3 } from "googleapis";
+import { GoogleAuth } from "google-auth-library";
 
-// ─── Singleton Drive client ───
+// ─── Drive API base URLs ───
+const DRIVE_API = "https://www.googleapis.com/drive/v3";
+const DRIVE_UPLOAD = "https://www.googleapis.com/upload/drive/v3";
 
-let _drive: drive_v3.Drive | null = null;
-let _auth: InstanceType<typeof google.auth.GoogleAuth> | null = null;
+// ─── Singleton auth client ───
+
+let _auth: GoogleAuth | null = null;
 
 function getCredentials() {
   const b64 = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
@@ -12,9 +15,9 @@ function getCredentials() {
   return JSON.parse(json);
 }
 
-function getAuth() {
+function getAuth(): GoogleAuth {
   if (!_auth) {
-    _auth = new google.auth.GoogleAuth({
+    _auth = new GoogleAuth({
       credentials: getCredentials(),
       scopes: ["https://www.googleapis.com/auth/drive"],
     });
@@ -22,11 +25,12 @@ function getAuth() {
   return _auth;
 }
 
-export function getDriveClient(): drive_v3.Drive {
-  if (!_drive) {
-    _drive = google.drive({ version: "v3", auth: getAuth() });
-  }
-  return _drive;
+export async function getAccessToken(): Promise<string> {
+  const client = await getAuth().getClient();
+  const res = await client.getAccessToken();
+  const token = res?.token;
+  if (!token) throw new Error("Failed to get access token");
+  return token;
 }
 
 export function getRootFolderId(): string {
@@ -35,7 +39,16 @@ export function getRootFolderId(): string {
   return id;
 }
 
-// ─── Subfolder cache (avoids repeated Drive lookups) ───
+// ─── Authenticated fetch helper ───
+
+async function driveFetch(url: string, init?: RequestInit): Promise<Response> {
+  const token = await getAccessToken();
+  const headers = new Headers(init?.headers);
+  headers.set("Authorization", `Bearer ${token}`);
+  return fetch(url, { ...init, headers });
+}
+
+// ─── Subfolder cache ───
 
 const folderCache = new Map<string, string>();
 
@@ -43,32 +56,31 @@ export async function ensureSubfolder(name: string, parentId: string): Promise<s
   const cacheKey = `${parentId}/${name}`;
   if (folderCache.has(cacheKey)) return folderCache.get(cacheKey)!;
 
-  const drive = getDriveClient();
-
   // Check if folder already exists
-  const res = await drive.files.list({
-    q: `name='${name}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-    fields: "files(id)",
-    spaces: "drive",
-  });
+  const q = encodeURIComponent(
+    `name='${name}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
+  );
+  const listRes = await driveFetch(`${DRIVE_API}/files?q=${q}&fields=files(id)&spaces=drive`);
+  const listData = await listRes.json();
 
-  if (res.data.files && res.data.files.length > 0) {
-    const id = res.data.files[0].id!;
+  if (listData.files && listData.files.length > 0) {
+    const id = listData.files[0].id;
     folderCache.set(cacheKey, id);
     return id;
   }
 
   // Create the subfolder
-  const create = await drive.files.create({
-    requestBody: {
+  const createRes = await driveFetch(`${DRIVE_API}/files`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
       name,
       mimeType: "application/vnd.google-apps.folder",
       parents: [parentId],
-    },
-    fields: "id",
+    }),
   });
-
-  const id = create.data.id!;
+  const createData = await createRes.json();
+  const id = createData.id;
   folderCache.set(cacheKey, id);
   return id;
 }
@@ -80,18 +92,11 @@ export async function createResumableUploadSession(
   mimeType: string,
   parentFolderId: string
 ): Promise<{ uploadUri: string; fileId: string }> {
-  const auth = getAuth();
-  const token = await auth.getAccessToken();
-
-  // Initiate resumable upload — metadata only
-  const res = await fetch(
-    "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable",
+  const res = await driveFetch(
+    `${DRIVE_UPLOAD}/files?uploadType=resumable`,
     {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: fileName,
         parents: [parentFolderId],
@@ -108,7 +113,6 @@ export async function createResumableUploadSession(
   const uploadUri = res.headers.get("location");
   if (!uploadUri) throw new Error("No upload URI in response headers");
 
-  // Extract fileId from the response body
   const body = await res.json();
   const fileId = body.id as string;
 
@@ -118,14 +122,15 @@ export async function createResumableUploadSession(
 // ─── Permissions ───
 
 export async function setPublicPermission(fileId: string): Promise<void> {
-  const drive = getDriveClient();
-  await drive.permissions.create({
-    fileId,
-    requestBody: {
-      role: "reader",
-      type: "anyone",
-    },
+  const res = await driveFetch(`${DRIVE_API}/files/${fileId}/permissions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ role: "reader", type: "anyone" }),
   });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Failed to set permission: ${res.status} ${err}`);
+  }
 }
 
 // ─── Serving URLs ───
@@ -141,24 +146,16 @@ export function getStreamUrl(fileId: string): string {
 // ─── File metadata ───
 
 export async function getFileMetadata(fileId: string) {
-  const drive = getDriveClient();
-  const res = await drive.files.get({
-    fileId,
-    fields: "id,name,mimeType,size",
-  });
+  const res = await driveFetch(`${DRIVE_API}/files/${fileId}?fields=id,name,mimeType,size`);
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Failed to get file metadata: ${res.status} ${err}`);
+  }
+  const data = await res.json();
   return {
-    id: res.data.id!,
-    name: res.data.name!,
-    mimeType: res.data.mimeType!,
-    size: Number(res.data.size || 0),
+    id: data.id as string,
+    name: data.name as string,
+    mimeType: data.mimeType as string,
+    size: Number(data.size || 0),
   };
-}
-
-// ─── Auth token accessor (for streaming proxy) ───
-
-export async function getAccessToken(): Promise<string> {
-  const auth = getAuth();
-  const token = await auth.getAccessToken();
-  if (!token) throw new Error("Failed to get access token");
-  return token;
 }
