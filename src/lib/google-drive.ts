@@ -99,45 +99,34 @@ export async function createResumableUploadSession(
   fileName: string,
   mimeType: string,
   parentFolderId: string
-): Promise<{ uploadUri: string; fileId: string }> {
-  // Step 1: Create file metadata (0-byte placeholder) to get the fileId
-  const createRes = await driveFetch(`${DRIVE_API}/files`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      name: fileName,
-      parents: [parentFolderId],
-      mimeType,
-    }),
-  });
-
-  if (!createRes.ok) {
-    const err = await createRes.text();
-    throw new Error(`Failed to create file metadata: ${createRes.status} ${err}`);
-  }
-
-  const createData = await createRes.json();
-  const fileId = createData.id as string;
-
-  // Step 2: Create resumable upload session to UPDATE the file's content
-  const uploadRes = await driveFetch(
-    `${DRIVE_UPLOAD}/files/${fileId}?uploadType=resumable`,
+): Promise<{ uploadUri: string }> {
+  // Standard Google resumable upload: single POST creates session + file in one call
+  // The fileId is returned AFTER the client completes the PUT upload
+  const res = await driveFetch(
+    `${DRIVE_UPLOAD}/files?uploadType=resumable`,
     {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mimeType }),
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Upload-Content-Type": mimeType,
+      },
+      body: JSON.stringify({
+        name: fileName,
+        parents: [parentFolderId],
+        mimeType,
+      }),
     }
   );
 
-  if (!uploadRes.ok) {
-    const err = await uploadRes.text();
-    throw new Error(`Failed to create resumable upload session: ${uploadRes.status} ${err}`);
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Failed to create resumable session: ${res.status} ${err}`);
   }
 
-  const uploadUri = uploadRes.headers.get("location");
+  const uploadUri = res.headers.get("location");
   if (!uploadUri) throw new Error("No upload URI in response headers");
 
-  return { uploadUri, fileId };
+  return { uploadUri };
 }
 
 // ─── Permissions ───
