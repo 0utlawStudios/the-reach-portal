@@ -366,7 +366,7 @@ export function AssetReviewDrawer() {
                   const isImage = /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(file.name);
                   const isVideo = /\.(mp4|mov|avi|webm|mkv)$/i.test(file.name);
                   return (
-                    <a key={i} href={file.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-white dark:bg-white/[0.02] border border-gray-100 dark:border-white/[0.05] hover:border-orange-200 dark:hover:border-orange-500/20 transition-colors group">
+                    <div key={i} className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-white dark:bg-white/[0.02] border border-gray-100 dark:border-white/[0.05] hover:border-orange-200 dark:hover:border-orange-500/20 transition-colors group">
                       {isImage ? (
                         <img src={file.url} alt={file.name} className="w-8 h-8 rounded object-cover shrink-0" />
                       ) : isVideo ? (
@@ -378,8 +378,22 @@ export function AssetReviewDrawer() {
                         <p className="text-[11px] font-medium text-gray-700 dark:text-gray-300 truncate">{file.name}</p>
                         <p className="text-[9px] text-gray-400">{new Date(file.uploadedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</p>
                       </div>
-                      <ExternalLink className="w-3 h-3 text-gray-300 group-hover:text-orange-500 transition-colors shrink-0" />
-                    </a>
+                      <a href={file.url} target="_blank" rel="noopener noreferrer" className="p-1 rounded hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-300 hover:text-blue-500 transition-colors cursor-pointer" title="Open file">
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                      <button
+                        onClick={() => {
+                          const updated = (selectedCard.sourceVault?.rawFiles || []).filter((_, idx) => idx !== i);
+                          updateCard(selectedCard.id, { sourceVault: { ...selectedCard.sourceVault, rawFiles: updated } });
+                          if (file.url.startsWith("blob:")) URL.revokeObjectURL(file.url);
+                          logAudit(selectedCard.id, currentUser.name, "raw_file_uploaded", `Removed ${file.name}`);
+                          addToast(`${file.name} removed`, "info");
+                        }}
+                        className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-500/10 text-gray-300 hover:text-red-500 transition-colors cursor-pointer" title="Remove file"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
                   );
                 })}
               </div>
