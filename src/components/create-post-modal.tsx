@@ -300,8 +300,8 @@ export function CreatePostModal({ open, onClose }: Props) {
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Schedule Date & Time <span className="text-red-400">*</span></label>
                   <div className="flex gap-2">
-                    <input type="date" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} className={`${inputClass} flex-1`} required />
-                    <input type="time" value={scheduledTime} onChange={(e) => setScheduledTime(e.target.value)} className={`${inputClass} w-28`} required />
+                    <input type="date" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} className={`${inputClass} flex-[3]`} required />
+                    <input type="time" value={scheduledTime} onChange={(e) => setScheduledTime(e.target.value)} className={`${inputClass} flex-[2]`} required />
                   </div>
                 </div>
 
