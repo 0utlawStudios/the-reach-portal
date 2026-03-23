@@ -18,7 +18,7 @@ const contentTypes: { id: ContentType; label: string; icon: React.ReactNode }[] 
   { id: "story", label: "Story", icon: <Film className="w-3.5 h-3.5" /> },
 ];
 
-const ASSET_SOURCES = ["Envato Elements", "Pexels", "Shot by Team", "Client Provided", "Google Images", "AI Generated", "Other"];
+const ASSET_SOURCES = ["Envato Elements", "Pexels", "Shot by Team", "Client Provided", "Google Images", "AI Generated"];
 
 interface UploadedFile {
   id: string;
