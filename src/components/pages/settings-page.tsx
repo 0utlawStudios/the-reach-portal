@@ -6,6 +6,7 @@ import { useTheme } from "@/lib/theme-context";
 import { useTeam, UserRole, TeamMember } from "@/lib/team-context";
 import { useToast } from "@/lib/toast-context";
 import { useAuth } from "@/lib/auth-context";
+import { usePresence, PresenceStatus } from "@/lib/use-presence";
 import { usePipeline } from "@/lib/pipeline-context";
 import { fetchAllAuditLogs, AuditEntry } from "@/lib/audit";
 import { History, ArrowUpRight, SlidersHorizontal } from "lucide-react";
@@ -139,11 +140,17 @@ function EditProfileModal({ member, onClose, onDelete, canDelete }: { member: Te
             {/* Role */}
             <div className="space-y-1">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.08em]">Role</label>
-              <select value={role} onChange={(e) => setRole(e.target.value as UserRole)} className="w-full h-9 px-3 rounded-lg bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-[13px] text-gray-700 dark:text-gray-300 outline-none cursor-pointer">
-                {Object.entries(roleConfig).map(([key, conf]) => (
-                  <option key={key} value={key}>{conf.label}</option>
-                ))}
-              </select>
+              {member.role === "owner" ? (
+                <div className="h-9 px-3 flex items-center rounded-lg bg-amber-50 dark:bg-amber-500/5 border border-amber-200 dark:border-amber-500/20 text-[13px] text-amber-700 dark:text-amber-400 font-medium">
+                  <Crown className="w-3.5 h-3.5 mr-2" />Owner — cannot be reassigned
+                </div>
+              ) : (
+                <select value={role} onChange={(e) => setRole(e.target.value as UserRole)} className="w-full h-9 px-3 rounded-lg bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-[13px] text-gray-700 dark:text-gray-300 outline-none cursor-pointer">
+                  {Object.entries(roleConfig).filter(([key]) => key !== "owner").map(([key, conf]) => (
+                    <option key={key} value={key}>{conf.label}</option>
+                  ))}
+                </select>
+              )}
             </div>
 
             {/* Additional Roles */}
@@ -214,6 +221,17 @@ function EditProfileModal({ member, onClose, onDelete, canDelete }: { member: Te
   );
 }
 
+function PresenceDot({ status }: { status: PresenceStatus }) {
+  const colors: Record<PresenceStatus, string> = {
+    online: "bg-emerald-500 shadow-emerald-500/40",
+    idle: "bg-amber-400 shadow-amber-400/40",
+    offline: "bg-gray-300 dark:bg-gray-600",
+  };
+  return (
+    <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white dark:border-[#151518] ${colors[status]} ${status === "online" ? "shadow-sm" : ""}`} title={status} />
+  );
+}
+
 function ConnectedBadge() {
   return (
     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-500/20">
@@ -236,6 +254,10 @@ export function SettingsPage() {
   const { members, removeMember } = useTeam();
   const { currentUser } = useAuth();
   const { addToast } = useToast();
+  const currentMember = members.find((m) => m.email === currentUser.email);
+  const isAdmin = currentMember?.role === "owner" || currentMember?.role === "admin";
+  const canViewAudit = isAdmin || currentMember?.secondaryRole?.includes("Approver") || currentMember?.secondaryRole?.includes("Creative Director");
+  const { getStatus } = usePresence(currentUser.email);
   const [activeTab, setActiveTab] = useState<"general" | "team" | "audit">("general");
   const [auditLogs, setAuditLogs] = useState<AuditEntry[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
@@ -287,7 +309,7 @@ export function SettingsPage() {
         {[
           { id: "general" as const, label: "General", icon: <SettingsIcon className="w-3.5 h-3.5" /> },
           { id: "team" as const, label: "Team Members", icon: <Users className="w-3.5 h-3.5" /> },
-          { id: "audit" as const, label: "Audit Logs", icon: <FileText className="w-3.5 h-3.5" /> },
+          ...(canViewAudit ? [{ id: "audit" as const, label: "Audit Logs", icon: <FileText className="w-3.5 h-3.5" /> }] : []),
         ].map((tab) => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
             className={`flex items-center gap-1.5 px-4 py-2.5 text-[12px] font-medium border-b-2 -mb-px transition-colors cursor-pointer ${activeTab === tab.id ? "border-blue-600 text-blue-700 dark:text-blue-400" : "border-transparent text-gray-400 hover:text-gray-600"}`}>
@@ -347,16 +369,20 @@ export function SettingsPage() {
             <SettingRow icon={Shield} label="Team activity" desc="When team members move posts or @mention"><Toggle /></SettingRow>
           </Section>
 
-          <Section title="Integrations" icon={<Webhook className="w-3.5 h-3.5 text-sky-500" />}>
-            <SettingRow icon={Database} label="Supabase" desc="Persistent storage, auth, real-time sync"><ConnectedBadge /></SettingRow>
-            <SettingRow icon={HardDrive} label="Google Drive" desc="Video/image cloud storage"><ComingSoonBadge /></SettingRow>
-            <SettingRow icon={ExternalLink} label="Notion" desc="Sync content ideas and briefs"><ComingSoonBadge /></SettingRow>
-            <SettingRow icon={Key} label="API Keys" desc="Custom integrations and automations"><ConnectedBadge /></SettingRow>
-          </Section>
+          {isAdmin && (
+            <Section title="Integrations" icon={<Webhook className="w-3.5 h-3.5 text-sky-500" />}>
+              <SettingRow icon={Database} label="Supabase" desc="Persistent storage, auth, real-time sync"><ConnectedBadge /></SettingRow>
+              <SettingRow icon={HardDrive} label="Google Drive" desc="Video/image cloud storage (60TB)"><ConnectedBadge /></SettingRow>
+              <SettingRow icon={ExternalLink} label="Notion" desc="Sync content ideas and briefs"><ComingSoonBadge /></SettingRow>
+              <SettingRow icon={Key} label="API Keys" desc="Custom integrations and automations"><ConnectedBadge /></SettingRow>
+            </Section>
+          )}
 
-          <Section title="Data" icon={<Shield className="w-3.5 h-3.5 text-rose-500" />}>
-            <SettingRow icon={Download} label="Export data" desc="Download posts, media, analytics as CSV"><Button size="sm" variant="outline" onClick={() => addToast("Data export coming soon", "info")} className="h-7 text-[10px] rounded-lg px-3 cursor-pointer">Export</Button></SettingRow>
-          </Section>
+          {isAdmin && (
+            <Section title="Data" icon={<Shield className="w-3.5 h-3.5 text-rose-500" />}>
+              <SettingRow icon={Download} label="Export data" desc="Download posts, media, analytics as CSV"><Button size="sm" variant="outline" onClick={() => addToast("Data export coming soon", "info")} className="h-7 text-[10px] rounded-lg px-3 cursor-pointer">Export</Button></SettingRow>
+            </Section>
+          )}
         </div>
       ) : (
         /* Team tab */
@@ -398,13 +424,16 @@ export function SettingsPage() {
               return (
                 <button key={member.id} onClick={() => setEditingMember(member)}
                   className={`w-full flex items-start gap-3 px-4 py-3.5 hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors cursor-pointer text-left ${i > 0 ? "border-t border-gray-50 dark:border-white/[0.03]" : ""}`}>
-                  {member.avatar ? (
-                    <img src={member.avatar} alt={member.name} className="w-9 h-9 rounded-full object-cover shrink-0 mt-0.5" />
-                  ) : (
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-[11px] font-bold text-white shrink-0 mt-0.5">
-                    {member.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                  <div className="relative shrink-0 mt-0.5">
+                    {member.avatar ? (
+                      <img src={member.avatar} alt={member.name} className="w-9 h-9 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-[11px] font-bold text-white">
+                        {member.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                      </div>
+                    )}
+                    <PresenceDot status={getStatus(member.email)} />
                   </div>
-                  )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
                       <p className="text-[13px] font-medium text-gray-800 dark:text-gray-200">{member.name}</p>
