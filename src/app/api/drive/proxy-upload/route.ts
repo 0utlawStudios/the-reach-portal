@@ -1,18 +1,23 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import {
   getRootFolderId,
   ensureSubfolder,
   setPublicPermission,
   getAccessToken,
-  getFileMetadata,
 } from "@/lib/google-drive";
 
-export const maxDuration = 60; // Fluid Compute for large files
+export const maxDuration = 60;
 
 const VALID_FOLDERS = ["thumbnails", "raw-files", "media-library"] as const;
 
-// Single API route: receives file, uploads to Google Drive, returns fileId + URL
-// Eliminates CORS issues by keeping everything server-side
+// Helper: always return clean JSON (no control characters ever)
+function jsonResponse(data: Record<string, unknown>, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
@@ -22,11 +27,11 @@ export async function POST(request: NextRequest) {
     const fileName = formData.get("fileName") as string || file?.name || "upload";
     const mimeType = formData.get("mimeType") as string || file?.type || "application/octet-stream";
 
-    if (!file) {
-      return NextResponse.json({ error: "No file provided" }, { status: 400 });
+    if (!file || !(file instanceof File)) {
+      return jsonResponse({ error: "No file provided" }, 400);
     }
     if (!VALID_FOLDERS.includes(folder as typeof VALID_FOLDERS[number])) {
-      return NextResponse.json({ error: `Invalid folder: ${folder}` }, { status: 400 });
+      return jsonResponse({ error: "Invalid folder" }, 400);
     }
 
     // Resolve subfolder
@@ -42,8 +47,8 @@ export async function POST(request: NextRequest) {
     // Get auth token
     const token = await getAccessToken();
 
-    // Upload to Google Drive using multipart upload (metadata + file in one request)
-    const boundary = "ten80ten_boundary_" + Date.now();
+    // Upload to Google Drive using multipart upload
+    const boundary = "ten80ten_" + Date.now();
     const metadata = JSON.stringify({
       name: driveFileName,
       parents: [parentId],
@@ -68,38 +73,45 @@ export async function POST(request: NextRequest) {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": `multipart/related; boundary=${boundary}`,
-          "Content-Length": multipartBody.length.toString(),
         },
         body: multipartBody,
       }
     );
 
     if (!uploadRes.ok) {
+      // Log the full error server-side, return clean message to client
       const rawErr = await uploadRes.text();
-      // Sanitize: Google API errors contain newlines that break downstream JSON parsing
-      const cleanErr = rawErr.replace(/[\x00-\x1F\x7F]/g, " ").slice(0, 200);
-      return NextResponse.json({ error: `Drive upload failed (${uploadRes.status}): ${cleanErr}` }, { status: 500 });
+      console.error("[proxy-upload] Google Drive error:", uploadRes.status, rawErr);
+      return jsonResponse({ error: `Google Drive rejected the upload (HTTP ${uploadRes.status}). Check that the service account has Content Manager access to the Shared Drive.` }, 500);
     }
 
     const driveFile = await uploadRes.json();
     const fileId = driveFile.id;
 
+    if (!fileId) {
+      console.error("[proxy-upload] No fileId in Google response:", driveFile);
+      return jsonResponse({ error: "Upload succeeded but Google did not return a file ID" }, 500);
+    }
+
     // Set public permission
-    await setPublicPermission(fileId);
+    try {
+      await setPublicPermission(fileId);
+    } catch (permErr) {
+      console.error("[proxy-upload] Permission error (file still uploaded):", permErr);
+      // Don't fail — file is uploaded, just not public yet
+    }
 
-    // Get serving URL via stream proxy
-    const streamUrl = `/api/drive/stream?id=${fileId}`;
-
-    return NextResponse.json({
+    return jsonResponse({
       fileId,
-      url: streamUrl,
+      url: `/api/drive/stream?id=${fileId}`,
       mimeType: driveFile.mimeType || mimeType,
       size: Number(driveFile.size || file.size),
       driveFileName,
     });
   } catch (err: unknown) {
-    const message = (err instanceof Error ? err.message : "Unknown error").replace(/[\x00-\x1F\x7F]/g, " ");
-    console.error("[drive/proxy-upload]", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    const message = err instanceof Error ? err.message : "Unknown server error";
+    console.error("[proxy-upload] Error:", message);
+    // Return clean error — never include raw stack traces or Google API responses
+    return jsonResponse({ error: message.slice(0, 200) }, 500);
   }
 }
