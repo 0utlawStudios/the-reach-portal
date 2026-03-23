@@ -1,31 +1,32 @@
 /**
- * Client-side Google Drive upload helper.
+ * Client-side Google Drive upload helper with progress tracking.
  *
  * Flow:
  * 1. POST /api/drive/upload with metadata → get resumable uploadUri + fileId + serving URLs
- * 2. PUT file body directly to Google's uploadUri (bypasses Vercel entirely)
+ * 2. PUT file body directly to Google's uploadUri via XHR (progress events)
  * 3. Return the permanent serving URL
  */
 
-interface DriveUploadResult {
+export interface DriveUploadResult {
   fileId: string;
-  /** CDN URL for images (lh3.googleusercontent.com) */
   imageUrl: string | null;
-  /** Proxy URL for videos (/api/drive/stream?id=...) */
   streamUrl: string | null;
-  /** The serving URL to use (imageUrl for images, streamUrl for videos) */
   url: string;
 }
+
+export type ProgressCallback = (percent: number) => void;
 
 export async function uploadToDrive(
   file: File,
   folder: "thumbnails" | "raw-files" | "media-library",
-  cardId?: string
+  cardId?: string,
+  onProgress?: ProgressCallback
 ): Promise<DriveUploadResult> {
   if (file.size === 0) throw new Error("Cannot upload empty file");
   if (file.size > 5 * 1024 * 1024 * 1024) throw new Error("File exceeds 5GB limit");
 
   // Step 1: Get upload session from our API
+  onProgress?.(0);
   const initRes = await fetch("/api/drive/upload", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -39,27 +40,40 @@ export async function uploadToDrive(
 
   if (!initRes.ok) {
     const err = await initRes.json().catch(() => ({ error: "Upload init failed" }));
-    throw new Error(err.error || "Failed to initialize upload");
+    throw new Error(err.error || `Upload init failed (${initRes.status})`);
   }
 
   const { uploadUri, fileId, imageUrl, streamUrl } = await initRes.json();
+  onProgress?.(5);
 
-  // Step 2: Upload file directly to Google (bypasses Vercel)
-  const uploadRes = await fetch(uploadUri, {
-    method: "PUT",
-    headers: {
-      "Content-Type": file.type || "application/octet-stream",
-      "Content-Length": file.size.toString(),
-    },
-    body: file,
+  // Step 2: Upload file directly to Google via XHR (for progress events)
+  await new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", uploadUri, true);
+    xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        // Scale from 5-100 (5% was the init phase)
+        const pct = Math.round(5 + (e.loaded / e.total) * 95);
+        onProgress?.(pct);
+      }
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        onProgress?.(100);
+        resolve();
+      } else {
+        reject(new Error(`Drive upload failed: ${xhr.status} ${xhr.statusText}`));
+      }
+    };
+
+    xhr.onerror = () => reject(new Error("Network error during Drive upload"));
+    xhr.ontimeout = () => reject(new Error("Drive upload timed out"));
+    xhr.send(file);
   });
 
-  if (!uploadRes.ok) {
-    throw new Error(`Upload to Google Drive failed: ${uploadRes.status}`);
-  }
-
-  // Determine the best serving URL
   const url = imageUrl || streamUrl || `https://drive.google.com/uc?id=${fileId}`;
-
   return { fileId, imageUrl, streamUrl, url };
 }

@@ -61,6 +61,8 @@ export function AssetReviewDrawer() {
   const assetInputRef = useRef<HTMLInputElement>(null);
   const rawFileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadingFileName, setUploadingFileName] = useState("");
 
   useEffect(() => {
     if (selectedCard && isEditingOnOpen && prevCardRef.current !== selectedCard.id) {
@@ -160,29 +162,31 @@ export function AssetReviewDrawer() {
     addToast("Schedule updated", "info");
   };
 
-  // ─── Replace primary asset ───
+  // ─── Replace primary asset (→ thumbnails/) ───
   const handleAssetReplace = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || uploading) return;
     setUploading(true);
+    setUploadingFileName(file.name);
+    setUploadProgress(0);
     const prevUrl = selectedCard.thumbnailUrl;
     const blobUrl = URL.createObjectURL(file);
     updateCard(selectedCard.id, { thumbnailUrl: blobUrl });
-    addToast("Uploading to Drive...", "info");
     try {
       const { uploadToDrive } = await import("@/lib/drive-upload");
-      const result = await uploadToDrive(file, "thumbnails", selectedCard.id);
+      const result = await uploadToDrive(file, "thumbnails", selectedCard.id, setUploadProgress);
       URL.revokeObjectURL(blobUrl);
       updateCard(selectedCard.id, { thumbnailUrl: result.url });
-      addToast("Primary asset uploaded to Drive", "success");
-    } catch {
-      addToast("Drive upload failed — using local preview", "warning");
+      addToast("Cover image uploaded to Drive", "success");
+    } catch (err) {
+      addToast(`Cover upload failed: ${err instanceof Error ? err.message : "unknown error"}`, "error");
     }
-    // Revoke old blob URL if it was one
     if (prevUrl?.startsWith("blob:")) URL.revokeObjectURL(prevUrl);
-    logAudit(selectedCard.id, currentUser.name, "asset_replaced", `Replaced primary asset with ${file.name}`);
+    logAudit(selectedCard.id, currentUser.name, "asset_replaced", `Replaced cover with ${file.name}`);
     if (assetInputRef.current) assetInputRef.current.value = "";
     setUploading(false);
+    setUploadProgress(0);
+    setUploadingFileName("");
   };
 
   // ─── Source Vault save ───
@@ -195,27 +199,32 @@ export function AssetReviewDrawer() {
     setVaultSaving(false);
   };
 
-  // ─── Raw file upload ───
+  // ─── Raw file upload (→ raw-files/) ───
   const handleRawFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    addToast(`Uploading ${file.name}...`, "info");
+    if (!file || uploading) return;
+    setUploading(true);
+    setUploadingFileName(file.name);
+    setUploadProgress(0);
     let fileUrl = URL.createObjectURL(file);
     let driveSuccess = false;
     try {
       const { uploadToDrive } = await import("@/lib/drive-upload");
-      const result = await uploadToDrive(file, "raw-files", selectedCard.id);
+      const result = await uploadToDrive(file, "raw-files", selectedCard.id, setUploadProgress);
       fileUrl = result.url;
       driveSuccess = true;
-    } catch {
-      // Keep blob URL as fallback
+    } catch (err) {
+      console.error("[raw-upload]", err);
     }
     const rawFiles = [...(selectedCard.sourceVault?.rawFiles || []), { name: file.name, url: fileUrl, uploadedAt: new Date().toISOString() }];
     const vault = { ...selectedCard.sourceVault, rawFiles };
     updateCard(selectedCard.id, { sourceVault: vault });
     logAudit(selectedCard.id, currentUser.name, "raw_file_uploaded", `Uploaded ${file.name}`);
-    addToast(driveSuccess ? `${file.name} uploaded to Drive` : `${file.name} saved locally (Drive unavailable)`, driveSuccess ? "success" : "warning");
+    addToast(driveSuccess ? `${file.name} uploaded to Drive` : `${file.name} saved locally`, driveSuccess ? "success" : "warning");
     if (rawFileInputRef.current) rawFileInputRef.current.value = "";
+    setUploading(false);
+    setUploadProgress(0);
+    setUploadingFileName("");
   };
 
   return (
@@ -336,11 +345,51 @@ export function AssetReviewDrawer() {
               </div>
             )}
 
+            {/* Upload progress bar */}
+            {uploading && (
+              <div className="bg-white dark:bg-white/[0.03] rounded-xl border border-gray-200/60 dark:border-white/[0.06] p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-medium text-gray-600 dark:text-gray-300 truncate flex-1">{uploadingFileName}</span>
+                  <span className="text-[10px] font-bold text-orange-500 tabular-nums ml-2">{uploadProgress}%</span>
+                </div>
+                <div className="w-full h-1.5 rounded-full bg-gray-100 dark:bg-white/[0.06] overflow-hidden">
+                  <div className="h-full rounded-full bg-gradient-to-r from-orange-500 to-amber-500 transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+                </div>
+              </div>
+            )}
+
+            {/* Uploaded files list */}
+            {(selectedCard.sourceVault?.rawFiles || []).length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.1em]">Attached Files</p>
+                {(selectedCard.sourceVault?.rawFiles || []).map((file, i) => {
+                  const isImage = /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(file.name);
+                  const isVideo = /\.(mp4|mov|avi|webm|mkv)$/i.test(file.name);
+                  return (
+                    <a key={i} href={file.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-white dark:bg-white/[0.02] border border-gray-100 dark:border-white/[0.05] hover:border-orange-200 dark:hover:border-orange-500/20 transition-colors group">
+                      {isImage ? (
+                        <img src={file.url} alt={file.name} className="w-8 h-8 rounded object-cover shrink-0" />
+                      ) : isVideo ? (
+                        <div className="w-8 h-8 rounded bg-violet-50 dark:bg-violet-500/10 flex items-center justify-center shrink-0"><FileVideo className="w-3.5 h-3.5 text-violet-500" /></div>
+                      ) : (
+                        <div className="w-8 h-8 rounded bg-gray-50 dark:bg-white/[0.04] flex items-center justify-center shrink-0"><FileText className="w-3.5 h-3.5 text-gray-400" /></div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[11px] font-medium text-gray-700 dark:text-gray-300 truncate">{file.name}</p>
+                        <p className="text-[9px] text-gray-400">{new Date(file.uploadedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</p>
+                      </div>
+                      <ExternalLink className="w-3 h-3 text-gray-300 group-hover:text-orange-500 transition-colors shrink-0" />
+                    </a>
+                  );
+                })}
+              </div>
+            )}
+
             {/* Dropzone */}
             <input ref={rawFileInputRef} type="file" accept="image/*,video/*,.pdf,.psd,.ai,.prproj,.aep,.sketch,.fig" onChange={handleRawFileUpload} className="hidden" />
-            <button onClick={() => rawFileInputRef.current?.click()} className="w-full border-2 border-dashed border-gray-200/80 dark:border-white/[0.05] rounded-xl py-4 flex items-center justify-center gap-2.5 text-gray-350 dark:text-gray-500 hover:text-gray-500 hover:border-gray-300 dark:hover:border-white/[0.1] transition-all duration-200 cursor-pointer">
-              <Upload className="w-3.5 h-3.5 text-gray-300 dark:text-gray-600" />
-              <span className="text-[11px] text-gray-400 dark:text-gray-500">Upload additional files or carousel slides</span>
+            <button disabled={uploading} onClick={() => rawFileInputRef.current?.click()} className="w-full border border-dashed border-gray-200 dark:border-white/[0.08] rounded-xl py-3.5 flex items-center justify-center gap-2 text-gray-400 dark:text-gray-500 hover:text-orange-500 hover:border-orange-300 dark:hover:border-orange-500/30 hover:bg-orange-50/30 dark:hover:bg-orange-500/[0.02] transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+              <Upload className="w-3.5 h-3.5" />
+              <span className="text-[11px]">Upload additional files</span>
             </button>
           </div>
 
