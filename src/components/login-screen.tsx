@@ -128,58 +128,50 @@ export function LoginScreen() {
         </div>
       </div>
 
-      {/* ─── Right: Brand Showcase (hidden on mobile) ─── */}
-      <div className="hidden lg:flex relative overflow-hidden bg-[#0a0a0f]">
-        {/* Gradient mesh — orange glow */}
-        <div className="absolute inset-0">
-          <div className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] rounded-full opacity-[0.07]" style={{ background: "radial-gradient(circle, #ea580c, transparent 70%)" }} />
-          <div className="absolute bottom-[-15%] left-[-5%] w-[500px] h-[500px] rounded-full opacity-[0.04]" style={{ background: "radial-gradient(circle, #f97316, transparent 70%)" }} />
-          <div className="absolute top-[40%] left-[30%] w-[400px] h-[400px] rounded-full opacity-[0.03]" style={{ background: "radial-gradient(circle, #3b82f6, transparent 70%)" }} />
-        </div>
+      {/* ─── Right: Video Showcase (hidden on mobile) ─── */}
+      <div className="hidden lg:flex relative overflow-hidden">
+        {/* Video background */}
+        <video
+          autoPlay muted loop playsInline
+          className="absolute inset-0 w-full h-full object-cover"
+          src="https://videos.pexels.com/video-files/3129671/3129671-uhd_2560_1440_30fps.mp4"
+        />
 
-        {/* Subtle grid pattern */}
-        <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.4) 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
+        {/* Dark overlay */}
+        <div className="absolute inset-0 bg-black/60" />
+
+        {/* Gradient overlay — warm tint from bottom */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30" />
 
         {/* Content */}
-        <div className="relative z-10 flex flex-col items-center justify-center w-full px-16 xl:px-24">
-          {/* Brand mark */}
-          <div className="mb-10">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-lg shadow-orange-500/20">
-              <span className="text-[24px] font-black text-white tracking-tighter">T</span>
+        <div className="relative z-10 flex flex-col justify-between w-full h-full p-12 xl:p-16">
+          {/* Top spacer */}
+          <div />
+
+          {/* Bottom — copy */}
+          <div>
+            <h2 className="text-[32px] xl:text-[38px] font-extrabold text-white leading-[1.15] tracking-[-0.02em] max-w-[440px]">
+              Your entire content workflow, one&nbsp;dashboard.
+            </h2>
+            <p className="text-[14px] text-white/50 mt-4 max-w-[380px] leading-relaxed">
+              Plan, approve, schedule, and publish — all from a single pipeline built for teams that move fast.
+            </p>
+
+            <div className="flex items-center gap-8 mt-8">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-orange-500" />
+                <span className="text-[12px] text-white/40 font-medium">Pipeline</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                <span className="text-[12px] text-white/40 font-medium">Approvals</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-sky-500" />
+                <span className="text-[12px] text-white/40 font-medium">Scheduling</span>
+              </div>
             </div>
           </div>
-
-          {/* Headline */}
-          <h2 className="text-[36px] xl:text-[42px] font-extrabold text-white text-center leading-[1.1] tracking-[-0.03em] max-w-[480px]">
-            The Command Center for Elite Content Pipelines
-          </h2>
-
-          <p className="text-[15px] text-gray-500 text-center mt-5 max-w-[380px] leading-relaxed">
-            Streamline approvals, manage assets, and ship content at scale across every platform.
-          </p>
-
-          {/* Stats row */}
-          <div className="flex items-center gap-10 mt-12">
-            {[
-              { value: "5+", label: "Platforms" },
-              { value: "10x", label: "Faster" },
-              { value: "100%", label: "Organized" },
-            ].map((stat) => (
-              <div key={stat.label} className="text-center">
-                <p className="text-[28px] font-black text-white tracking-tight">{stat.value}</p>
-                <p className="text-[11px] text-gray-600 uppercase tracking-[0.12em] font-medium mt-0.5">{stat.label}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Subtle divider line */}
-          <div className="w-12 h-px bg-gray-800 mt-12 mb-8" />
-
-          {/* Testimonial-style text */}
-          <p className="text-[13px] text-gray-600 italic text-center max-w-[340px]">
-            &ldquo;From idea to posted in one drag. The pipeline changed how we operate.&rdquo;
-          </p>
-          <p className="text-[11px] text-gray-700 mt-2 font-medium">Ten80Ten Creative Team</p>
         </div>
       </div>
     </div>
