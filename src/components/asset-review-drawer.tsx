@@ -201,18 +201,20 @@ export function AssetReviewDrawer() {
     if (!file) return;
     addToast(`Uploading ${file.name}...`, "info");
     let fileUrl = URL.createObjectURL(file);
+    let driveSuccess = false;
     try {
       const { uploadToDrive } = await import("@/lib/drive-upload");
       const result = await uploadToDrive(file, "raw-files", selectedCard.id);
       fileUrl = result.url;
+      driveSuccess = true;
     } catch {
-      addToast("Drive upload failed — using local preview", "warning");
+      // Keep blob URL as fallback
     }
     const rawFiles = [...(selectedCard.sourceVault?.rawFiles || []), { name: file.name, url: fileUrl, uploadedAt: new Date().toISOString() }];
     const vault = { ...selectedCard.sourceVault, rawFiles };
     updateCard(selectedCard.id, { sourceVault: vault });
     logAudit(selectedCard.id, currentUser.name, "raw_file_uploaded", `Uploaded ${file.name}`);
-    addToast(`${file.name} uploaded to Drive`, "success");
+    addToast(driveSuccess ? `${file.name} uploaded to Drive` : `${file.name} saved locally (Drive unavailable)`, driveSuccess ? "success" : "warning");
     if (rawFileInputRef.current) rawFileInputRef.current.value = "";
   };
 
@@ -335,7 +337,7 @@ export function AssetReviewDrawer() {
             )}
 
             {/* Dropzone */}
-            <input ref={rawFileInputRef} type="file" accept="image/*,video/*" multiple onChange={handleRawFileUpload} className="hidden" />
+            <input ref={rawFileInputRef} type="file" accept="image/*,video/*,.pdf,.psd,.ai,.prproj,.aep,.sketch,.fig" onChange={handleRawFileUpload} className="hidden" />
             <button onClick={() => rawFileInputRef.current?.click()} className="w-full border-2 border-dashed border-gray-200/80 dark:border-white/[0.05] rounded-xl py-4 flex items-center justify-center gap-2.5 text-gray-350 dark:text-gray-500 hover:text-gray-500 hover:border-gray-300 dark:hover:border-white/[0.1] transition-all duration-200 cursor-pointer">
               <Upload className="w-3.5 h-3.5 text-gray-300 dark:text-gray-600" />
               <span className="text-[11px] text-gray-400 dark:text-gray-500">Upload additional files or carousel slides</span>
@@ -387,62 +389,77 @@ export function AssetReviewDrawer() {
                   />
                 </div>
 
-                {/* Asset Source (compliance) */}
-                <div className="bg-slate-50/70 dark:bg-white/[0.02] rounded-xl border border-gray-100 dark:border-white/[0.05] p-5">
-                  <label className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1.5 mb-3">
-                    <FileText className="w-3.5 h-3.5 text-orange-400" />Asset Source <span className="text-red-400 text-[9px] normal-case font-medium ml-1">Required for approval</span>
-                  </label>
-                  <InlineEdit
-                    value={selectedCard.assetSource || ""}
-                    onSave={(v) => { updateCard(selectedCard.id, { assetSource: v || undefined }); logAudit(selectedCard.id, currentUser.name, "content_edited", "Updated asset source"); }}
-                    placeholder="e.g. Envato Elements, Client provided, Shot by team..."
-                    className="text-[13px] text-gray-700 dark:text-gray-300"
-                    inputClassName="text-[13px]"
-                  />
-                  {!selectedCard.assetSource?.trim() && (
-                    <p className="text-[10px] text-amber-500 mt-2 flex items-center gap-1"><AlertCircle className="w-3 h-3" />Must be filled before this post can be approved</p>
-                  )}
-                </div>
-
-                {/* License upload (optional compliance) */}
-                <div className="bg-slate-50/70 dark:bg-white/[0.02] rounded-xl border border-gray-100 dark:border-white/[0.05] p-5">
-                  <label className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1.5 mb-3">
-                    <Paperclip className="w-3.5 h-3.5 text-orange-400" />License / Release <span className="text-gray-300 dark:text-gray-600 text-[9px] normal-case font-medium ml-1">Optional</span>
-                  </label>
-                  {selectedCard.licenseFileId ? (
-                    <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-500/5 border border-emerald-200 dark:border-emerald-500/20 rounded-lg px-3 py-2">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                      <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium flex-1">License uploaded</span>
-                      <button onClick={() => { updateCard(selectedCard.id, { licenseFileId: undefined }); }} className="text-[10px] text-gray-400 hover:text-red-500 cursor-pointer transition-colors">Remove</button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={async () => {
-                        const input = document.createElement("input");
-                        input.type = "file";
-                        input.accept = "image/*,.pdf";
-                        input.onchange = async (ev) => {
-                          const file = (ev.target as HTMLInputElement).files?.[0];
-                          if (!file) return;
-                          addToast("Uploading license...", "info");
-                          try {
-                            const { uploadToDrive } = await import("@/lib/drive-upload");
-                            const result = await uploadToDrive(file, "raw-files", selectedCard.id);
-                            updateCard(selectedCard.id, { licenseFileId: result.fileId });
-                            logAudit(selectedCard.id, currentUser.name, "license_uploaded", `Uploaded license: ${file.name}`);
-                            addToast("License uploaded", "success");
-                          } catch {
-                            addToast("License upload failed", "error");
-                          }
-                        };
-                        input.click();
+                {/* ── Compliance Block ── */}
+                <div className="bg-white dark:bg-white/[0.02] rounded-xl border border-gray-200/60 dark:border-white/[0.06] shadow-sm overflow-hidden">
+                  {/* Asset Source */}
+                  <div className="p-4 border-b border-gray-100 dark:border-white/[0.04]">
+                    <label className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.1em] flex items-center gap-1.5 mb-2.5">
+                      <FileText className="w-3 h-3 text-orange-400" />Asset Source
+                      {!selectedCard.assetSource?.trim() && <span className="text-red-400 text-[8px] normal-case ml-auto">Required</span>}
+                    </label>
+                    <select
+                      value={selectedCard.assetSource || ""}
+                      onChange={(e) => {
+                        updateCard(selectedCard.id, { assetSource: e.target.value || undefined });
+                        logAudit(selectedCard.id, currentUser.name, "content_edited", `Asset source: ${e.target.value}`);
                       }}
-                      className="w-full border-2 border-dashed border-gray-200/80 dark:border-white/[0.05] rounded-lg py-3 flex items-center justify-center gap-2 text-gray-400 dark:text-gray-500 hover:text-gray-500 hover:border-gray-300 dark:hover:border-white/[0.1] transition-all cursor-pointer"
+                      className="w-full h-9 px-3 rounded-lg bg-slate-50 dark:bg-white/[0.03] border border-gray-200 dark:border-white/[0.08] text-[12px] text-gray-700 dark:text-gray-300 outline-none cursor-pointer focus:border-orange-400 focus:ring-2 focus:ring-orange-100 dark:focus:ring-orange-500/10 transition-all"
                     >
-                      <Upload className="w-3.5 h-3.5" />
-                      <span className="text-[11px]">Upload license PDF or screenshot</span>
-                    </button>
-                  )}
+                      <option value="">Select source...</option>
+                      <option value="Envato Elements">Envato Elements</option>
+                      <option value="Pexels">Pexels</option>
+                      <option value="Shot by Team">Shot by Team</option>
+                      <option value="Client Provided">Client Provided</option>
+                      <option value="Google Images">Google Images</option>
+                      <option value="AI Generated">AI Generated</option>
+                      <option value="Other">Other</option>
+                    </select>
+                    {!selectedCard.assetSource?.trim() && (
+                      <p className="text-[9px] text-amber-500/80 mt-1.5 flex items-center gap-1"><AlertCircle className="w-2.5 h-2.5" />Fill before submitting for approval</p>
+                    )}
+                  </div>
+
+                  {/* License upload */}
+                  <div className="p-4">
+                    <label className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.1em] flex items-center gap-1.5 mb-2.5">
+                      <Paperclip className="w-3 h-3 text-orange-400" />License / Release
+                      <span className="text-gray-300 dark:text-gray-600 text-[8px] normal-case ml-auto">Optional</span>
+                    </label>
+                    {selectedCard.licenseFileId ? (
+                      <div className="flex items-center gap-2.5 bg-emerald-50 dark:bg-emerald-500/5 border border-emerald-200/60 dark:border-emerald-500/20 rounded-lg px-3.5 py-2.5">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                        <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium flex-1">License on file</span>
+                        <button onClick={() => { updateCard(selectedCard.id, { licenseFileId: undefined }); }} className="text-[10px] text-gray-400 hover:text-red-500 cursor-pointer transition-colors">Remove</button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={async () => {
+                          const input = document.createElement("input");
+                          input.type = "file";
+                          input.accept = "image/*,.pdf,.txt";
+                          input.onchange = async (ev) => {
+                            const file = (ev.target as HTMLInputElement).files?.[0];
+                            if (!file) return;
+                            addToast("Uploading license...", "info");
+                            try {
+                              const { uploadToDrive } = await import("@/lib/drive-upload");
+                              const result = await uploadToDrive(file, "raw-files", selectedCard.id);
+                              updateCard(selectedCard.id, { licenseFileId: result.fileId });
+                              logAudit(selectedCard.id, currentUser.name, "license_uploaded", `Uploaded license: ${file.name}`);
+                              addToast("License uploaded", "success");
+                            } catch {
+                              addToast("License upload failed", "error");
+                            }
+                          };
+                          input.click();
+                        }}
+                        className="w-full border border-dashed border-gray-200 dark:border-white/[0.08] rounded-lg py-3 flex items-center justify-center gap-2 text-gray-400 dark:text-gray-500 hover:text-orange-500 hover:border-orange-300 dark:hover:border-orange-500/30 hover:bg-orange-50/30 dark:hover:bg-orange-500/[0.02] transition-all cursor-pointer"
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        <span className="text-[11px]">Upload license (PDF, TXT, or screenshot)</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Notes & Comments */}
