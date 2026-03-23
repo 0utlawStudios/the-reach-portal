@@ -75,8 +75,10 @@ export async function POST(request: NextRequest) {
     );
 
     if (!uploadRes.ok) {
-      const err = await uploadRes.text();
-      return NextResponse.json({ error: `Drive upload failed: ${uploadRes.status} ${err}` }, { status: 500 });
+      const rawErr = await uploadRes.text();
+      // Sanitize: Google API errors contain newlines that break downstream JSON parsing
+      const cleanErr = rawErr.replace(/[\x00-\x1F\x7F]/g, " ").slice(0, 200);
+      return NextResponse.json({ error: `Drive upload failed (${uploadRes.status}): ${cleanErr}` }, { status: 500 });
     }
 
     const driveFile = await uploadRes.json();
@@ -96,7 +98,7 @@ export async function POST(request: NextRequest) {
       driveFileName,
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Unknown error";
+    const message = (err instanceof Error ? err.message : "Unknown error").replace(/[\x00-\x1F\x7F]/g, " ");
     console.error("[drive/proxy-upload]", message);
     return NextResponse.json({ error: message }, { status: 500 });
   }

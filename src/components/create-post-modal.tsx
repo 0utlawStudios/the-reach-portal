@@ -56,6 +56,8 @@ export function CreatePostModal({ open, onClose }: Props) {
   const [licenseFileId, setLicenseFileId] = useState("");
   const [activeTab, setActiveTab] = useState<ModalTab>("content");
   const [checklist, setChecklist] = useState(() => DEFAULT_CHECKLIST.map((c) => ({ ...c })));
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadingFileName, setUploadingFileName] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const rawFilesRef = useRef<Map<string, File>>(new Map());
 
@@ -121,8 +123,10 @@ export function CreatePostModal({ open, onClose }: Props) {
         const f = files[i];
         const rawFile = rawFilesRef.current.get(f.id);
         if (!rawFile) continue;
+        setUploadingFileName(rawFile.name);
+        setUploadProgress(0);
         try {
-          const result = await uploadToDrive(rawFile, "raw-files");
+          const result = await uploadToDrive(rawFile, "raw-files", undefined, setUploadProgress);
           rawFiles.push({
             name: rawFile.name,
             url: result.url,
@@ -430,9 +434,22 @@ export function CreatePostModal({ open, onClose }: Props) {
               </div>
             )}
 
+            {/* Upload progress */}
+            {submitting && uploadingFileName && (
+              <div className="bg-white dark:bg-white/[0.03] rounded-xl border border-gray-200/60 dark:border-white/[0.06] p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-medium text-gray-600 dark:text-gray-300 truncate flex-1">{uploadingFileName}</span>
+                  <span className="text-[10px] font-bold text-orange-500 tabular-nums ml-2">{uploadProgress}%</span>
+                </div>
+                <div className="w-full h-1.5 rounded-full bg-gray-100 dark:bg-white/[0.06] overflow-hidden">
+                  <div className="h-full rounded-full bg-gradient-to-r from-orange-500 to-amber-500 transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+                </div>
+              </div>
+            )}
+
             {/* Actions */}
             <div className="flex gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={onClose} className="flex-1 h-10 rounded-lg text-[12px]">Cancel</Button>
+              <Button type="button" variant="outline" onClick={onClose} disabled={submitting} className="flex-1 h-10 rounded-lg text-[12px]">Cancel</Button>
               <Button type="submit" disabled={submitting || !title.trim() || files.length === 0 || platforms.length === 0 || !scheduledDate || !scheduledTime || !hook.trim() || !caption.trim()} className="flex-1 h-10 rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white text-[12px] disabled:opacity-40 shadow-sm">
                 {submitting ? "Uploading..." : "Create Post"}
               </Button>

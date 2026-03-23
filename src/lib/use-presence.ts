@@ -55,6 +55,9 @@ export function usePresence(userEmail: string) {
             status: "online" as PresenceStatus,
             lastSeen: new Date().toISOString(),
           });
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          console.warn("[presence] Channel failed:", status);
+          setPresenceMap({});
         }
       });
 

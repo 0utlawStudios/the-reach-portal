@@ -196,7 +196,7 @@ export function AssetReviewDrawer() {
   // ─── Source Vault save ───
   const saveVault = async () => {
     setVaultSaving(true);
-    const vault = { ...selectedCard.sourceVault, designLink: designLink || undefined, driveFolder: driveFolder || undefined };
+    const vault = { ...(selectedCard.sourceVault || {}), designLink: designLink || undefined, driveFolder: driveFolder || undefined };
     updateCard(selectedCard.id, { sourceVault: vault });
     logAudit(selectedCard.id, currentUser.name, "vault_updated", "Updated source vault links");
     addToast("Source vault saved", "success");
@@ -225,7 +225,7 @@ export function AssetReviewDrawer() {
         uploadedAt: new Date().toISOString(),
       };
       const rawFiles = [...existingFiles, newFile];
-      updateCard(selectedCard.id, { sourceVault: { ...selectedCard.sourceVault, rawFiles } });
+      updateCard(selectedCard.id, { sourceVault: { ...(selectedCard.sourceVault || {}), rawFiles } });
       logAudit(selectedCard.id, currentUser.name, "raw_file_uploaded", `Uploaded ${file.name} (${newFile.usageType})`);
       addToast(`${file.name} uploaded to Drive`, "success");
     } catch (err) {
@@ -434,7 +434,7 @@ export function AssetReviewDrawer() {
                       <button
                         onClick={() => {
                           const updated = (selectedCard.sourceVault?.rawFiles || []).filter((_, idx) => idx !== i);
-                          updateCard(selectedCard.id, { sourceVault: { ...selectedCard.sourceVault, rawFiles: updated } });
+                          updateCard(selectedCard.id, { sourceVault: { ...(selectedCard.sourceVault || {}), rawFiles: updated } });
                           if (file.url.startsWith("blob:")) URL.revokeObjectURL(file.url);
                           logAudit(selectedCard.id, currentUser.name, "raw_file_uploaded", `Removed ${file.name}`);
                           addToast(`${file.name} removed`, "info");

@@ -32,7 +32,7 @@ export function MentionTextarea({ value, onChange, placeholder, className, rows 
 
     // Check for @ trigger
     const textBeforeCursor = val.slice(0, pos);
-    const atMatch = textBeforeCursor.match(/@(\w*)$/);
+    const atMatch = textBeforeCursor.match(/@([\w\s]*)$/);
     if (atMatch) {
       setMentionQuery(atMatch[1]);
       setShowDropdown(true);
