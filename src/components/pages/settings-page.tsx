@@ -577,6 +577,7 @@ const INTEGRATIONS = [
 function IntegrationDetailPanel({ integration, onClose }: { integration: (typeof INTEGRATIONS)[number]; onClose: () => void }) {
   const connected = integration.status === "connected";
   const Icon = integration.icon;
+  const [showContactPrompt, setShowContactPrompt] = useState(false);
 
   return (
     <>
@@ -666,14 +667,34 @@ function IntegrationDetailPanel({ integration, onClose }: { integration: (typeof
           {connected ? (
             <div className="flex items-center justify-between">
               <span className="text-[10px] text-gray-400">Managed by workspace admin</span>
-              <Button size="sm" variant="outline" className="h-8 rounded-lg text-[11px] border-red-200 text-red-500 hover:bg-red-50 dark:border-red-500/20 dark:hover:bg-red-500/10 cursor-pointer">Disconnect</Button>
+              <Button size="sm" variant="outline" onClick={() => setShowContactPrompt(true)} className="h-8 rounded-lg text-[11px] border-gray-200 text-gray-500 hover:bg-gray-50 dark:border-white/[0.08] dark:hover:bg-white/[0.04] cursor-pointer">Manage</Button>
             </div>
           ) : (
-            <Button size="sm" className="w-full h-9 rounded-lg bg-gray-900 dark:bg-white dark:text-gray-900 text-white text-[12px] cursor-pointer">
+            <Button size="sm" onClick={() => setShowContactPrompt(true)} className="w-full h-9 rounded-lg bg-gray-900 dark:bg-white dark:text-gray-900 text-white text-[12px] cursor-pointer">
               Enable Integration
             </Button>
           )}
         </div>
+
+        {/* Contact prompt */}
+        {showContactPrompt && (
+          <>
+            <div onClick={() => setShowContactPrompt(false)} className="fixed inset-0 bg-black/40 z-[70]" />
+            <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[70] w-full max-w-[360px] bg-white dark:bg-[#151518] rounded-2xl border border-gray-200 dark:border-white/[0.08] shadow-2xl p-6 text-center animate-in fade-in zoom-in-95 duration-200">
+              <div className="w-12 h-12 mx-auto rounded-xl bg-orange-50 dark:bg-orange-500/10 flex items-center justify-center mb-4">
+                <ShieldIcon className="w-6 h-6 text-orange-500" />
+              </div>
+              <h3 className="text-[15px] font-bold text-gray-900 dark:text-white">Admin Action Required</h3>
+              <p className="text-[12px] text-gray-400 mt-2 leading-relaxed">Integration changes require developer access. Reach out to make modifications to this connection.</p>
+              <div className="flex flex-col gap-2 mt-5">
+                <a href="https://wa.me/639154954549" target="_blank" rel="noopener noreferrer" className="w-full h-10 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-[13px] font-semibold flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-sm">
+                  <ExternalLink className="w-3.5 h-3.5" />Contact Developer
+                </a>
+                <button onClick={() => setShowContactPrompt(false)} className="w-full h-10 rounded-lg border border-gray-200 dark:border-white/[0.08] text-gray-500 dark:text-gray-400 text-[12px] font-medium hover:bg-gray-50 dark:hover:bg-white/[0.03] cursor-pointer transition-colors">Cancel</button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </>
   );
