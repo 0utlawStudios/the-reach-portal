@@ -108,6 +108,7 @@ export function CreatePostModal({ open, onClose }: Props) {
     if (!scheduledTime) missing.push("time");
     if (!hook.trim()) missing.push("hook");
     if (!caption.trim()) missing.push("caption");
+    if (!assetSource.trim()) missing.push("asset source");
     if (missing.length > 0) { addToast(`Missing required fields: ${missing.join(", ")}`, "error"); return; }
 
     setSubmitting(true);
@@ -330,7 +331,7 @@ export function CreatePostModal({ open, onClose }: Props) {
 
                 {/* Asset Source */}
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Asset Source</label>
+                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Asset Source <span className="text-red-400">*</span></label>
                   <select
                     value={assetSourceOther ? "__other__" : assetSource}
                     onChange={(e) => {
@@ -393,7 +394,7 @@ export function CreatePostModal({ open, onClose }: Props) {
                 {/* Notes */}
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em] flex items-center gap-1.5"><MessageSquare className="w-3 h-3 text-orange-400" />Notes</label>
-                  <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Any notes for the team..." className={`${inputClass} h-auto min-h-[60px] resize-none py-2`} rows={2} />
+                  <MentionTextarea value={notes} onChange={setNotes} placeholder="Any notes for the team... Type @ to mention" className={`${inputClass} h-auto min-h-[60px] resize-none py-2`} rows={2} />
                 </div>
               </>
             )}
@@ -450,7 +451,7 @@ export function CreatePostModal({ open, onClose }: Props) {
             {/* Actions */}
             <div className="flex gap-2 pt-2">
               <Button type="button" variant="outline" onClick={onClose} disabled={submitting} className="flex-1 h-10 rounded-lg text-[12px]">Cancel</Button>
-              <Button type="submit" disabled={submitting || !title.trim() || files.length === 0 || platforms.length === 0 || !scheduledDate || !scheduledTime || !hook.trim() || !caption.trim()} className="flex-1 h-10 rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white text-[12px] disabled:opacity-40 shadow-sm">
+              <Button type="submit" disabled={submitting || !title.trim() || files.length === 0 || platforms.length === 0 || !scheduledDate || !scheduledTime || !hook.trim() || !caption.trim() || !assetSource.trim()} className="flex-1 h-10 rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white text-[12px] disabled:opacity-40 shadow-sm">
                 {submitting ? "Uploading..." : "Create Post"}
               </Button>
             </div>

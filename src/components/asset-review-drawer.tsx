@@ -273,17 +273,24 @@ export function AssetReviewDrawer() {
               inputClassName="text-[18px] font-bold"
             />
 
-            {/* Creator + date */}
+            {/* Creator + date + time */}
             <div className="flex items-center gap-2 text-[10px] text-gray-400 dark:text-gray-500">
-              {selectedCard.createdBy && (
-                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/[0.05] font-medium text-gray-500 dark:text-gray-400">
-                  <span className="w-4 h-4 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-[7px] font-bold text-white shrink-0">
-                    {selectedCard.createdBy.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+              {selectedCard.createdBy && (() => {
+                const creator = members.find((m) => m.name === selectedCard.createdBy);
+                return (
+                  <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/[0.05] font-medium text-gray-500 dark:text-gray-400">
+                    {creator?.avatar ? (
+                      <img src={creator.avatar} alt={creator.name} className="w-4 h-4 rounded-full object-cover shrink-0" />
+                    ) : (
+                      <span className="w-4 h-4 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-[7px] font-bold text-white shrink-0">
+                        {selectedCard.createdBy.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                      </span>
+                    )}
+                    {selectedCard.createdBy}
                   </span>
-                  {selectedCard.createdBy}
-                </span>
-              )}
-              <span>{selectedCard.createdAt ? new Date(selectedCard.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""}</span>
+                );
+              })()}
+              <span>{selectedCard.createdAt ? new Date(selectedCard.createdAt).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : ""}</span>
             </div>
 
             {/* Platforms — editable */}
@@ -583,10 +590,15 @@ export function AssetReviewDrawer() {
                         const content = hasAuthor ? closingMatch![3].trim() : note;
                         const isRevisionNote = author === "Revision Note";
                         const displayAuthor = isRevisionNote ? "Aldridge Dagos" : author;
+                        const authorMember = displayAuthor ? members.find((m) => m.name === displayAuthor) : null;
                         const initials = displayAuthor ? displayAuthor.split(" ").map((n) => n[0]).join("").slice(0, 2) : "??";
                         return (
                           <div key={i} className="flex gap-2.5 group">
-                            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[8px] font-bold text-white shrink-0 mt-0.5 ${isRevisionNote ? "bg-gradient-to-br from-violet-500 to-purple-600" : "bg-gradient-to-br from-amber-400 to-orange-500"}`}>{initials}</div>
+                            {authorMember?.avatar ? (
+                              <img src={authorMember.avatar} alt={displayAuthor || ""} className="w-7 h-7 rounded-full object-cover shrink-0 mt-0.5" />
+                            ) : (
+                              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[8px] font-bold text-white shrink-0 mt-0.5 ${isRevisionNote ? "bg-gradient-to-br from-violet-500 to-purple-600" : "bg-gradient-to-br from-amber-400 to-orange-500"}`}>{initials}</div>
+                            )}
                             <div className={`flex-1 min-w-0 rounded-xl px-3 py-2 border ${isRevisionNote ? "bg-violet-50 dark:bg-violet-500/5 border-violet-200/40 dark:border-violet-500/10" : "bg-amber-50 dark:bg-amber-500/5 border-amber-200/40 dark:border-amber-500/10"}`}>
                               {displayAuthor && (
                                 <div className="flex items-center gap-2 mb-0.5">

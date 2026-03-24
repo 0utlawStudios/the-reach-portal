@@ -335,7 +335,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
   }, [useSupabase]);
 
   const createCard = useCallback((card: Partial<Pick<ContentCard, "checklist">> & Omit<ContentCard, "id" | "createdAt" | "updatedAt" | "checklist">) => {
-    const now = new Date().toISOString().split("T")[0];
+    const now = new Date().toISOString();
     const tempId = Date.now().toString();
     const newCard: ContentCard = {
       ...card,
