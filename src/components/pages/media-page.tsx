@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   FolderOpen, Upload, Film, Image as ImageIcon, Search, Grid3X3, List,
-  CheckCircle, Clock, X, Trash2, Eye,
+  CheckCircle, Clock, X, Trash2, Eye, Link2, ExternalLink, Download,
 } from "lucide-react";
 
 type StatusFilter = "all" | "unused" | "inuse";
@@ -88,6 +88,18 @@ export function MediaPage() {
   };
 
   const getUsageInfo = (asset: MediaAsset) => (!asset.usedIn || asset.usedIn.length === 0) ? null : asset.usedIn.map((id) => cards.find((c) => c.id === id)).filter(Boolean);
+
+  const copyShareLink = (asset: MediaAsset) => {
+    const siteUrl = typeof window !== "undefined" ? window.location.origin : "";
+    const shareUrl = asset.url.startsWith("/") ? `${siteUrl}${asset.url}` : asset.url;
+    navigator.clipboard.writeText(shareUrl).then(() => addToast(`Link copied for "${asset.name}"`, "success"));
+  };
+
+  const openInNewTab = (asset: MediaAsset) => {
+    const siteUrl = typeof window !== "undefined" ? window.location.origin : "";
+    const url = asset.url.startsWith("/") ? `${siteUrl}${asset.url}` : asset.url;
+    window.open(url, "_blank");
+  };
 
   const formatDate = (date: string, time?: string) => {
     const d = new Date(date + "T12:00:00");
@@ -204,8 +216,10 @@ export function MediaPage() {
                           <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded-md bg-gray-500/70 text-[8px] text-white font-medium flex items-center gap-0.5"><Clock className="w-2.5 h-2.5" />Unused</div>
                         )}
                         {/* Hover overlay */}
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-200 flex items-center justify-center opacity-0 group-hover:opacity-100">
-                          <div className="w-9 h-9 rounded-full bg-white/90 flex items-center justify-center shadow-lg"><Eye className="w-4 h-4 text-gray-700" /></div>
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-200 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                          <button onClick={(e) => { e.stopPropagation(); copyShareLink(asset); }} className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow-lg hover:bg-white transition-colors" title="Copy link"><Link2 className="w-3.5 h-3.5 text-gray-700" /></button>
+                          <div className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow-lg"><Eye className="w-3.5 h-3.5 text-gray-700" /></div>
+                          <button onClick={(e) => { e.stopPropagation(); openInNewTab(asset); }} className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow-lg hover:bg-white transition-colors" title="Open"><ExternalLink className="w-3.5 h-3.5 text-gray-700" /></button>
                         </div>
                       </div>
                       {/* Select checkbox */}
@@ -298,7 +312,11 @@ export function MediaPage() {
                   <p className="text-[13px] font-medium text-gray-800 dark:text-gray-200">{lightboxAsset.name}</p>
                   <p className="text-[10px] text-gray-400">{lightboxAsset.folder} · {formatDate(lightboxAsset.uploadedAt, lightboxAsset.uploadedTime)}{lightboxAsset.addedBy ? ` · by ${lightboxAsset.addedBy}` : ""}</p>
                 </div>
-                <button onClick={() => setLightboxAsset(null)} className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-400 cursor-pointer transition-colors"><X className="w-5 h-5" /></button>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => copyShareLink(lightboxAsset)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-400 hover:text-orange-500 cursor-pointer transition-colors" title="Copy shareable link"><Link2 className="w-4 h-4" /></button>
+                  <button onClick={() => openInNewTab(lightboxAsset)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-400 hover:text-blue-500 cursor-pointer transition-colors" title="Open in new tab"><ExternalLink className="w-4 h-4" /></button>
+                  <button onClick={() => setLightboxAsset(null)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-400 cursor-pointer transition-colors"><X className="w-5 h-5" /></button>
+                </div>
               </div>
               <div className="flex-1 overflow-hidden bg-gray-50 dark:bg-black flex items-center justify-center p-4">
                 {lightboxAsset.type === "image" ? (

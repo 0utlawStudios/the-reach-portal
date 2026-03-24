@@ -11,6 +11,7 @@ export interface TeamMember {
   id: string;
   name: string;
   email: string;
+  phone?: string;
   role: UserRole;
   secondaryRole?: string;
   status: InviteStatus;
@@ -42,15 +43,16 @@ function dbToMember(row: any): TeamMember {
     status: row.status,
     joinedAt: row.joined_at || row.created_at?.split("T")[0],
     avatar: row.avatar_url || undefined,
+    phone: row.phone || undefined,
   };
 }
 
 const DEFAULT_MEMBERS: TeamMember[] = [
-  { id: "1", name: "Aldridge Dagos", email: "aldridge@ten80ten.com", role: "owner", secondaryRole: "Approver / Developer", status: "active", joinedAt: "2025-01-01" },
-  { id: "2", name: "Christer Umali", email: "christer@ten80ten.com", role: "admin", secondaryRole: "Approver", status: "active", joinedAt: "2025-02-01" },
-  { id: "3", name: "Alex Nicholson", email: "alex@ten80ten.com", role: "admin", secondaryRole: "Approver", status: "active", joinedAt: "2025-03-01" },
-  { id: "4", name: "Carlo Navarro", email: "carlo@ten80ten.com", role: "specialist", secondaryRole: "Creative Director / Approver", status: "active", joinedAt: "2025-04-01" },
-  { id: "5", name: "Muaaz Saifi", email: "muaaz.ten80ten@gmail.com", role: "specialist", secondaryRole: "Social Media Specialist", status: "active", joinedAt: "2025-05-01" },
+  { id: "1", name: "Aldridge Dagos", email: "aldridge@ten80ten.com", phone: "+639154954549", role: "owner", secondaryRole: "Approver / Developer", status: "active", joinedAt: "2025-01-01" },
+  { id: "2", name: "Christer Umali", email: "christer@ten80ten.com", phone: "+639985517848", role: "admin", secondaryRole: "Approver", status: "active", joinedAt: "2025-02-01" },
+  { id: "3", name: "Alex Nicholson", email: "alex@ten80ten.com", phone: "+12397845377", role: "admin", secondaryRole: "Approver", status: "active", joinedAt: "2025-03-01" },
+  { id: "4", name: "Carlo Navarro", email: "carlo@ten80ten.com", phone: "+639279909987", role: "specialist", secondaryRole: "Creative Director / Approver", status: "active", joinedAt: "2025-04-01" },
+  { id: "5", name: "Muaaz Saifi", email: "muaaz.ten80ten@gmail.com", phone: "+923286959680", role: "specialist", secondaryRole: "Social Media Specialist", status: "active", joinedAt: "2025-05-01" },
 ];
 
 export function TeamProvider({ children }: { children: ReactNode }) {
@@ -130,6 +132,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       if (updates.secondaryRole !== undefined) dbUpdates.secondary_role = updates.secondaryRole;
       if (updates.status !== undefined) dbUpdates.status = updates.status;
       if (updates.avatar !== undefined) dbUpdates.avatar_url = updates.avatar;
+      if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
       supabase.from("team_members").update(dbUpdates).eq("id", id).then(() => {});
     }
   }, [useDb]);

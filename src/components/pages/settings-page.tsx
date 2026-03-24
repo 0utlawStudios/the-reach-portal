@@ -40,6 +40,7 @@ function EditProfileModal({ member, onClose, onDelete, canDelete }: { member: Te
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [name, setName] = useState(member.name);
   const [email, setEmail] = useState(member.email);
+  const [phone, setPhone] = useState(member.phone || "");
   const [role, setRole] = useState<UserRole>(member.role);
   const [avatarUrl, setAvatarUrl] = useState(member.avatar || "");
   const [uploading, setUploading] = useState(false);
@@ -83,7 +84,7 @@ function EditProfileModal({ member, onClose, onDelete, canDelete }: { member: Te
 
   const handleSave = () => {
     const roleChanged = role !== member.role;
-    updateMember(member.id, { name, email, role, avatar: avatarUrl || undefined, secondaryRole: secondaryRoles.length > 0 ? secondaryRoles.join(" / ") : undefined });
+    updateMember(member.id, { name, email, phone: phone || undefined, role, avatar: avatarUrl || undefined, secondaryRole: secondaryRoles.length > 0 ? secondaryRoles.join(" / ") : undefined });
     if (member.email === currentUser.email) {
       updateCurrentUserAvatar(avatarUrl || undefined);
     }
@@ -138,6 +139,12 @@ function EditProfileModal({ member, onClose, onDelete, canDelete }: { member: Te
             <div className="space-y-1">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.08em]">Email</label>
               <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="h-9 bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[13px] text-gray-800 dark:text-gray-200" />
+            </div>
+
+            {/* Phone */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.08em]">Phone / WhatsApp</label>
+              <Input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+1 234 567 8900" className="h-9 bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[13px] text-gray-800 dark:text-gray-200 font-mono" />
             </div>
 
             {/* Role */}
