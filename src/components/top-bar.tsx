@@ -6,7 +6,7 @@ import { useTheme } from "@/lib/theme-context";
 import { useNavigation } from "@/lib/navigation-context";
 import { Sun, Moon, User, Settings, LogOut, ChevronDown, Menu } from "lucide-react";
 
-export function TopBar() {
+export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
   const { logout, currentUser } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { navigate } = useNavigation();
@@ -23,8 +23,8 @@ export function TopBar() {
 
   return (
     <header className="h-12 flex items-center gap-2 px-4 border-b border-gray-100 bg-white dark:bg-[#111] dark:border-white/[0.06] shrink-0">
-      {/* Mobile hamburger */}
-      <button onClick={() => { const sidebar = document.getElementById("mobile-sidebar"); const backdrop = document.getElementById("mobile-sidebar-backdrop"); sidebar?.classList.remove("hidden"); sidebar?.classList.add("flex"); backdrop?.classList.remove("hidden"); }} className="md:hidden p-2 -ml-1 rounded-lg text-gray-500 hover:bg-gray-50 dark:hover:bg-white/[0.06] cursor-pointer transition-colors">
+      {/* Mobile / tablet hamburger */}
+      <button onClick={onMenuClick} className="md:hidden p-2 -ml-1 rounded-lg text-gray-500 hover:bg-gray-50 dark:hover:bg-white/[0.06] cursor-pointer transition-colors">
         <Menu className="w-5 h-5" />
       </button>
       <div className="flex-1" />
