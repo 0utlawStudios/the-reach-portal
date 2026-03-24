@@ -314,8 +314,8 @@ export function AssetReviewDrawer() {
             <div className="bg-slate-50 dark:bg-white/[0.03] rounded-xl border border-gray-100 dark:border-white/[0.06] px-4 py-3">
               {dateEditing ? (
                 <div className="flex gap-2 items-center">
-                  <Input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} className="h-9 flex-1 bg-white dark:bg-white/[0.04] border-orange-300 dark:border-orange-500/40 rounded-lg text-[12px] ring-2 ring-orange-100 dark:ring-orange-500/20" autoFocus />
-                  <Input type="time" value={editTime} onChange={(e) => setEditTime(e.target.value)} className="h-9 w-28 bg-white dark:bg-white/[0.04] border-orange-300 dark:border-orange-500/40 rounded-lg text-[12px] ring-2 ring-orange-100 dark:ring-orange-500/20" />
+                  <Input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} className="h-9 flex-1 bg-white dark:bg-white/[0.04] border-orange-300 dark:border-orange-500/40 rounded-lg text-[12px] text-gray-800 dark:text-gray-200 ring-2 ring-orange-100 dark:ring-orange-500/20" autoFocus />
+                  <Input type="time" value={editTime} onChange={(e) => setEditTime(e.target.value)} className="h-9 w-28 bg-white dark:bg-white/[0.04] border-orange-300 dark:border-orange-500/40 rounded-lg text-[12px] text-gray-800 dark:text-gray-200 ring-2 ring-orange-100 dark:ring-orange-500/20" />
                   <Button size="sm" onClick={saveDate} className="h-9 px-3 rounded-lg bg-orange-600 hover:bg-orange-700 text-white text-[11px]"><Save className="w-3 h-3" /></Button>
                   <button onClick={() => setDateEditing(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer"><X className="w-4 h-4" /></button>
                 </div>
@@ -645,7 +645,7 @@ export function AssetReviewDrawer() {
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em] flex items-center gap-1.5"><Link2 className="w-3 h-3 text-blue-500" />Design Link <span className="text-[9px] font-normal normal-case text-gray-400">(Canva / Figma)</span></label>
                     <div className="flex gap-2">
-                      <Input value={designLink} onChange={(e) => setDesignLink(e.target.value)} placeholder="https://www.canva.com/design/..." className="flex-1 h-9 bg-gray-50 dark:bg-white/[0.03] border-gray-200 dark:border-white/[0.08] rounded-lg text-[12px]" />
+                      <Input value={designLink} onChange={(e) => setDesignLink(e.target.value)} placeholder="https://www.canva.com/design/..." className="flex-1 h-9 bg-gray-50 dark:bg-white/[0.03] border-gray-200 dark:border-white/[0.08] rounded-lg text-[12px] text-gray-800 dark:text-gray-200" />
                       {designLink && <a href={designLink} target="_blank" rel="noopener noreferrer" className="h-9 px-3 flex items-center rounded-lg bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[11px] hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors border border-blue-200 dark:border-blue-500/20"><ExternalLink className="w-3 h-3" /></a>}
                     </div>
                   </div>
@@ -654,7 +654,7 @@ export function AssetReviewDrawer() {
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em] flex items-center gap-1.5"><FolderOpen className="w-3 h-3 text-amber-500" />Drive / Folder Link</label>
                     <div className="flex gap-2">
-                      <Input value={driveFolder} onChange={(e) => setDriveFolder(e.target.value)} placeholder="https://drive.google.com/drive/folders/..." className="flex-1 h-9 bg-gray-50 dark:bg-white/[0.03] border-gray-200 dark:border-white/[0.08] rounded-lg text-[12px]" />
+                      <Input value={driveFolder} onChange={(e) => setDriveFolder(e.target.value)} placeholder="https://drive.google.com/drive/folders/..." className="flex-1 h-9 bg-gray-50 dark:bg-white/[0.03] border-gray-200 dark:border-white/[0.08] rounded-lg text-[12px] text-gray-800 dark:text-gray-200" />
                       {driveFolder && <a href={driveFolder} target="_blank" rel="noopener noreferrer" className="h-9 px-3 flex items-center rounded-lg bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[11px] hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors border border-amber-200 dark:border-amber-500/20"><ExternalLink className="w-3 h-3" /></a>}
                     </div>
                   </div>

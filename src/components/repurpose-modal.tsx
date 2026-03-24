@@ -172,7 +172,7 @@ export function RepurposeModal({ card, onClose }: Props) {
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.08em]">
                   {mode === "seasonal" ? "Updated Caption" : "Rewritten Caption"}
                 </label>
-                <Textarea value={caption} onChange={(e) => setCaption(e.target.value)} className="min-h-[70px] bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[12px] resize-none" />
+                <Textarea value={caption} onChange={(e) => setCaption(e.target.value)} className="min-h-[70px] bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[12px] text-gray-800 dark:text-gray-200 resize-none" />
               </div>
             )}
 
@@ -180,7 +180,7 @@ export function RepurposeModal({ card, onClose }: Props) {
             {mode !== "repost" && (
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.08em]">Hook</label>
-                <Input value={hook} onChange={(e) => setHook(e.target.value)} className="h-9 bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[12px]" />
+                <Input value={hook} onChange={(e) => setHook(e.target.value)} className="h-9 bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[12px] text-gray-800 dark:text-gray-200" />
               </div>
             )}
 
@@ -188,8 +188,8 @@ export function RepurposeModal({ card, onClose }: Props) {
             <div className="space-y-1">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.08em]">New Schedule <span className="text-red-400">*</span></label>
               <div className="flex gap-2">
-                <Input type="date" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} className="h-9 flex-1 bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[12px]" />
-                <Input type="time" value={scheduledTime} onChange={(e) => setScheduledTime(e.target.value)} className="h-9 w-28 bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[12px]" />
+                <Input type="date" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} className="h-9 flex-1 bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[12px] text-gray-800 dark:text-gray-200" />
+                <Input type="time" value={scheduledTime} onChange={(e) => setScheduledTime(e.target.value)} className="h-9 w-28 bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[12px] text-gray-800 dark:text-gray-200" />
               </div>
               {(!scheduledDate || !scheduledTime) && <p className="text-[10px] text-amber-500">Select when this should be published</p>}
             </div>
