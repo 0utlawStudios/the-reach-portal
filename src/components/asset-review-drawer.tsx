@@ -19,6 +19,7 @@ import {
 import { PlatformIcon } from "./platform-icons";
 import { MentionTextarea } from "./mention-textarea";
 import { RichComment } from "./rich-comment";
+import { MediaPicker } from "./media-picker";
 import { InlineEdit } from "./inline-edit";
 import { useAuth } from "@/lib/auth-context";
 import { useTeam } from "@/lib/team-context";
@@ -45,7 +46,7 @@ export function AssetReviewDrawer() {
   const [dateEditing, setDateEditing] = useState(false);
   const [newComment, setNewComment] = useState("");
   const [activeTab, setActiveTab] = useState<DrawerTab>("content");
-  const [showMediaPicker, setShowMediaPicker] = useState(false);
+  const [showMediaPicker, setShowMediaPicker] = useState<"thumbnail" | "content" | null>(null);
   const prevCardRef = useRef<string | null>(null);
   const viewLoggedRef = useRef<string | null>(null);
 
@@ -372,7 +373,7 @@ export function AssetReviewDrawer() {
               </select>
               <input ref={assetInputRef} type="file" accept="image/*,video/*" onChange={handleAssetReplace} className="hidden" />
               <div className="absolute bottom-3 right-3 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                <button onClick={() => setShowMediaPicker(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-black/60 backdrop-blur-sm text-white text-[10px] font-medium hover:bg-black/80 cursor-pointer">
+                <button onClick={() => setShowMediaPicker("thumbnail")} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-black/60 backdrop-blur-sm text-white text-[10px] font-medium hover:bg-black/80 cursor-pointer">
                   <ImageIcon className="w-3 h-3" />Library
                 </button>
                 <button onClick={() => assetInputRef.current?.click()} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-black/60 backdrop-blur-sm text-white text-[10px] font-medium hover:bg-black/80 cursor-pointer">
@@ -451,14 +452,20 @@ export function AssetReviewDrawer() {
 
             {/* Dropzone */}
             <input ref={rawFileInputRef} type="file" accept="image/*,video/*,.pdf,.psd,.ai,.prproj,.aep,.sketch,.fig" onChange={handleRawFileUpload} className="hidden" />
-            <button disabled={uploading} onClick={() => rawFileInputRef.current?.click()} className={`w-full border border-dashed rounded-xl py-3.5 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
-              !(selectedCard.sourceVault?.rawFiles?.length)
-                ? "border-red-300 dark:border-red-500/20 text-red-400 dark:text-red-400/70 hover:border-red-400 hover:bg-red-50/30 dark:hover:bg-red-500/[0.02]"
-                : "border-gray-200 dark:border-white/[0.08] text-gray-400 dark:text-gray-500 hover:text-orange-500 hover:border-orange-300 dark:hover:border-orange-500/30 hover:bg-orange-50/30 dark:hover:bg-orange-500/[0.02]"
-            }`}>
-              <Upload className="w-3.5 h-3.5" />
-              <span className="text-[11px]">{(selectedCard.sourceVault?.rawFiles?.length) ? "Upload more content" : "Upload content for publishing *"}</span>
-            </button>
+            <div className="flex gap-2">
+              <button disabled={uploading} onClick={() => rawFileInputRef.current?.click()} className={`flex-1 border border-dashed rounded-xl py-3 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+                !(selectedCard.sourceVault?.rawFiles?.length)
+                  ? "border-red-300 dark:border-red-500/20 text-red-400 dark:text-red-400/70 hover:border-red-400 hover:bg-red-50/30 dark:hover:bg-red-500/[0.02]"
+                  : "border-gray-200 dark:border-white/[0.08] text-gray-400 dark:text-gray-500 hover:text-orange-500 hover:border-orange-300 dark:hover:border-orange-500/30 hover:bg-orange-50/30 dark:hover:bg-orange-500/[0.02]"
+              }`}>
+                <Upload className="w-3.5 h-3.5" />
+                <span className="text-[11px]">{(selectedCard.sourceVault?.rawFiles?.length) ? "Upload" : "Upload *"}</span>
+              </button>
+              <button onClick={() => setShowMediaPicker("content")} className="flex-1 border border-dashed border-gray-200 dark:border-white/[0.08] rounded-xl py-3 flex items-center justify-center gap-2 text-gray-400 dark:text-gray-500 hover:text-orange-500 hover:border-orange-300 dark:hover:border-orange-500/30 hover:bg-orange-50/30 dark:hover:bg-orange-500/[0.02] transition-all cursor-pointer">
+                <FolderOpen className="w-3.5 h-3.5" />
+                <span className="text-[11px]">Browse Library</span>
+              </button>
+            </div>
             {!(selectedCard.sourceVault?.rawFiles?.length) && (
               <p className="text-[9px] text-red-400/80 flex items-center gap-1"><AlertCircle className="w-2.5 h-2.5" />At least 1 file required — this is what gets posted to social platforms</p>
             )}
@@ -872,59 +879,36 @@ export function AssetReviewDrawer() {
       </div>
 
       {/* ─── Media Library Picker ─── */}
-      {showMediaPicker && (
-        <>
-          <div onClick={() => setShowMediaPicker(false)} className="fixed inset-0 bg-black/40 z-[60]" />
-          <div className="fixed inset-4 md:inset-8 lg:inset-12 z-[60] bg-white dark:bg-[#151518] rounded-2xl border border-gray-200 dark:border-white/[0.08] shadow-2xl flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-white/[0.06] shrink-0">
-              <h3 className="text-[14px] font-semibold text-gray-800 dark:text-gray-200">Choose from Media Library</h3>
-              <button onClick={() => setShowMediaPicker(false)} className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-400 cursor-pointer"><X className="w-4 h-4" /></button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4">
-              <MediaPickerGrid
-                onSelect={(url) => {
-                  updateCard(selectedCard.id, { thumbnailUrl: url });
-                  logAudit(selectedCard.id, currentUser.name, "asset_replaced", "Linked asset from media library");
-                  addToast("Asset linked from library", "success");
-                  setShowMediaPicker(false);
-                }}
-              />
-            </div>
-          </div>
-        </>
-      )}
+      <MediaPicker
+        open={!!showMediaPicker}
+        onClose={() => setShowMediaPicker(null)}
+        folder={showMediaPicker === "thumbnail" ? "thumbnails" : "raw-files"}
+        cardId={selectedCard.id}
+        onSelect={(result) => {
+          if (showMediaPicker === "thumbnail") {
+            updateCard(selectedCard.id, { thumbnailUrl: result.url });
+            logAudit(selectedCard.id, currentUser.name, "asset_replaced", `Thumbnail: ${result.name}`);
+            addToast("Thumbnail updated", "success");
+          } else {
+            const existingFiles = selectedCard.sourceVault?.rawFiles || [];
+            const isFirstFile = existingFiles.length === 0;
+            const newFile = {
+              name: result.name,
+              url: result.url,
+              fileId: result.fileId,
+              usageType: (isFirstFile ? "master" : "supplementary") as "master" | "supplementary",
+              mimeType: result.mimeType,
+              size: result.size,
+              uploadedAt: new Date().toISOString(),
+            };
+            updateCard(selectedCard.id, { sourceVault: { ...(selectedCard.sourceVault || {}), rawFiles: [...existingFiles, newFile] } });
+            logAudit(selectedCard.id, currentUser.name, "raw_file_uploaded", `Added ${result.name} (${newFile.usageType})`);
+            addToast(`${result.name} added as content`, "success");
+          }
+          setShowMediaPicker(null);
+        }}
+      />
     </>
-  );
-}
-
-// ─── Media Picker Grid (inline, uses placeholder data) ───
-function MediaPickerGrid({ onSelect }: { onSelect: (url: string) => void }) {
-  const { cards } = usePipeline();
-  // Collect all unique thumbnail URLs from existing cards
-  const existingUrls = Array.from(new Set(cards.map((c) => c.thumbnailUrl).filter(Boolean)));
-
-  if (existingUrls.length === 0) {
-    return (
-      <div className="text-center py-12">
-        <ImageIcon className="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
-        <p className="text-[13px] text-gray-400">No media assets yet</p>
-        <p className="text-[11px] text-gray-300 dark:text-gray-600 mt-1">Upload assets to posts first</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
-      {existingUrls.map((url, i) => (
-        <button
-          key={i}
-          onClick={() => onSelect(url)}
-          className="aspect-square rounded-lg overflow-hidden border-2 border-transparent hover:border-orange-400 transition-all cursor-pointer group"
-        >
-          <img src={url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-        </button>
-      ))}
-    </div>
   );
 }
 
