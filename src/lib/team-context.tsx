@@ -48,11 +48,11 @@ function dbToMember(row: any): TeamMember {
 }
 
 const DEFAULT_MEMBERS: TeamMember[] = [
-  { id: "1", name: "Aldridge Dagos", email: "aldridge@ten80ten.com", phone: "+639154954549", role: "owner", secondaryRole: "Approver / Developer", status: "active", joinedAt: "2025-01-01" },
-  { id: "2", name: "Christer Umali", email: "christer@ten80ten.com", phone: "+639985517848", role: "admin", secondaryRole: "Approver", status: "active", joinedAt: "2025-02-01" },
-  { id: "3", name: "Alex Nicholson", email: "alex@ten80ten.com", phone: "+12397845377", role: "admin", secondaryRole: "Approver", status: "active", joinedAt: "2025-03-01" },
-  { id: "4", name: "Carlo Navarro", email: "carlo@ten80ten.com", phone: "+639279909987", role: "specialist", secondaryRole: "Creative Director / Approver", status: "active", joinedAt: "2025-04-01" },
-  { id: "5", name: "Muaaz Saifi", email: "muaaz.ten80ten@gmail.com", phone: "+923286959680", role: "specialist", secondaryRole: "Social Media Specialist", status: "active", joinedAt: "2025-05-01" },
+  { id: "1", name: "Aldridge Dagos", email: "aldridge@ten80ten.com", phone: "+63 915 495 4549", role: "owner", secondaryRole: "Approver / Developer", status: "active", joinedAt: "2025-01-01" },
+  { id: "2", name: "Christer Umali", email: "christer@ten80ten.com", phone: "+63 998 551 7848", role: "admin", secondaryRole: "Approver", status: "active", joinedAt: "2025-02-01" },
+  { id: "3", name: "Alex Nicholson", email: "alex@ten80ten.com", phone: "+1 239 784 5377", role: "admin", secondaryRole: "Approver", status: "active", joinedAt: "2025-03-01" },
+  { id: "4", name: "Carlo Navarro", email: "carlo@ten80ten.com", phone: "+63 927 990 9987", role: "specialist", secondaryRole: "Creative Director / Approver", status: "active", joinedAt: "2025-04-01" },
+  { id: "5", name: "Muaaz Saifi", email: "muaaz.ten80ten@gmail.com", phone: "+92 328 695 9680", role: "specialist", secondaryRole: "Social Media Specialist", status: "active", joinedAt: "2025-05-01" },
 ];
 
 export function TeamProvider({ children }: { children: ReactNode }) {

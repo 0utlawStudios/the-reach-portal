@@ -460,7 +460,7 @@ export function SettingsPage() {
                       <p className="text-[13px] font-medium text-gray-800 dark:text-gray-200">{member.name}</p>
                       <Pencil className="w-3.5 h-3.5 text-gray-300 shrink-0 ml-2" />
                     </div>
-                    <p className="text-[11px] text-gray-400 mt-0.5">{member.email}</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">{member.email}{member.phone ? ` · ${member.phone}` : ""}</p>
                     <div className="flex flex-wrap items-center gap-1.5 mt-2">
                       <Badge variant="outline" className={`text-[10px] h-5 px-2 border ${role?.color || "text-gray-500 bg-gray-50 border-gray-200"}`}>{role?.icon}<span className="ml-1">{role?.label || member.role}</span></Badge>
                       {member.secondaryRole && member.secondaryRole.split(" / ").map((badge) => {

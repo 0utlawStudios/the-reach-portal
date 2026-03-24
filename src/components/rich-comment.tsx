@@ -57,23 +57,22 @@ function MentionBadge({ name }: { name: string }) {
             </div>
 
             {/* Contact actions */}
-            <div className="space-y-1.5">
-              {member.phone && (
-                <a href={`https://wa.me/${member.phone.replace(/[^0-9+]/g, "").replace("+", "")}`} target="_blank" rel="noopener noreferrer"
-                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/15 transition-colors cursor-pointer">
-                  <MessageCircle className="w-3.5 h-3.5" />
-                  <span className="text-[11px] font-medium">Message</span>
-                  <span className="text-[10px] text-emerald-500/70 ml-auto font-mono">{member.phone}</span>
-                </a>
-              )}
-              {member.phone && (
-                <a href={`tel:${member.phone}`}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 text-blue-700 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-500/15 transition-colors cursor-pointer">
-                  <Phone className="w-3.5 h-3.5" />
-                  <span className="text-[11px] font-medium">Call</span>
-                </a>
-              )}
+            <div className="flex gap-1.5">
+              <a href={member.phone ? `https://wa.me/${member.phone.replace(/[^0-9]/g, "")}` : `mailto:${member.email}`} target="_blank" rel="noopener noreferrer"
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/15 transition-colors cursor-pointer">
+                <MessageCircle className="w-3.5 h-3.5" />
+                <span className="text-[11px] font-medium">Message</span>
+              </a>
+              <a href={member.phone ? `tel:${member.phone}` : `mailto:${member.email}`}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 text-blue-700 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-500/15 transition-colors cursor-pointer">
+                <Phone className="w-3.5 h-3.5" />
+                <span className="text-[11px] font-medium">Call</span>
+              </a>
             </div>
+            {member.phone && (
+              <p className="text-[10px] text-gray-400 font-mono text-center">{member.phone}</p>
+            )}
+            <p className="text-[10px] text-gray-400 text-center">{member.email}</p>
           </div>
         </>
       )}
@@ -92,7 +91,8 @@ export function RichComment({ text, className = "" }: Props) {
   let remaining = text;
 
   // Combined regex for URLs and mentions
-  const combined = /(@[A-Za-z][A-Za-z\s]*?)(?=\s@|\s*$|[.,!?;:\n])|(https?:\/\/[^\s<>"{}|\\^`[\]]+)/g;
+  // Match @FirstName LastName (exactly 2-3 capitalized words) or URLs
+  const combined = /(@[A-Z][a-z]+(?:\s[A-Z][a-z]+){0,2})|(https?:\/\/[^\s<>"{}|\\^`[\]]+)/g;
   let lastIdx = 0;
   let match: RegExpExecArray | null;
   const combinedRegex = new RegExp(combined.source, "g");
