@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { AvatarCropModal } from "@/components/avatar-crop-modal";
 import { useTheme } from "@/lib/theme-context";
 import { useTeam, UserRole, TeamMember } from "@/lib/team-context";
 import { useToast } from "@/lib/toast-context";
@@ -55,31 +56,38 @@ function EditProfileModal({ member, onClose, onDelete, canDelete }: { member: Te
   const addSecondaryRole = (r: string) => setSecondaryRoles((prev) => [...prev, r]);
   const removeSecondaryRole = (r: string) => setSecondaryRoles((prev) => prev.filter((x) => x !== r));
 
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Avatar crop flow
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
+
+  const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const src = URL.createObjectURL(file);
+    setCropImageSrc(src);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleCroppedAvatar = async (croppedBlob: Blob) => {
+    setCropImageSrc(null);
     setUploading(true);
 
     const useDb = !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
     if (useDb) {
-      const ext = file.name.split(".").pop();
-      const path = `${member.id}-${Date.now()}.${ext}`;
-      const { error } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
+      const path = `${member.id}-${Date.now()}.jpg`;
+      const { error } = await supabase.storage.from("avatars").upload(path, croppedBlob, { upsert: true, contentType: "image/jpeg" });
       if (!error) {
         const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
         setAvatarUrl(urlData.publicUrl);
-        addToast("Photo uploaded", "success");
+        addToast("Photo cropped & uploaded", "success");
       } else {
         addToast("Upload failed — check Supabase storage bucket", "error");
       }
     } else {
-      // Fallback: use blob URL (local only)
-      setAvatarUrl(URL.createObjectURL(file));
-      addToast("Photo set (local only — connect Supabase for sync)", "info");
+      setAvatarUrl(URL.createObjectURL(croppedBlob));
+      addToast("Photo cropped (local only)", "info");
     }
     setUploading(false);
-    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleSave = () => {
@@ -106,7 +114,7 @@ function EditProfileModal({ member, onClose, onDelete, canDelete }: { member: Te
           </div>
           <div className="p-5 space-y-4">
             {/* Avatar */}
-            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
+            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarSelect} className="hidden" />
             <div className="flex justify-center">
               <div className="relative group">
                 {avatarUrl ? (
@@ -227,6 +235,15 @@ function EditProfileModal({ member, onClose, onDelete, canDelete }: { member: Te
           </div>
         </div>
       </div>
+
+      {/* Avatar crop modal */}
+      {cropImageSrc && (
+        <AvatarCropModal
+          imageSrc={cropImageSrc}
+          onCropComplete={handleCroppedAvatar}
+          onClose={() => { setCropImageSrc(null); }}
+        />
+      )}
     </>
   );
 }
