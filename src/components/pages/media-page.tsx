@@ -25,6 +25,9 @@ export function MediaPage() {
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [lightboxAsset, setLightboxAsset] = useState<MediaAsset | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadingFileName, setUploadingFileName] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const folders = useMemo(() => Array.from(new Set(media.map((m) => m.folder))).sort(), [media]);
@@ -41,12 +44,15 @@ export function MediaPage() {
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files) return;
+    if (!files || uploading) return;
+    setUploading(true);
     const { uploadToDrive } = await import("@/lib/drive-upload");
     for (const file of Array.from(files)) {
       const id = `m-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      setUploadingFileName(file.name);
+      setUploadProgress(0);
       try {
-        const result = await uploadToDrive(file, "media-library");
+        const result = await uploadToDrive(file, "media-library", undefined, setUploadProgress);
         const asset: MediaAsset = {
           id,
           name: file.name,
@@ -64,6 +70,9 @@ export function MediaPage() {
       }
     }
     if (fileInputRef.current) fileInputRef.current.value = "";
+    setUploading(false);
+    setUploadProgress(0);
+    setUploadingFileName("");
   };
 
   const toggleSelect = (id: string) => {
@@ -109,8 +118,8 @@ export function MediaPage() {
           ))}
         </div>
         <input ref={fileInputRef} type="file" multiple accept="image/*,video/*" onChange={handleUpload} className="hidden" />
-        <button onClick={() => fileInputRef.current?.click()} className="hidden md:flex mt-2 w-full items-center justify-center gap-2 h-9 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-[11px] font-medium cursor-pointer shadow-sm transition-all duration-200">
-          <Upload className="w-3.5 h-3.5" />Upload Files
+        <button disabled={uploading} onClick={() => fileInputRef.current?.click()} className="hidden md:flex mt-2 w-full items-center justify-center gap-2 h-9 rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white text-[11px] font-medium cursor-pointer shadow-sm transition-all duration-200 disabled:opacity-40">
+          <Upload className="w-3.5 h-3.5" />{uploading ? "Uploading..." : "Upload Files"}
         </button>
       </div>
 
@@ -156,8 +165,21 @@ export function MediaPage() {
 
           <span className="ml-auto text-[10px] text-gray-400 hidden sm:block">{filteredMedia.length} files</span>
           {/* Mobile upload */}
-          <button onClick={() => fileInputRef.current?.click()} className="md:hidden p-2 rounded-lg bg-blue-600 text-white cursor-pointer"><Upload className="w-4 h-4" /></button>
+          <button disabled={uploading} onClick={() => fileInputRef.current?.click()} className="md:hidden p-2 rounded-lg bg-orange-500 text-white cursor-pointer disabled:opacity-40"><Upload className="w-4 h-4" /></button>
         </div>
+
+        {/* Upload progress */}
+        {uploading && (
+          <div className="px-4 py-3 border-b border-gray-100 dark:border-white/[0.06] bg-white dark:bg-[#111] shrink-0">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[11px] font-medium text-gray-600 dark:text-gray-300 truncate">{uploadingFileName}</span>
+              <span className="text-[11px] font-bold text-orange-500 tabular-nums ml-2">{uploadProgress}%</span>
+            </div>
+            <div className="w-full h-1.5 rounded-full bg-gray-100 dark:bg-white/[0.06] overflow-hidden">
+              <div className="h-full rounded-full bg-gradient-to-r from-orange-500 to-amber-500 transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+            </div>
+          </div>
+        )}
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4">
