@@ -829,7 +829,19 @@ export function AssetReviewDrawer() {
                 <Button variant="outline" size="sm" onClick={() => setRevisionMode(true)} className="flex-1 h-9 rounded-lg border-red-200 text-red-600 hover:bg-red-50 dark:border-red-500/20 dark:text-red-400 dark:hover:bg-red-500/10 bg-white dark:bg-transparent text-[12px] transition-all duration-150">
                   <ArrowRightLeft className="w-3.5 h-3.5 mr-1.5" />Request Revision
                 </Button>
-                <Button size="sm" onClick={() => { moveCard(selectedCard.id, "approved_scheduled"); addToast("Post approved and scheduled.", "success"); }}
+                <Button size="sm" onClick={() => {
+                  const missing: string[] = [];
+                  if (!selectedCard.scheduledDate) missing.push("scheduled date");
+                  if (!selectedCard.scheduledTime) missing.push("scheduled time");
+                  if (!selectedCard.thumbnailUrl) missing.push("thumbnail");
+                  if (!selectedCard.sourceVault?.rawFiles?.length) missing.push("content for publishing");
+                  if (!selectedCard.caption?.trim()) missing.push("caption");
+                  if (!selectedCard.assetSource?.trim()) missing.push("asset source");
+                  const unchk = checklist.filter((c) => !c.checked).length;
+                  if (unchk > 0) missing.push(`${unchk} checklist item${unchk > 1 ? "s" : ""}`);
+                  if (missing.length > 0) { addToast(`Cannot approve — missing: ${missing.join(", ")}`, "error"); return; }
+                  moveCard(selectedCard.id, "approved_scheduled"); addToast("Post approved and scheduled.", "success");
+                }}
                   className="flex-1 h-9 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[12px] shadow-sm shadow-emerald-500/20 transition-all duration-150">
                   <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />Approve Post
                 </Button>
@@ -863,7 +875,7 @@ export function AssetReviewDrawer() {
                   </div>
                 ) : (
                   <Button size="sm" onClick={() => {
-                    if (selectedCard.stage === "ideas") {
+                    if (selectedCard.stage === "ideas" || nextStage === "approved_scheduled" || nextStage === "posted") {
                       const missing: string[] = [];
                       if (!selectedCard.scheduledDate) missing.push("scheduled date");
                       if (!selectedCard.scheduledTime) missing.push("scheduled time");

@@ -160,8 +160,8 @@ export function KanbanBoard() {
 
     if (!targetStage || sourceCard.stage === targetStage) return;
 
-    // ── Ideas gate: card must have required fields + full checklist to leave Ideas ──
-    if (sourceCard.stage === "ideas") {
+    // ── Completeness gate: required fields must be filled before leaving Ideas OR entering Approved/Posted ──
+    if (sourceCard.stage === "ideas" || targetStage === "approved_scheduled" || targetStage === "posted") {
       const missing: string[] = [];
       if (!sourceCard.scheduledDate) missing.push("scheduled date");
       if (!sourceCard.scheduledTime) missing.push("scheduled time");
@@ -169,10 +169,10 @@ export function KanbanBoard() {
       if (!sourceCard.sourceVault?.rawFiles?.length) missing.push("content for publishing");
       if (!sourceCard.caption?.trim()) missing.push("caption");
       if (!sourceCard.assetSource?.trim()) missing.push("asset source");
-      const unchecked = sourceCard.checklist.filter((c) => !c.checked).length;
+      const unchecked = (sourceCard.checklist || []).filter((c) => !c.checked).length;
       if (unchecked > 0) missing.push(`${unchecked} checklist item${unchecked > 1 ? "s" : ""}`);
       if (missing.length > 0) {
-        addToast(`Cannot move from Ideas — missing: ${missing.join(", ")}. Click the card to complete them.`, "error");
+        addToast(`Cannot move — missing: ${missing.join(", ")}. Click the card to complete them.`, "error");
         return;
       }
     }
