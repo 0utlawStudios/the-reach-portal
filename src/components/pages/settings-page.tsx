@@ -643,6 +643,22 @@ const INTEGRATIONS = [
     },
   },
   {
+    id: "n8n",
+    name: "n8n Auto-Publish",
+    desc: "Automated social media posting engine",
+    icon: Zap,
+    iconBg: "bg-orange-50 dark:bg-orange-500/10",
+    iconColor: "text-orange-600 dark:text-orange-400",
+    status: "connected" as const,
+    details: {
+      version: "n8n Community Edition 2.3.6",
+      region: "n8n.casemovers.com",
+      features: ["Scheduled Auto-Post (5-min cron)", "Platform-Specific Caption Formatting", "Master File Download via Drive Proxy", "Supabase Status Update → Posted", "Audit Log Auto-Entry"],
+      tables: ["[WIP] - Ten80Ten Auto-Post Engine"],
+      lastSync: "Active — workflow deployed",
+    },
+  },
+  {
     id: "api-keys",
     name: "API Keys",
     desc: "Custom integrations and automations",

@@ -83,12 +83,12 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
     LayoutDashboard, Kanban, CalendarDays, Eye, FolderOpen, Settings, ChevronLeft, Plus, Palette, Pin, PinOff,
   } = require("lucide-react");
 
-  // Auto-collapse after 5s on desktop (not mobile, not pinned)
+  // Auto-collapse after 6s on desktop (not mobile, not pinned)
   useEffect(() => {
     if (sidebarPinned) return;
     autoCollapseTimer.current = setTimeout(() => {
       setSidebarCollapsed(true);
-    }, 5000);
+    }, 6000);
     return () => { if (autoCollapseTimer.current) clearTimeout(autoCollapseTimer.current); };
   }, [sidebarPinned, setSidebarCollapsed]);
 
