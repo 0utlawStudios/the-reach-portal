@@ -73,8 +73,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Email admin about the new request
-    const smtpConfigured = process.env.SMTP_USER && process.env.SMTP_PASS;
-    if (smtpConfigured) {
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+    console.log("[request-access] SMTP check:", { hasUser: !!smtpUser, hasPass: !!smtpPass, user: smtpUser });
+    if (smtpUser && smtpPass) {
       try {
         const transporter = nodemailer.createTransport({
           host: process.env.SMTP_HOST || "smtp.gmail.com",
@@ -117,12 +119,13 @@ export async function POST(request: NextRequest) {
             `,
           });
         }
-      } catch (emailErr) {
-        console.error("[request-access] Email notification failed:", emailErr);
+        console.log("[request-access] Email sent to:", adminEmails);
+      } catch (emailErr: any) {
+        console.error("[request-access] Email FAILED:", emailErr?.message || emailErr);
       }
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, smtpConfigured: !!(smtpUser && smtpPass) });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[request-access]", message);
