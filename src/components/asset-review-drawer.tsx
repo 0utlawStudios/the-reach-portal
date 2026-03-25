@@ -782,7 +782,7 @@ export function AssetReviewDrawer() {
             <div className="space-y-2">
               <div className="bg-red-50 dark:bg-red-500/5 rounded-xl border border-red-200 dark:border-red-500/20 p-3 space-y-2">
                 <p className="text-[11px] font-semibold text-red-700 dark:text-red-400">What needs to be changed?</p>
-                <textarea value={revisionFeedback} onChange={(e) => setRevisionFeedback(e.target.value)} placeholder="e.g. Make the logo bigger, fix the audio..." className="w-full min-h-[60px] bg-white dark:bg-[#111] border border-red-200 dark:border-red-500/20 rounded-lg p-2.5 text-[12px] text-gray-800 dark:text-gray-200 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-red-300 dark:focus:ring-red-500/30 resize-none transition-all duration-150" autoFocus />
+                <MentionTextarea value={revisionFeedback} onChange={setRevisionFeedback} placeholder="e.g. Make the logo bigger... Type @ to mention someone" className="w-full min-h-[60px] bg-white dark:bg-[#111] border border-red-200 dark:border-red-500/20 rounded-lg p-2.5 text-[12px] text-gray-800 dark:text-gray-200 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-red-300 dark:focus:ring-red-500/30 resize-none transition-all duration-150" rows={3} />
               </div>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" onClick={() => { setRevisionMode(false); setRevisionFeedback(""); }} className="flex-1 h-9 rounded-lg text-[12px]">Cancel</Button>

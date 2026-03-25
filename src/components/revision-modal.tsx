@@ -5,6 +5,7 @@ import { usePipeline } from "@/lib/pipeline-context";
 import { useToast } from "@/lib/toast-context";
 import { Button } from "@/components/ui/button";
 import { X, Send, FileCheck, AlertCircle } from "lucide-react";
+import { MentionTextarea } from "./mention-textarea";
 
 export function RevisionModal() {
   const { pendingReapproval, submitReapproval, cancelReapproval } = usePipeline();
@@ -73,12 +74,12 @@ export function RevisionModal() {
                   {charCount}/10 min
                 </span>
               </div>
-              <textarea
+              <MentionTextarea
                 value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="Detail exactly what was fixed, changed, or updated in this revision..."
+                onChange={setNote}
+                placeholder="Detail what was fixed... Type @ to mention someone..."
                 className="w-full min-h-[100px] bg-gray-50 dark:bg-white/[0.03] border border-gray-200 dark:border-white/[0.08] rounded-xl px-4 py-3 text-[13px] text-gray-800 dark:text-gray-200 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-violet-200 dark:focus:ring-violet-500/20 focus:border-violet-300 dark:focus:border-violet-500/30 resize-none transition-all duration-200"
-                autoFocus
+                rows={4}
               />
               {charCount > 0 && charCount < 10 && (
                 <p className="text-[10px] text-amber-500 flex items-center gap-1">

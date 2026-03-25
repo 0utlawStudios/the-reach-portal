@@ -6,6 +6,7 @@ import { useToast } from "@/lib/toast-context";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { X, AlertTriangle, Send, Paperclip, Image as ImageIcon, Trash2 } from "lucide-react";
+import { MentionTextarea } from "./mention-textarea";
 
 const useSupabase = !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
@@ -114,12 +115,12 @@ export function KickbackModal() {
                   {charCount}/10 min
                 </span>
               </div>
-              <textarea
+              <MentionTextarea
                 value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="Be specific: What's wrong? What should be changed? Include timestamps, slide numbers, or sections..."
+                onChange={setNote}
+                placeholder="Be specific: What's wrong? Type @ to mention someone..."
                 className="w-full min-h-[100px] bg-gray-50 dark:bg-white/[0.03] border border-gray-200 dark:border-white/[0.08] rounded-xl px-4 py-3 text-[13px] text-gray-800 dark:text-gray-200 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-red-200 dark:focus:ring-red-500/20 focus:border-red-300 dark:focus:border-red-500/30 resize-none transition-all duration-200"
-                autoFocus
+                rows={4}
               />
               {charCount > 0 && charCount < 10 && (
                 <p className="text-[10px] text-amber-500 flex items-center gap-1">
