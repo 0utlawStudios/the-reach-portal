@@ -119,8 +119,12 @@ export function LoginScreen() {
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="px-8 pb-6 lg:px-14">
+        {/* Request access + Footer */}
+        <div className="px-8 pb-6 lg:px-14 space-y-3">
+          <p className="text-center text-[12px] text-gray-400">
+            Don&apos;t have an account?{" "}
+            <a href="/request-access" className="text-orange-500 hover:text-orange-600 font-semibold transition-colors">Request Access</a>
+          </p>
           <p className="text-[11px] text-gray-300 dark:text-gray-700">&copy; 2026 Ten80Ten Media. All rights reserved.</p>
         </div>
       </div>

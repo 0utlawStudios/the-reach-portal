@@ -295,6 +295,34 @@ export function SettingsPage() {
   const [inviting, setInviting] = useState(false);
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
   const [activeIntegration, setActiveIntegration] = useState<string | null>(null);
+  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  const [approving, setApproving] = useState<string | null>(null);
+
+  // Fetch pending access requests (admin only)
+  useEffect(() => {
+    if (!isAdmin) return;
+    supabase.from("signup_requests").select("*").eq("status", "pending").order("created_at", { ascending: false })
+      .then(({ data }) => { if (data) setPendingRequests(data); });
+  }, [isAdmin]);
+
+  const handleApprove = async (reqId: string, action: "approve" | "reject", role = "viewer") => {
+    setApproving(reqId);
+    try {
+      const res = await fetch("/api/team/approve-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requestId: reqId, action, role, reviewedBy: currentUser.email }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setPendingRequests((prev) => prev.filter((r) => r.id !== reqId));
+        addToast(action === "approve" ? `Approved — invite sent` : "Request rejected", action === "approve" ? "success" : "info");
+      } else {
+        addToast(data.error || "Action failed", "error");
+      }
+    } catch { addToast("Network error", "error"); }
+    setApproving(null);
+  };
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -337,13 +365,14 @@ export function SettingsPage() {
       <div className="flex items-center gap-1 border-b border-gray-100 dark:border-white/[0.06]">
         {[
           { id: "general" as const, label: "General", icon: <SettingsIcon className="w-3.5 h-3.5" /> },
-          { id: "team" as const, label: "Team Members", icon: <Users className="w-3.5 h-3.5" /> },
+          { id: "team" as const, label: "Team Members", icon: <Users className="w-3.5 h-3.5" />, badge: pendingRequests.length > 0 ? pendingRequests.length : undefined },
           ...(canViewAudit ? [{ id: "audit" as const, label: "Audit Logs", icon: <FileText className="w-3.5 h-3.5" /> }] : []),
         ].map((tab) => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
             className={`flex items-center gap-1.5 px-4 py-2.5 text-[12px] font-medium border-b-2 -mb-px transition-colors cursor-pointer ${activeTab === tab.id ? "border-blue-600 text-blue-700 dark:text-blue-400" : "border-transparent text-gray-400 hover:text-gray-600"}`}>
             {tab.icon}{tab.label}
             {tab.id === "team" && <span className="text-[9px] bg-gray-100 dark:bg-white/[0.06] text-gray-500 px-1.5 rounded-full">{members.length}</span>}
+            {tab.id === "team" && pendingRequests.length > 0 && <span className="w-4 h-4 rounded-full bg-amber-500 text-white text-[8px] font-bold flex items-center justify-center animate-pulse">{pendingRequests.length}</span>}
           </button>
         ))}
       </div>
@@ -453,6 +482,41 @@ export function SettingsPage() {
                 </Button>
               </div>
             </form>
+          )}
+
+          {/* Pending access requests */}
+          {isAdmin && pendingRequests.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-[0.08em] flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                Pending Access Requests ({pendingRequests.length})
+              </h3>
+              <div className="bg-white dark:bg-[#151518] rounded-2xl border border-amber-200/60 dark:border-amber-500/20 overflow-hidden shadow-sm">
+                {pendingRequests.map((req, i) => (
+                  <div key={req.id} className={`px-4 py-3 ${i > 0 ? "border-t border-amber-100 dark:border-amber-500/10" : ""}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-medium text-gray-800 dark:text-gray-200">{req.name}</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">{req.email}{req.phone ? ` · ${req.phone}` : ""}</p>
+                        {req.company && <p className="text-[10px] text-gray-400 mt-0.5">{req.company}</p>}
+                        {req.reason && <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1 italic">&ldquo;{req.reason}&rdquo;</p>}
+                        <p className="text-[9px] text-gray-300 dark:text-gray-600 mt-1">{new Date(req.created_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</p>
+                      </div>
+                      <div className="flex gap-1.5 shrink-0">
+                        <button disabled={approving === req.id} onClick={() => handleApprove(req.id, "reject")}
+                          className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-white/[0.08] text-[10px] font-medium text-gray-500 hover:text-red-500 hover:border-red-200 dark:hover:border-red-500/20 transition-colors cursor-pointer disabled:opacity-40">
+                          Reject
+                        </button>
+                        <button disabled={approving === req.id} onClick={() => handleApprove(req.id, "approve", "viewer")}
+                          className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-medium shadow-sm cursor-pointer transition-colors disabled:opacity-40">
+                          {approving === req.id ? "..." : "Approve"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
 
           {/* Members list */}
