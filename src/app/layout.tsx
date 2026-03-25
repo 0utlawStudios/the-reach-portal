@@ -9,6 +9,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://ten80tensmm.vercel.app"),
   title: "Ten80Ten SMM",
   description: "Content Pipeline & Social Media Management for Ten80Ten",
   manifest: "/manifest.json",
