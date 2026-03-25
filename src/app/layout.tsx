@@ -10,8 +10,26 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "Ten80Ten SMM",
-  description: "Social Media Management Platform for Ten80Ten",
+  description: "Content Pipeline & Social Media Management for Ten80Ten",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/icon-192.png",
+  },
+  openGraph: {
+    title: "Ten80Ten SMM",
+    description: "Content Pipeline & Social Media Management for Ten80Ten",
+    url: "https://ten80tensmm.vercel.app",
+    siteName: "Ten80Ten",
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "Ten80Ten SMM" }],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Ten80Ten SMM",
+    description: "Content Pipeline & Social Media Management for Ten80Ten",
+    images: ["/og-image.png"],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -21,8 +39,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#e5e7eb" },
-    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+    { media: "(prefers-color-scheme: light)", color: "#f8f9fb" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0a0e" },
   ],
   width: "device-width",
   initialScale: 1,

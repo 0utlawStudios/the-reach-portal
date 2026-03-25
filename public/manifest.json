@@ -1,11 +1,11 @@
 {
   "name": "Ten80Ten SMM",
-  "short_name": "Ten80Ten SMM",
-  "description": "Social Media Management Platform for Ten80Ten",
+  "short_name": "Ten80Ten",
+  "description": "Content Pipeline & Social Media Management for Ten80Ten",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#fafbfc",
-  "theme_color": "#e5e7eb",
+  "background_color": "#0a0a0e",
+  "theme_color": "#ea580c",
   "orientation": "any",
   "icons": [
     {
