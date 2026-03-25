@@ -139,16 +139,18 @@ export function LoginScreen() {
                 Explore Demo Mode
               </button>
             </motion.div>
+
+            {/* Request Access — inside the form block for proper spacing */}
+            <motion.p className="text-center text-[12px] text-gray-400 mt-6" {...fadeUp(0.34)}>
+              Don&apos;t have an account?{" "}
+              <a href="/request-access" className="text-[#f59e0b] hover:text-orange-600 font-semibold transition-colors">Request Access</a>
+            </motion.p>
           </div>
         </div>
 
         {/* Footer */}
-        <motion.div className="px-8 pb-6 lg:px-14 space-y-3" {...fadeUp(0.36)}>
-          <p className="text-center text-[12px] text-gray-400">
-            Don&apos;t have an account?{" "}
-            <a href="/request-access" className="text-[#f59e0b] hover:text-orange-600 font-semibold transition-colors">Request Access</a>
-          </p>
-          <p className="text-[11px] text-slate-400 dark:text-slate-600 text-center">Developed by Aldridge</p>
+        <motion.div className="px-8 pb-5 lg:px-14" {...fadeUp(0.4)}>
+          <p className="text-[10px] text-slate-300/60 dark:text-slate-700 text-center">Developed by Aldridge</p>
         </motion.div>
       </div>
 
