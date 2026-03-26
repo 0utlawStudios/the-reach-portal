@@ -156,21 +156,21 @@ html:not(.dark)[data-design="glass"] select {
 }
 
 /* ─── 2. CLAYMORPHISM ─── */
-/* Soft, puffy, 3D clay-like elements with rounded corners and inner glow */
+/* 3-shadow technique: 1 outer depth + 2 inset (dark emboss + light highlight) */
+/* Large border-radius (32-48px), candy pastel backgrounds, pillowy 3D look */
 [data-design="clay"] [class*="bg-white"],
 [data-design="clay"] [class*="bg-\\["],
 [data-design="clay"] .card,
 [data-design="clay"] aside,
 [data-design="clay"] nav,
 [data-design="clay"] header {
-  background: #f0f4ff !important;
-  border: 2px solid rgba(0, 0, 0, 0.04) !important;
-  border-radius: 20px !important;
+  background: #ffffff !important;
+  border: none !important;
+  border-radius: 32px !important;
   box-shadow:
-    8px 8px 16px rgba(0, 0, 0, 0.08),
-    -4px -4px 12px rgba(255, 255, 255, 0.9),
-    inset 2px 2px 4px rgba(255, 255, 255, 0.7),
-    inset -1px -1px 3px rgba(0, 0, 0, 0.04) !important;
+    8px 8px 16px 0 rgba(0, 0, 0, 0.25),
+    inset -8px -8px 12px 0 rgba(0, 0, 0, 0.06),
+    inset 8px 8px 12px 0 rgba(255, 255, 255, 0.9) !important;
 }
 .dark[data-design="clay"] [class*="bg-white"],
 .dark[data-design="clay"] [class*="bg-\\["],
@@ -178,66 +178,86 @@ html:not(.dark)[data-design="glass"] select {
 .dark[data-design="clay"] aside,
 .dark[data-design="clay"] nav,
 .dark[data-design="clay"] header {
-  background: #1e2340 !important;
-  border: 2px solid rgba(255, 255, 255, 0.04) !important;
+  background: hsl(260, 20%, 22%) !important;
+  border: none !important;
   box-shadow:
-    8px 8px 16px rgba(0, 0, 0, 0.35),
-    -4px -4px 12px rgba(255, 255, 255, 0.03),
-    inset 2px 2px 4px rgba(255, 255, 255, 0.06),
-    inset -1px -1px 3px rgba(0, 0, 0, 0.15) !important;
+    8px 8px 24px 0 rgba(0, 0, 0, 0.5),
+    inset -8px -8px 16px 0 hsla(260, 15%, 10%, 0.9),
+    inset 0px 14px 28px 0 hsla(260, 15%, 32%, 1) !important;
 }
+/* Clay page background — soft pastel lavender */
 [data-design="clay"] body {
-  background: #e8ecf4 !important;
+  background: #E8D5F5 !important;
 }
 .dark[data-design="clay"] body {
-  background: #12152a !important;
+  background: hsl(260, 15%, 12%) !important;
 }
-/* Clay inputs — pressed inward */
+/* Force readable text */
+[data-design="clay"] [class*="bg-white"] *,
+[data-design="clay"] .card * {
+  color: #2D3557;
+}
+.dark[data-design="clay"] [class*="bg-white"] *,
+.dark[data-design="clay"] .card * {
+  color: #F0E6F6;
+}
+/* Clay inputs — pressed inward with 3-shadow technique */
 [data-design="clay"] input,
 [data-design="clay"] textarea,
 [data-design="clay"] select {
-  background: #e4e9f2 !important;
-  border: 2px solid rgba(0, 0, 0, 0.04) !important;
-  border-radius: 14px !important;
+  background: hsl(260, 30%, 95%) !important;
+  border: none !important;
+  border-radius: 16px !important;
   box-shadow:
-    inset 3px 3px 6px rgba(0, 0, 0, 0.06),
-    inset -2px -2px 4px rgba(255, 255, 255, 0.8) !important;
-  color: #1e293b !important;
+    inset -4px -4px 8px 0 rgba(0, 0, 0, 0.08),
+    inset 4px 4px 8px 0 rgba(255, 255, 255, 0.7) !important;
+  color: #2D3557 !important;
 }
 .dark[data-design="clay"] input,
 .dark[data-design="clay"] textarea,
 .dark[data-design="clay"] select {
-  background: #151830 !important;
-  border: 2px solid rgba(255, 255, 255, 0.04) !important;
+  background: hsl(260, 20%, 18%) !important;
   box-shadow:
-    inset 3px 3px 6px rgba(0, 0, 0, 0.25),
-    inset -2px -2px 4px rgba(255, 255, 255, 0.03) !important;
-  color: #e2e8f0 !important;
+    inset -4px -4px 8px 0 hsla(260, 15%, 8%, 0.8),
+    inset 4px 4px 8px 0 hsla(260, 15%, 28%, 0.6) !important;
+  color: #F0E6F6 !important;
 }
-/* Clay buttons — puffy raised */
+/* Clay buttons — puffy 3D with 3 shadows */
 [data-design="clay"] button[class*="bg-orange"],
 [data-design="clay"] button[class*="bg-\\[\\#f59e0b\\]"] {
-  background: linear-gradient(145deg, #ffb833, #f59e0b) !important;
-  border: 2px solid rgba(0, 0, 0, 0.05) !important;
-  border-radius: 16px !important;
+  background: hsl(40, 95%, 55%) !important;
+  border: none !important;
+  border-radius: 20px !important;
+  color: #2D3557 !important;
+  font-weight: 700 !important;
   box-shadow:
-    6px 6px 12px rgba(0, 0, 0, 0.12),
-    -3px -3px 8px rgba(255, 255, 255, 0.5),
-    inset 2px 2px 4px rgba(255, 255, 255, 0.3),
-    inset -1px -1px 2px rgba(0, 0, 0, 0.05) !important;
+    4px 4px 8px 0 rgba(0, 0, 0, 0.2),
+    inset -4px -4px 6px 0 rgba(0, 0, 0, 0.15),
+    inset 4px 4px 6px 0 rgba(255, 255, 255, 0.4) !important;
+  transition: all 0.15s ease !important;
+}
+[data-design="clay"] button[class*="bg-orange"]:hover,
+[data-design="clay"] button[class*="bg-\\[\\#f59e0b\\]"]:hover {
+  box-shadow:
+    2px 2px 4px 0 rgba(0, 0, 0, 0.2),
+    inset -4px -4px 6px 0 rgba(0, 0, 0, 0.18),
+    inset 4px 4px 6px 0 rgba(255, 255, 255, 0.45) !important;
+  transform: translateY(1px) !important;
 }
 [data-design="clay"] button[class*="bg-orange"]:active,
 [data-design="clay"] button[class*="bg-\\[\\#f59e0b\\]"]:active {
   box-shadow:
-    inset 3px 3px 6px rgba(0, 0, 0, 0.12),
-    inset -2px -2px 4px rgba(255, 255, 255, 0.3) !important;
-  transform: translateY(1px) !important;
+    1px 1px 2px 0 rgba(0, 0, 0, 0.15),
+    inset -6px -6px 10px 0 rgba(0, 0, 0, 0.22),
+    inset 6px 6px 10px 0 rgba(255, 255, 255, 0.3) !important;
+  transform: translateY(2px) !important;
 }
-/* Clay badges — soft rounded */
-[data-design="clay"] [class*="rounded-full"],
+/* Clay — generous rounding on everything */
+[data-design="clay"] [class*="rounded-full"] { border-radius: 9999px !important; }
 [data-design="clay"] [class*="rounded-xl"],
-[data-design="clay"] [class*="rounded-2xl"] {
-  border-radius: 20px !important;
+[data-design="clay"] [class*="rounded-2xl"],
+[data-design="clay"] [class*="rounded-lg"] {
+  border-radius: 24px !important;
 }
 
 /* ─── 3. LIQUID GLASS (Apple Vision Pro / macOS) ─── */
