@@ -108,30 +108,30 @@
 /* Uses :where() for zero specificity so themes can override cleanly */
 
 /* ─── 1. GLASSMORPHISM ─── */
-/* Dark mode — solid enough to READ text */
+/* Dark mode — frosted dark panels */
 [data-design="glass"] [class*="bg-white"],
 [data-design="glass"] [class*="bg-\\["],
 [data-design="glass"] .card,
 [data-design="glass"] aside,
 [data-design="glass"] nav,
 [data-design="glass"] header {
-  background: rgba(15, 23, 42, 0.85) !important;
-  backdrop-filter: blur(16px) saturate(1.3) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(1.3) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  background: rgba(15, 23, 42, 0.7) !important;
+  backdrop-filter: blur(40px) saturate(1.5) !important;
+  -webkit-backdrop-filter: blur(40px) saturate(1.5) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25) !important;
 }
-/* Light mode — frosted white, highly readable */
+/* Light mode — frosted white with heavy blur */
 html:not(.dark)[data-design="glass"] [class*="bg-white"],
 html:not(.dark)[data-design="glass"] [class*="bg-\\["],
 html:not(.dark)[data-design="glass"] .card,
 html:not(.dark)[data-design="glass"] aside,
 html:not(.dark)[data-design="glass"] nav,
 html:not(.dark)[data-design="glass"] header {
-  background: rgba(255, 255, 255, 0.65) !important;
-  backdrop-filter: blur(16px) saturate(1.3) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(1.3) !important;
-  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  background: rgba(255, 255, 255, 0.5) !important;
+  backdrop-filter: blur(40px) saturate(1.5) !important;
+  -webkit-backdrop-filter: blur(40px) saturate(1.5) !important;
+  border: 1px solid rgba(255, 255, 255, 0.35) !important;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08) !important;
 }
 [data-design="glass"] body {
@@ -261,21 +261,21 @@ html:not(.dark)[data-design="glass"] select {
 }
 
 /* ─── 3. LIQUID GLASS (Apple Vision Pro / macOS) ─── */
-/* Organic shapes, specular highlights, higher opacity for readability */
+/* Organic shapes, specular highlights, heavy blur for frosted refractive look */
 [data-design="liquid"] [class*="bg-white"],
 [data-design="liquid"] [class*="bg-\\["],
 [data-design="liquid"] .card,
 [data-design="liquid"] aside,
 [data-design="liquid"] nav,
 [data-design="liquid"] header {
-  background: rgba(15, 23, 42, 0.8) !important;
-  backdrop-filter: blur(20px) saturate(1.8) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(1.8) !important;
-  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  background: rgba(15, 23, 42, 0.65) !important;
+  backdrop-filter: blur(50px) saturate(1.8) brightness(1.05) !important;
+  -webkit-backdrop-filter: blur(50px) saturate(1.8) brightness(1.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
   border-radius: 24px !important;
   box-shadow:
     0 8px 40px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
     inset 0 -1px 0 rgba(255, 255, 255, 0.05) !important;
 }
 html:not(.dark)[data-design="liquid"] [class*="bg-white"],
@@ -284,13 +284,14 @@ html:not(.dark)[data-design="liquid"] .card,
 html:not(.dark)[data-design="liquid"] aside,
 html:not(.dark)[data-design="liquid"] nav,
 html:not(.dark)[data-design="liquid"] header {
-  background: rgba(255, 255, 255, 0.55) !important;
-  backdrop-filter: blur(20px) saturate(1.8) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(1.8) !important;
-  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  background: rgba(255, 255, 255, 0.4) !important;
+  backdrop-filter: blur(50px) saturate(1.8) brightness(1.05) !important;
+  -webkit-backdrop-filter: blur(50px) saturate(1.8) brightness(1.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+  border-radius: 24px !important;
   box-shadow:
-    0 8px 40px rgba(0, 0, 0, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 8px 40px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
     inset 0 -1px 0 rgba(255, 255, 255, 0.2) !important;
 }
 [data-design="liquid"] body {
