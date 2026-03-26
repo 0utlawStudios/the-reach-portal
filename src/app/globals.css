@@ -98,6 +98,169 @@
   }
 }
 
+/* ═══════════════════════════════════════════════════════
+   GOD-TIER DESIGN ENGINE — 5 Theme Modes
+   Applied via data-design attribute on <html>
+   Pure CSS cascade — zero JS at render time
+   ═══════════════════════════════════════════════════════ */
+
+/* ─── 1. GLASSMORPHISM ─── */
+[data-design="glass"] .card,
+[data-design="glass"] [class*="rounded"][class*="border"][class*="bg-white"],
+[data-design="glass"] [class*="rounded"][class*="border"][class*="dark:bg-"] {
+  background: rgba(255, 255, 255, 0.08) !important;
+  backdrop-filter: blur(20px) saturate(1.6) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.6) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+}
+html:not(.dark)[data-design="glass"] .card,
+html:not(.dark)[data-design="glass"] [class*="rounded"][class*="border"][class*="bg-white"] {
+  background: rgba(255, 255, 255, 0.55) !important;
+  border-color: rgba(255, 255, 255, 0.6) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
+}
+[data-design="glass"] body {
+  background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 40%, #0f172a 100%) !important;
+}
+html:not(.dark)[data-design="glass"] body {
+  background: linear-gradient(135deg, #e2e8f0 0%, #dbeafe 50%, #e0e7ff 100%) !important;
+}
+[data-design="glass"] button[class*="bg-orange"],
+[data-design="glass"] button[class*="bg-\\[\\#f59e0b\\]"] {
+  backdrop-filter: blur(12px) !important;
+  box-shadow: 0 4px 24px rgba(245, 158, 11, 0.3) !important;
+}
+
+/* ─── 2. SKEUOMORPHISM ─── */
+[data-design="skeuomorphic"] .card,
+[data-design="skeuomorphic"] [class*="rounded"][class*="border"][class*="bg-white"],
+[data-design="skeuomorphic"] [class*="rounded"][class*="border"][class*="dark:bg-"] {
+  background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%) !important;
+  border: 1px solid #d1d5db !important;
+  box-shadow: 0 2px 0 #cbd5e1, 0 4px 12px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.9) !important;
+}
+.dark[data-design="skeuomorphic"] .card,
+.dark[data-design="skeuomorphic"] [class*="rounded"][class*="border"][class*="dark:bg-"] {
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%) !important;
+  border: 1px solid #334155 !important;
+  box-shadow: 0 2px 0 #0f172a, 0 4px 12px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05) !important;
+}
+[data-design="skeuomorphic"] input,
+[data-design="skeuomorphic"] textarea,
+[data-design="skeuomorphic"] select {
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.08), inset 0 0 0 1px rgba(0,0,0,0.04) !important;
+  border: 1px solid #d1d5db !important;
+}
+.dark[data-design="skeuomorphic"] input,
+.dark[data-design="skeuomorphic"] textarea,
+.dark[data-design="skeuomorphic"] select {
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.3), inset 0 0 0 1px rgba(255,255,255,0.03) !important;
+  border: 1px solid #334155 !important;
+}
+[data-design="skeuomorphic"] button[class*="bg-orange"],
+[data-design="skeuomorphic"] button[class*="bg-\\[\\#f59e0b\\]"] {
+  background: linear-gradient(180deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%) !important;
+  box-shadow: 0 2px 0 #b45309, inset 0 1px 0 rgba(255,255,255,0.35) !important;
+  text-shadow: 0 1px 1px rgba(0,0,0,0.15);
+}
+[data-design="skeuomorphic"] button[class*="bg-orange"]:active,
+[data-design="skeuomorphic"] button[class*="bg-\\[\\#f59e0b\\]"]:active {
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.2) !important;
+  transform: translateY(1px);
+}
+
+/* ─── 3. LIQUID GLASS ─── */
+[data-design="liquid"] .card,
+[data-design="liquid"] [class*="rounded"][class*="border"][class*="bg-white"],
+[data-design="liquid"] [class*="rounded"][class*="border"][class*="dark:bg-"] {
+  background: rgba(255, 255, 255, 0.05) !important;
+  backdrop-filter: blur(40px) saturate(1.8) brightness(1.1) !important;
+  -webkit-backdrop-filter: blur(40px) saturate(1.8) brightness(1.1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 24px !important;
+  box-shadow: 0 0 0 0.5px rgba(255,255,255,0.1), 0 20px 60px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.15) !important;
+}
+html:not(.dark)[data-design="liquid"] .card,
+html:not(.dark)[data-design="liquid"] [class*="rounded"][class*="border"][class*="bg-white"] {
+  background: rgba(255, 255, 255, 0.45) !important;
+  border: 1px solid rgba(255, 255, 255, 0.7) !important;
+  box-shadow: 0 0 0 0.5px rgba(255,255,255,0.4), 0 20px 60px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.6) !important;
+}
+[data-design="liquid"] body {
+  background: linear-gradient(160deg, #020617 0%, #0c0a2a 30%, #1a0a2e 55%, #0f172a 100%) !important;
+}
+html:not(.dark)[data-design="liquid"] body {
+  background: linear-gradient(160deg, #dbeafe 0%, #e0e7ff 30%, #fce7f3 55%, #dbeafe 100%) !important;
+}
+[data-design="liquid"] * {
+  transition: background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease !important;
+}
+/* Exclude inputs and typing from the transition */
+[data-design="liquid"] input,
+[data-design="liquid"] textarea {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+/* ─── 4. NEOBRUTALISM ─── */
+[data-design="brutalism"] .card,
+[data-design="brutalism"] [class*="rounded"][class*="border"][class*="bg-white"],
+[data-design="brutalism"] [class*="rounded"][class*="border"][class*="dark:bg-"] {
+  background: #ffffff !important;
+  border: 3px solid #000000 !important;
+  border-radius: 12px !important;
+  box-shadow: 5px 5px 0px #000000 !important;
+  backdrop-filter: none !important;
+}
+.dark[data-design="brutalism"] .card,
+.dark[data-design="brutalism"] [class*="rounded"][class*="border"][class*="dark:bg-"] {
+  background: #1a1a2e !important;
+  border: 3px solid #e2e8f0 !important;
+  box-shadow: 5px 5px 0px #e2e8f0 !important;
+}
+[data-design="brutalism"] input,
+[data-design="brutalism"] textarea,
+[data-design="brutalism"] select {
+  border: 2px solid #000 !important;
+  border-radius: 8px !important;
+  box-shadow: 3px 3px 0 #000 !important;
+  background: #fff !important;
+}
+.dark[data-design="brutalism"] input,
+.dark[data-design="brutalism"] textarea,
+.dark[data-design="brutalism"] select {
+  border: 2px solid #e2e8f0 !important;
+  box-shadow: 3px 3px 0 #e2e8f0 !important;
+  background: #0f172a !important;
+  color: #e2e8f0 !important;
+}
+[data-design="brutalism"] button[class*="bg-orange"],
+[data-design="brutalism"] button[class*="bg-\\[\\#f59e0b\\]"] {
+  background: #f59e0b !important;
+  border: 3px solid #000 !important;
+  box-shadow: 4px 4px 0px #000 !important;
+  border-radius: 10px !important;
+  font-weight: 900 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+}
+[data-design="brutalism"] button[class*="bg-orange"]:hover,
+[data-design="brutalism"] button[class*="bg-\\[\\#f59e0b\\]"]:hover {
+  transform: translate(-2px, -2px) !important;
+  box-shadow: 6px 6px 0px #000 !important;
+}
+[data-design="brutalism"] button[class*="bg-orange"]:active,
+[data-design="brutalism"] button[class*="bg-\\[\\#f59e0b\\]"]:active {
+  transform: translate(3px, 3px) !important;
+  box-shadow: 0px 0px 0px #000 !important;
+}
+[data-design="brutalism"] body {
+  background: #fef3c7 !important;
+}
+.dark[data-design="brutalism"] body {
+  background: #0f0f23 !important;
+}
+
 /* Dashboard pulse animation */
 @keyframes pulse {
   0%, 100% { opacity: 1; transform: scale(1); }

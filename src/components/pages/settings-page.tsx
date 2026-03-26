@@ -9,6 +9,7 @@ import { useToast } from "@/lib/toast-context";
 import { useAuth } from "@/lib/auth-context";
 import { usePresence, PresenceStatus } from "@/lib/use-presence";
 import { usePipeline } from "@/lib/pipeline-context";
+import { ThemeSelector } from "@/components/theme-selector";
 import { logAudit, fetchAllAuditLogs, AuditEntry } from "@/lib/audit";
 import { History, ArrowUpRight, SlidersHorizontal, Search, FileText as FileTextIcon, Shield as ShieldIcon, AtSign, ArrowUpDown, Filter, ChevronRight, CheckCircle, Activity, Clock as ClockIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -392,6 +393,11 @@ export function SettingsPage() {
                 ))}
               </div>
             </SettingRow>
+            {/* Design Engine — God-Tier Theme Switcher */}
+            <div className="px-4 py-4 border-b border-gray-50 dark:border-white/[0.03]">
+              <ThemeSelector />
+            </div>
+
             <SettingRow icon={Clock} label="Timezone" desc="Scheduled posts use this timezone">
               <select className="h-8 px-3 rounded-lg bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-[11px] text-gray-600 dark:text-gray-300 outline-none cursor-pointer">
                 <option>Pacific Time (PT)</option><option>Mountain Time (MT)</option><option>Central Time (CT)</option><option>Eastern Time (ET)</option><option>UTC</option>
