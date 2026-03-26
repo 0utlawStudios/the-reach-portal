@@ -104,44 +104,69 @@
    Pure CSS cascade — zero JS at render time
    ═══════════════════════════════════════════════════════ */
 
+/* Broad card selector — catches all card-like elements across the app */
+/* Uses :where() for zero specificity so themes can override cleanly */
+
 /* ─── 1. GLASSMORPHISM ─── */
+/* Dark mode (default glass look) */
+[data-design="glass"] [class*="bg-white"],
+[data-design="glass"] [class*="bg-\\["],
 [data-design="glass"] .card,
-[data-design="glass"] [class*="rounded"][class*="border"][class*="bg-white"],
-[data-design="glass"] [class*="rounded"][class*="border"][class*="dark:bg-"] {
-  background: rgba(255, 255, 255, 0.08) !important;
-  backdrop-filter: blur(20px) saturate(1.6) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(1.6) !important;
-  border-color: rgba(255, 255, 255, 0.15) !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+[data-design="glass"] aside,
+[data-design="glass"] nav,
+[data-design="glass"] header {
+  background: rgba(17, 25, 40, 0.75) !important;
+  backdrop-filter: blur(12px) saturate(1.4) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(1.4) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
 }
+/* Light mode glass */
+html:not(.dark)[data-design="glass"] [class*="bg-white"],
 html:not(.dark)[data-design="glass"] .card,
-html:not(.dark)[data-design="glass"] [class*="rounded"][class*="border"][class*="bg-white"] {
-  background: rgba(255, 255, 255, 0.55) !important;
-  border-color: rgba(255, 255, 255, 0.6) !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
+html:not(.dark)[data-design="glass"] aside,
+html:not(.dark)[data-design="glass"] nav,
+html:not(.dark)[data-design="glass"] header {
+  background: rgba(255, 255, 255, 0.15) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
 }
 [data-design="glass"] body {
   background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 40%, #0f172a 100%) !important;
 }
 html:not(.dark)[data-design="glass"] body {
-  background: linear-gradient(135deg, #e2e8f0 0%, #dbeafe 50%, #e0e7ff 100%) !important;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%) !important;
 }
-[data-design="glass"] button[class*="bg-orange"],
-[data-design="glass"] button[class*="bg-\\[\\#f59e0b\\]"] {
-  backdrop-filter: blur(12px) !important;
-  box-shadow: 0 4px 24px rgba(245, 158, 11, 0.3) !important;
+/* Glass inputs */
+[data-design="glass"] input,
+[data-design="glass"] textarea,
+[data-design="glass"] select {
+  background: rgba(255, 255, 255, 0.06) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+html:not(.dark)[data-design="glass"] input,
+html:not(.dark)[data-design="glass"] textarea,
+html:not(.dark)[data-design="glass"] select {
+  background: rgba(255, 255, 255, 0.3) !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
 }
 
 /* ─── 2. SKEUOMORPHISM ─── */
+[data-design="skeuomorphic"] [class*="bg-white"],
 [data-design="skeuomorphic"] .card,
-[data-design="skeuomorphic"] [class*="rounded"][class*="border"][class*="bg-white"],
-[data-design="skeuomorphic"] [class*="rounded"][class*="border"][class*="dark:bg-"] {
+[data-design="skeuomorphic"] aside,
+[data-design="skeuomorphic"] nav {
   background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%) !important;
   border: 1px solid #d1d5db !important;
   box-shadow: 0 2px 0 #cbd5e1, 0 4px 12px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.9) !important;
 }
+.dark[data-design="skeuomorphic"] [class*="bg-white"],
+.dark[data-design="skeuomorphic"] [class*="bg-\\["],
 .dark[data-design="skeuomorphic"] .card,
-.dark[data-design="skeuomorphic"] [class*="rounded"][class*="border"][class*="dark:bg-"] {
+.dark[data-design="skeuomorphic"] aside,
+.dark[data-design="skeuomorphic"] nav {
   background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%) !important;
   border: 1px solid #334155 !important;
   box-shadow: 0 2px 0 #0f172a, 0 4px 12px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05) !important;
@@ -170,95 +195,171 @@ html:not(.dark)[data-design="glass"] body {
   transform: translateY(1px);
 }
 
-/* ─── 3. LIQUID GLASS ─── */
+/* ─── 3. LIQUID GLASS (Apple Vision Pro / macOS) ─── */
+/* Key difference from glass: lower blur, higher saturation, organic shapes,
+   specular highlights via multiple inset shadows, refractive feel */
+[data-design="liquid"] [class*="bg-white"],
+[data-design="liquid"] [class*="bg-\\["],
 [data-design="liquid"] .card,
-[data-design="liquid"] [class*="rounded"][class*="border"][class*="bg-white"],
-[data-design="liquid"] [class*="rounded"][class*="border"][class*="dark:bg-"] {
-  background: rgba(255, 255, 255, 0.05) !important;
-  backdrop-filter: blur(40px) saturate(1.8) brightness(1.1) !important;
-  -webkit-backdrop-filter: blur(40px) saturate(1.8) brightness(1.1) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+[data-design="liquid"] aside,
+[data-design="liquid"] nav,
+[data-design="liquid"] header {
+  background: rgba(255, 255, 255, 0.08) !important;
+  backdrop-filter: blur(2px) saturate(1.8) !important;
+  -webkit-backdrop-filter: blur(2px) saturate(1.8) !important;
+  border: 1px solid rgba(255, 255, 255, 0.8) !important;
   border-radius: 24px !important;
-  box-shadow: 0 0 0 0.5px rgba(255,255,255,0.1), 0 20px 60px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.15) !important;
+  box-shadow:
+    0 8px 32px rgba(31, 38, 135, 0.15),
+    inset 0 4px 20px rgba(255, 255, 255, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
 }
+html:not(.dark)[data-design="liquid"] [class*="bg-white"],
 html:not(.dark)[data-design="liquid"] .card,
-html:not(.dark)[data-design="liquid"] [class*="rounded"][class*="border"][class*="bg-white"] {
-  background: rgba(255, 255, 255, 0.45) !important;
-  border: 1px solid rgba(255, 255, 255, 0.7) !important;
-  box-shadow: 0 0 0 0.5px rgba(255,255,255,0.4), 0 20px 60px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.6) !important;
+html:not(.dark)[data-design="liquid"] aside,
+html:not(.dark)[data-design="liquid"] nav,
+html:not(.dark)[data-design="liquid"] header {
+  background: rgba(255, 255, 255, 0.15) !important;
+  border: 1px solid rgba(255, 255, 255, 0.8) !important;
+  box-shadow:
+    0 8px 32px rgba(31, 38, 135, 0.1),
+    inset 0 4px 20px rgba(255, 255, 255, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
 }
 [data-design="liquid"] body {
-  background: linear-gradient(160deg, #020617 0%, #0c0a2a 30%, #1a0a2e 55%, #0f172a 100%) !important;
+  background: linear-gradient(160deg, #020617 0%, #0c0a2a 25%, #1a0a2e 50%, #0a1628 75%, #020617 100%) !important;
 }
 html:not(.dark)[data-design="liquid"] body {
-  background: linear-gradient(160deg, #dbeafe 0%, #e0e7ff 30%, #fce7f3 55%, #dbeafe 100%) !important;
+  background: linear-gradient(160deg, #c7d2fe 0%, #ddd6fe 25%, #fbcfe8 50%, #bae6fd 75%, #c7d2fe 100%) !important;
 }
-[data-design="liquid"] * {
-  transition: background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease !important;
-}
-/* Exclude inputs and typing from the transition */
+/* Liquid inputs — pressed into the surface */
 [data-design="liquid"] input,
-[data-design="liquid"] textarea {
-  transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+[data-design="liquid"] textarea,
+[data-design="liquid"] select {
+  background: rgba(255, 255, 255, 0.05) !important;
+  backdrop-filter: blur(2px) !important;
+  -webkit-backdrop-filter: blur(2px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+  border-radius: 16px !important;
+  box-shadow: inset 0 2px 8px rgba(0,0,0,0.06) !important;
+}
+html:not(.dark)[data-design="liquid"] input,
+html:not(.dark)[data-design="liquid"] textarea,
+html:not(.dark)[data-design="liquid"] select {
+  background: rgba(255, 255, 255, 0.3) !important;
 }
 
 /* ─── 4. NEOBRUTALISM ─── */
+/* Rules: hard shadows (ZERO blur), thick borders, NO border-radius, bold colors */
+[data-design="brutalism"] [class*="bg-white"],
+[data-design="brutalism"] [class*="bg-\\["],
 [data-design="brutalism"] .card,
-[data-design="brutalism"] [class*="rounded"][class*="border"][class*="bg-white"],
-[data-design="brutalism"] [class*="rounded"][class*="border"][class*="dark:bg-"] {
+[data-design="brutalism"] aside,
+[data-design="brutalism"] nav,
+[data-design="brutalism"] header {
   background: #ffffff !important;
   border: 3px solid #000000 !important;
-  border-radius: 12px !important;
-  box-shadow: 5px 5px 0px #000000 !important;
+  border-radius: 0 !important;
+  box-shadow: 5px 5px 0px 0px #000000 !important;
   backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
+.dark[data-design="brutalism"] [class*="bg-white"],
+.dark[data-design="brutalism"] [class*="bg-\\["],
 .dark[data-design="brutalism"] .card,
-.dark[data-design="brutalism"] [class*="rounded"][class*="border"][class*="dark:bg-"] {
+.dark[data-design="brutalism"] aside,
+.dark[data-design="brutalism"] nav,
+.dark[data-design="brutalism"] header {
   background: #1a1a2e !important;
   border: 3px solid #e2e8f0 !important;
-  box-shadow: 5px 5px 0px #e2e8f0 !important;
+  box-shadow: 5px 5px 0px 0px #e2e8f0 !important;
 }
+/* Force text contrast in brutalism */
+[data-design="brutalism"] [class*="bg-white"] *,
+[data-design="brutalism"] .card *,
+[data-design="brutalism"] aside *,
+[data-design="brutalism"] nav * {
+  color: #000000 !important;
+}
+.dark[data-design="brutalism"] [class*="bg-white"] *,
+.dark[data-design="brutalism"] .card *,
+.dark[data-design="brutalism"] aside *,
+.dark[data-design="brutalism"] nav * {
+  color: #e2e8f0 !important;
+}
+/* Brutalism active/selected nav items — high contrast */
+[data-design="brutalism"] [class*="bg-orange"] {
+  background: #FFD23F !important;
+  color: #000000 !important;
+  border: 3px solid #000000 !important;
+  box-shadow: 3px 3px 0px 0px #000000 !important;
+  border-radius: 0 !important;
+}
+[data-design="brutalism"] [class*="bg-orange"] * {
+  color: #000000 !important;
+}
+.dark[data-design="brutalism"] [class*="bg-orange"] {
+  background: #FFD23F !important;
+  border: 3px solid #e2e8f0 !important;
+  box-shadow: 3px 3px 0px 0px #e2e8f0 !important;
+}
+.dark[data-design="brutalism"] [class*="bg-orange"] * {
+  color: #000000 !important;
+}
+/* Brutalism inputs */
 [data-design="brutalism"] input,
 [data-design="brutalism"] textarea,
 [data-design="brutalism"] select {
-  border: 2px solid #000 !important;
-  border-radius: 8px !important;
-  box-shadow: 3px 3px 0 #000 !important;
+  border: 3px solid #000 !important;
+  border-radius: 0 !important;
+  box-shadow: 3px 3px 0 0 #000 !important;
   background: #fff !important;
+  color: #000 !important;
 }
 .dark[data-design="brutalism"] input,
 .dark[data-design="brutalism"] textarea,
 .dark[data-design="brutalism"] select {
-  border: 2px solid #e2e8f0 !important;
-  box-shadow: 3px 3px 0 #e2e8f0 !important;
+  border: 3px solid #e2e8f0 !important;
+  box-shadow: 3px 3px 0 0 #e2e8f0 !important;
   background: #0f172a !important;
   color: #e2e8f0 !important;
 }
+/* Brutalism buttons */
 [data-design="brutalism"] button[class*="bg-orange"],
 [data-design="brutalism"] button[class*="bg-\\[\\#f59e0b\\]"] {
-  background: #f59e0b !important;
+  background: #FFD23F !important;
+  color: #000000 !important;
   border: 3px solid #000 !important;
-  box-shadow: 4px 4px 0px #000 !important;
-  border-radius: 10px !important;
+  box-shadow: 5px 5px 0px 0px #000 !important;
+  border-radius: 0 !important;
   font-weight: 900 !important;
   text-transform: uppercase !important;
-  letter-spacing: 0.05em !important;
+  letter-spacing: 0.06em !important;
+  transition: transform 0.1s, box-shadow 0.1s !important;
 }
 [data-design="brutalism"] button[class*="bg-orange"]:hover,
 [data-design="brutalism"] button[class*="bg-\\[\\#f59e0b\\]"]:hover {
   transform: translate(-2px, -2px) !important;
-  box-shadow: 6px 6px 0px #000 !important;
+  box-shadow: 7px 7px 0px 0px #000 !important;
 }
 [data-design="brutalism"] button[class*="bg-orange"]:active,
 [data-design="brutalism"] button[class*="bg-\\[\\#f59e0b\\]"]:active {
   transform: translate(3px, 3px) !important;
-  box-shadow: 0px 0px 0px #000 !important;
+  box-shadow: 0px 0px 0px 0px #000 !important;
 }
+/* Brutalism body */
 [data-design="brutalism"] body {
-  background: #fef3c7 !important;
+  background: #FFFDF5 !important;
 }
 .dark[data-design="brutalism"] body {
   background: #0f0f23 !important;
+}
+/* Brutalism badges/pills */
+[data-design="brutalism"] [class*="rounded-full"],
+[data-design="brutalism"] [class*="rounded-lg"],
+[data-design="brutalism"] [class*="rounded-xl"],
+[data-design="brutalism"] [class*="rounded-2xl"] {
+  border-radius: 0 !important;
 }
 
 /* Dashboard pulse animation */
