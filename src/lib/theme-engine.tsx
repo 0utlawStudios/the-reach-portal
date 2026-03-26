@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 
-export type DesignTheme = "default" | "glass" | "skeuomorphic" | "liquid" | "brutalism";
+export type DesignTheme = "default" | "glass" | "clay" | "liquid" | "brutalism";
 
 interface ThemeEngineCtx {
   theme: DesignTheme;
@@ -19,7 +19,7 @@ export function ThemeEngineProvider({ children }: { children: React.ReactNode })
   // Hydrate from localStorage on mount
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY) as DesignTheme | null;
-    if (stored && ["default", "glass", "skeuomorphic", "liquid", "brutalism"].includes(stored)) {
+    if (stored && ["default", "glass", "clay", "liquid", "brutalism"].includes(stored)) {
       setThemeState(stored);
       document.documentElement.setAttribute("data-design", stored);
     }

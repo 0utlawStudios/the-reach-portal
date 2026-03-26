@@ -286,7 +286,7 @@ export function SettingsPage() {
   const isAdmin = currentMember?.role === "owner" || currentMember?.role === "admin";
   const canViewAudit = isAdmin || currentMember?.secondaryRole?.includes("Approver") || currentMember?.secondaryRole?.includes("Creative Director");
   const { getStatus } = usePresence(currentUser.email);
-  const [activeTab, setActiveTab] = useState<"general" | "team" | "audit">("general");
+  const [activeTab, setActiveTab] = useState<"general" | "team" | "audit" | "themes">("general");
   const [auditLogs, setAuditLogs] = useState<AuditEntry[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
@@ -367,6 +367,7 @@ export function SettingsPage() {
         {[
           { id: "general" as const, label: "General", icon: <SettingsIcon className="w-3.5 h-3.5" /> },
           { id: "team" as const, label: "Team Members", icon: <Users className="w-3.5 h-3.5" />, badge: pendingRequests.length > 0 ? pendingRequests.length : undefined },
+          { id: "themes" as const, label: "Themes", icon: <Palette className="w-3.5 h-3.5" /> },
           ...(canViewAudit ? [{ id: "audit" as const, label: "Audit Logs", icon: <FileText className="w-3.5 h-3.5" /> }] : []),
         ].map((tab) => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
@@ -378,7 +379,11 @@ export function SettingsPage() {
         ))}
       </div>
 
-      {activeTab === "audit" ? (
+      {activeTab === "themes" ? (
+        <div className="py-6 px-4">
+          <ThemeSelector />
+        </div>
+      ) : activeTab === "audit" ? (
         <AuditLogTab auditLogs={auditLogs} auditLoading={auditLoading} setAuditLogs={setAuditLogs} setAuditLoading={setAuditLoading} />
       ) : activeTab === "general" ? (
         <div className="space-y-4">
@@ -393,11 +398,6 @@ export function SettingsPage() {
                 ))}
               </div>
             </SettingRow>
-            {/* Design Engine — God-Tier Theme Switcher */}
-            <div className="px-4 py-4 border-b border-gray-50 dark:border-white/[0.03]">
-              <ThemeSelector />
-            </div>
-
             <SettingRow icon={Clock} label="Timezone" desc="Scheduled posts use this timezone">
               <select className="h-8 px-3 rounded-lg bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-[11px] text-gray-600 dark:text-gray-300 outline-none cursor-pointer">
                 <option>Pacific Time (PT)</option><option>Mountain Time (MT)</option><option>Central Time (CT)</option><option>Eastern Time (ET)</option><option>UTC</option>

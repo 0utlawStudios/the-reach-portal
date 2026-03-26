@@ -1,7 +1,7 @@
 "use client";
 
 import { useDesignTheme, DesignTheme } from "@/lib/theme-engine";
-import { Layers, Sparkles, Box, Droplets, Zap, Check } from "lucide-react";
+import { Layers, Sparkles, Circle, Droplets, Zap, Check } from "lucide-react";
 
 const THEMES: { id: DesignTheme; label: string; desc: string; icon: typeof Layers; preview: string; previewDark: string }[] = [
   {
@@ -17,31 +17,31 @@ const THEMES: { id: DesignTheme; label: string; desc: string; icon: typeof Layer
     label: "Glassmorphism",
     desc: "Frosted glass & blur",
     icon: Sparkles,
-    preview: "bg-blue-100/40 border-white/50 backdrop-blur-sm",
-    previewDark: "dark:bg-blue-900/20 dark:border-white/15",
+    preview: "bg-indigo-200/40 border-white/50 backdrop-blur-sm",
+    previewDark: "dark:bg-indigo-900/30 dark:border-white/15",
   },
   {
-    id: "skeuomorphic",
-    label: "Skeuomorphic",
-    desc: "Tactile depth & texture",
-    icon: Box,
-    preview: "bg-gradient-to-b from-white to-gray-100 border-gray-300 shadow-md",
-    previewDark: "dark:from-slate-700 dark:to-slate-800 dark:border-slate-600",
+    id: "clay",
+    label: "Claymorphism",
+    desc: "Soft, puffy & 3D",
+    icon: Circle,
+    preview: "bg-[#f0f4ff] border-transparent shadow-[4px_4px_8px_rgba(0,0,0,0.06),-2px_-2px_6px_rgba(255,255,255,0.8)]",
+    previewDark: "dark:bg-[#1e2340] dark:shadow-[4px_4px_8px_rgba(0,0,0,0.3)]",
   },
   {
     id: "liquid",
     label: "Liquid Glass",
-    desc: "Organic macOS fluidity",
+    desc: "Apple Vision Pro style",
     icon: Droplets,
-    preview: "bg-purple-100/30 border-white/40 backdrop-blur-sm rounded-2xl",
-    previewDark: "dark:bg-purple-900/15 dark:border-white/10",
+    preview: "bg-purple-100/40 border-white/40 backdrop-blur-sm rounded-2xl",
+    previewDark: "dark:bg-purple-900/20 dark:border-white/10",
   },
   {
     id: "brutalism",
     label: "Neobrutalism",
     desc: "Bold & aggressive",
     icon: Zap,
-    preview: "bg-amber-100 border-[3px] border-black shadow-[4px_4px_0px_#000]",
+    preview: "bg-[#FFFDF5] border-[3px] border-black shadow-[4px_4px_0px_#000]",
     previewDark: "dark:bg-slate-800 dark:border-slate-300 dark:shadow-[4px_4px_0px_#e2e8f0]",
   },
 ];
