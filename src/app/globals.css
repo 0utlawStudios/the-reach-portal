@@ -429,6 +429,37 @@ html:not(.dark)[data-design="liquid"] select {
   border-radius: 0 !important;
 }
 
+/* ─── THEME OVERRIDES: Force solid backgrounds on overlays ─── */
+/* Drawers, modals, dialogs, sheets must stay opaque for readability */
+[data-design="glass"] [class*="fixed"][class*="bg-white"],
+[data-design="glass"] [class*="fixed"][class*="bg-\\["],
+[data-design="glass"] [role="dialog"],
+[data-design="glass"] [class*="drawer"],
+[data-design="glass"] [class*="sheet"],
+[data-design="liquid"] [class*="fixed"][class*="bg-white"],
+[data-design="liquid"] [class*="fixed"][class*="bg-\\["],
+[data-design="liquid"] [role="dialog"],
+[data-design="liquid"] [class*="drawer"],
+[data-design="liquid"] [class*="sheet"] {
+  background: rgba(255, 255, 255, 0.92) !important;
+  backdrop-filter: blur(60px) saturate(1.2) !important;
+  -webkit-backdrop-filter: blur(60px) saturate(1.2) !important;
+}
+.dark[data-design="glass"] [class*="fixed"][class*="bg-white"],
+.dark[data-design="glass"] [class*="fixed"][class*="bg-\\["],
+.dark[data-design="glass"] [role="dialog"],
+.dark[data-design="glass"] [class*="drawer"],
+.dark[data-design="glass"] [class*="sheet"],
+.dark[data-design="liquid"] [class*="fixed"][class*="bg-white"],
+.dark[data-design="liquid"] [class*="fixed"][class*="bg-\\["],
+.dark[data-design="liquid"] [role="dialog"],
+.dark[data-design="liquid"] [class*="drawer"],
+.dark[data-design="liquid"] [class*="sheet"] {
+  background: rgba(15, 23, 42, 0.95) !important;
+  backdrop-filter: blur(60px) saturate(1.2) !important;
+  -webkit-backdrop-filter: blur(60px) saturate(1.2) !important;
+}
+
 /* Dashboard pulse animation */
 @keyframes pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
