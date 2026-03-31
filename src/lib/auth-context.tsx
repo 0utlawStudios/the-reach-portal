@@ -1,12 +1,14 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback, useMemo, useEffect, ReactNode } from "react";
+import { supabase } from "./supabaseClient";
 
 interface UserProfile {
   name: string;
   email: string;
   initials: string;
   avatar?: string;
+  role?: string;
 }
 
 interface AuthContextType {
@@ -14,22 +16,27 @@ interface AuthContextType {
   isDemo: boolean;
   currentUser: UserProfile;
   updateCurrentUserAvatar: (avatar: string | undefined) => void;
-  login: (email: string, password: string) => boolean;
+  login: (email: string, password: string) => Promise<boolean>;
   loginDemo: () => void;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const VALID_CREDENTIALS = {
-  email: "aldridge@ten80ten.com",
-  password: "ten80ten2026",
-};
+function getInitials(name: string): string {
+  return name
+    .split(" ")
+    .map((w) => w[0])
+    .filter(Boolean)
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
 
 const DEFAULT_USER: UserProfile = {
-  name: "Aldridge Dagos",
-  email: "aldridge@ten80ten.com",
-  initials: "AD",
+  name: "Guest",
+  email: "",
+  initials: "G",
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -38,34 +45,89 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
   const [currentUser, setCurrentUser] = useState<UserProfile>(DEFAULT_USER);
 
+  // Check for existing Supabase session on mount
   useEffect(() => {
-    setIsAuthenticated(sessionStorage.getItem("t10_auth") === "true");
-    setIsDemo(sessionStorage.getItem("t10_demo") === "true");
-    setHydrated(true);
+    async function init() {
+      // Check demo mode first
+      if (sessionStorage.getItem("t10_demo") === "true") {
+        setIsAuthenticated(true);
+        setIsDemo(true);
+        setCurrentUser({ name: "Demo User", email: "demo@ten80ten.com", initials: "DU" });
+        setHydrated(true);
+        return;
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const meta = session.user.user_metadata || {};
+        const name = meta.name || session.user.email?.split("@")[0] || "User";
+        setCurrentUser({
+          name,
+          email: session.user.email || "",
+          initials: getInitials(name),
+          role: meta.role,
+        });
+        setIsAuthenticated(true);
+      }
+      setHydrated(true);
+    }
+    init();
+
+    // Listen for auth state changes (e.g., token refresh, signout from another tab)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        const meta = session.user.user_metadata || {};
+        const name = meta.name || session.user.email?.split("@")[0] || "User";
+        setCurrentUser({
+          name,
+          email: session.user.email || "",
+          initials: getInitials(name),
+          role: meta.role,
+        });
+        setIsAuthenticated(true);
+        setIsDemo(false);
+      } else if (!sessionStorage.getItem("t10_demo")) {
+        setIsAuthenticated(false);
+        setCurrentUser(DEFAULT_USER);
+      }
+    });
+
+    return () => { subscription.unsubscribe(); };
   }, []);
 
-  const login = useCallback((email: string, password: string) => {
-    if (email.toLowerCase().trim() === VALID_CREDENTIALS.email && password === VALID_CREDENTIALS.password) {
-      setIsAuthenticated(true);
-      setIsDemo(false);
-      sessionStorage.setItem("t10_auth", "true");
-      sessionStorage.removeItem("t10_demo");
-      return true;
-    }
-    return false;
+  const login = useCallback(async (email: string, password: string): Promise<boolean> => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.toLowerCase().trim(),
+      password,
+    });
+    if (error || !data.session) return false;
+
+    const meta = data.user?.user_metadata || {};
+    const name = meta.name || email.split("@")[0];
+    setCurrentUser({
+      name,
+      email: data.user?.email || email,
+      initials: getInitials(name),
+      role: meta.role,
+    });
+    setIsAuthenticated(true);
+    setIsDemo(false);
+    sessionStorage.removeItem("t10_demo");
+    return true;
   }, []);
 
   const loginDemo = useCallback(() => {
     setIsAuthenticated(true);
     setIsDemo(true);
-    sessionStorage.setItem("t10_auth", "true");
+    setCurrentUser({ name: "Demo User", email: "demo@ten80ten.com", initials: "DU" });
     sessionStorage.setItem("t10_demo", "true");
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut();
     setIsAuthenticated(false);
     setIsDemo(false);
-    sessionStorage.removeItem("t10_auth");
+    setCurrentUser(DEFAULT_USER);
     sessionStorage.removeItem("t10_demo");
   }, []);
 

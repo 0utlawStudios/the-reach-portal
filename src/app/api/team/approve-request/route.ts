@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { getTransporter, getFromAddress, getSiteUrl, buildApprovalEmailHtml } from "@/lib/email-utils";
 
 export const maxDuration = 10;
 
@@ -27,15 +28,15 @@ export async function POST(request: NextRequest) {
 
     const admin = getAdminClient();
 
-    // Verify requester is admin/owner
+    // ─── RBAC: Only superadmin can approve/reject ───
     const { data: reviewer } = await admin
       .from("team_members")
       .select("role")
       .eq("email", body.reviewedBy)
       .single();
 
-    if (!reviewer || (reviewer.role !== "owner" && reviewer.role !== "admin")) {
-      return NextResponse.json({ error: "Only admins can approve requests" }, { status: 403 });
+    if (!reviewer || reviewer.role !== "superadmin") {
+      return NextResponse.json({ error: "Only superadmins can approve or reject requests" }, { status: 403 });
     }
 
     // Get the request
@@ -62,18 +63,55 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, action: "rejected" });
     }
 
-    // Approve: send invite via Supabase Auth
+    // ─── Approve: createUser + generateLink + branded email ───
     const role = body.role || "viewer";
-    const { data: authData, error: authErr } = await admin.auth.admin.inviteUserByEmail(req.email, {
-      data: { name: req.name, role, phone: req.phone },
+
+    // Step 1: Create user silently
+    const { data: authData, error: createErr } = await admin.auth.admin.createUser({
+      email: req.email,
+      email_confirm: false,
+      user_metadata: { name: req.name, role, phone: req.phone },
     });
 
-    if (authErr) {
-      console.error("[approve-request] Auth invite failed:", authErr.message);
-      return NextResponse.json({ error: `Invite failed: ${authErr.message}` }, { status: 500 });
+    if (createErr) {
+      console.error("[approve-request] createUser failed:", createErr.message);
+      return NextResponse.json({ error: `Failed to create user: ${createErr.message}` }, { status: 500 });
     }
 
-    // Insert into team_members
+    // Step 2: Generate invite link
+    const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
+      type: "invite",
+      email: req.email,
+      options: { data: { name: req.name, role } },
+    });
+
+    if (linkErr || !linkData?.properties?.hashed_token) {
+      console.error("[approve-request] generateLink failed:", linkErr?.message);
+      if (authData?.user?.id) await admin.auth.admin.deleteUser(authData.user.id);
+      return NextResponse.json({ error: "Failed to generate invite link" }, { status: 500 });
+    }
+
+    // Step 3: Build confirmation URL
+    const siteUrl = getSiteUrl();
+    const tokenHash = linkData.properties.hashed_token;
+    const confirmUrl = `${siteUrl}/auth/confirm?token_hash=${tokenHash}&type=invite`;
+
+    // Step 4: Send branded approval email
+    try {
+      const transporter = getTransporter();
+      await transporter.sendMail({
+        from: getFromAddress(),
+        to: req.email,
+        subject: `Your access to Ten80Ten has been approved!`,
+        html: buildApprovalEmailHtml(req.name, role, confirmUrl),
+      });
+    } catch (emailErr: any) {
+      console.error("[approve-request] Email send failed:", emailErr?.message);
+      if (authData?.user?.id) await admin.auth.admin.deleteUser(authData.user.id);
+      return NextResponse.json({ error: "Failed to send approval email" }, { status: 500 });
+    }
+
+    // Step 5: Insert into team_members
     const { error: memberErr } = await admin
       .from("team_members")
       .insert({
@@ -85,7 +123,6 @@ export async function POST(request: NextRequest) {
       });
 
     if (memberErr) {
-      // Rollback auth user
       if (authData?.user?.id) await admin.auth.admin.deleteUser(authData.user.id);
       return NextResponse.json({ error: "Failed to create team member" }, { status: 500 });
     }

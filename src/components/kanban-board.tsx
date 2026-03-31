@@ -54,7 +54,7 @@ function sortForColumn(cards: ContentCardType[], stage: PipelineStage): ContentC
 const APPROVER_COLUMNS: PipelineStage[] = ["approved_scheduled", "posted"];
 
 function isApprover(role: string, secondaryRole?: string): boolean {
-  if (role === "owner") return true;
+  if (role === "superadmin") return true;
   if (role === "admin") return true;
   if (secondaryRole?.includes("Approver")) return true;
   return false;

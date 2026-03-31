@@ -21,10 +21,10 @@ export async function GET(request: NextRequest) {
 
   const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-  // Verify the OTP token (magic link / invite)
+  // Verify the OTP token
   const { data, error } = await supabase.auth.verifyOtp({
     token_hash: tokenHash,
-    type: type as "invite" | "magiclink" | "signup" | "email",
+    type: type as "invite" | "recovery" | "magiclink" | "signup" | "email",
   });
 
   if (error) {
@@ -32,13 +32,19 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${siteUrl}?error=invalid_token`);
   }
 
-  // For invite type: redirect to password setup page
-  // Pass the access token so the setup page can authenticate
-  if (type === "invite" && data?.session) {
-    const token = data.session.access_token;
+  const token = data?.session?.access_token;
+
+  // Route based on type
+  if (type === "invite" && token) {
+    // Invite → profile setup page
     return NextResponse.redirect(`${siteUrl}/auth/setup?access_token=${token}`);
   }
 
-  // For other types (magic link, etc.): redirect to dashboard
+  if (type === "recovery" && token) {
+    // Password recovery → reset password page (NOT the login screen)
+    return NextResponse.redirect(`${siteUrl}/auth/reset-password?access_token=${token}`);
+  }
+
+  // Default: redirect to dashboard
   return NextResponse.redirect(`${siteUrl}?invite=accepted`);
 }

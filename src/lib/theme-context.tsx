@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback, useMemo, useEffect, ReactNode } from "react";
+import { supabase } from "./supabaseClient";
 
 type Theme = "light" | "dark";
 
@@ -11,13 +12,40 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | null>(null);
 
-export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>("light");
+function isSupabaseConfigured(): boolean {
+  return !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+}
 
+export function ThemeProvider({ children, email }: { children: ReactNode; email?: string }) {
+  const [theme, setTheme] = useState<Theme>(() => {
+    // Use localStorage as immediate fallback (prevents flash)
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("pt_theme") as Theme | null;
+      if (saved) return saved;
+    }
+    return "light";
+  });
+
+  // Fetch per-user theme preference from Supabase when email is provided
   useEffect(() => {
-    const saved = localStorage.getItem("pt_theme") as Theme | null;
-    if (saved) setTheme(saved);
-  }, []);
+    if (!email || !isSupabaseConfigured()) return;
+    let cancelled = false;
+
+    supabase
+      .from("team_members")
+      .select("theme_preference")
+      .eq("email", email)
+      .single()
+      .then(({ data }) => {
+        if (!cancelled && data?.theme_preference) {
+          const pref = data.theme_preference as Theme;
+          setTheme(pref);
+          localStorage.setItem("pt_theme", pref);
+        }
+      });
+
+    return () => { cancelled = true; };
+  }, [email]);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
@@ -27,9 +55,19 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setTheme((t) => {
       const next = t === "light" ? "dark" : "light";
       localStorage.setItem("pt_theme", next);
+
+      // Persist to Supabase per-user if email is available
+      if (email && isSupabaseConfigured()) {
+        supabase
+          .from("team_members")
+          .update({ theme_preference: next })
+          .eq("email", email)
+          .then(() => {});
+      }
+
       return next;
     });
-  }, []);
+  }, [email]);
 
   const value = useMemo(() => ({ theme, toggleTheme }), [theme, toggleTheme]);
 

@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useCallback, useMemo, useEffect, u
 import { loadState, saveState } from "./persistence";
 import { supabase } from "./supabaseClient";
 
-export type UserRole = "owner" | "admin" | "developer" | "editor" | "viewer" | "specialist" | "technician";
+export type UserRole = "superadmin" | "developer" | "admin" | "editor" | "viewer" | "specialist" | "technician";
 export type InviteStatus = "active" | "pending";
 
 export interface TeamMember {
@@ -19,11 +19,26 @@ export interface TeamMember {
   avatar?: string;
 }
 
+export interface SignupRequest {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  company?: string;
+  reason?: string;
+  status: "pending" | "approved" | "rejected";
+  reviewed_by?: string;
+  reviewed_at?: string;
+  created_at: string;
+}
+
 interface TeamContextType {
   members: TeamMember[];
+  pendingRequests: SignupRequest[];
   inviteMember: (email: string, name: string, role: UserRole) => void;
   removeMember: (id: string) => void;
   updateMember: (id: string, updates: Partial<TeamMember>) => void;
+  refreshPendingRequests: () => void;
 }
 
 const TeamContext = createContext<TeamContextType | null>(null);
@@ -48,7 +63,7 @@ function dbToMember(row: any): TeamMember {
 }
 
 const DEFAULT_MEMBERS: TeamMember[] = [
-  { id: "1", name: "Aldridge Dagos", email: "aldridge@ten80ten.com", phone: "+63 915 495 4549", role: "owner", secondaryRole: "Approver / Developer", status: "active", joinedAt: "2025-01-01" },
+  { id: "1", name: "Aldridge Dagos", email: "aldridge@ten80ten.com", phone: "+63 915 495 4549", role: "superadmin", secondaryRole: "Approver / Developer", status: "active", joinedAt: "2025-01-01" },
   { id: "2", name: "Christer Umali", email: "christer@ten80ten.com", phone: "+63 998 551 7848", role: "admin", secondaryRole: "Approver", status: "active", joinedAt: "2025-02-01" },
   { id: "3", name: "Alex Nicholson", email: "alex@ten80ten.com", phone: "+1 239 784 5377", role: "admin", secondaryRole: "Approver", status: "active", joinedAt: "2025-03-01" },
   { id: "4", name: "Carlo Navarro", email: "carlo@ten80ten.com", phone: "+63 927 990 9987", role: "specialist", secondaryRole: "Creative Director / Approver", status: "active", joinedAt: "2025-04-01" },
@@ -57,6 +72,7 @@ const DEFAULT_MEMBERS: TeamMember[] = [
 
 export function TeamProvider({ children }: { children: ReactNode }) {
   const [members, setMembers] = useState<TeamMember[]>(DEFAULT_MEMBERS);
+  const [pendingRequests, setPendingRequests] = useState<SignupRequest[]>([]);
   const hydrated = useRef(false);
   const useDb = isSupabaseConfigured();
 
@@ -80,6 +96,23 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     }
     load();
   }, [useDb]);
+
+  // Load pending signup requests
+  const refreshPendingRequests = useCallback(() => {
+    if (!useDb) return;
+    supabase
+      .from("signup_requests")
+      .select("*")
+      .eq("status", "pending")
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        if (data) setPendingRequests(data);
+      });
+  }, [useDb]);
+
+  useEffect(() => {
+    refreshPendingRequests();
+  }, [refreshPendingRequests]);
 
   // ─── Realtime subscription for team changes ───
   useEffect(() => {
@@ -138,8 +171,8 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   }, [useDb]);
 
   const value = useMemo(
-    () => ({ members, inviteMember, removeMember, updateMember }),
-    [members, inviteMember, removeMember, updateMember]
+    () => ({ members, pendingRequests, inviteMember, removeMember, updateMember, refreshPendingRequests }),
+    [members, pendingRequests, inviteMember, removeMember, updateMember, refreshPendingRequests]
   );
 
   return <TeamContext.Provider value={value}>{children}</TeamContext.Provider>;

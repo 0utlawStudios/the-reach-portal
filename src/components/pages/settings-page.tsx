@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 
 const roleConfig: Record<UserRole, { label: string; icon: React.ReactNode; color: string }> = {
-  owner: { label: "Owner", icon: <Crown className="w-3 h-3" />, color: "text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20" },
+  superadmin: { label: "Super Admin", icon: <Crown className="w-3 h-3" />, color: "text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20" },
   admin: { label: "Admin", icon: <ShieldCheck className="w-3 h-3" />, color: "text-blue-600 bg-blue-50 border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20" },
   developer: { label: "Developer", icon: <Code className="w-3 h-3" />, color: "text-emerald-600 bg-emerald-50 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20" },
   specialist: { label: "Social Media Specialist", icon: <Megaphone className="w-3 h-3" />, color: "text-purple-600 bg-purple-50 border-purple-200 dark:bg-purple-500/10 dark:text-purple-400 dark:border-purple-500/20" },
@@ -159,13 +159,13 @@ function EditProfileModal({ member, onClose, onDelete, canDelete }: { member: Te
             {/* Role */}
             <div className="space-y-1">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.08em]">Role</label>
-              {member.role === "owner" ? (
+              {member.role === "superadmin" ? (
                 <div className="h-9 px-3 flex items-center rounded-lg bg-amber-50 dark:bg-amber-500/5 border border-amber-200 dark:border-amber-500/20 text-[13px] text-amber-700 dark:text-amber-400 font-medium">
                   <Crown className="w-3.5 h-3.5 mr-2" />Owner — cannot be reassigned
                 </div>
               ) : (
                 <select value={role} onChange={(e) => setRole(e.target.value as UserRole)} className="w-full h-9 px-3 rounded-lg bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-[13px] text-gray-700 dark:text-gray-300 outline-none cursor-pointer">
-                  {Object.entries(roleConfig).filter(([key]) => key !== "owner").map(([key, conf]) => (
+                  {Object.entries(roleConfig).filter(([key]) => key !== "superadmin").map(([key, conf]) => (
                     <option key={key} value={key}>{conf.label}</option>
                   ))}
                 </select>
@@ -279,11 +279,12 @@ function ComingSoonBadge() {
 // ─── Main Settings Page ───
 export function SettingsPage() {
   const { theme, toggleTheme } = useTheme();
-  const { members, removeMember } = useTeam();
+  const { members, removeMember, pendingRequests, refreshPendingRequests } = useTeam();
   const { currentUser } = useAuth();
   const { addToast } = useToast();
   const currentMember = members.find((m) => m.email === currentUser.email);
-  const isAdmin = currentMember?.role === "owner" || currentMember?.role === "admin";
+  const isAdmin = currentMember?.role === "superadmin" || currentMember?.role === "developer" || currentMember?.role === "admin";
+  const isSuperadmin = currentMember?.role === "superadmin";
   const canViewAudit = isAdmin || currentMember?.secondaryRole?.includes("Approver") || currentMember?.secondaryRole?.includes("Creative Director");
   const { getStatus } = usePresence(currentUser.email);
   const [activeTab, setActiveTab] = useState<"general" | "team" | "audit" | "themes">("general");
@@ -296,15 +297,7 @@ export function SettingsPage() {
   const [inviting, setInviting] = useState(false);
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
   const [activeIntegration, setActiveIntegration] = useState<string | null>(null);
-  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [approving, setApproving] = useState<string | null>(null);
-
-  // Fetch pending access requests (admin only)
-  useEffect(() => {
-    if (!isAdmin) return;
-    supabase.from("signup_requests").select("*").eq("status", "pending").order("created_at", { ascending: false })
-      .then(({ data }) => { if (data) setPendingRequests(data); });
-  }, [isAdmin]);
 
   const handleApprove = async (reqId: string, action: "approve" | "reject", role = "viewer") => {
     setApproving(reqId);
@@ -316,8 +309,8 @@ export function SettingsPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        setPendingRequests((prev) => prev.filter((r) => r.id !== reqId));
-        addToast(action === "approve" ? `Approved — invite sent` : "Request rejected", action === "approve" ? "success" : "info");
+        refreshPendingRequests();
+        addToast(action === "approve" ? `Approved — branded invite sent` : "Request rejected", action === "approve" ? "success" : "info");
       } else {
         addToast(data.error || "Action failed", "error");
       }
@@ -490,8 +483,8 @@ export function SettingsPage() {
             </form>
           )}
 
-          {/* Pending access requests */}
-          {isAdmin && pendingRequests.length > 0 && (
+          {/* Pending access requests — visible to ALL, approve/reject buttons for superadmin ONLY */}
+          {pendingRequests.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-[0.08em] flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
@@ -508,16 +501,19 @@ export function SettingsPage() {
                         {req.reason && <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1 italic">&ldquo;{req.reason}&rdquo;</p>}
                         <p className="text-[9px] text-gray-300 dark:text-gray-600 mt-1">{new Date(req.created_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</p>
                       </div>
-                      <div className="flex gap-1.5 shrink-0">
-                        <button disabled={approving === req.id} onClick={() => handleApprove(req.id, "reject")}
-                          className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-white/[0.08] text-[10px] font-medium text-gray-500 hover:text-red-500 hover:border-red-200 dark:hover:border-red-500/20 transition-colors cursor-pointer disabled:opacity-40">
-                          Reject
-                        </button>
-                        <button disabled={approving === req.id} onClick={() => handleApprove(req.id, "approve", "viewer")}
-                          className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-medium shadow-sm cursor-pointer transition-colors disabled:opacity-40">
-                          {approving === req.id ? "..." : "Approve"}
-                        </button>
-                      </div>
+                      {/* Only superadmin sees approve/reject buttons */}
+                      {isSuperadmin && (
+                        <div className="flex gap-1.5 shrink-0">
+                          <button disabled={approving === req.id} onClick={() => handleApprove(req.id, "reject")}
+                            className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-white/[0.08] text-[10px] font-medium text-gray-500 hover:text-red-500 hover:border-red-200 dark:hover:border-red-500/20 transition-colors cursor-pointer disabled:opacity-40">
+                            Reject
+                          </button>
+                          <button disabled={approving === req.id} onClick={() => handleApprove(req.id, "approve", "viewer")}
+                            className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-medium shadow-sm cursor-pointer transition-colors disabled:opacity-40">
+                            {approving === req.id ? "..." : "Approve"}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -578,9 +574,9 @@ export function SettingsPage() {
           member={editingMember}
           onClose={() => setEditingMember(null)}
           canDelete={
-            editingMember.role !== "owner" &&
+            editingMember.role !== "superadmin" &&
             (currentUser.email !== editingMember.email) &&
-            members.some((m) => m.email === currentUser.email && (m.role === "owner" || m.role === "admin"))
+            members.some((m) => m.email === currentUser.email && (m.role === "superadmin" || m.role === "admin"))
           }
           onDelete={() => { removeMember(editingMember.id); logAudit("system", currentUser.name, "member_removed", `Removed ${editingMember.name} (${editingMember.email})`); addToast(`${editingMember.name} removed from team`, "success"); }}
         />

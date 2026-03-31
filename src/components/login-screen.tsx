@@ -23,8 +23,7 @@ export function LoginScreen() {
     e.preventDefault();
     setError(false);
     setIsLoading(true);
-    await new Promise((r) => setTimeout(r, 400));
-    const success = login(email, password);
+    const success = await login(email, password);
     if (!success) { setError(true); setIsLoading(false); }
   };
 
@@ -76,7 +75,10 @@ export function LoginScreen() {
 
               {/* Password */}
               <motion.div className="space-y-1.5" {...fadeUp(0.14)}>
-                <label className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-[0.1em]">Password</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-[0.1em]">Password</label>
+                  <a href="/auth/forgot-password" className="text-[10px] font-semibold text-[#f59e0b] hover:text-orange-600 transition-colors">Forgot password?</a>
+                </div>
                 <div className="relative">
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300 dark:text-gray-600" />
                   <input
@@ -140,7 +142,7 @@ export function LoginScreen() {
               </button>
             </motion.div>
 
-            {/* Request Access — inside the form block for proper spacing */}
+            {/* Request Access */}
             <motion.p className="text-center text-[12px] text-gray-400 mt-6" {...fadeUp(0.34)}>
               Don&apos;t have an account?{" "}
               <a href="/request-access" className="text-[#f59e0b] hover:text-orange-600 font-semibold transition-colors">Request Access</a>

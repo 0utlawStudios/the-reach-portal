@@ -240,7 +240,7 @@ function AvatarSync() {
 }
 
 export function AppShell() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, currentUser } = useAuth();
   if (!isAuthenticated) return <LoginScreen />;
-  return <ThemeProvider><DashboardLayout /></ThemeProvider>;
+  return <ThemeProvider email={currentUser.email}><DashboardLayout /></ThemeProvider>;
 }
