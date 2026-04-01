@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ─── Approve: createUser + generateLink + branded email ───
-    const role = body.role || "viewer";
+    const role = body.role || "social_media_specialist";
 
     // Clean up any orphaned auth user first
     let page = 1;

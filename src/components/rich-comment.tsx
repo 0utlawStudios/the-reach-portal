@@ -52,7 +52,7 @@ function MentionBadge({ name }: { name: string }) {
               )}
               <div>
                 <p className="text-[13px] font-semibold text-gray-800 dark:text-gray-200">{member.name}</p>
-                <p className="text-[10px] text-gray-400 capitalize">{member.role}{member.secondaryRole ? ` · ${member.secondaryRole.split(" / ")[0]}` : ""}</p>
+                <p className="text-[10px] text-gray-400 capitalize">{member.role.replace(/_/g, " ")}</p>
               </div>
             </div>
 

@@ -4,7 +4,7 @@ import { getTransporter, getFromAddress, getSiteUrl, buildInviteEmailHtml } from
 
 export const maxDuration = 10;
 
-const VALID_ROLES = ["admin", "editor", "viewer", "specialist", "technician", "developer"] as const;
+const VALID_ROLES = ["admin", "approver", "creative_director", "social_media_specialist", "video_editor", "graphic_designer"] as const;
 type ValidRole = (typeof VALID_ROLES)[number];
 
 function getAdminClient() {
@@ -67,8 +67,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized — requester not found in team" }, { status: 403 });
     }
 
-    if (!["superadmin", "developer", "admin"].includes(requester.role)) {
-      return NextResponse.json({ error: "Unauthorized — only superadmins, developers, and admins can invite members" }, { status: 403 });
+    if (!["superadmin", "admin"].includes(requester.role)) {
+      return NextResponse.json({ error: "Unauthorized — only superadmins and admins can invite members" }, { status: 403 });
     }
 
     // ─── Check if email already exists in team ───

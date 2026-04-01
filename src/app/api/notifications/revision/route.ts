@@ -51,11 +51,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Find all Creative Directors
+    // Find all Creative Directors and Approvers
     const { data: directors } = await admin
       .from("team_members")
-      .select("email, secondary_role")
-      .like("secondary_role", "%Creative Director%");
+      .select("email, role")
+      .in("role", ["creative_director", "approver"]);
 
     if (directors) {
       for (const d of directors) {

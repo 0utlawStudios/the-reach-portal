@@ -35,9 +35,7 @@ export function AssetReviewDrawer() {
   const userIsApprover = useMemo(() => {
     const me = members.find((m) => m.email === currentUser.email);
     if (!me) return false;
-    if (me.role === "superadmin" || me.role === "admin") return true;
-    if (me.secondaryRole?.includes("Approver")) return true;
-    return false;
+    return ["superadmin", "admin", "approver", "creative_director"].includes(me.role);
   }, [members, currentUser.email]);
   const [revisionMode, setRevisionMode] = useState(false);
   const [revisionFeedback, setRevisionFeedback] = useState("");

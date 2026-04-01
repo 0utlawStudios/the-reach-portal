@@ -53,11 +53,8 @@ function sortForColumn(cards: ContentCardType[], stage: PipelineStage): ContentC
 // ─── RBAC: columns that require Approver ───
 const APPROVER_COLUMNS: PipelineStage[] = ["approved_scheduled", "posted"];
 
-function isApprover(role: string, secondaryRole?: string): boolean {
-  if (role === "superadmin") return true;
-  if (role === "admin") return true;
-  if (secondaryRole?.includes("Approver")) return true;
-  return false;
+function isApprover(role: string): boolean {
+  return ["superadmin", "admin", "approver", "creative_director"].includes(role);
 }
 
 export function KanbanBoard() {
@@ -100,7 +97,7 @@ export function KanbanBoard() {
     [members, currentUser.email]
   );
   const userIsApprover = useMemo(
-    () => currentMember ? isApprover(currentMember.role, currentMember.secondaryRole) : false,
+    () => currentMember ? isApprover(currentMember.role) : false,
     [currentMember]
   );
 

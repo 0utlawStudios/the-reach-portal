@@ -91,7 +91,7 @@ export function MentionTextarea({ value, onChange, placeholder, className, rows 
               )}
               <div>
                 <p className="text-[12px] font-medium text-gray-800 dark:text-gray-200">{member.name}</p>
-                <p className="text-[9px] text-gray-400">{member.role}{member.secondaryRole ? ` · ${member.secondaryRole}` : ""}</p>
+                <p className="text-[9px] text-gray-400 capitalize">{member.role.replace(/_/g, " ")}</p>
               </div>
             </button>
           ))}

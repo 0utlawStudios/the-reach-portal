@@ -27,11 +27,11 @@ import {
 const roleConfig: Record<UserRole, { label: string; icon: React.ReactNode; color: string }> = {
   superadmin: { label: "Super Admin", icon: <Crown className="w-3 h-3" />, color: "text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20" },
   admin: { label: "Admin", icon: <ShieldCheck className="w-3 h-3" />, color: "text-blue-600 bg-blue-50 border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20" },
-  developer: { label: "Developer", icon: <Code className="w-3 h-3" />, color: "text-emerald-600 bg-emerald-50 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20" },
-  specialist: { label: "Social Media Specialist", icon: <Megaphone className="w-3 h-3" />, color: "text-purple-600 bg-purple-50 border-purple-200 dark:bg-purple-500/10 dark:text-purple-400 dark:border-purple-500/20" },
-  editor: { label: "Editor", icon: <Pencil className="w-3 h-3" />, color: "text-green-600 bg-green-50 border-green-200 dark:bg-green-500/10 dark:text-green-400 dark:border-green-500/20" },
-  viewer: { label: "Viewer", icon: <Eye className="w-3 h-3" />, color: "text-gray-500 bg-gray-50 border-gray-200 dark:bg-white/[0.04] dark:text-gray-400 dark:border-white/[0.08]" },
-  technician: { label: "Field Tech", icon: <ShieldCheck className="w-3 h-3" />, color: "text-sky-600 bg-sky-50 border-sky-200 dark:bg-sky-500/10 dark:text-sky-400 dark:border-sky-500/20" },
+  approver: { label: "Approver", icon: <CheckCircle className="w-3 h-3" />, color: "text-emerald-600 bg-emerald-50 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20" },
+  creative_director: { label: "Creative Director", icon: <Eye className="w-3 h-3" />, color: "text-violet-600 bg-violet-50 border-violet-200 dark:bg-violet-500/10 dark:text-violet-400 dark:border-violet-500/20" },
+  social_media_specialist: { label: "Social Media Specialist", icon: <Megaphone className="w-3 h-3" />, color: "text-purple-600 bg-purple-50 border-purple-200 dark:bg-purple-500/10 dark:text-purple-400 dark:border-purple-500/20" },
+  video_editor: { label: "Video Editor", icon: <Pencil className="w-3 h-3" />, color: "text-orange-600 bg-orange-50 border-orange-200 dark:bg-orange-500/10 dark:text-orange-400 dark:border-orange-500/20" },
+  graphic_designer: { label: "Graphic Designer", icon: <Palette className="w-3 h-3" />, color: "text-pink-600 bg-pink-50 border-pink-200 dark:bg-pink-500/10 dark:text-pink-400 dark:border-pink-500/20" },
 };
 
 // ─── Edit Profile Modal ───
@@ -47,16 +47,6 @@ function EditProfileModal({ member, onClose, onDelete, canDelete }: { member: Te
   const [avatarUrl, setAvatarUrl] = useState(member.avatar || "");
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [secondaryRoles, setSecondaryRoles] = useState<string[]>(
-    member.secondaryRole ? member.secondaryRole.split(" / ") : []
-  );
-
-  const availableSecondary = ["Approver", "Developer", "Lead Tech", "Social Media Specialist", "Content Creator", "Project Manager"];
-  const unusedRoles = availableSecondary.filter((r) => !secondaryRoles.includes(r));
-
-  const addSecondaryRole = (r: string) => setSecondaryRoles((prev) => [...prev, r]);
-  const removeSecondaryRole = (r: string) => setSecondaryRoles((prev) => prev.filter((x) => x !== r));
-
   // Avatar crop flow
   const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
 
@@ -93,7 +83,7 @@ function EditProfileModal({ member, onClose, onDelete, canDelete }: { member: Te
 
   const handleSave = () => {
     const roleChanged = role !== member.role;
-    updateMember(member.id, { name, email, phone: phone || undefined, role, avatar: avatarUrl || undefined, secondaryRole: secondaryRoles.length > 0 ? secondaryRoles.join(" / ") : undefined });
+    updateMember(member.id, { name, email, phone: phone || undefined, role, avatar: avatarUrl || undefined });
     if (member.email === currentUser.email) {
       updateCurrentUserAvatar(avatarUrl || undefined);
     }
@@ -168,38 +158,6 @@ function EditProfileModal({ member, onClose, onDelete, canDelete }: { member: Te
                   {Object.entries(roleConfig).filter(([key]) => key !== "superadmin").map(([key, conf]) => (
                     <option key={key} value={key}>{conf.label}</option>
                   ))}
-                </select>
-              )}
-            </div>
-
-            {/* Additional Roles */}
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.08em]">Additional Roles</label>
-              {secondaryRoles.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {secondaryRoles.map((r) => {
-                    const badgeColor =
-                      r === "Developer" ? "text-emerald-600 bg-emerald-50 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400" :
-                      r === "Approver" ? "text-violet-600 bg-violet-50 border-violet-200 dark:bg-violet-500/10 dark:text-violet-400" :
-                      r === "Lead Tech" ? "text-sky-600 bg-sky-50 border-sky-200 dark:bg-sky-500/10 dark:text-sky-400" :
-                      "text-gray-600 bg-gray-50 border-gray-200 dark:bg-white/[0.04] dark:text-gray-400";
-                    return (
-                      <span key={r} className={`inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-lg border ${badgeColor}`}>
-                        {r}
-                        <button onClick={() => removeSecondaryRole(r)} className="ml-0.5 text-gray-400 hover:text-red-500 cursor-pointer transition-colors"><X className="w-3 h-3" /></button>
-                      </span>
-                    );
-                  })}
-                </div>
-              )}
-              {unusedRoles.length > 0 && (
-                <select
-                  onChange={(e) => { if (e.target.value) { addSecondaryRole(e.target.value); e.target.value = ""; } }}
-                  defaultValue=""
-                  className="w-full h-9 px-3 rounded-lg bg-gray-50 dark:bg-white/[0.04] border border-dashed border-gray-300 dark:border-white/[0.1] text-[12px] text-gray-500 dark:text-gray-400 outline-none cursor-pointer"
-                >
-                  <option value="" disabled>+ Add another role...</option>
-                  {unusedRoles.map((r) => <option key={r} value={r}>{r}</option>)}
                 </select>
               )}
             </div>
@@ -283,9 +241,9 @@ export function SettingsPage() {
   const { currentUser } = useAuth();
   const { addToast } = useToast();
   const currentMember = members.find((m) => m.email === currentUser.email);
-  const isAdmin = currentMember?.role === "superadmin" || currentMember?.role === "developer" || currentMember?.role === "admin";
+  const isAdmin = currentMember?.role === "superadmin" || currentMember?.role === "admin";
   const isSuperadmin = currentMember?.role === "superadmin";
-  const canViewAudit = isAdmin || currentMember?.secondaryRole?.includes("Approver") || currentMember?.secondaryRole?.includes("Creative Director");
+  const canViewAudit = isAdmin || currentMember?.role === "approver" || currentMember?.role === "creative_director";
   const { getStatus } = usePresence(currentUser.email);
   const [activeTab, setActiveTab] = useState<"general" | "team" | "audit" | "themes">("general");
   const [auditLogs, setAuditLogs] = useState<AuditEntry[]>([]);
@@ -293,13 +251,13 @@ export function SettingsPage() {
   const [showInvite, setShowInvite] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteName, setInviteName] = useState("");
-  const [inviteRole, setInviteRole] = useState<UserRole>("viewer");
+  const [inviteRole, setInviteRole] = useState<UserRole>("social_media_specialist");
   const [inviting, setInviting] = useState(false);
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
   const [activeIntegration, setActiveIntegration] = useState<string | null>(null);
   const [approving, setApproving] = useState<string | null>(null);
 
-  const handleApprove = async (reqId: string, action: "approve" | "reject", role = "viewer") => {
+  const handleApprove = async (reqId: string, action: "approve" | "reject", role = "social_media_specialist") => {
     setApproving(reqId);
     try {
       const res = await fetch("/api/team/approve-request", {
@@ -482,7 +440,7 @@ export function SettingsPage() {
               <Input type="email" placeholder="email@example.com" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} className="h-9 bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[12px] text-gray-800 dark:text-gray-200" />
               <div className="flex gap-2">
                 <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value as UserRole)} className="h-9 px-3 rounded-lg bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-[12px] text-gray-600 dark:text-gray-300 outline-none cursor-pointer flex-1">
-                  <option value="viewer">Viewer</option><option value="editor">Editor</option><option value="specialist">Specialist</option><option value="technician">Field Tech</option><option value="admin">Admin</option>
+                  <option value="social_media_specialist">Social Media Specialist</option><option value="video_editor">Video Editor</option><option value="graphic_designer">Graphic Designer</option><option value="approver">Approver</option><option value="creative_director">Creative Director</option><option value="admin">Admin</option>
                 </select>
                 <Button type="submit" size="sm" disabled={inviting || !inviteEmail.trim() || !inviteName.trim()} className="h-9 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-[12px] px-5 cursor-pointer shadow-sm disabled:opacity-40">
                   {inviting ? <span className="flex items-center gap-1.5"><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Sending...</span> : <><Send className="w-3 h-3 mr-1.5" />Send Invite</>}
@@ -516,7 +474,7 @@ export function SettingsPage() {
                             className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-white/[0.08] text-[10px] font-medium text-gray-500 hover:text-red-500 hover:border-red-200 dark:hover:border-red-500/20 transition-colors cursor-pointer disabled:opacity-40">
                             Reject
                           </button>
-                          <button disabled={approving === req.id} onClick={() => handleApprove(req.id, "approve", "viewer")}
+                          <button disabled={approving === req.id} onClick={() => handleApprove(req.id, "approve", "social_media_specialist")}
                             className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-medium shadow-sm cursor-pointer transition-colors disabled:opacity-40">
                             {approving === req.id ? "..." : "Approve"}
                           </button>
@@ -554,14 +512,6 @@ export function SettingsPage() {
                     <p className="text-[11px] text-gray-400 mt-0.5">{member.email}{member.phone ? ` · ${member.phone}` : ""}</p>
                     <div className="flex flex-wrap items-center gap-1.5 mt-2">
                       <Badge variant="outline" className={`text-[10px] h-5 px-2 border ${role?.color || "text-gray-500 bg-gray-50 border-gray-200"}`}>{role?.icon}<span className="ml-1">{role?.label || member.role}</span></Badge>
-                      {member.secondaryRole && member.secondaryRole.split(" / ").map((badge) => {
-                        const badgeColor =
-                          badge === "Developer" ? "text-emerald-600 bg-emerald-50 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20" :
-                          badge === "Approver" ? "text-violet-600 bg-violet-50 border-violet-200 dark:bg-violet-500/10 dark:text-violet-400 dark:border-violet-500/20" :
-                          badge === "Lead Tech" ? "text-sky-600 bg-sky-50 border-sky-200 dark:bg-sky-500/10 dark:text-sky-400 dark:border-sky-500/20" :
-                          "text-gray-500 bg-gray-50 border-gray-200 dark:bg-white/[0.04] dark:text-gray-400 dark:border-white/[0.08]";
-                        return <Badge key={badge} variant="outline" className={`text-[10px] h-5 px-2 border ${badgeColor}`}>{badge}</Badge>;
-                      })}
                       {member.status === "pending" && (
                         <Badge variant="outline" className="text-[10px] h-5 px-2 border text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20 animate-pulse">
                           <Mail className="w-2.5 h-2.5 mr-1" />Pending Invite

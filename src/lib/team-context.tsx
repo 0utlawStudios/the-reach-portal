@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useCallback, useMemo, useEffect, u
 import { loadState, saveState } from "./persistence";
 import { supabase } from "./supabaseClient";
 
-export type UserRole = "superadmin" | "developer" | "admin" | "editor" | "viewer" | "specialist" | "technician";
+export type UserRole = "superadmin" | "admin" | "approver" | "creative_director" | "social_media_specialist" | "video_editor" | "graphic_designer";
 export type InviteStatus = "active" | "pending";
 
 export interface TeamMember {

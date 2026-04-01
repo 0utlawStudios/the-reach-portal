@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
       .eq("email", body.requestedBy)
       .single();
 
-    if (!requester || !["superadmin", "developer", "admin"].includes(requester.role)) {
+    if (!requester || !["superadmin", "admin"].includes(requester.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
