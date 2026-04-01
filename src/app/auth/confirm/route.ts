@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
+const VALID_TYPES = ["invite", "recovery", "magiclink", "signup", "email"] as const;
+
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const tokenHash = searchParams.get("token_hash");
@@ -10,6 +12,11 @@ export async function GET(request: NextRequest) {
 
   if (!tokenHash || !type) {
     return NextResponse.redirect(`${siteUrl}?error=missing_token`);
+  }
+
+  // Reject unknown types
+  if (!VALID_TYPES.includes(type as any)) {
+    return NextResponse.redirect(`${siteUrl}?error=invalid_type`);
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -35,19 +42,22 @@ export async function GET(request: NextRequest) {
   const accessToken = data?.session?.access_token;
   const refreshToken = data?.session?.refresh_token;
 
+  if (!accessToken) {
+    return NextResponse.redirect(`${siteUrl}?error=no_session`);
+  }
+
   // Route based on type — pass both tokens so client can establish a full session
-  if (type === "invite" && accessToken) {
-    const params = new URLSearchParams({ access_token: accessToken });
-    if (refreshToken) params.set("refresh_token", refreshToken);
+  const params = new URLSearchParams({ access_token: accessToken });
+  if (refreshToken) params.set("refresh_token", refreshToken);
+
+  if (type === "invite") {
     return NextResponse.redirect(`${siteUrl}/auth/setup?${params.toString()}`);
   }
 
-  if (type === "recovery" && accessToken) {
-    const params = new URLSearchParams({ access_token: accessToken });
-    if (refreshToken) params.set("refresh_token", refreshToken);
+  if (type === "recovery") {
     return NextResponse.redirect(`${siteUrl}/auth/reset-password?${params.toString()}`);
   }
 
-  // Default: redirect to dashboard
-  return NextResponse.redirect(`${siteUrl}?invite=accepted`);
+  // All other valid types → dashboard
+  return NextResponse.redirect(`${siteUrl}`);
 }

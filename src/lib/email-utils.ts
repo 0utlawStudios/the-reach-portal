@@ -3,11 +3,14 @@ import nodemailer from "nodemailer";
 // ─── Shared Utilities ───
 
 export function getTransporter() {
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  if (!user || !pass) throw new Error("SMTP_USER and SMTP_PASS must be set");
   return nodemailer.createTransport({
     host: process.env.SMTP_HOST || "smtp.gmail.com",
     port: Number(process.env.SMTP_PORT || 465),
     secure: true,
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    auth: { user, pass },
   });
 }
 
@@ -17,6 +20,17 @@ export function getFromAddress() {
 
 export function getSiteUrl() {
   return process.env.NEXT_PUBLIC_SITE_URL || "https://ten80tensmm.vercel.app";
+}
+
+// ─── HTML Escaping (prevent XSS injection) ───
+
+function esc(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 // ─── Shared HTML Wrapper ───
@@ -38,11 +52,11 @@ ${content}
 }
 
 function ctaButton(label: string, url: string, gradient = "background:linear-gradient(135deg,#ea580c,#f59e0b);") {
-  return `<a href="${url}" style="display:inline-block;${gradient}color:#fff;text-decoration:none;padding:16px 48px;border-radius:12px;font-size:15px;font-weight:800;letter-spacing:0.02em;">${label}</a>`;
+  return `<a href="${esc(url)}" style="display:inline-block;${gradient}color:#fff;text-decoration:none;padding:16px 48px;border-radius:12px;font-size:15px;font-weight:800;letter-spacing:0.02em;">${esc(label)}</a>`;
 }
 
 function roleBadge(role: string) {
-  return `<span style="display:inline-block;background:#f59e0b22;color:#f59e0b;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;text-transform:capitalize;">${role}</span>`;
+  return `<span style="display:inline-block;background:#f59e0b22;color:#f59e0b;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;text-transform:capitalize;">${esc(role)}</span>`;
 }
 
 // ─── Template 1: Invite Email ───
@@ -55,7 +69,7 @@ export function buildInviteEmailHtml(name: string, role: string, confirmUrl: str
   <p style="color:rgba(255,255,255,0.8);font-size:13px;margin:8px 0 0;">Join the Ten80Ten content team</p>
 </div>
 <div style="background:#fff;padding:32px;">
-  <p style="color:#111;font-size:15px;line-height:1.6;margin:0 0 16px;">Hi <strong>${name}</strong>,</p>
+  <p style="color:#111;font-size:15px;line-height:1.6;margin:0 0 16px;">Hi <strong>${esc(name)}</strong>,</p>
   <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 16px;">You've been invited to join the <strong>Ten80Ten</strong> Social Media Management Portal as:</p>
   <div style="text-align:center;margin:12px 0;">${roleBadge(role)}</div>
   <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 24px;">Click the button below to set up your password and complete your profile.</p>
@@ -74,7 +88,7 @@ export function buildApprovalEmailHtml(name: string, role: string, confirmUrl: s
   <p style="color:rgba(255,255,255,0.8);font-size:13px;margin:8px 0 0;">Welcome to the Ten80Ten team</p>
 </div>
 <div style="background:#fff;padding:32px;">
-  <p style="color:#111;font-size:15px;line-height:1.6;margin:0 0 16px;">Hi <strong>${name}</strong>,</p>
+  <p style="color:#111;font-size:15px;line-height:1.6;margin:0 0 16px;">Hi <strong>${esc(name)}</strong>,</p>
   <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 16px;">Great news! Your access request has been approved. You've been assigned the role:</p>
   <div style="text-align:center;margin:12px 0;">${roleBadge(role)}</div>
   <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 24px;">Click below to set up your account and start using the portal.</p>
@@ -105,10 +119,10 @@ export function buildPasswordResetEmailHtml(confirmUrl: string) {
 export function buildAdminNotificationHtml(requester: { name: string; email: string; phone?: string | null; company?: string | null; reason?: string | null }) {
   const siteUrl = getSiteUrl();
   const rows = [
-    `<tr><td style="padding:6px 16px 6px 0;color:#9ca3af;font-size:13px;">Email</td><td style="font-size:13px;color:#374151;">${requester.email}</td></tr>`,
-    requester.phone ? `<tr><td style="padding:6px 16px 6px 0;color:#9ca3af;font-size:13px;">WhatsApp</td><td style="font-size:13px;color:#374151;">${requester.phone}</td></tr>` : "",
-    requester.company ? `<tr><td style="padding:6px 16px 6px 0;color:#9ca3af;font-size:13px;">Company</td><td style="font-size:13px;color:#374151;">${requester.company}</td></tr>` : "",
-    requester.reason ? `<tr><td style="padding:6px 16px 6px 0;color:#9ca3af;font-size:13px;">Reason</td><td style="font-size:13px;color:#374151;">${requester.reason}</td></tr>` : "",
+    `<tr><td style="padding:6px 16px 6px 0;color:#9ca3af;font-size:13px;">Email</td><td style="font-size:13px;color:#374151;">${esc(requester.email)}</td></tr>`,
+    requester.phone ? `<tr><td style="padding:6px 16px 6px 0;color:#9ca3af;font-size:13px;">WhatsApp</td><td style="font-size:13px;color:#374151;">${esc(requester.phone)}</td></tr>` : "",
+    requester.company ? `<tr><td style="padding:6px 16px 6px 0;color:#9ca3af;font-size:13px;">Company</td><td style="font-size:13px;color:#374151;">${esc(requester.company)}</td></tr>` : "",
+    requester.reason ? `<tr><td style="padding:6px 16px 6px 0;color:#9ca3af;font-size:13px;">Reason</td><td style="font-size:13px;color:#374151;">${esc(requester.reason)}</td></tr>` : "",
   ].filter(Boolean).join("");
 
   return wrapEmail(`
@@ -116,7 +130,7 @@ export function buildAdminNotificationHtml(requester: { name: string; email: str
   <p style="color:#f59e0b;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin:0;">New Access Request</p>
 </div>
 <div style="background:#fff;padding:32px;">
-  <p style="color:#111;font-size:15px;line-height:1.6;margin:0 0 16px;"><strong>${requester.name}</strong> is requesting access to the portal.</p>
+  <p style="color:#111;font-size:15px;line-height:1.6;margin:0 0 16px;"><strong>${esc(requester.name)}</strong> is requesting access to the portal.</p>
   <table style="margin:16px 0 24px;">${rows}</table>
   <div style="text-align:center;">${ctaButton("Review in Portal", siteUrl)}</div>
 </div>`);

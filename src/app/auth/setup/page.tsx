@@ -33,10 +33,14 @@ export default function SetupPasswordPage() {
       if (accessToken) {
         // Establish a proper Supabase session
         const supabase = getSupabase();
-        await supabase.auth.setSession({
+        const { error: sessionErr } = await supabase.auth.setSession({
           access_token: accessToken,
           refresh_token: refreshToken || "",
         });
+        if (sessionErr) {
+          setError("Session expired or invalid. Please request a new invite link.");
+          return;
+        }
         setReady(true);
 
         // Extract invite metadata from JWT

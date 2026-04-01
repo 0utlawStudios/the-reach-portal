@@ -35,8 +35,12 @@ export default function RequestAccessPage() {
           reason: reason.trim() || null,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error || "Request failed"); setLoading(false); return; }
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || "Request failed. Please try again.");
+        setLoading(false);
+        return;
+      }
       setSuccess(true);
     } catch {
       setError("Network error. Please try again.");

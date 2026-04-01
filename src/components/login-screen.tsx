@@ -16,15 +16,21 @@ export function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(false);
+    setError("");
     setIsLoading(true);
-    const success = await login(email, password);
-    if (!success) { setError(true); setIsLoading(false); }
+    const err = await login(email, password);
+    if (err) {
+      const msg = err.includes("Invalid login") ? "Invalid email or password."
+        : err.includes("Email not confirmed") ? "Your account hasn't been set up yet. Check your email for the invite link."
+        : err;
+      setError(msg);
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -60,7 +66,7 @@ export function LoginScreen() {
                     type="email"
                     placeholder="you@company.com"
                     value={email}
-                    onChange={(e) => { setEmail(e.target.value); setError(false); }}
+                    onChange={(e) => { setEmail(e.target.value); setError(""); }}
                     className="w-full h-12 pl-11 pr-4 rounded-xl bg-slate-50 dark:bg-white/[0.04] border border-gray-200/80 dark:border-white/[0.08] text-[14px] text-gray-900 dark:text-gray-100 placeholder:text-gray-300 dark:placeholder:text-gray-600 outline-none focus:bg-white dark:focus:bg-white/[0.06] focus:border-[#f59e0b] focus:ring-2 focus:ring-[#f59e0b]/20 transition-all"
                     autoFocus
                   />
@@ -79,7 +85,7 @@ export function LoginScreen() {
                     type={showPassword ? "text" : "password"}
                     placeholder="Enter your password"
                     value={password}
-                    onChange={(e) => { setPassword(e.target.value); setError(false); }}
+                    onChange={(e) => { setPassword(e.target.value); setError(""); }}
                     className="w-full h-12 pl-11 pr-11 rounded-xl bg-slate-50 dark:bg-white/[0.04] border border-gray-200/80 dark:border-white/[0.08] text-[14px] text-gray-900 dark:text-gray-100 placeholder:text-gray-300 dark:placeholder:text-gray-600 outline-none focus:bg-white dark:focus:bg-white/[0.06] focus:border-[#f59e0b] focus:ring-2 focus:ring-[#f59e0b]/20 transition-all"
                   />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 dark:text-gray-600 hover:text-gray-500 cursor-pointer transition-colors">
@@ -96,7 +102,7 @@ export function LoginScreen() {
                   className="flex items-center gap-2 bg-red-50 dark:bg-red-500/5 border border-red-200 dark:border-red-500/20 rounded-xl px-3.5 py-2.5"
                 >
                   <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
-                  <span className="text-[12px] text-red-600 dark:text-red-400">Invalid credentials. Please try again.</span>
+                  <span className="text-[12px] text-red-600 dark:text-red-400">{error}</span>
                 </motion.div>
               )}
 

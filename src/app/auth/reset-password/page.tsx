@@ -30,15 +30,19 @@ export default function ResetPasswordPage() {
       const params = new URLSearchParams(window.location.search);
       const accessToken = params.get("access_token");
       const refreshToken = params.get("refresh_token");
-      if (accessToken && refreshToken) {
+      if (accessToken) {
         const supabase = getSupabase();
-        await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+        const { error: sessionErr } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken || "",
+        });
+        if (sessionErr) {
+          setError("Reset link expired or invalid. Please request a new one.");
+          return;
+        }
         setReady(true);
-      } else if (accessToken) {
-        // Fallback: try setSession with empty refresh token
-        const supabase = getSupabase();
-        await supabase.auth.setSession({ access_token: accessToken, refresh_token: "" });
-        setReady(true);
+      } else {
+        setError("Missing reset token. Please use the link from your email.");
       }
     }
     initSession();
@@ -77,7 +81,7 @@ export default function ResetPasswordPage() {
               </div>
               <h1 className="text-[24px] font-extrabold text-gray-900 dark:text-white tracking-[-0.03em]">Password updated!</h1>
               <p className="text-[14px] text-gray-500 dark:text-gray-400 leading-relaxed">
-                Your password has been reset successfully. Redirecting to login...
+                Your password has been reset successfully. Redirecting...
               </p>
               <div className="w-8 h-8 mx-auto border-3 border-gray-200 border-t-orange-500 rounded-full animate-spin" />
             </div>

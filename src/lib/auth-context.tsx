@@ -15,7 +15,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   currentUser: UserProfile;
   updateCurrentUserAvatar: (avatar: string | undefined) => void;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<string | null>;
   logout: () => void;
 }
 
@@ -122,12 +122,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => { subscription.unsubscribe(); };
   }, []);
 
-  const login = useCallback(async (email: string, password: string): Promise<boolean> => {
+  const login = useCallback(async (email: string, password: string): Promise<string | null> => {
     const { data, error } = await supabase.auth.signInWithPassword({
       email: email.toLowerCase().trim(),
       password,
     });
-    if (error || !data.session) return false;
+    if (error) return error.message;
+    if (!data.session) return "No session returned";
 
     const userEmail = data.user?.email || email;
     const meta = data.user?.user_metadata || {};
@@ -135,7 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     profile = await enrichFromTeamMembers(userEmail, profile);
     setCurrentUser(profile);
     setIsAuthenticated(true);
-    return true;
+    return null;
   }, []);
 
   const logout = useCallback(async () => {
