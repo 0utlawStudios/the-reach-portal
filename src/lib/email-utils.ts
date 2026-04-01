@@ -43,8 +43,7 @@ function wrapEmail(content: string) {
 <div style="max-width:540px;margin:40px auto;border-radius:16px;overflow:hidden;background:#ffffff;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
 ${content}
 <div style="padding:24px 32px;text-align:center;background:#fafafa;border-top:1px solid #f0f0f0;">
-  <p style="color:#999;font-size:11px;margin:0;">Ten80Ten &mdash; Social Media Management Portal</p>
-  <p style="color:#bbb;font-size:10px;margin:6px 0 0;">Developed by Aldridge</p>
+  <p style="color:#999;font-size:11px;margin:0;">Ten80Ten Social Media Management Portal</p>
 </div>
 </div>
 </body>
@@ -66,7 +65,7 @@ export function buildInviteEmailHtml(name: string, role: string, confirmUrl: str
 <div style="background:linear-gradient(135deg,#ea580c,#f59e0b);padding:32px;text-align:center;">
   <div style="width:56px;height:56px;margin:0 auto 16px;background:rgba(255,255,255,0.2);border-radius:14px;line-height:56px;font-size:24px;font-weight:900;color:#fff;">T</div>
   <h1 style="color:#fff;font-size:22px;font-weight:800;margin:0;">You're Invited!</h1>
-  <p style="color:rgba(255,255,255,0.8);font-size:13px;margin:8px 0 0;">Join the Ten80Ten content team</p>
+  <p style="color:rgba(255,255,255,0.8);font-size:13px;margin:8px 0 0;">Join Ten80Ten Creative Design team</p>
 </div>
 <div style="background:#fff;padding:32px;">
   <p style="color:#111;font-size:15px;line-height:1.6;margin:0 0 16px;">Hi <strong>${esc(name)}</strong>,</p>
