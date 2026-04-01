@@ -9,12 +9,10 @@ const ease = [0.25, 0.4, 0.25, 1] as const;
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.07, delayChildren: 0.1 } } };
 const fadeUp = { hidden: { opacity: 0, y: 18 }, show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: ease as unknown as [number, number, number, number] } } };
 
-function getSupabase(accessToken?: string) {
+function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  return createClient(url, key, {
-    global: accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : undefined,
-  });
+  return createClient(url, key);
 }
 
 export default function ResetPasswordPage() {
@@ -24,23 +22,37 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
 
+  // Establish a proper Supabase session from URL tokens
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get("access_token");
-    if (token) setAccessToken(token);
+    async function initSession() {
+      const params = new URLSearchParams(window.location.search);
+      const accessToken = params.get("access_token");
+      const refreshToken = params.get("refresh_token");
+      if (accessToken && refreshToken) {
+        const supabase = getSupabase();
+        await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+        setReady(true);
+      } else if (accessToken) {
+        // Fallback: try setSession with empty refresh token
+        const supabase = getSupabase();
+        await supabase.auth.setSession({ access_token: accessToken, refresh_token: "" });
+        setReady(true);
+      }
+    }
+    initSession();
   }, []);
 
   const isValid = password.length >= 8 && password === confirm;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isValid || loading || !accessToken) return;
+    if (!isValid || loading || !ready) return;
     setLoading(true);
     setError("");
 
-    const supabase = getSupabase(accessToken);
+    const supabase = getSupabase();
     const { error: pwError } = await supabase.auth.updateUser({ password });
 
     if (pwError) {

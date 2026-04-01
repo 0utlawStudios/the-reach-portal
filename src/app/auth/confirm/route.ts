@@ -32,17 +32,20 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${siteUrl}?error=invalid_token`);
   }
 
-  const token = data?.session?.access_token;
+  const accessToken = data?.session?.access_token;
+  const refreshToken = data?.session?.refresh_token;
 
-  // Route based on type
-  if (type === "invite" && token) {
-    // Invite → profile setup page
-    return NextResponse.redirect(`${siteUrl}/auth/setup?access_token=${token}`);
+  // Route based on type — pass both tokens so client can establish a full session
+  if (type === "invite" && accessToken) {
+    const params = new URLSearchParams({ access_token: accessToken });
+    if (refreshToken) params.set("refresh_token", refreshToken);
+    return NextResponse.redirect(`${siteUrl}/auth/setup?${params.toString()}`);
   }
 
-  if (type === "recovery" && token) {
-    // Password recovery → reset password page (NOT the login screen)
-    return NextResponse.redirect(`${siteUrl}/auth/reset-password?access_token=${token}`);
+  if (type === "recovery" && accessToken) {
+    const params = new URLSearchParams({ access_token: accessToken });
+    if (refreshToken) params.set("refresh_token", refreshToken);
+    return NextResponse.redirect(`${siteUrl}/auth/reset-password?${params.toString()}`);
   }
 
   // Default: redirect to dashboard

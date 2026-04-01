@@ -4,12 +4,10 @@ import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { Lock, CheckCircle, AlertCircle, Eye, EyeOff, User, Phone, Shield } from "lucide-react";
 
-function getSupabase(accessToken?: string) {
+function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  return createClient(url, key, {
-    global: accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : undefined,
-  });
+  return createClient(url, key);
 }
 
 export default function SetupPasswordPage() {
@@ -24,28 +22,40 @@ export default function SetupPasswordPage() {
   const [success, setSuccess] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("");
-  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get("access_token");
-    if (token) {
-      setAccessToken(token);
-      try {
-        const payload = JSON.parse(atob(token.split(".")[1]));
-        const meta = payload.user_metadata || {};
-        setInviteEmail(payload.email || meta.email || "");
-        setInviteRole(meta.role || "");
-        // Pre-fill name if provided during invite
-        const name = meta.name || "";
-        if (name.includes(" ")) {
-          setFirstName(name.split(" ")[0]);
-          setLastName(name.split(" ").slice(1).join(" "));
-        } else {
-          setFirstName(name);
-        }
-      } catch { /* ignore */ }
+    async function initSession() {
+      const params = new URLSearchParams(window.location.search);
+      const accessToken = params.get("access_token");
+      const refreshToken = params.get("refresh_token");
+
+      if (accessToken) {
+        // Establish a proper Supabase session
+        const supabase = getSupabase();
+        await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken || "",
+        });
+        setReady(true);
+
+        // Extract invite metadata from JWT
+        try {
+          const payload = JSON.parse(atob(accessToken.split(".")[1]));
+          const meta = payload.user_metadata || {};
+          setInviteEmail(payload.email || meta.email || "");
+          setInviteRole(meta.role || "");
+          const name = meta.name || "";
+          if (name.includes(" ")) {
+            setFirstName(name.split(" ")[0]);
+            setLastName(name.split(" ").slice(1).join(" "));
+          } else {
+            setFirstName(name);
+          }
+        } catch { /* ignore */ }
+      }
     }
+    initSession();
   }, []);
 
   const isValid = firstName.trim() && lastName.trim() && password.length >= 8 && password === confirm;
@@ -54,13 +64,13 @@ export default function SetupPasswordPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isValid || loading || !accessToken) return;
+    if (!isValid || loading || !ready) return;
     setLoading(true);
     setError("");
 
     const fullName = `${firstName.trim()} ${lastName.trim()}`;
     const cleanPhone = whatsapp.trim().replace(/[^0-9+]/g, "");
-    const supabase = getSupabase(accessToken);
+    const supabase = getSupabase();
 
     // Update password
     const { error: pwError } = await supabase.auth.updateUser({
@@ -77,7 +87,7 @@ export default function SetupPasswordPage() {
     }
 
     // Get user email
-    const { data: { user } } = await supabase.auth.getUser(accessToken);
+    const { data: { user } } = await supabase.auth.getUser();
 
     // Update team_members: status → active, name, phone
     if (user?.email) {
