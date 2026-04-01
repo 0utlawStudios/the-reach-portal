@@ -31,11 +31,50 @@ function getInitials(name: string): string {
     .slice(0, 2);
 }
 
+/** Capitalize each word: "aldridge dagos" → "Aldridge Dagos" */
+function capitalize(str: string): string {
+  return str.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 const DEFAULT_USER: UserProfile = {
   name: "Guest",
   email: "",
   initials: "G",
 };
+
+/** Build a profile from auth metadata, with proper capitalization */
+function buildProfile(email: string, meta: Record<string, any>): UserProfile {
+  const rawName = meta.name || email.split("@")[0] || "User";
+  const name = capitalize(rawName);
+  return {
+    name,
+    email,
+    initials: getInitials(name),
+    role: meta.role,
+  };
+}
+
+/** Enrich profile with team_members data (real name, role, avatar) */
+async function enrichFromTeamMembers(email: string, profile: UserProfile): Promise<UserProfile> {
+  try {
+    const { data } = await supabase
+      .from("team_members")
+      .select("name, role, avatar_url")
+      .eq("email", email)
+      .single();
+    if (data) {
+      const name = data.name || profile.name;
+      return {
+        ...profile,
+        name,
+        initials: getInitials(name),
+        role: data.role || profile.role,
+        avatar: data.avatar_url || profile.avatar,
+      };
+    }
+  } catch { /* DB not available, use auth metadata */ }
+  return profile;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -47,31 +86,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async function init() {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
+        const email = session.user.email || "";
         const meta = session.user.user_metadata || {};
-        const name = meta.name || session.user.email?.split("@")[0] || "User";
-        setCurrentUser({
-          name,
-          email: session.user.email || "",
-          initials: getInitials(name),
-          role: meta.role,
-        });
+        let profile = buildProfile(email, meta);
+        profile = await enrichFromTeamMembers(email, profile);
+        setCurrentUser(profile);
         setIsAuthenticated(true);
       }
       setHydrated(true);
     }
     init();
 
-    // Listen for auth state changes (e.g., token refresh, signout from another tab)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
+        const email = session.user.email || "";
         const meta = session.user.user_metadata || {};
-        const name = meta.name || session.user.email?.split("@")[0] || "User";
-        setCurrentUser({
-          name,
-          email: session.user.email || "",
-          initials: getInitials(name),
-          role: meta.role,
-        });
+        let profile = buildProfile(email, meta);
+        profile = await enrichFromTeamMembers(email, profile);
+        setCurrentUser(profile);
         setIsAuthenticated(true);
       } else {
         setIsAuthenticated(false);
@@ -89,14 +122,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     if (error || !data.session) return false;
 
+    const userEmail = data.user?.email || email;
     const meta = data.user?.user_metadata || {};
-    const name = meta.name || email.split("@")[0];
-    setCurrentUser({
-      name,
-      email: data.user?.email || email,
-      initials: getInitials(name),
-      role: meta.role,
-    });
+    let profile = buildProfile(userEmail, meta);
+    profile = await enrichFromTeamMembers(userEmail, profile);
+    setCurrentUser(profile);
     setIsAuthenticated(true);
     return true;
   }, []);
