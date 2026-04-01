@@ -54,16 +54,22 @@ function ctaButton(label: string, url: string, gradient = "background:linear-gra
   return `<a href="${esc(url)}" style="display:inline-block;${gradient}color:#fff;text-decoration:none;padding:16px 48px;border-radius:12px;font-size:15px;font-weight:800;letter-spacing:0.02em;">${esc(label)}</a>`;
 }
 
+/** Format role slug to display name: "creative_director" → "Creative Director" */
+function formatRole(role: string): string {
+  return role.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 function roleBadge(role: string) {
-  return `<span style="display:inline-block;background:#f59e0b22;color:#f59e0b;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;text-transform:capitalize;">${esc(role)}</span>`;
+  return `<span style="display:inline-block;background:#f59e0b15;color:#ea580c;padding:6px 16px;border-radius:8px;font-size:13px;font-weight:700;border:1px solid #f59e0b33;">${esc(formatRole(role))}</span>`;
 }
 
 // ─── Template 1: Invite Email ───
 
 export function buildInviteEmailHtml(name: string, role: string, confirmUrl: string) {
+  const logoUrl = `${getSiteUrl()}/ten80ten-logo.png`;
   return wrapEmail(`
 <div style="background:linear-gradient(135deg,#ea580c,#f59e0b);padding:32px;text-align:center;">
-  <div style="width:56px;height:56px;margin:0 auto 16px;background:rgba(255,255,255,0.2);border-radius:14px;line-height:56px;font-size:24px;font-weight:900;color:#fff;">T</div>
+  <img src="${logoUrl}" alt="Ten80Ten" width="52" height="52" style="display:block;margin:0 auto 16px;border-radius:14px;background:rgba(255,255,255,0.2);padding:8px;" />
   <h1 style="color:#fff;font-size:22px;font-weight:800;margin:0;">You're Invited!</h1>
   <p style="color:rgba(255,255,255,0.8);font-size:13px;margin:8px 0 0;">Join Ten80Ten Creative Design team</p>
 </div>
@@ -80,9 +86,10 @@ export function buildInviteEmailHtml(name: string, role: string, confirmUrl: str
 // ─── Template 2: Approval Email ───
 
 export function buildApprovalEmailHtml(name: string, role: string, confirmUrl: string) {
+  const logoUrl = `${getSiteUrl()}/ten80ten-logo.png`;
   return wrapEmail(`
 <div style="background:linear-gradient(135deg,#059669,#10b981);padding:32px;text-align:center;">
-  <div style="width:56px;height:56px;margin:0 auto 16px;background:rgba(255,255,255,0.2);border-radius:14px;line-height:56px;font-size:28px;color:#fff;">&#10003;</div>
+  <img src="${logoUrl}" alt="Ten80Ten" width="52" height="52" style="display:block;margin:0 auto 16px;border-radius:14px;background:rgba(255,255,255,0.2);padding:8px;" />
   <h1 style="color:#fff;font-size:22px;font-weight:800;margin:0;">Request Approved!</h1>
   <p style="color:rgba(255,255,255,0.8);font-size:13px;margin:8px 0 0;">Welcome to the Ten80Ten team</p>
 </div>
@@ -99,9 +106,10 @@ export function buildApprovalEmailHtml(name: string, role: string, confirmUrl: s
 // ─── Template 3: Password Reset Email ───
 
 export function buildPasswordResetEmailHtml(confirmUrl: string) {
+  const logoUrl = `${getSiteUrl()}/ten80ten-logo.png`;
   return wrapEmail(`
 <div style="background:linear-gradient(135deg,#d97706,#f59e0b);padding:32px;text-align:center;">
-  <div style="width:56px;height:56px;margin:0 auto 16px;background:rgba(255,255,255,0.2);border-radius:14px;line-height:56px;font-size:24px;font-weight:900;color:#fff;">&#128274;</div>
+  <img src="${logoUrl}" alt="Ten80Ten" width="52" height="52" style="display:block;margin:0 auto 16px;border-radius:14px;background:rgba(255,255,255,0.2);padding:8px;" />
   <h1 style="color:#fff;font-size:22px;font-weight:800;margin:0;">Reset Your Password</h1>
   <p style="color:rgba(255,255,255,0.8);font-size:13px;margin:8px 0 0;">Ten80Ten Portal</p>
 </div>
