@@ -12,7 +12,7 @@ export function getTransporter() {
 }
 
 export function getFromAddress() {
-  return `"Ten80Ten SMM" <${process.env.SMTP_USER}>`;
+  return `"Ten80Ten Social Media Management Portal" <${process.env.SMTP_USER}>`;
 }
 
 export function getSiteUrl() {
@@ -57,7 +57,7 @@ export function buildInviteEmailHtml(name: string, role: string, confirmUrl: str
 <div style="background:#fff;padding:32px;">
   <p style="color:#111;font-size:15px;line-height:1.6;margin:0 0 16px;">Hi <strong>${name}</strong>,</p>
   <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 16px;">You've been invited to join the <strong>Ten80Ten</strong> Social Media Management Portal as:</p>
-  <div style="text-align:center;margin:20px 0;">${roleBadge(role)}</div>
+  <div style="text-align:center;margin:12px 0;">${roleBadge(role)}</div>
   <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 24px;">Click the button below to set up your password and complete your profile.</p>
   <div style="text-align:center;margin:28px 0;">${ctaButton("ACCEPT INVITATION", confirmUrl)}</div>
   <p style="color:#9ca3af;font-size:11px;text-align:center;margin:20px 0 0;">This link will expire in 24 hours.</p>
@@ -76,7 +76,7 @@ export function buildApprovalEmailHtml(name: string, role: string, confirmUrl: s
 <div style="background:#fff;padding:32px;">
   <p style="color:#111;font-size:15px;line-height:1.6;margin:0 0 16px;">Hi <strong>${name}</strong>,</p>
   <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 16px;">Great news! Your access request has been approved. You've been assigned the role:</p>
-  <div style="text-align:center;margin:20px 0;">${roleBadge(role)}</div>
+  <div style="text-align:center;margin:12px 0;">${roleBadge(role)}</div>
   <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 24px;">Click below to set up your account and start using the portal.</p>
   <div style="text-align:center;margin:28px 0;">${ctaButton("SET UP YOUR ACCOUNT", confirmUrl, "background:linear-gradient(135deg,#059669,#10b981);")}</div>
   <p style="color:#9ca3af;font-size:11px;text-align:center;margin:20px 0 0;">This link will expire in 24 hours.</p>
