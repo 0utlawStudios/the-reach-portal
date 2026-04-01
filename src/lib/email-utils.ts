@@ -25,12 +25,12 @@ function wrapEmail(content: string) {
   return `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background:#0a0a0e;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-<div style="max-width:540px;margin:40px auto;border-radius:16px;overflow:hidden;background:#0a0a0e;">
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+<div style="max-width:540px;margin:40px auto;border-radius:16px;overflow:hidden;background:#ffffff;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
 ${content}
-<div style="padding:24px 32px;text-align:center;">
-  <p style="color:#555;font-size:11px;margin:0;">Ten80Ten &mdash; Social Media Management Portal</p>
-  <p style="color:#444;font-size:10px;margin:6px 0 0;">Developed by Aldridge</p>
+<div style="padding:24px 32px;text-align:center;background:#fafafa;border-top:1px solid #f0f0f0;">
+  <p style="color:#999;font-size:11px;margin:0;">Ten80Ten &mdash; Social Media Management Portal</p>
+  <p style="color:#bbb;font-size:10px;margin:6px 0 0;">Developed by Aldridge</p>
 </div>
 </div>
 </body>
