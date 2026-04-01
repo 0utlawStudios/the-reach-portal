@@ -13,11 +13,9 @@ interface UserProfile {
 
 interface AuthContextType {
   isAuthenticated: boolean;
-  isDemo: boolean;
   currentUser: UserProfile;
   updateCurrentUserAvatar: (avatar: string | undefined) => void;
   login: (email: string, password: string) => Promise<boolean>;
-  loginDemo: () => void;
   logout: () => void;
 }
 
@@ -41,22 +39,12 @@ const DEFAULT_USER: UserProfile = {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isDemo, setIsDemo] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [currentUser, setCurrentUser] = useState<UserProfile>(DEFAULT_USER);
 
   // Check for existing Supabase session on mount
   useEffect(() => {
     async function init() {
-      // Check demo mode first
-      if (sessionStorage.getItem("t10_demo") === "true") {
-        setIsAuthenticated(true);
-        setIsDemo(true);
-        setCurrentUser({ name: "Demo User", email: "demo@ten80ten.com", initials: "DU" });
-        setHydrated(true);
-        return;
-      }
-
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         const meta = session.user.user_metadata || {};
@@ -85,8 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           role: meta.role,
         });
         setIsAuthenticated(true);
-        setIsDemo(false);
-      } else if (!sessionStorage.getItem("t10_demo")) {
+      } else {
         setIsAuthenticated(false);
         setCurrentUser(DEFAULT_USER);
       }
@@ -111,24 +98,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       role: meta.role,
     });
     setIsAuthenticated(true);
-    setIsDemo(false);
-    sessionStorage.removeItem("t10_demo");
     return true;
-  }, []);
-
-  const loginDemo = useCallback(() => {
-    setIsAuthenticated(true);
-    setIsDemo(true);
-    setCurrentUser({ name: "Demo User", email: "demo@ten80ten.com", initials: "DU" });
-    sessionStorage.setItem("t10_demo", "true");
   }, []);
 
   const logout = useCallback(async () => {
     await supabase.auth.signOut();
     setIsAuthenticated(false);
-    setIsDemo(false);
     setCurrentUser(DEFAULT_USER);
-    sessionStorage.removeItem("t10_demo");
   }, []);
 
   const updateCurrentUserAvatar = useCallback((avatar: string | undefined) => {
@@ -136,8 +112,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ isAuthenticated, isDemo, currentUser, updateCurrentUserAvatar, login, loginDemo, logout }),
-    [isAuthenticated, isDemo, currentUser, updateCurrentUserAvatar, login, loginDemo, logout]
+    () => ({ isAuthenticated, currentUser, updateCurrentUserAvatar, login, logout }),
+    [isAuthenticated, currentUser, updateCurrentUserAvatar, login, logout]
   );
 
   if (!hydrated) return null;

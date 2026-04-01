@@ -6,6 +6,7 @@ import { PLACEHOLDER_CARDS } from "./placeholder-data";
 import { loadState, saveState } from "./persistence";
 import { supabase } from "./supabaseClient";
 import { logAudit } from "./audit";
+import { useAuth } from "./auth-context";
 
 const STORAGE_KEY = "pipeline_cards";
 
@@ -110,6 +111,7 @@ interface PipelineContextType {
 const PipelineContext = createContext<PipelineContextType | null>(null);
 
 export function PipelineProvider({ children }: { children: ReactNode }) {
+  const { currentUser } = useAuth();
   const [cards, setCards] = useState<ContentCard[]>(PLACEHOLDER_CARDS);
   const [selectedCard, setSelectedCard] = useState<ContentCard | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -242,7 +244,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
       markMutation(cardId);
       supabase.from("posts").update({ stage: newStage }).eq("id", cardId).then(() => {});
     }
-    logAudit(cardId, "Aldridge Dagos", "stage_change", `Moved from ${fromLabel} to ${toLabel}`);
+    logAudit(cardId, currentUser.name, "stage_change", `Moved from ${fromLabel} to ${toLabel}`);
   }, [useSupabase, cards]);
 
   const requestReapproval = useCallback((cardId: string) => {
@@ -253,7 +255,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
   const submitReapproval = useCallback((cardId: string, note: string) => {
     const now = new Date();
     const timestamp = now.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-    const author = "Aldridge Dagos";
+    const author = currentUser.name;
     const historyEntry = { note, by: author, at: now.toISOString() };
     const noteLine = `Revision Note (${timestamp}): ${note}`;
 
@@ -295,7 +297,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
   const submitKickback = useCallback((cardId: string, note: string, attachmentUrl?: string) => {
     const now = new Date();
     const timestamp = now.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-    const author = "Aldridge Dagos";
+    const author = currentUser.name;
     let noteLine = `${author} (${timestamp}): Revision requested — ${note}`;
     if (attachmentUrl) noteLine += `\n📎 ${attachmentUrl}`;
 

@@ -20,7 +20,7 @@ export function RevisionModal() {
   const handleSubmit = () => {
     if (!isValid) return;
     submitReapproval(pendingReapproval.cardId, note.trim());
-    addToast("Revision submitted — Aldridge Dagos notified for re-approval.", "success");
+    addToast("Revision submitted — sent for re-approval.", "success");
     setNote("");
   };
 

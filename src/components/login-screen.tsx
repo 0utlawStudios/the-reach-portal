@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { Mail, Lock, ArrowRight, AlertCircle, Sparkles, Eye, EyeOff, Zap, Shield, BarChart3, Send } from "lucide-react";
+import { Mail, Lock, ArrowRight, AlertCircle, Eye, EyeOff, Zap, Shield, BarChart3, Send } from "lucide-react";
 import { motion } from "framer-motion";
 
 const ease = [0.25, 0.4, 0.25, 1] as const;
@@ -12,7 +12,7 @@ const fadeUp = (delay: number) => ({
 });
 
 export function LoginScreen() {
-  const { login, loginDemo } = useAuth();
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -25,12 +25,6 @@ export function LoginScreen() {
     setIsLoading(true);
     const success = await login(email, password);
     if (!success) { setError(true); setIsLoading(false); }
-  };
-
-  const handleDemo = async () => {
-    setIsLoading(true);
-    await new Promise((r) => setTimeout(r, 300));
-    loginDemo();
   };
 
   return (
@@ -122,28 +116,8 @@ export function LoginScreen() {
               </motion.div>
             </form>
 
-            {/* Divider */}
-            <motion.div className="flex items-center gap-4 my-6" {...fadeUp(0.26)}>
-              <div className="flex-1 h-px bg-gray-100 dark:bg-white/[0.06]" />
-              <span className="text-[10px] text-gray-300 dark:text-gray-600 uppercase tracking-[0.15em] font-medium">or</span>
-              <div className="flex-1 h-px bg-gray-100 dark:bg-white/[0.06]" />
-            </motion.div>
-
-            {/* Demo mode */}
-            <motion.div {...fadeUp(0.3)}>
-              <button
-                type="button"
-                onClick={handleDemo}
-                disabled={isLoading}
-                className="w-full h-11 rounded-xl border border-gray-200 dark:border-white/[0.08] bg-transparent hover:bg-slate-50 dark:hover:bg-white/[0.03] text-gray-500 dark:text-gray-400 text-[13px] font-medium cursor-pointer transition-all flex items-center justify-center gap-2"
-              >
-                <Sparkles className="w-4 h-4 text-[#f59e0b]" />
-                Explore Demo Mode
-              </button>
-            </motion.div>
-
             {/* Request Access */}
-            <motion.p className="text-center text-[12px] text-gray-400 mt-6" {...fadeUp(0.34)}>
+            <motion.p className="text-center text-[12px] text-gray-400 mt-6" {...fadeUp(0.26)}>
               Don&apos;t have an account?{" "}
               <a href="/request-access" className="text-[#f59e0b] hover:text-orange-600 font-semibold transition-colors">Request Access</a>
             </motion.p>

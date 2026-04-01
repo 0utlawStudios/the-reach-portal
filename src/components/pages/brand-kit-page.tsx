@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { CopyBlock, ColorSwatch } from "@/components/copy-block";
 import { useToast } from "@/lib/toast-context";
+import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabaseClient";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -65,6 +66,7 @@ const useSupabase = !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_
 
 export function BrandKitPage() {
   const { addToast } = useToast();
+  const { currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("copy");
   const [data, setData] = useState<PlaybookData>(DEFAULT_DATA);
   const [editMode, setEditMode] = useState(false);
@@ -99,7 +101,7 @@ export function BrandKitPage() {
     setSaving(true);
     setData(editData);
     if (useSupabase) {
-      await supabase.from("brand_playbook").update({ data: editData, updated_by: "Aldridge Dagos" }).eq("id", "singleton");
+      await supabase.from("brand_playbook").update({ data: editData, updated_by: currentUser.name }).eq("id", "singleton");
     }
     setSaving(false);
     setEditMode(false);

@@ -8,7 +8,7 @@
  * - This prevents JSON.parse crashes from stale schemas.
  */
 
-const PREFIX = "pt_v1_";
+const PREFIX = "pt_v2_";
 
 export function loadState<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;

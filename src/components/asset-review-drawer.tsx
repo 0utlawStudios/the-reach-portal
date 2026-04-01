@@ -589,7 +589,7 @@ export function AssetReviewDrawer() {
                         const timestamp = hasAuthor ? closingMatch![2] : null;
                         const content = hasAuthor ? closingMatch![3].trim() : note;
                         const isRevisionNote = author === "Revision Note";
-                        const displayAuthor = isRevisionNote ? "Aldridge Dagos" : author;
+                        const displayAuthor = isRevisionNote ? (author || "Team Member") : author;
                         const authorMember = displayAuthor ? members.find((m) => m.name === displayAuthor) : null;
                         const initials = displayAuthor ? displayAuthor.split(" ").map((n) => n[0]).join("").slice(0, 2) : "??";
                         return (
