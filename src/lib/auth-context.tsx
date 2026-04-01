@@ -84,28 +84,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Check for existing Supabase session on mount
   useEffect(() => {
     async function init() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        const email = session.user.email || "";
-        const meta = session.user.user_metadata || {};
-        let profile = buildProfile(email, meta);
-        profile = await enrichFromTeamMembers(email, profile);
-        setCurrentUser(profile);
-        setIsAuthenticated(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          const email = session.user.email || "";
+          const meta = session.user.user_metadata || {};
+          let profile = buildProfile(email, meta);
+          profile = await enrichFromTeamMembers(email, profile);
+          setCurrentUser(profile);
+          setIsAuthenticated(true);
+        }
+      } catch (err) {
+        console.error("[auth] init failed:", err);
       }
       setHydrated(true);
     }
     init();
 
     // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         const email = session.user.email || "";
         const meta = session.user.user_metadata || {};
-        let profile = buildProfile(email, meta);
-        profile = await enrichFromTeamMembers(email, profile);
+        const profile = buildProfile(email, meta);
         setCurrentUser(profile);
         setIsAuthenticated(true);
+        // Enrich from DB in background (non-blocking)
+        enrichFromTeamMembers(email, profile).then((enriched) => {
+          setCurrentUser(enriched);
+        }).catch(() => {});
       } else {
         setIsAuthenticated(false);
         setCurrentUser(DEFAULT_USER);
