@@ -51,14 +51,17 @@ async function driveFetch(url: string, init?: RequestInit): Promise<Response> {
 // ─── Subfolder cache ───
 
 // Folder cache + mutex: prevents duplicate folder creation on parallel requests
-const folderCache = new Map<string, string>();
+// Cache entries expire after 5 minutes to handle external folder deletion
+const folderCache = new Map<string, { id: string; at: number }>();
 const folderLocks = new Map<string, Promise<string>>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 export async function ensureSubfolder(name: string, parentId: string): Promise<string> {
   const cacheKey = `${parentId}/${name}`;
 
-  // Fast path: already resolved
-  if (folderCache.has(cacheKey)) return folderCache.get(cacheKey)!;
+  // Fast path: already resolved and not expired
+  const cached = folderCache.get(cacheKey);
+  if (cached && Date.now() - cached.at < CACHE_TTL) return cached.id;
 
   // Mutex: if another request is already creating this folder, wait for it
   if (folderLocks.has(cacheKey)) return folderLocks.get(cacheKey)!;
@@ -77,7 +80,7 @@ export async function ensureSubfolder(name: string, parentId: string): Promise<s
 
     if (listData.files && listData.files.length > 0) {
       const id = listData.files[0].id;
-      folderCache.set(cacheKey, id);
+      folderCache.set(cacheKey, { id, at: Date.now() });
       return id;
     }
 
@@ -97,7 +100,7 @@ export async function ensureSubfolder(name: string, parentId: string): Promise<s
     }
     const createData = await createRes.json();
     const id = createData.id;
-    folderCache.set(cacheKey, id);
+    folderCache.set(cacheKey, { id, at: Date.now() });
     return id;
   })();
 

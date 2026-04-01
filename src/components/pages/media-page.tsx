@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
-import { PLACEHOLDER_MEDIA } from "@/lib/placeholder-data";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { MediaAsset } from "@/lib/types";
 import { usePipeline } from "@/lib/pipeline-context";
+import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
+import { supabase } from "@/lib/supabaseClient";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
@@ -14,10 +15,28 @@ import {
 
 type StatusFilter = "all" | "unused" | "inuse";
 
+function isSupabaseConfigured(): boolean {
+  return !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+}
+
+function dbToAsset(row: any): MediaAsset {
+  return {
+    id: row.id,
+    name: row.name,
+    url: row.url,
+    type: row.file_type,
+    folder: row.folder || "Uploads",
+    uploadedAt: row.uploaded_at?.split("T")[0] || new Date().toISOString().split("T")[0],
+    addedBy: row.added_by || undefined,
+    usedIn: row.used_in || undefined,
+  };
+}
+
 export function MediaPage() {
   const { cards } = usePipeline();
+  const { currentUser } = useAuth();
   const { addToast } = useToast();
-  const [media, setMedia] = useState<MediaAsset[]>(PLACEHOLDER_MEDIA);
+  const [media, setMedia] = useState<MediaAsset[]>([]);
   const [activeFolder, setActiveFolder] = useState<string>("all");
   const [activeType, setActiveType] = useState<"all" | "image" | "video">("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -29,6 +48,19 @@ export function MediaPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadingFileName, setUploadingFileName] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const useDb = isSupabaseConfigured();
+
+  // ─── Load media from Supabase ───
+  useEffect(() => {
+    if (!useDb) return;
+    supabase
+      .from("media_assets")
+      .select("*")
+      .order("uploaded_at", { ascending: false })
+      .then(({ data }) => {
+        if (data && data.length > 0) setMedia(data.map(dbToAsset));
+      });
+  }, [useDb]);
 
   const folders = useMemo(() => Array.from(new Set(media.map((m) => m.folder))).sort(), [media]);
 
@@ -48,21 +80,36 @@ export function MediaPage() {
     setUploading(true);
     const { uploadToDrive } = await import("@/lib/drive-upload");
     for (const file of Array.from(files)) {
-      const id = `m-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       setUploadingFileName(file.name);
       setUploadProgress(0);
       try {
         const result = await uploadToDrive(file, "media-library", undefined, setUploadProgress);
         const asset: MediaAsset = {
-          id,
+          id: `m-${Date.now()}-${Math.random().toString(36).slice(2)}`,
           name: file.name,
           url: result.url,
           type: file.type.startsWith("video") ? "video" : "image",
           folder: "Uploads",
           uploadedAt: new Date().toISOString().split("T")[0],
-          uploadedTime: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
-          addedBy: "Admin",
+          addedBy: currentUser.name,
         };
+
+        // Persist to Supabase
+        if (useDb) {
+          const { data: inserted } = await supabase
+            .from("media_assets")
+            .insert({
+              name: asset.name,
+              url: asset.url,
+              file_type: asset.type,
+              folder: asset.folder,
+              added_by: asset.addedBy,
+            })
+            .select("id")
+            .single();
+          if (inserted) asset.id = inserted.id;
+        }
+
         setMedia((prev) => [asset, ...prev]);
         addToast(`${file.name} uploaded`, "success");
       } catch (err) {
@@ -80,11 +127,13 @@ export function MediaPage() {
   };
 
   const deleteSelected = () => {
-    setMedia((prev) => {
-      prev.forEach((m) => { if (selectedIds.has(m.id) && m.url.startsWith("blob:")) URL.revokeObjectURL(m.url); });
-      return prev.filter((m) => !selectedIds.has(m.id));
-    });
+    const idsToDelete = Array.from(selectedIds);
+    setMedia((prev) => prev.filter((m) => !selectedIds.has(m.id)));
     setSelectedIds(new Set());
+    // Delete from Supabase
+    if (useDb && idsToDelete.length > 0) {
+      supabase.from("media_assets").delete().in("id", idsToDelete).then(() => {});
+    }
   };
 
   const getUsageInfo = (asset: MediaAsset) => (!asset.usedIn || asset.usedIn.length === 0) ? null : asset.usedIn.map((id) => cards.find((c) => c.id === id)).filter(Boolean);
@@ -215,14 +264,12 @@ export function MediaPage() {
                         ) : (
                           <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded-md bg-gray-500/70 text-[8px] text-white font-medium flex items-center gap-0.5"><Clock className="w-2.5 h-2.5" />Unused</div>
                         )}
-                        {/* Hover overlay */}
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-200 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
                           <button onClick={(e) => { e.stopPropagation(); copyShareLink(asset); }} className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow-lg hover:bg-white transition-colors" title="Copy link"><Link2 className="w-3.5 h-3.5 text-gray-700" /></button>
                           <div className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow-lg"><Eye className="w-3.5 h-3.5 text-gray-700" /></div>
                           <button onClick={(e) => { e.stopPropagation(); openInNewTab(asset); }} className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow-lg hover:bg-white transition-colors" title="Open"><ExternalLink className="w-3.5 h-3.5 text-gray-700" /></button>
                         </div>
                       </div>
-                      {/* Select checkbox */}
                       <button onClick={(e) => { e.stopPropagation(); toggleSelect(asset.id); }} className={`absolute top-2 right-2 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-200 ${selected ? "bg-blue-500 border-blue-500" : "border-white/80 bg-black/20 opacity-0 group-hover:opacity-100"}`}>
                         {selected && <CheckCircle className="w-3 h-3 text-white" />}
                       </button>
@@ -241,7 +288,6 @@ export function MediaPage() {
                 })}
               </div>
             ) : (
-              /* List view — polished data table */
               <div className="overflow-x-auto -mx-4 px-4">
                 <div className="bg-white dark:bg-[#151518] rounded-xl border border-gray-100 dark:border-white/[0.06] overflow-hidden shadow-sm min-w-[700px]">
                   <div className="grid grid-cols-[1fr_80px_100px_90px_80px_140px] gap-2 px-4 py-2.5 border-b border-gray-100 dark:border-white/[0.06] text-[9px] font-bold text-gray-400 uppercase tracking-wider">

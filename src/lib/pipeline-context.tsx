@@ -242,7 +242,14 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     setSelectedCard((prev) => (prev?.id === cardId ? { ...prev, stage: newStage } : prev));
     if (useSupabase) {
       markMutation(cardId);
-      supabase.from("posts").update({ stage: newStage }).eq("id", cardId).then(() => {});
+      supabase.from("posts").update({ stage: newStage }).eq("id", cardId).then(({ error }) => {
+        if (error) {
+          console.error("[pipeline] stage_change failed:", error.message);
+          // Rollback
+          setCards((prev) => prev.map((c) => c.id === cardId ? { ...c, stage: fromStage as PipelineStage } : c));
+          setSelectedCard((prev) => prev?.id === cardId ? { ...prev, stage: fromStage as PipelineStage } : prev);
+        }
+      });
     }
     logAudit(cardId, currentUser.name, "stage_change", `Moved from ${fromLabel} to ${toLabel}`);
   }, [useSupabase, cards]);
@@ -276,7 +283,9 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
       markMutation(cardId);
       const card = cards.find((c) => c.id === cardId);
       const notes = card?.notes ? card.notes + "\n\n" + noteLine : noteLine;
-      supabase.from("posts").update({ stage: "awaiting_approval", notes }).eq("id", cardId).then(() => {});
+      supabase.from("posts").update({ stage: "awaiting_approval", notes }).eq("id", cardId).then(({ error }) => {
+        if (error) console.error("[pipeline] reapproval sync failed:", error.message);
+      });
     }
 
     setPendingReapproval(null);
@@ -316,7 +325,9 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
       markMutation(cardId);
       const card = cards.find((c) => c.id === cardId);
       const notes = card?.notes ? card.notes + "\n\n" + noteLine : noteLine;
-      supabase.from("posts").update({ stage: "revision_needed", notes }).eq("id", cardId).then(() => {});
+      supabase.from("posts").update({ stage: "revision_needed", notes }).eq("id", cardId).then(({ error }) => {
+        if (error) console.error("[pipeline] kickback sync failed:", error.message);
+      });
     }
 
     setPendingKickback(null);
@@ -332,7 +343,9 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     setSelectedCard((prev) => (prev?.id === cardId ? { ...prev, ...updates } : prev));
     if (useSupabase) {
       markMutation(cardId);
-      supabase.from("posts").update(cardToDb(updates)).eq("id", cardId).then(() => {});
+      supabase.from("posts").update(cardToDb(updates)).eq("id", cardId).then(({ error }) => {
+        if (error) console.error("[pipeline] updateCard sync failed:", error.message);
+      });
     }
   }, [useSupabase]);
 
@@ -352,8 +365,10 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
       markMutation("create");
       const dbRow = cardToDb(newCard);
       dbRow.checklist = newCard.checklist;
-      supabase.from("posts").insert(dbRow).select().single().then(({ data }) => {
-        if (data) {
+      supabase.from("posts").insert(dbRow).select().single().then(({ data, error }) => {
+        if (error) {
+          console.error("[pipeline] createCard sync failed:", error.message);
+        } else if (data) {
           setCards((prev) => prev.map((c) => c.id === tempId ? { ...c, id: data.id } : c));
         }
       });
@@ -369,7 +384,9 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     });
     if (useSupabase) {
       markMutation(cardId);
-      supabase.from("posts").delete().eq("id", cardId).then(() => {});
+      supabase.from("posts").delete().eq("id", cardId).then(({ error }) => {
+        if (error) console.error("[pipeline] deleteCard sync failed:", error.message);
+      });
     }
   }, [selectedCard, useSupabase]);
 

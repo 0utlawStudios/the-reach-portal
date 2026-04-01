@@ -113,7 +113,7 @@ export function CreatePostModal({ open, onClose }: Props) {
 
     setSubmitting(true);
 
-    let thumbnailUrl = "https://images.unsplash.com/photo-1497366216548-37526070297c?w=400&fit=crop";
+    let thumbnailUrl = "";
     const rawFiles: import("@/lib/types").RawFile[] = [];
     let uploadFailed = false;
 

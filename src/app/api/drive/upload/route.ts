@@ -37,10 +37,11 @@ export async function POST(request: NextRequest) {
     const rootId = getRootFolderId();
     const parentId = await ensureSubfolder(body.folder, rootId);
 
-    const prefix = body.cardId ? `${body.cardId}-` : "";
-    const timestamp = Date.now();
-    const ext = body.fileName.split(".").pop() || "";
-    const driveFileName = `${prefix}${timestamp}.${ext}`;
+    // Human-readable filename: 2026-04-01_08-32-15_originalname.ext
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 19).replace("T", "_").replace(/:/g, "-");
+    const safeName = body.fileName.replace(/[^a-zA-Z0-9._-]/g, "_").replace(/_+/g, "_");
+    const driveFileName = `${dateStr}_${safeName}`;
 
     // Create resumable upload session — fileId comes from PUT completion
     const { uploadUri } = await createResumableUploadSession(
