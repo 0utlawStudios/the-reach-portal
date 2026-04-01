@@ -338,7 +338,15 @@ export function SettingsPage() {
         addToast(data.error || "Invite failed", "error");
         return;
       }
-      addToast(`Secure invite link sent to ${inviteEmail.trim()}`, "success");
+      if (data.emailSent) {
+        addToast(`Invite email sent to ${inviteEmail.trim()}`, "success");
+      } else if (data.inviteUrl) {
+        // Email failed but user was created — copy invite link
+        await navigator.clipboard.writeText(data.inviteUrl);
+        addToast(`Email failed — invite link copied to clipboard. Share it manually.`, "info");
+      } else {
+        addToast(`Invited ${inviteName.trim()}, but email delivery uncertain`, "info");
+      }
       logAudit("system", currentUser.name, "invite_sent", `Invited ${inviteName.trim()} (${inviteEmail.trim()}) as ${inviteRole}`);
       setInviteEmail(""); setInviteName(""); setShowInvite(false);
     } catch {

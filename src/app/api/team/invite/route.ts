@@ -88,7 +88,6 @@ export async function POST(request: NextRequest) {
 
     if (linkErr || !linkData?.properties?.hashed_token) {
       console.error("[team/invite] generateLink failed:", linkErr?.message);
-      // Rollback: delete the auth user
       if (authData?.user?.id) await admin.auth.admin.deleteUser(authData.user.id);
       return NextResponse.json({ error: "Failed to generate invite link" }, { status: 500 });
     }
@@ -98,23 +97,7 @@ export async function POST(request: NextRequest) {
     const tokenHash = linkData.properties.hashed_token;
     const confirmUrl = `${siteUrl}/auth/confirm?token_hash=${tokenHash}&type=invite`;
 
-    // ─── Step 4: Send branded email via nodemailer ───
-    try {
-      const transporter = getTransporter();
-      await transporter.sendMail({
-        from: getFromAddress(),
-        to: email,
-        subject: `You're invited to join Ten80Ten`,
-        html: buildInviteEmailHtml(body.name, body.role, confirmUrl),
-      });
-    } catch (emailErr: any) {
-      console.error("[team/invite] Email send failed:", emailErr?.message);
-      // Rollback: delete the auth user
-      if (authData?.user?.id) await admin.auth.admin.deleteUser(authData.user.id);
-      return NextResponse.json({ error: "Failed to send invite email" }, { status: 500 });
-    }
-
-    // ─── Step 5: Sync to team_members table ───
+    // ─── Step 4: Insert team_members BEFORE email (so user exists even if email fails) ───
     const { data: member, error: memberError } = await admin
       .from("team_members")
       .insert({
@@ -128,16 +111,57 @@ export async function POST(request: NextRequest) {
 
     if (memberError) {
       console.error("[team/invite] team_members insert failed:", memberError.message);
-      // Rollback: delete auth user
       if (authData?.user?.id) await admin.auth.admin.deleteUser(authData.user.id);
       return NextResponse.json({ error: "Failed to register team member" }, { status: 500 });
     }
 
+    // ─── Step 5: Send branded email via nodemailer ───
+    let emailSent = false;
+    let emailError = "";
+
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+
+    if (!smtpUser || !smtpPass) {
+      emailError = "SMTP not configured — add SMTP_USER and SMTP_PASS to environment variables";
+      console.error("[team/invite]", emailError);
+    } else {
+      try {
+        const transporter = getTransporter();
+        await transporter.sendMail({
+          from: getFromAddress(),
+          to: email,
+          subject: `You're invited to join Ten80Ten`,
+          html: buildInviteEmailHtml(body.name, body.role, confirmUrl),
+        });
+        emailSent = true;
+      } catch (err: any) {
+        emailError = err?.message || "Unknown SMTP error";
+        console.error("[team/invite] Email send failed:", emailError);
+      }
+    }
+
+    // ─── Audit log ───
+    try {
+      await admin.from("post_audit_logs").insert({
+        user_name: body.requestedBy,
+        action_type: "invite_sent",
+        details: emailSent
+          ? `Invited ${body.name} (${email}) as ${body.role} — email sent`
+          : `Invited ${body.name} (${email}) as ${body.role} — email FAILED: ${emailError}. Invite link generated.`,
+      });
+    } catch { /* audit log is best-effort */ }
+
+    // Return success with invite link (admin can share manually if email failed)
     return NextResponse.json({
       success: true,
       memberId: member.id,
       email,
-      message: `Branded invite email sent to ${email}`,
+      emailSent,
+      inviteUrl: emailSent ? undefined : confirmUrl,
+      message: emailSent
+        ? `Branded invite email sent to ${email}`
+        : `User created but email failed: ${emailError}`,
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
