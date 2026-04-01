@@ -66,9 +66,11 @@ export async function POST(request: NextRequest) {
     // ─── Approve: createUser + generateLink + branded email ───
     const role = body.role || "viewer";
 
-    // Step 1: Create user silently
+    // Step 1: Create user silently with random temp password
+    const tempPassword = crypto.randomUUID() + "!Aa1";
     const { data: authData, error: createErr } = await admin.auth.admin.createUser({
       email: req.email,
+      password: tempPassword,
       email_confirm: false,
       user_metadata: { name: req.name, role, phone: req.phone },
     });

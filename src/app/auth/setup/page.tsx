@@ -67,7 +67,14 @@ export default function SetupPasswordPage() {
       password,
       data: { name: fullName, phone: cleanPhone },
     });
-    if (pwError) { setError(pwError.message); setLoading(false); return; }
+    if (pwError) {
+      const msg = pwError.message.includes("different from the old")
+        ? "Please choose a different password."
+        : pwError.message;
+      setError(msg);
+      setLoading(false);
+      return;
+    }
 
     // Get user email
     const { data: { user } } = await supabase.auth.getUser(accessToken);

@@ -67,9 +67,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "This email is already a team member" }, { status: 409 });
     }
 
-    // ─── Step 1: Create user silently (no email sent) ───
+    // ─── Step 1: Create user silently with random temp password ───
+    const tempPassword = crypto.randomUUID() + "!Aa1";
     const { data: authData, error: createErr } = await admin.auth.admin.createUser({
       email,
+      password: tempPassword,
       email_confirm: false,
       user_metadata: { name: body.name, role: body.role },
     });
