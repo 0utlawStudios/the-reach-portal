@@ -66,6 +66,18 @@ export async function POST(request: NextRequest) {
     // ─── Approve: createUser + generateLink + branded email ───
     const role = body.role || "viewer";
 
+    // Clean up any orphaned auth user first
+    let page = 1;
+    const perPage = 100;
+    while (true) {
+      const { data: { users }, error: listErr } = await admin.auth.admin.listUsers({ page, perPage });
+      if (listErr || !users || users.length === 0) break;
+      const found = users.find((u) => u.email?.toLowerCase() === req.email.toLowerCase());
+      if (found) { await admin.auth.admin.deleteUser(found.id); break; }
+      if (users.length < perPage) break;
+      page++;
+    }
+
     // Step 1: Create user silently with random temp password
     const tempPassword = crypto.randomUUID() + "!Aa1";
     const { data: authData, error: createErr } = await admin.auth.admin.createUser({

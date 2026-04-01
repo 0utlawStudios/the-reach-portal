@@ -36,7 +36,7 @@ interface TeamContextType {
   members: TeamMember[];
   pendingRequests: SignupRequest[];
   inviteMember: (email: string, name: string, role: UserRole) => void;
-  removeMember: (id: string) => void;
+  removeMember: (id: string, email: string, requestedBy: string) => void;
   updateMember: (id: string, updates: Partial<TeamMember>) => void;
   refreshPendingRequests: () => void;
 }
@@ -144,9 +144,16 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     }
   }, [useDb]);
 
-  const removeMember = useCallback((id: string) => {
+  const removeMember = useCallback((id: string, email: string, requestedBy: string) => {
     setMembers((prev) => prev.filter((m) => m.id !== id));
-    if (useDb) { supabase.from("team_members").delete().eq("id", id).then(() => {}); }
+    if (useDb) {
+      // Use the API route to delete both team_members AND auth user
+      fetch("/api/team/remove-member", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberId: id, memberEmail: email, requestedBy }),
+      }).catch(() => {});
+    }
   }, [useDb]);
 
   const updateMember = useCallback((id: string, updates: Partial<TeamMember>) => {

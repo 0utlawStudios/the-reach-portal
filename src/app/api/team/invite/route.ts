@@ -14,6 +14,21 @@ function getAdminClient() {
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
 }
 
+/** Find an existing auth user by email using paginated listUsers */
+async function findAuthUserByEmail(admin: ReturnType<typeof getAdminClient>, email: string) {
+  let page = 1;
+  const perPage = 100;
+  while (true) {
+    const { data: { users }, error } = await admin.auth.admin.listUsers({ page, perPage });
+    if (error || !users || users.length === 0) break;
+    const found = users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+    if (found) return found;
+    if (users.length < perPage) break;
+    page++;
+  }
+  return null;
+}
+
 interface InviteRequest {
   email: string;
   name: string;
@@ -67,6 +82,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "This email is already a team member" }, { status: 409 });
     }
 
+    // ─── Clean up any orphaned auth user (e.g. previously removed member) ───
+    const existingAuthUser = await findAuthUserByEmail(admin, email);
+    if (existingAuthUser) {
+      await admin.auth.admin.deleteUser(existingAuthUser.id);
+    }
+
     // ─── Step 1: Create user silently with random temp password ───
     const tempPassword = crypto.randomUUID() + "!Aa1";
     const { data: authData, error: createErr } = await admin.auth.admin.createUser({
@@ -97,9 +118,9 @@ export async function POST(request: NextRequest) {
     // ─── Step 3: Build our own confirmation URL ───
     const siteUrl = getSiteUrl();
     const tokenHash = linkData.properties.hashed_token;
-    const confirmUrl = `${siteUrl}/auth/confirm?token_hash=${tokenHash}&type=invite`;
+    const confirmUrl = `${siteUrl}/auth/confirm?token_hash=${encodeURIComponent(tokenHash)}&type=invite`;
 
-    // ─── Step 4: Insert team_members BEFORE email (so user exists even if email fails) ───
+    // ─── Step 4: Insert team_members BEFORE email ───
     const { data: member, error: memberError } = await admin
       .from("team_members")
       .insert({
@@ -154,7 +175,6 @@ export async function POST(request: NextRequest) {
       });
     } catch { /* audit log is best-effort */ }
 
-    // Return success with invite link (admin can share manually if email failed)
     return NextResponse.json({
       success: true,
       memberId: member.id,

@@ -586,7 +586,7 @@ export function SettingsPage() {
             (currentUser.email !== editingMember.email) &&
             members.some((m) => m.email === currentUser.email && (m.role === "superadmin" || m.role === "admin"))
           }
-          onDelete={() => { removeMember(editingMember.id); logAudit("system", currentUser.name, "member_removed", `Removed ${editingMember.name} (${editingMember.email})`); addToast(`${editingMember.name} removed from team`, "success"); }}
+          onDelete={() => { removeMember(editingMember.id, editingMember.email, currentUser.email); addToast(`${editingMember.name} removed from team and auth`, "success"); }}
         />
       )}
 
