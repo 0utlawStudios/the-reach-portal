@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, useMemo, useEffect, ReactNode } from "react";
 import { supabase } from "./supabaseClient";
+import { saveState } from "./persistence";
 
 interface UserProfile {
   name: string;
@@ -136,6 +137,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     profile = await enrichFromTeamMembers(userEmail, profile);
     setCurrentUser(profile);
     setIsAuthenticated(true);
+    // Reset navigation to dashboard on fresh login
+    saveState("nav_page", "dashboard");
     return null;
   }, []);
 

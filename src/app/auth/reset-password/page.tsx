@@ -65,6 +65,9 @@ export default function ResetPasswordPage() {
       return;
     }
 
+    // Sign out so user must log in with their new password
+    await supabase.auth.signOut();
+
     setSuccess(true);
     setLoading(false);
     setTimeout(() => { window.location.href = "/"; }, 2500);

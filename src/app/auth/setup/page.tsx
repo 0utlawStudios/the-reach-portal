@@ -105,6 +105,9 @@ export default function SetupPasswordPage() {
         .eq("email", user.email);
     }
 
+    // Sign out so user must log in with their new credentials
+    await supabase.auth.signOut();
+
     setSuccess(true);
     setLoading(false);
     setTimeout(() => { window.location.href = "/"; }, 2000);
@@ -118,7 +121,7 @@ export default function SetupPasswordPage() {
             <CheckCircle className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
           </div>
           <h1 className="text-[20px] font-bold text-gray-900 dark:text-white">You&apos;re all set!</h1>
-          <p className="text-[13px] text-gray-500 dark:text-gray-400">Account created. Redirecting to dashboard...</p>
+          <p className="text-[13px] text-gray-500 dark:text-gray-400">Account created. Redirecting to login...</p>
           <div className="w-8 h-8 mx-auto border-3 border-gray-200 border-t-orange-500 rounded-full animate-spin" />
         </div>
       </div>
