@@ -149,7 +149,7 @@ export function PostPreviewPage() {
   const [activeTab, setActiveTab] = useState<Platform>("instagram");
 
   const previewableCards = useMemo(() => {
-    let filtered = cards.filter((c) => c.stage !== "ideas");
+    let filtered = [...cards];
     if (platformFilter !== "all") filtered = filtered.filter((c) => c.platforms.includes(platformFilter));
     return filtered;
   }, [cards, platformFilter]);

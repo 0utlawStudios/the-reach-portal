@@ -8,6 +8,7 @@ import { X, Image as ImageIcon, Film, Layers, PlayCircle, Upload, FileVideo, Plu
 import { PlatformIcon } from "./platform-icons";
 import { useToast } from "@/lib/toast-context";
 import { useAuth } from "@/lib/auth-context";
+import { supabase } from "@/lib/supabaseClient";
 import { MentionTextarea } from "./mention-textarea";
 
 const contentTypes: { id: ContentType; label: string; icon: React.ReactNode }[] = [
@@ -172,6 +173,17 @@ export function CreatePostModal({ open, onClose }: Props) {
         rawFiles: rawFiles.length > 0 ? rawFiles : undefined,
       } : undefined,
     });
+
+    // Insert uploaded files into media_assets so they appear in Media Library
+    for (const rf of rawFiles) {
+      supabase.from("media_assets").insert({
+        name: rf.name,
+        url: rf.url,
+        file_type: rf.mimeType?.startsWith("video") ? "video" : "image",
+        folder: "Pipeline Uploads",
+        added_by: currentUser.name,
+      }).then(() => {});
+    }
 
     rawFilesRef.current.clear();
     setTitle(""); setCaption(""); setHook(""); setPlatforms([]); setContentType("video");
