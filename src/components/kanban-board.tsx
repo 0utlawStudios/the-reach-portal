@@ -238,7 +238,7 @@ export function KanbanBoard() {
             {archivedCards.length > 0 ? (
               <div className="space-y-2">
                 {archivedCards.map((card) => (
-                  <div key={card.id} className="flex items-center gap-3 p-3 bg-white dark:bg-[#151518] rounded-xl border border-gray-200/80 dark:border-white/[0.06] shadow-sm hover:shadow-md transition-shadow">
+                  <div key={card.id} onClick={() => selectCard(card)} className="flex items-center gap-3 p-3 bg-white dark:bg-[#151518] rounded-xl border border-gray-200/80 dark:border-white/[0.06] shadow-sm hover:shadow-md transition-shadow cursor-pointer">
                     <img src={card.thumbnailUrl} alt="" className="w-16 h-12 rounded-lg object-cover shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-[13px] font-medium text-gray-800 dark:text-gray-200 truncate">{card.title}</p>
@@ -250,7 +250,7 @@ export function KanbanBoard() {
                       </div>
                     </div>
                     <button
-                      onClick={() => setRepurposingCard(card)}
+                      onClick={(e) => { e.stopPropagation(); setRepurposingCard(card); }}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[11px] font-medium hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors cursor-pointer border border-blue-200 dark:border-blue-500/20"
                     >
                       <RotateCcw className="w-3 h-3" />
