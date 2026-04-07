@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { Lock, CheckCircle, AlertCircle, Eye, EyeOff, User, Phone, Shield } from "lucide-react";
+import { Lock, CheckCircle, AlertCircle, Eye, EyeOff, User, Phone, Shield, Camera } from "lucide-react";
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -16,6 +16,8 @@ export default function SetupPasswordPage() {
   const [whatsapp, setWhatsapp] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -62,7 +64,16 @@ export default function SetupPasswordPage() {
     initSession();
   }, []);
 
-  const isValid = firstName.trim() && lastName.trim() && password.length >= 8 && password === confirm;
+  const isValid = firstName.trim() && lastName.trim() && whatsapp.trim() && avatarFile && password.length >= 8 && password === confirm;
+
+  const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarFile(file);
+    const reader = new FileReader();
+    reader.onload = (ev) => setAvatarPreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
+  };
 
   const inputClass = "w-full h-11 px-3 rounded-xl bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-[13px] text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 dark:focus:ring-orange-500/10 transition-all";
 
@@ -93,7 +104,22 @@ export default function SetupPasswordPage() {
     // Get user email
     const { data: { user } } = await supabase.auth.getUser();
 
-    // Update team_members: status → active, name, phone
+    // Upload avatar
+    let avatarUrl: string | null = null;
+    if (avatarFile && user?.email) {
+      const ext = avatarFile.name.split(".").pop() || "jpg";
+      const path = `${user.email.replace(/[^a-z0-9]/gi, "_")}-${Date.now()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage.from("avatars").upload(path, avatarFile, { upsert: true });
+      if (uploadErr) {
+        setError("Failed to upload photo. Please try again.");
+        setLoading(false);
+        return;
+      }
+      const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
+      avatarUrl = urlData.publicUrl;
+    }
+
+    // Update team_members: status → active, name, phone, avatar
     if (user?.email) {
       await supabase
         .from("team_members")
@@ -101,6 +127,7 @@ export default function SetupPasswordPage() {
           status: "active",
           name: fullName,
           phone: cleanPhone || null,
+          avatar_url: avatarUrl,
         })
         .eq("email", user.email);
     }
@@ -166,6 +193,22 @@ export default function SetupPasswordPage() {
               </div>
             )}
 
+            {/* Profile Photo */}
+            <div className="flex flex-col items-center gap-2">
+              <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Profile Photo <span className="text-red-400">*</span></label>
+              <label className="cursor-pointer group">
+                <input type="file" accept="image/*" onChange={handleAvatarSelect} className="hidden" />
+                <div className="w-20 h-20 rounded-full border-2 border-dashed border-gray-300 dark:border-white/[0.12] group-hover:border-orange-400 dark:group-hover:border-orange-500 transition-colors flex items-center justify-center overflow-hidden bg-gray-50 dark:bg-white/[0.04]">
+                  {avatarPreview ? (
+                    <img src={avatarPreview} alt="Preview" className="w-full h-full object-cover" />
+                  ) : (
+                    <Camera className="w-6 h-6 text-gray-300 dark:text-gray-600 group-hover:text-orange-400 transition-colors" />
+                  )}
+                </div>
+              </label>
+              <p className="text-[10px] text-gray-400">{avatarPreview ? "Click to change" : "Click to upload"}</p>
+            </div>
+
             {/* Name row */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
@@ -183,7 +226,7 @@ export default function SetupPasswordPage() {
 
             {/* WhatsApp */}
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">WhatsApp Number</label>
+              <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">WhatsApp Number <span className="text-red-400">*</span></label>
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300 dark:text-gray-600" />
                 <input type="tel" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="+63 912 345 6789" className={`${inputClass} pl-10 font-mono`} />
