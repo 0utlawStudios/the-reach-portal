@@ -21,7 +21,7 @@ import {
   Shield, Download, Sun, Moon, Mail,
   Smartphone, Calendar, BarChart3, Zap, Link2, Webhook, FileText,
   UserPlus, ShieldCheck, Pencil, Eye, Crown, X, Send, Megaphone, Code, Users, Settings as SettingsIcon,
-  Camera, Save, Upload, Trash2,
+  Camera, Save, Upload, Trash2, RefreshCw,
 } from "lucide-react";
 
 const roleConfig: Record<UserRole, { label: string; icon: React.ReactNode; color: string }> = {
@@ -256,6 +256,10 @@ export function SettingsPage() {
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
   const [activeIntegration, setActiveIntegration] = useState<string | null>(null);
   const [approving, setApproving] = useState<string | null>(null);
+  const [resendingInvite, setResendingInvite] = useState<string | null>(null);
+
+  const activeMembers = useMemo(() => members.filter((m) => m.status === "active"), [members]);
+  const pendingMembers = useMemo(() => members.filter((m) => m.status === "pending"), [members]);
 
   const handleApprove = async (reqId: string, action: "approve" | "reject", role = "social_media_specialist") => {
     setApproving(reqId);
@@ -312,6 +316,29 @@ export function SettingsPage() {
     } finally {
       setInviting(false);
     }
+  };
+
+  const handleResendInvite = async (member: TeamMember) => {
+    setResendingInvite(member.id);
+    try {
+      const res = await fetch("/api/team/resend-invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: member.email, name: member.name, role: member.role, requestedBy: currentUser.email }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        if (data.emailSent) {
+          addToast(`Invite resent to ${member.email}`, "success");
+        } else if (data.inviteUrl) {
+          await navigator.clipboard.writeText(data.inviteUrl);
+          addToast(`Email failed — invite link copied to clipboard`, "info");
+        }
+      } else {
+        addToast(data.error || "Resend failed", "error");
+      }
+    } catch { addToast("Network error", "error"); }
+    setResendingInvite(null);
   };
 
   return (
@@ -487,42 +514,95 @@ export function SettingsPage() {
             </div>
           )}
 
-          {/* Members list */}
-          <div className="bg-white dark:bg-[#151518] rounded-2xl border border-gray-100 dark:border-white/[0.06] overflow-hidden shadow-sm">
-            {members.map((member, i) => {
-              const role = roleConfig[member.role];
-              return (
-                <button key={member.id} onClick={() => setEditingMember(member)}
-                  className={`w-full flex items-start gap-3 px-4 py-3.5 hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors cursor-pointer text-left ${i > 0 ? "border-t border-gray-50 dark:border-white/[0.03]" : ""}`}>
-                  <div className="relative shrink-0 mt-0.5">
-                    {member.avatar ? (
-                      <img src={member.avatar} alt={member.name} className="w-9 h-9 rounded-full object-cover" />
-                    ) : (
-                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-[11px] font-bold text-white">
+          {/* Active Members */}
+          {activeMembers.length > 0 && (
+            <div>
+              <h3 className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em] mb-2">Active Members ({activeMembers.length})</h3>
+              <div className="bg-white dark:bg-[#151518] rounded-2xl border border-gray-100 dark:border-white/[0.06] overflow-hidden shadow-sm">
+                {activeMembers.map((member, i) => {
+                  const role = roleConfig[member.role];
+                  return (
+                    <button key={member.id} onClick={() => setEditingMember(member)}
+                      className={`w-full flex items-start gap-3 px-4 py-3.5 hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors cursor-pointer text-left ${i > 0 ? "border-t border-gray-50 dark:border-white/[0.03]" : ""}`}>
+                      <div className="relative shrink-0 mt-0.5">
+                        {member.avatar ? (
+                          <img src={member.avatar} alt={member.name} className="w-9 h-9 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-[11px] font-bold text-white">
+                            {member.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                          </div>
+                        )}
+                        <PresenceDot status={getStatus(member.email)} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <p className="text-[13px] font-medium text-gray-800 dark:text-gray-200">{member.name}</p>
+                          <Pencil className="w-3.5 h-3.5 text-gray-300 shrink-0 ml-2" />
+                        </div>
+                        <p className="text-[11px] text-gray-400 mt-0.5">{member.email}{member.phone ? ` · ${member.phone}` : ""}</p>
+                        <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                          <Badge variant="outline" className={`text-[10px] h-5 px-2 border ${role?.color || "text-gray-500 bg-gray-50 border-gray-200"}`}>{role?.icon}<span className="ml-1">{role?.label || member.role}</span></Badge>
+                          {member.updatedAt && (
+                            <span className="text-[9px] text-gray-300 dark:text-gray-600 flex items-center gap-1">
+                              <Clock className="w-2.5 h-2.5" />
+                              Signed up {new Date(member.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} at {new Date(member.updatedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Pending Invites */}
+          {pendingMembers.length > 0 && (
+            <div>
+              <h3 className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-[0.08em] mb-2 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                Pending Invites ({pendingMembers.length})
+              </h3>
+              <div className="bg-white dark:bg-[#151518] rounded-2xl border border-amber-200/60 dark:border-amber-500/20 overflow-hidden shadow-sm">
+                {pendingMembers.map((member, i) => {
+                  const role = roleConfig[member.role];
+                  return (
+                    <div key={member.id} className={`flex items-center gap-3 px-4 py-3.5 ${i > 0 ? "border-t border-amber-100 dark:border-amber-500/10" : ""}`}>
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-[11px] font-bold text-white shrink-0">
                         {member.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
                       </div>
-                    )}
-                    <PresenceDot status={getStatus(member.email)} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[13px] font-medium text-gray-800 dark:text-gray-200">{member.name}</p>
-                      <Pencil className="w-3.5 h-3.5 text-gray-300 shrink-0 ml-2" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-medium text-gray-800 dark:text-gray-200">{member.name}</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">{member.email}</p>
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                          <Badge variant="outline" className={`text-[10px] h-5 px-2 border ${role?.color || "text-gray-500 bg-gray-50 border-gray-200"}`}>{role?.icon}<span className="ml-1">{role?.label || member.role}</span></Badge>
+                          <Badge variant="outline" className="text-[10px] h-5 px-2 border text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20">
+                            <Mail className="w-2.5 h-2.5 mr-1" />Invite Sent
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="flex gap-1.5 shrink-0">
+                        <button onClick={() => setEditingMember(member)}
+                          className="p-2 rounded-lg border border-gray-200 dark:border-white/[0.08] text-gray-400 hover:text-gray-600 hover:bg-gray-50 dark:hover:bg-white/[0.04] transition-colors cursor-pointer">
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button disabled={resendingInvite === member.id} onClick={() => handleResendInvite(member)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 text-[11px] font-medium hover:bg-orange-100 dark:hover:bg-orange-500/20 transition-colors cursor-pointer border border-orange-200 dark:border-orange-500/20 disabled:opacity-40">
+                          {resendingInvite === member.id ? (
+                            <span className="w-3 h-3 border-2 border-orange-300 border-t-orange-600 rounded-full animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-3 h-3" />
+                          )}
+                          Resend
+                        </button>
+                      </div>
                     </div>
-                    <p className="text-[11px] text-gray-400 mt-0.5">{member.email}{member.phone ? ` · ${member.phone}` : ""}</p>
-                    <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                      <Badge variant="outline" className={`text-[10px] h-5 px-2 border ${role?.color || "text-gray-500 bg-gray-50 border-gray-200"}`}>{role?.icon}<span className="ml-1">{role?.label || member.role}</span></Badge>
-                      {member.status === "pending" && (
-                        <Badge variant="outline" className="text-[10px] h-5 px-2 border text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20 animate-pulse">
-                          <Mail className="w-2.5 h-2.5 mr-1" />Pending Invite
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

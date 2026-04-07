@@ -16,6 +16,7 @@ export interface TeamMember {
   secondaryRole?: string;
   status: InviteStatus;
   joinedAt: string;
+  updatedAt?: string;
   avatar?: string;
 }
 
@@ -57,6 +58,7 @@ function dbToMember(row: any): TeamMember {
     secondaryRole: row.secondary_role || undefined,
     status: row.status,
     joinedAt: row.joined_at || row.created_at?.split("T")[0],
+    updatedAt: row.updated_at || undefined,
     avatar: row.avatar_url || undefined,
     phone: row.phone || undefined,
   };
