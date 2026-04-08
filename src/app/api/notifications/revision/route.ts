@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import nodemailer from "nodemailer";
+import { getTransporter, getFromAddress } from "@/lib/email-utils";
 
 export const maxDuration = 10;
 
@@ -11,14 +11,6 @@ function getAdminClient() {
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
 }
 
-function getTransporter() {
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || "smtp.gmail.com",
-    port: Number(process.env.SMTP_PORT || 465),
-    secure: true,
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-  });
-}
 
 interface RevisionRequest {
   postId: string;
@@ -104,7 +96,7 @@ export async function POST(request: NextRequest) {
       for (const email of recipients) {
         try {
           await transporter.sendMail({
-            from: `"Ten80Ten Portal" <${process.env.SMTP_USER}>`,
+            from: getFromAddress(),
             to: email,
             subject: `Revision Requested: "${body.postTitle}"`,
             html: htmlEmail,

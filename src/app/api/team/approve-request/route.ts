@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
     // Step 3: Build confirmation URL
     const siteUrl = getSiteUrl();
     const tokenHash = linkData.properties.hashed_token;
-    const confirmUrl = `${siteUrl}/auth/confirm?token_hash=${tokenHash}&type=invite`;
+    const confirmUrl = `${siteUrl}/auth/confirm?token_hash=${encodeURIComponent(tokenHash)}&type=invite`;
 
     // Step 4: Insert into team_members BEFORE email
     const { error: memberErr } = await admin

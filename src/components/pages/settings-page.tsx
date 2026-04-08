@@ -272,7 +272,12 @@ export function SettingsPage() {
       const data = await res.json();
       if (res.ok) {
         refreshPendingRequests();
-        addToast(action === "approve" ? `Approved — branded invite sent` : "Request rejected", action === "approve" ? "success" : "info");
+        if (action === "approve" && data.emailSent === false && data.inviteUrl) {
+          await navigator.clipboard.writeText(data.inviteUrl);
+          addToast("Approved — email failed, invite link copied to clipboard", "info");
+        } else {
+          addToast(action === "approve" ? `Approved — branded invite sent` : "Request rejected", action === "approve" ? "success" : "info");
+        }
       } else {
         addToast(data.error || "Action failed", "error");
       }
