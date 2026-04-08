@@ -9,7 +9,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://ten80tensmm.vercel.app"),
+  metadataBase: new URL("https://smm.ten80ten.com"),
   title: "Ten80Ten SMM",
   description: "Content Pipeline & Social Media Management for Ten80Ten",
   manifest: "/manifest.json",
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Ten80Ten SMM",
     description: "Content Pipeline & Social Media Management for Ten80Ten",
-    url: "https://ten80tensmm.vercel.app",
+    url: "https://smm.ten80ten.com",
     siteName: "Ten80Ten",
     images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "Ten80Ten SMM" }],
     type: "website",

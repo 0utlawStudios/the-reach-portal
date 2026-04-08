@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type");
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://ten80tensmm.vercel.app";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://smm.ten80ten.com";
 
   if (!tokenHash || !type) {
     return NextResponse.redirect(`${siteUrl}?error=missing_token`);

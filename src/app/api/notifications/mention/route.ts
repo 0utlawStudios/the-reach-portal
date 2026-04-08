@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
 
     if (smtpConfigured) {
       const transporter = getTransporter();
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://ten80tensmm.vercel.app";
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://smm.ten80ten.com";
 
       for (const member of members) {
         // Don't email yourself

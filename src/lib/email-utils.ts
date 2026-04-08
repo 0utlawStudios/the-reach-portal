@@ -19,7 +19,7 @@ export function getFromAddress() {
 }
 
 export function getSiteUrl() {
-  return process.env.NEXT_PUBLIC_SITE_URL || "https://ten80tensmm.vercel.app";
+  return process.env.NEXT_PUBLIC_SITE_URL || "https://smm.ten80ten.com";
 }
 
 // ─── HTML Escaping (prevent XSS injection) ───
