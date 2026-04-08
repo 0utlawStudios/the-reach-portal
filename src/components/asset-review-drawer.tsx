@@ -48,6 +48,23 @@ export function AssetReviewDrawer() {
   const prevCardRef = useRef<string | null>(null);
   const viewLoggedRef = useRef<string | null>(null);
 
+  // Resolve actual video URL for video/reel cards (may differ from thumbnailUrl)
+  const resolvedVideoUrl = useMemo(() => {
+    if (!selectedCard) return null;
+    if (selectedCard.contentType !== "video" && selectedCard.contentType !== "reel") return null;
+
+    // Check sourceVault.rawFiles for a video file
+    const rawVideo = selectedCard.sourceVault?.rawFiles?.find((f) => f.mimeType?.startsWith("video/"));
+    if (rawVideo) return rawVideo.url;
+
+    // Check media_ids for a file that isn't the thumbnail image
+    const thumbFileId = selectedCard.thumbnailUrl?.match(/[?&]id=([^&]+)/)?.[1];
+    const videoId = selectedCard.mediaIds?.find((id) => id !== thumbFileId);
+    if (videoId) return `/api/drive/stream?id=${videoId}`;
+
+    return null;
+  }, [selectedCard]);
+
   // Source Vault state
   const [designLink, setDesignLink] = useState("");
   const [driveFolder, setDriveFolder] = useState("");
@@ -361,7 +378,11 @@ export function AssetReviewDrawer() {
             </div>
             <div className="relative w-full rounded-2xl overflow-hidden bg-gray-50 dark:bg-white/[0.03] group shadow-sm">
               {(selectedCard.contentType === "video" || selectedCard.contentType === "reel") ? (
-                <video src={selectedCard.thumbnailUrl} controls poster={selectedCard.thumbnailUrl} className="w-full aspect-video rounded-2xl bg-black object-contain" />
+                resolvedVideoUrl ? (
+                  <video key={resolvedVideoUrl} src={resolvedVideoUrl} controls poster={selectedCard.thumbnailUrl || undefined} className="w-full aspect-video rounded-2xl bg-black object-contain" />
+                ) : (
+                  <video src={selectedCard.thumbnailUrl} controls className="w-full aspect-video rounded-2xl bg-black object-contain" />
+                )
               ) : (
                 <img src={selectedCard.thumbnailUrl} alt={selectedCard.title} className="w-full aspect-video object-cover transition-transform duration-300 group-hover:scale-[1.02]" />
               )}
