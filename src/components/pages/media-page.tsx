@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import {
   FolderOpen, Upload, Film, Image as ImageIcon, Search, Grid3X3, List,
   CheckCircle, Clock, X, Trash2, Eye, Link2, ExternalLink, Download,
+  ChevronLeft, ChevronRight,
 } from "lucide-react";
 
 type StatusFilter = "all" | "unused" | "inuse";
@@ -48,6 +49,7 @@ export function MediaPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadingFileName, setUploadingFileName] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const useDb = isSupabaseConfigured();
 
   // ─── Load media from Supabase ───
@@ -154,6 +156,40 @@ export function MediaPage() {
     const d = new Date(date + "T12:00:00");
     const formatted = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
     return time ? `${formatted} · ${time}` : formatted;
+  };
+
+  // ─── Lightbox navigation ───
+  const lightboxIndex = lightboxAsset ? filteredMedia.findIndex((m) => m.id === lightboxAsset.id) : -1;
+  const hasPrev = lightboxIndex > 0;
+  const hasNext = lightboxIndex >= 0 && lightboxIndex < filteredMedia.length - 1;
+
+  useEffect(() => {
+    if (!lightboxAsset) return;
+    const idx = filteredMedia.findIndex((m) => m.id === lightboxAsset.id);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft" && idx > 0) setLightboxAsset(filteredMedia[idx - 1]);
+      else if (e.key === "ArrowRight" && idx < filteredMedia.length - 1) setLightboxAsset(filteredMedia[idx + 1]);
+      else if (e.key === "Escape") setLightboxAsset(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [lightboxAsset, filteredMedia]);
+
+  const onSwipeStart = (e: React.TouchEvent) => {
+    touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  };
+  const onSwipeEnd = (e: React.TouchEvent) => {
+    if (!touchStartRef.current || !lightboxAsset) return;
+    const dx = e.changedTouches[0].clientX - touchStartRef.current.x;
+    const dy = e.changedTouches[0].clientY - touchStartRef.current.y;
+    touchStartRef.current = null;
+    const idx = filteredMedia.findIndex((m) => m.id === lightboxAsset.id);
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
+      if (dx < 0 && idx < filteredMedia.length - 1) setLightboxAsset(filteredMedia[idx + 1]);
+      else if (dx > 0 && idx > 0) setLightboxAsset(filteredMedia[idx - 1]);
+    } else if (dy > 80) {
+      setLightboxAsset(null);
+    }
   };
 
   return (
@@ -357,6 +393,7 @@ export function MediaPage() {
                 <div>
                   <p className="text-[13px] font-medium text-gray-800 dark:text-gray-200">{lightboxAsset.name}</p>
                   <p className="text-[10px] text-gray-400">{lightboxAsset.folder} · {formatDate(lightboxAsset.uploadedAt, lightboxAsset.uploadedTime)}{lightboxAsset.addedBy ? ` · by ${lightboxAsset.addedBy}` : ""}</p>
+                  {filteredMedia.length > 1 && <p className="text-[9px] text-gray-400 tabular-nums mt-0.5">{lightboxIndex + 1} of {filteredMedia.length}</p>}
                 </div>
                 <div className="flex items-center gap-1">
                   <button onClick={() => copyShareLink(lightboxAsset)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-400 hover:text-orange-500 cursor-pointer transition-colors" title="Copy shareable link"><Link2 className="w-4 h-4" /></button>
@@ -364,15 +401,25 @@ export function MediaPage() {
                   <button onClick={() => setLightboxAsset(null)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-400 cursor-pointer transition-colors"><X className="w-5 h-5" /></button>
                 </div>
               </div>
-              <div className="flex-1 overflow-hidden bg-gray-50 dark:bg-black flex items-center justify-center p-4">
+              <div className="flex-1 overflow-hidden bg-gray-50 dark:bg-black flex items-center justify-center p-4 relative group/lb" onTouchStart={onSwipeStart} onTouchEnd={onSwipeEnd}>
                 {lightboxAsset.type === "image" ? (
-                  <img src={lightboxAsset.url} alt={lightboxAsset.name} className="max-w-full max-h-[60vh] object-contain rounded-lg" />
+                  <img src={lightboxAsset.url} alt={lightboxAsset.name} className="max-w-full max-h-[60vh] object-contain rounded-lg select-none" draggable={false} />
                 ) : (
                   <div className="flex flex-col items-center justify-center text-gray-400 gap-2">
                     <Film className="w-16 h-16" />
                     <p className="text-[13px]">Video preview</p>
                     <p className="text-[11px] text-gray-500">{lightboxAsset.name}</p>
                   </div>
+                )}
+                {hasPrev && (
+                  <button onClick={() => setLightboxAsset(filteredMedia[lightboxIndex - 1])} className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/60 transition-all cursor-pointer shadow-lg opacity-70 md:opacity-0 md:group-hover/lb:opacity-100">
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                )}
+                {hasNext && (
+                  <button onClick={() => setLightboxAsset(filteredMedia[lightboxIndex + 1])} className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/60 transition-all cursor-pointer shadow-lg opacity-70 md:opacity-0 md:group-hover/lb:opacity-100">
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
                 )}
               </div>
             </div>
