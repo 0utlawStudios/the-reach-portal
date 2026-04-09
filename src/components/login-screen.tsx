@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { Mail, Lock, ArrowRight, AlertCircle, Eye, EyeOff, Zap, Shield, BarChart3, Send } from "lucide-react";
 import { motion } from "framer-motion";
@@ -18,6 +18,22 @@ export function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  // Show error from URL params (e.g. expired invite link)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlError = params.get("error");
+    if (urlError) {
+      const messages: Record<string, string> = {
+        invalid_token: "Your invite link has expired or is invalid. Ask an admin to resend your invite.",
+        missing_token: "Invalid link. Please use the invite link from your email.",
+        no_session: "Could not create a session. Ask an admin to resend your invite.",
+        config: "Server configuration error. Please contact your admin.",
+      };
+      setError(messages[urlError] || "Something went wrong. Please try again or contact your admin.");
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

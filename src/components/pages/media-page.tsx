@@ -405,11 +405,7 @@ export function MediaPage() {
                 {lightboxAsset.type === "image" ? (
                   <img src={lightboxAsset.url} alt={lightboxAsset.name} className="max-w-full max-h-[60vh] object-contain rounded-lg select-none" draggable={false} />
                 ) : (
-                  <div className="flex flex-col items-center justify-center text-gray-400 gap-2">
-                    <Film className="w-16 h-16" />
-                    <p className="text-[13px]">Video preview</p>
-                    <p className="text-[11px] text-gray-500">{lightboxAsset.name}</p>
-                  </div>
+                  <video src={lightboxAsset.url} controls playsInline className="max-w-full max-h-[60vh] rounded-lg bg-black" />
                 )}
                 {hasPrev && (
                   <button onClick={() => setLightboxAsset(filteredMedia[lightboxIndex - 1])} className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/60 transition-all cursor-pointer shadow-lg opacity-70 md:opacity-0 md:group-hover/lb:opacity-100">
