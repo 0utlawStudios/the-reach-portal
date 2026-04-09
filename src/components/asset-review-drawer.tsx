@@ -14,7 +14,7 @@ import {
   X, Calendar, Clock, PlayCircle, ChevronRight, CheckCircle2, MessageSquare,
   ArrowRightLeft, Pencil, Save, ExternalLink, Hash, Type, Trash2, Send,
   Upload, FolderOpen, Link2, FileText, History, Image as ImageIcon,
-  FileVideo, Paperclip, AlertCircle,
+  FileVideo, Paperclip, AlertCircle, Maximize2,
 } from "lucide-react";
 import { PlatformIcon } from "./platform-icons";
 import { MentionTextarea } from "./mention-textarea";
@@ -80,6 +80,7 @@ export function AssetReviewDrawer() {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadingFileName, setUploadingFileName] = useState("");
+  const [showLightbox, setShowLightbox] = useState(false);
 
   useEffect(() => {
     if (selectedCard && isEditingOnOpen && prevCardRef.current !== selectedCard.id) {
@@ -93,6 +94,7 @@ export function AssetReviewDrawer() {
       setDesignLink(selectedCard.sourceVault?.designLink || "");
       setDriveFolder(selectedCard.sourceVault?.driveFolder || "");
       setActiveTab("content");
+      setShowLightbox(false);
       prevCardRef.current = selectedCard.id;
     }
     if (!isDrawerOpen) {
@@ -101,6 +103,7 @@ export function AssetReviewDrawer() {
       setDateEditing(false);
       setNewComment("");
       setActiveTab("content");
+      setShowLightbox(false);
       prevCardRef.current = null;
       viewLoggedRef.current = null;
     }
@@ -377,14 +380,32 @@ export function AssetReviewDrawer() {
               <span className="text-[8px] text-gray-400 dark:text-gray-600 font-medium">Preview only — not posted</span>
             </div>
             <div className="relative w-full rounded-2xl overflow-hidden bg-gray-50 dark:bg-white/[0.03] group shadow-sm">
-              {(selectedCard.contentType === "video" || selectedCard.contentType === "reel") ? (
+              {selectedCard.contentType === "video" ? (
                 resolvedVideoUrl ? (
                   <video key={resolvedVideoUrl} src={resolvedVideoUrl} controls poster={selectedCard.thumbnailUrl || undefined} className="w-full aspect-video rounded-2xl bg-black object-contain" />
                 ) : (
                   <video src={selectedCard.thumbnailUrl} controls className="w-full aspect-video rounded-2xl bg-black object-contain" />
                 )
+              ) : selectedCard.contentType === "reel" ? (
+                <div className="w-full max-h-[400px] flex items-center justify-center bg-black">
+                  {resolvedVideoUrl ? (
+                    <video key={resolvedVideoUrl} src={resolvedVideoUrl} controls poster={selectedCard.thumbnailUrl || undefined} className="w-full max-h-[400px] rounded-2xl bg-black object-contain" />
+                  ) : (
+                    <video src={selectedCard.thumbnailUrl} controls className="w-full max-h-[400px] rounded-2xl bg-black object-contain" />
+                  )}
+                </div>
               ) : (
-                <img src={selectedCard.thumbnailUrl} alt={selectedCard.title} className="w-full aspect-video object-cover transition-transform duration-300 group-hover:scale-[1.02]" />
+                <div
+                  className="w-full flex items-center justify-center bg-gray-100 dark:bg-black/40 cursor-pointer"
+                  onClick={() => selectedCard.thumbnailUrl && setShowLightbox(true)}
+                >
+                  <img src={selectedCard.thumbnailUrl} alt={selectedCard.title} className="w-full h-auto object-contain transition-transform duration-300 group-hover:scale-[1.01]" />
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+                    <div className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center">
+                      <Maximize2 className="w-4 h-4 text-white" />
+                    </div>
+                  </div>
+                </div>
               )}
               <select
                 value={selectedCard.contentType}
@@ -920,6 +941,31 @@ export function AssetReviewDrawer() {
           )}
         </div>
       </div>
+
+      {/* ─── Thumbnail Lightbox ─── */}
+      {showLightbox && selectedCard.thumbnailUrl && (
+        <>
+          <div
+            onClick={() => setShowLightbox(false)}
+            className="fixed inset-0 bg-black/80 z-[60] backdrop-blur-sm cursor-pointer"
+          />
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-8 pointer-events-none">
+            <div className="relative max-w-4xl w-full max-h-[90vh] pointer-events-auto">
+              <img
+                src={selectedCard.thumbnailUrl}
+                alt={selectedCard.title}
+                className="max-w-full max-h-[85vh] object-contain mx-auto rounded-lg shadow-2xl"
+              />
+              <button
+                onClick={() => setShowLightbox(false)}
+                className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/80 transition-colors cursor-pointer shadow-lg"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* ─── Media Library Picker ─── */}
       <MediaPicker

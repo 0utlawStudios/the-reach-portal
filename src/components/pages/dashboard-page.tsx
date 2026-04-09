@@ -140,12 +140,12 @@ export function DashboardPage() {
             </div>
             <div className="grid grid-cols-2 gap-3 pt-1">
               {[
-                { label: "Published", value: postedCount, color: "text-gray-900 dark:text-white" },
-                { label: "In Review", value: pendingApproval + needsRevision, color: "text-orange-600 dark:text-orange-400" },
-                { label: "Scheduled", value: scheduledCount, color: "text-amber-600 dark:text-amber-400" },
-                { label: "Platforms", value: platformCounts.length, color: "text-gray-600 dark:text-gray-300" },
+                { label: "Published", value: postedCount, color: "text-gray-900 dark:text-white", action: () => { sessionStorage.setItem("t10_open_archive", "true"); navigate("pipeline"); } },
+                { label: "In Review", value: pendingApproval + needsRevision, color: "text-orange-600 dark:text-orange-400", action: () => navigate("pipeline") },
+                { label: "Scheduled", value: scheduledCount, color: "text-amber-600 dark:text-amber-400", action: () => navigate("pipeline") },
+                { label: "Platforms", value: platformCounts.length, color: "text-gray-600 dark:text-gray-300", action: undefined as (() => void) | undefined },
               ].map((s) => (
-                <div key={s.label} className="bg-gray-50/80 dark:bg-white/[0.02] rounded-xl p-3 text-center border border-gray-100/60 dark:border-white/[0.04]">
+                <div key={s.label} onClick={s.action} className={`bg-gray-50/80 dark:bg-white/[0.02] rounded-xl p-3 text-center border border-gray-100/60 dark:border-white/[0.04] ${s.action ? "cursor-pointer hover:bg-gray-100/80 dark:hover:bg-white/[0.05] hover:border-gray-200 dark:hover:border-white/[0.08] transition-all duration-200 active:scale-[0.97]" : ""}`}>
                   <p className={`text-[26px] font-black tabular-nums font-mono tracking-tighter ${s.color}`}>
                     {mounted ? <AnimatedCounter value={s.value} duration={2000} /> : "0"}
                   </p>
