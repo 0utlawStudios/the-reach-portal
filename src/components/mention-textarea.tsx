@@ -21,8 +21,8 @@ export function MentionTextarea({ value, onChange, placeholder, className, rows 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const filteredMembers = members.filter((m) =>
-    m.name.toLowerCase().includes(mentionQuery.toLowerCase())
-  ).slice(0, 5);
+    m.status === "active" && m.name.toLowerCase().includes(mentionQuery.toLowerCase())
+  );
 
   const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
@@ -74,7 +74,7 @@ export function MentionTextarea({ value, onChange, placeholder, className, rows 
         className={className}
       />
       {showDropdown && filteredMembers.length > 0 && (
-        <div className="absolute left-0 bottom-full mb-1 w-64 bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-white/[0.1] shadow-xl py-1 z-50">
+        <div className="absolute left-0 bottom-full mb-1 w-64 max-h-72 overflow-y-auto bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-white/[0.1] shadow-xl py-1 z-50">
           <p className="px-3 py-1 text-[9px] font-bold text-gray-400 uppercase tracking-wider">Mention someone</p>
           {filteredMembers.map((member) => (
             <button

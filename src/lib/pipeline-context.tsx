@@ -15,14 +15,14 @@ const STORAGE_KEY = "pipeline_cards";
 function dbToCard(row: any): ContentCard {
   const notes = row.notes || undefined;
   // Reconstruct revised flag from notes — if notes contain "Revision Note" entries, card was revised
-  const revised = notes ? /Revision Note \(/.test(notes) : false;
+  const revised = notes ? /(Revision Note \(|Fix submitted —)/.test(notes) : false;
   // Reconstruct revision history from notes
   const revisionHistory: { note: string; by: string; at: string }[] = [];
   if (notes) {
-    const matches = notes.matchAll(/Revision Note \(([^)]+)\): (.+?)(?=\n\n|$)/g);
-    for (const m of matches) {
-      revisionHistory.push({ note: m[2], by: "Revision Author", at: m[1] });
-    }
+    const oldFmt = notes.matchAll(/Revision Note \(([^)]+)\): (.+?)(?=\n\n|$)/g);
+    for (const m of oldFmt) revisionHistory.push({ note: m[2], by: "Revision Note", at: m[1] });
+    const newFmt = notes.matchAll(/(.+?)\s*\(([^)]+)\):\s*Fix submitted — (.+?)(?=\n\n|$)/g);
+    for (const m of newFmt) revisionHistory.push({ note: m[3], by: m[1].trim(), at: m[2] });
   }
   return {
     id: row.id,
@@ -264,7 +264,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     const timestamp = now.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
     const author = currentUser.name;
     const historyEntry = { note, by: author, at: now.toISOString() };
-    const noteLine = `Revision Note (${timestamp}): ${note}`;
+    const noteLine = `${author} (${timestamp}): Fix submitted — ${note}`;
 
     setCards((prev) => prev.map((c) => {
       if (c.id !== cardId) return c;
