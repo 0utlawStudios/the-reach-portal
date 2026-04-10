@@ -1,0 +1,70 @@
+{
+  "name": "Ten80Ten Daily Health Check",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 7 * * *" }]
+        }
+      },
+      "id": "schedule",
+      "name": "Every Day 7AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://smm.ten80ten.com/api/health/deep-check",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer YOUR_HEALTH_CHECK_SECRET_HERE" }
+          ]
+        },
+        "options": { "timeout": 30000 }
+      },
+      "id": "http",
+      "name": "Run Health Check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const report = $input.first().json;\nconst checks = report.checks || {};\nconst summary = report.summary || {};\nconst ts = new Date(report.timestamp).toLocaleString('en-US', { timeZone: 'Asia/Manila', dateStyle: 'full', timeStyle: 'short' });\n\nconst icon = (s) => s === 'pass' ? '✅' : s === 'warn' ? '⚠️' : '❌';\nconst color = (s) => s === 'pass' ? '#16a34a' : s === 'warn' ? '#d97706' : '#dc2626';\nconst bg = (s) => s === 'pass' ? '#f0fdf4' : s === 'warn' ? '#fffbeb' : '#fef2f2';\n\nconst overallStatus = summary.failures > 0 ? 'CRITICAL' : summary.warnings > 0 ? 'WARNINGS' : 'ALL CLEAR';\nconst overallColor = summary.failures > 0 ? '#dc2626' : summary.warnings > 0 ? '#d97706' : '#16a34a';\n\nlet rows = '';\nfor (const [name, check] of Object.entries(checks)) {\n  const c = check;\n  const label = name.replace(/_/g, ' ').replace(/\\b\\w/g, l => l.toUpperCase());\n  let detail = c.message;\n  if (c.details && typeof c.details === 'object') {\n    const entries = Object.entries(c.details).filter(([k,v]) => typeof v !== 'object').map(([k,v]) => `${k}: ${v}`).join(' | ');\n    if (entries) detail += `<br/><span style=\"font-size:11px;color:#6b7280;\">${entries}</span>`;\n  }\n  rows += `<tr><td style=\"padding:10px 14px;border-bottom:1px solid #f3f4f6;\">${icon(c.status)}</td><td style=\"padding:10px 14px;border-bottom:1px solid #f3f4f6;font-weight:600;color:#374151;\">${label}</td><td style=\"padding:10px 14px;border-bottom:1px solid #f3f4f6;color:${color(c.status)};\">${detail}</td></tr>`;\n}\n\nconst html = `\n<div style=\"font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:700px;margin:0 auto;\">\n  <div style=\"background:${overallColor};color:white;padding:20px 24px;border-radius:12px 12px 0 0;\">\n    <h1 style=\"margin:0;font-size:20px;\">🏥 Daily Health Report — ${overallStatus}</h1>\n    <p style=\"margin:6px 0 0;font-size:13px;opacity:0.9;\">${ts}</p>\n  </div>\n  <div style=\"background:white;padding:16px 24px;border:1px solid #e5e7eb;\">\n    <div style=\"display:flex;gap:16px;margin-bottom:16px;\">\n      <div style=\"text-align:center;padding:10px 16px;background:#f0fdf4;border-radius:8px;flex:1;\"><span style=\"font-size:22px;font-weight:800;color:#16a34a;\">${summary.passed}</span><br/><span style=\"font-size:11px;color:#6b7280;\">Passed</span></div>\n      <div style=\"text-align:center;padding:10px 16px;background:#fffbeb;border-radius:8px;flex:1;\"><span style=\"font-size:22px;font-weight:800;color:#d97706;\">${summary.warnings}</span><br/><span style=\"font-size:11px;color:#6b7280;\">Warnings</span></div>\n      <div style=\"text-align:center;padding:10px 16px;background:#fef2f2;border-radius:8px;flex:1;\"><span style=\"font-size:22px;font-weight:800;color:#dc2626;\">${summary.failures}</span><br/><span style=\"font-size:11px;color:#6b7280;\">Failures</span></div>\n    </div>\n  </div>\n  <table style=\"width:100%;border-collapse:collapse;background:white;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;overflow:hidden;\">\n    <thead><tr style=\"background:#f9fafb;\"><th style=\"padding:8px 14px;text-align:left;font-size:11px;color:#6b7280;text-transform:uppercase;\"></th><th style=\"padding:8px 14px;text-align:left;font-size:11px;color:#6b7280;text-transform:uppercase;\">Check</th><th style=\"padding:8px 14px;text-align:left;font-size:11px;color:#6b7280;text-transform:uppercase;\">Result</th></tr></thead>\n    <tbody>${rows}</tbody>\n  </table>\n  <p style=\"text-align:center;font-size:11px;color:#9ca3af;margin-top:16px;\">Ten80Ten SMM Health Monitor</p>\n</div>`;\n\nreturn [{ json: { subject: `${icon(summary.failures > 0 ? 'fail' : summary.warnings > 0 ? 'warn' : 'pass')} Ten80Ten Health: ${overallStatus} — ${summary.passed}/${summary.total} passed`, html, summary: report.summary } }];"
+      },
+      "id": "format",
+      "name": "Format Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "sendTo": "hello@ten80ten.com",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "html": "={{ $json.html }}",
+        "options": {}
+      },
+      "id": "email",
+      "name": "Send Report",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [880, 300],
+      "credentials": {
+        "smtp": { "id": "", "name": "CONFIGURE_YOUR_SMTP" }
+      }
+    }
+  ],
+  "connections": {
+    "Every Day 7AM": { "main": [[{ "node": "Run Health Check", "type": "main", "index": 0 }]] },
+    "Run Health Check": { "main": [[{ "node": "Format Email", "type": "main", "index": 0 }]] },
+    "Format Email": { "main": [[{ "node": "Send Report", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "monitoring" }]
+}
