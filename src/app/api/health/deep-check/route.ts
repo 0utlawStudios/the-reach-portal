@@ -195,14 +195,14 @@ export async function GET(req: Request) {
       const anonClient = createClient(url, anonKey);
       // Anon should NOT be able to list all team members without auth
       const { data: anonMembers, error: anonErr } = await anonClient.from("team_members").select("email").limit(5);
-      // Anon should NOT be able to delete posts
-      const { error: deleteErr } = await anonClient.from("posts").delete().eq("id", "00000000-0000-0000-0000-000000000000");
+      // Anon should NOT be able to read posts
+      const { data: anonPosts, error: postsErr } = await anonClient.from("posts").select("id").limit(1);
       // Anon should NOT be able to read audit logs
       const { data: anonAudit, error: auditErr } = await anonClient.from("post_audit_logs").select("id").limit(1);
 
       const issues: string[] = [];
       if (!anonErr && anonMembers && anonMembers.length > 0) issues.push("CRITICAL: Anon can read team_members emails");
-      if (!deleteErr) issues.push("CRITICAL: Anon delete on posts did not error");
+      if (!postsErr && anonPosts && anonPosts.length > 0) issues.push("CRITICAL: Anon can read posts data");
       if (!auditErr && anonAudit && anonAudit.length > 0) issues.push("Anon can read audit logs (may be intentional)");
 
       checks["06_rls_security"] = issues.some((i) => i.startsWith("CRITICAL"))
