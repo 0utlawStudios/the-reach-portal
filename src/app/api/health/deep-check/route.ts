@@ -582,6 +582,351 @@ export async function GET(req: Request) {
     checks["20_growth_metrics"] = fail(`Growth metrics error: ${e.message}`);
   }
 
+  // ═══ 21. SUPABASE STORAGE ═══
+  try {
+    const { data: buckets, error: bucketsErr } = await admin.storage.listBuckets();
+    if (bucketsErr) throw bucketsErr;
+    checks["21_supabase_storage"] = pass(`Storage accessible — ${(buckets || []).length} bucket(s)`, { buckets: (buckets || []).map((b: any) => b.name) });
+  } catch (e: any) {
+    checks["21_supabase_storage"] = fail(`Storage inaccessible: ${e.message}`);
+  }
+
+  // ═══ 22. TABLE LATENCY ═══
+  try {
+    const latencyTables = ["posts", "team_members", "post_audit_logs"];
+    const latencies: Record<string, number> = {};
+    for (const t of latencyTables) {
+      const s = Date.now();
+      await admin.from(t).select("id").limit(1);
+      latencies[t] = Date.now() - s;
+    }
+    const slowTables = Object.entries(latencies).filter(([, ms]) => ms > 2000);
+    checks["22_table_latency"] = slowTables.length > 0
+      ? warn(`Slow tables (>2000ms): ${slowTables.map(([t, ms]) => `${t}=${ms}ms`).join(", ")}`, latencies)
+      : pass(`All table queries fast — ${Object.entries(latencies).map(([t, ms]) => `${t}=${ms}ms`).join(", ")}`, latencies);
+  } catch (e: any) {
+    checks["22_table_latency"] = fail(`Latency check error: ${e.message}`);
+  }
+
+  // ═══ 23. SUPERADMIN CHECK ═══
+  try {
+    const superadmins = allMembers.filter((m) => m.role === "superadmin" && m.status === "active");
+    checks["23_superadmin_check"] = superadmins.length === 0
+      ? fail("No active superadmin found — system has no top-level admin", { count: 0 })
+      : pass(`${superadmins.length} active superadmin(s)`, { superadmins: superadmins.map((m: any) => m.email) });
+  } catch (e: any) {
+    checks["23_superadmin_check"] = fail(`Superadmin check error: ${e.message}`);
+  }
+
+  // ═══ 24. PASSWORD AGE ═══
+  try {
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+    const memberEmails = new Set(allMembers.filter((m) => m.status === "active").map((m) => m.email?.toLowerCase()));
+    const staleAccounts = authUsers.filter((u) => {
+      if (!u.email || !memberEmails.has(u.email.toLowerCase())) return false;
+      const lastUpdate = u.updated_at || u.created_at;
+      return lastUpdate && lastUpdate < ninetyDaysAgo;
+    });
+    checks["24_password_age"] = staleAccounts.length > 0
+      ? warn(`${staleAccounts.length} active user(s) haven't updated account in 90+ days`, { users: staleAccounts.map((u: any) => u.email) })
+      : pass("All active users have recent account updates");
+  } catch (e: any) {
+    checks["24_password_age"] = fail(`Password age check error: ${e.message}`);
+  }
+
+  // ═══ 25. SESSION ANALYSIS ═══
+  try {
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+    const weekStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const monthStart = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    const signedInToday = authUsers.filter((u) => u.last_sign_in_at && u.last_sign_in_at >= todayStart).length;
+    const signedInWeek = authUsers.filter((u) => u.last_sign_in_at && u.last_sign_in_at >= weekStart).length;
+    const signedInMonth = authUsers.filter((u) => u.last_sign_in_at && u.last_sign_in_at >= monthStart).length;
+
+    checks["25_session_analysis"] = pass(
+      `Sign-ins: ${signedInToday} today, ${signedInWeek} this week, ${signedInMonth} this month`,
+      { today: signedInToday, thisWeek: signedInWeek, thisMonth: signedInMonth, totalAuthUsers: authUsers.length }
+    );
+  } catch (e: any) {
+    checks["25_session_analysis"] = fail(`Session analysis error: ${e.message}`);
+  }
+
+  // ═══ 26. DUPLICATE POSTS ═══
+  try {
+    const { data: allPostTitles } = await admin.from("posts").select("id, title");
+    const titleMap: Record<string, string[]> = {};
+    (allPostTitles || []).forEach((p) => {
+      const t = (p.title || "").trim().toLowerCase();
+      if (t) {
+        if (!titleMap[t]) titleMap[t] = [];
+        titleMap[t].push(p.id);
+      }
+    });
+    const dupes = Object.entries(titleMap).filter(([, ids]) => ids.length > 1);
+    checks["26_duplicate_posts"] = dupes.length > 0
+      ? warn(`${dupes.length} duplicate title(s) found`, { duplicates: dupes.map(([title, ids]) => ({ title, count: ids.length })) })
+      : pass(`No duplicate post titles found across ${(allPostTitles || []).length} posts`);
+  } catch (e: any) {
+    checks["26_duplicate_posts"] = fail(`Duplicate check error: ${e.message}`);
+  }
+
+  // ═══ 27. STAGE VALIDITY ═══
+  try {
+    const validStages = ["ideas", "awaiting_approval", "revision_needed", "approved_scheduled", "posted"];
+    const { data: allPostStages } = await admin.from("posts").select("id, stage");
+    const invalidStage = (allPostStages || []).filter((p) => !validStages.includes(p.stage));
+    checks["27_stage_validity"] = invalidStage.length > 0
+      ? fail(`${invalidStage.length} post(s) with invalid stage`, { invalid: invalidStage.map((p) => ({ id: p.id, stage: p.stage })), validStages })
+      : pass(`All ${(allPostStages || []).length} posts have valid stages`, { validStages });
+  } catch (e: any) {
+    checks["27_stage_validity"] = fail(`Stage validity error: ${e.message}`);
+  }
+
+  // ═══ 28. PLATFORM VALIDITY ═══
+  try {
+    const validPlatforms = ["instagram", "facebook", "tiktok", "youtube", "linkedin", "x"];
+    const { data: allPostPlats } = await admin.from("posts").select("id, platforms");
+    const unknownPlatforms: { id: string; unknown: string[] }[] = [];
+    (allPostPlats || []).forEach((p) => {
+      const bad = (p.platforms || []).filter((pl: string) => !validPlatforms.includes(pl));
+      if (bad.length > 0) unknownPlatforms.push({ id: p.id, unknown: bad });
+    });
+    checks["28_platform_validity"] = unknownPlatforms.length > 0
+      ? warn(`${unknownPlatforms.length} post(s) with unknown platforms`, { posts: unknownPlatforms, validPlatforms })
+      : pass(`All platforms valid across ${(allPostPlats || []).length} posts`, { validPlatforms });
+  } catch (e: any) {
+    checks["28_platform_validity"] = fail(`Platform validity error: ${e.message}`);
+  }
+
+  // ═══ 29. ORPHANED COMMENTS ═══
+  try {
+    const { data: comments } = await admin.from("post_comments").select("id, post_id");
+    const { data: postIdList } = await admin.from("posts").select("id");
+    const validPostIds = new Set((postIdList || []).map((p) => p.id));
+    const orphaned = (comments || []).filter((c) => c.post_id && !validPostIds.has(c.post_id));
+    checks["29_orphaned_comments"] = orphaned.length > 0
+      ? warn(`${orphaned.length} comment(s) referencing deleted posts`, { orphanedCount: orphaned.length, sampleIds: orphaned.slice(0, 5).map((c) => c.id) })
+      : pass(`All ${(comments || []).length} comments reference valid posts`);
+  } catch (e: any) {
+    checks["29_orphaned_comments"] = fail(`Orphaned comments check error: ${e.message}`);
+  }
+
+  // ═══ 30. DATA FRESHNESS ═══
+  try {
+    const { data: latestPost } = await admin.from("posts").select("created_at").order("created_at", { ascending: false }).limit(1);
+    const { data: latestAudit } = await admin.from("post_audit_logs").select("created_at").order("created_at", { ascending: false }).limit(1);
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    const lastPostDate = latestPost?.[0]?.created_at || null;
+    const lastAuditDate = latestAudit?.[0]?.created_at || null;
+    const postStale = lastPostDate && lastPostDate < sevenDaysAgo;
+    const auditStale = lastAuditDate && lastAuditDate < sevenDaysAgo;
+
+    const issues: string[] = [];
+    if (!lastPostDate) issues.push("No posts found");
+    else if (postStale) issues.push(`Last post created ${lastPostDate.split("T")[0]} (>7 days ago)`);
+    if (!lastAuditDate) issues.push("No audit logs found");
+    else if (auditStale) issues.push(`Last audit entry ${lastAuditDate.split("T")[0]} (>7 days ago)`);
+
+    checks["30_data_freshness"] = issues.length > 0
+      ? warn(issues.join("; "), { lastPost: lastPostDate, lastAudit: lastAuditDate })
+      : pass(`Data fresh — last post ${lastPostDate?.split("T")[0]}, last audit ${lastAuditDate?.split("T")[0]}`, { lastPost: lastPostDate, lastAudit: lastAuditDate });
+  } catch (e: any) {
+    checks["30_data_freshness"] = fail(`Freshness check error: ${e.message}`);
+  }
+
+  // ═══ 31. ROLE DISTRIBUTION ═══
+  try {
+    const roleCounts: Record<string, number> = {};
+    allMembers.forEach((m) => { roleCounts[m.role || "unknown"] = (roleCounts[m.role || "unknown"] || 0) + 1; });
+    const emptyRoles = Object.entries(roleCounts).filter(([, c]) => c === 0);
+    checks["31_role_distribution"] = emptyRoles.length > 0
+      ? warn(`Role(s) with zero members: ${emptyRoles.map(([r]) => r).join(", ")}`, roleCounts)
+      : pass(`Role distribution: ${Object.entries(roleCounts).map(([r, c]) => `${r}=${c}`).join(", ")}`, roleCounts);
+  } catch (e: any) {
+    checks["31_role_distribution"] = fail(`Role distribution error: ${e.message}`);
+  }
+
+  // ═══ 32. MEMBER COMPLETENESS ═══
+  try {
+    const activeMembers = allMembers.filter((m) => m.status === "active");
+    const requiredFields = ["name", "email", "role", "avatar_url", "phone"];
+    const incomplete = activeMembers.filter((m) => requiredFields.some((f) => !m[f]));
+    const completeCount = activeMembers.length - incomplete.length;
+    const pct = activeMembers.length > 0 ? Math.round((completeCount / activeMembers.length) * 100) : 0;
+
+    checks["32_member_completeness"] = pct < 100
+      ? warn(`${pct}% complete profiles (${completeCount}/${activeMembers.length})`, {
+          percentage: pct,
+          incomplete: incomplete.map((m: any) => ({ name: m.name, missing: requiredFields.filter((f) => !m[f]) })),
+        })
+      : pass(`100% complete profiles (${activeMembers.length}/${activeMembers.length})`, { percentage: 100 });
+  } catch (e: any) {
+    checks["32_member_completeness"] = fail(`Member completeness error: ${e.message}`);
+  }
+
+  // ═══ 33. INVITE CONVERSION ═══
+  try {
+    const active = allMembers.filter((m) => m.status === "active").length;
+    const pending = allMembers.filter((m) => m.status === "pending").length;
+    const total = active + pending;
+    const rate = total > 0 ? Math.round((active / total) * 100) : 100;
+    checks["33_invite_conversion"] = rate < 50
+      ? warn(`Low invite conversion: ${rate}% (${active} active / ${total} total)`, { active, pending, rate })
+      : pass(`Invite conversion: ${rate}% (${active} active, ${pending} pending)`, { active, pending, rate });
+  } catch (e: any) {
+    checks["33_invite_conversion"] = fail(`Invite conversion error: ${e.message}`);
+  }
+
+  // ═══ 34. CAPTION QUALITY ═══
+  try {
+    const { data: captionPosts } = await admin.from("posts").select("id, title, caption, stage")
+      .in("stage", ["approved_scheduled", "awaiting_approval"]);
+    const tooShort = (captionPosts || []).filter((p) => p.caption && p.caption.trim().length < 20);
+    const tooLong = (captionPosts || []).filter((p) => p.caption && p.caption.trim().length > 2000);
+    const issues: string[] = [];
+    if (tooShort.length > 0) issues.push(`${tooShort.length} post(s) with captions <20 chars`);
+    if (tooLong.length > 0) issues.push(`${tooLong.length} post(s) with captions >2000 chars`);
+    checks["34_caption_quality"] = issues.length > 0
+      ? warn(issues.join("; "), { tooShort: tooShort.map((p: any) => p.title), tooLong: tooLong.map((p: any) => p.title) })
+      : pass(`All ${(captionPosts || []).length} approved/scheduled post captions within range`);
+  } catch (e: any) {
+    checks["34_caption_quality"] = fail(`Caption quality error: ${e.message}`);
+  }
+
+  // ═══ 35. SOURCE VAULT CHECK ═══
+  try {
+    const { data: approvedPosts } = await admin.from("posts").select("id, title, asset_source, stage")
+      .in("stage", ["approved_scheduled", "posted"]);
+    const missingSource = (approvedPosts || []).filter((p) => !p.asset_source);
+    checks["35_source_vault_check"] = missingSource.length > 0
+      ? warn(`${missingSource.length} approved/posted post(s) missing asset_source (compliance risk)`, {
+          count: missingSource.length,
+          posts: missingSource.slice(0, 10).map((p: any) => p.title),
+        })
+      : pass(`All ${(approvedPosts || []).length} approved/posted posts have asset_source`);
+  } catch (e: any) {
+    checks["35_source_vault_check"] = fail(`Source vault check error: ${e.message}`);
+  }
+
+  // ═══ 36. REVISION CYCLES ═══
+  try {
+    const { data: notePosts } = await admin.from("posts").select("id, title, notes");
+    const highRevision = (notePosts || []).filter((p) => {
+      if (!p.notes) return false;
+      const revisionMarkers = (p.notes.match(/revision|revise|redo|change|update/gi) || []).length;
+      return revisionMarkers >= 3;
+    });
+    checks["36_revision_cycles"] = highRevision.length > 0
+      ? warn(`${highRevision.length} post(s) with 3+ revision indicators in notes (quality concern)`, {
+          posts: highRevision.map((p: any) => p.title),
+        })
+      : pass(`No posts with excessive revision cycles`);
+  } catch (e: any) {
+    checks["36_revision_cycles"] = fail(`Revision cycles error: ${e.message}`);
+  }
+
+  // ═══ 37. SCHEDULED READINESS ═══
+  try {
+    const { data: scheduledPosts } = await admin.from("posts").select("id, title, caption, platforms, thumbnail_url, scheduled_date")
+      .eq("stage", "approved_scheduled");
+    const requiredFields37 = ["title", "caption", "platforms", "thumbnail_url", "scheduled_date"];
+    const incomplete = (scheduledPosts || []).filter((p) => {
+      return !p.title?.trim() || !p.caption?.trim() || !p.platforms || p.platforms.length === 0 || !p.thumbnail_url || !p.scheduled_date;
+    });
+    checks["37_scheduled_readiness"] = incomplete.length > 0
+      ? warn(`${incomplete.length} scheduled post(s) missing required fields`, {
+          incomplete: incomplete.map((p: any) => ({
+            title: p.title,
+            missing: requiredFields37.filter((f) => {
+              if (f === "platforms") return !p.platforms || p.platforms.length === 0;
+              return !p[f] || (typeof p[f] === "string" && !p[f].trim());
+            }),
+          })),
+        })
+      : pass(`All ${(scheduledPosts || []).length} scheduled posts are ready to publish`);
+  } catch (e: any) {
+    checks["37_scheduled_readiness"] = fail(`Scheduled readiness error: ${e.message}`);
+  }
+
+  // ═══ 38. PLATFORM DISTRIBUTION ═══
+  try {
+    const { data: platPosts } = await admin.from("posts").select("platforms");
+    const platUsage: Record<string, number> = {};
+    let totalUsage = 0;
+    (platPosts || []).forEach((p) => {
+      (p.platforms || []).forEach((pl: string) => {
+        platUsage[pl] = (platUsage[pl] || 0) + 1;
+        totalUsage++;
+      });
+    });
+    const underused = Object.entries(platUsage).filter(([, c]) => totalUsage > 0 && (c / totalUsage) * 100 < 10);
+    checks["38_platform_distribution"] = underused.length > 0
+      ? warn(`Underutilized platforms (<10%): ${underused.map(([p, c]) => `${p} (${Math.round((c / totalUsage) * 100)}%)`).join(", ")}`, {
+          distribution: Object.fromEntries(Object.entries(platUsage).map(([p, c]) => [p, `${c} (${Math.round((c / totalUsage) * 100)}%)`])),
+          totalUsage,
+        })
+      : pass(`Platform usage balanced across ${Object.keys(platUsage).length} platforms`, {
+          distribution: Object.fromEntries(Object.entries(platUsage).map(([p, c]) => [p, `${c} (${Math.round((c / totalUsage) * 100)}%)`])),
+          totalUsage,
+        });
+  } catch (e: any) {
+    checks["38_platform_distribution"] = fail(`Platform distribution error: ${e.message}`);
+  }
+
+  // ═══ 39. AUDIT COVERAGE ═══
+  try {
+    const { data: allAuditEntries } = await admin.from("post_audit_logs").select("user_name");
+    const auditedNames = new Set((allAuditEntries || []).map((a) => a.user_name));
+    const activeMembersForAudit = allMembers.filter((m) => m.status === "active");
+    const uncovered = activeMembersForAudit.filter((m) => !auditedNames.has(m.name));
+    checks["39_audit_coverage"] = uncovered.length > 0
+      ? warn(`${uncovered.length} active member(s) with zero audit log entries`, { members: uncovered.map((m: any) => m.name) })
+      : pass(`All ${activeMembersForAudit.length} active members have audit trail`);
+  } catch (e: any) {
+    checks["39_audit_coverage"] = fail(`Audit coverage error: ${e.message}`);
+  }
+
+  // ═══ 40. HEALTH SCORE ═══
+  try {
+    const categoryChecks: Record<string, string[]> = {
+      infrastructure: ["01_environment", "02_supabase_connection", "03_google_drive", "04_site_availability", "05_api_endpoints", "21_supabase_storage", "22_table_latency"],
+      security: ["06_rls_security", "07_auth_consistency", "08_secrets_scan", "23_superadmin_check", "24_password_age", "25_session_analysis"],
+      data_integrity: ["09_table_stats", "10_cross_table_integrity", "11_timestamp_sanity", "12_field_audit", "26_duplicate_posts", "27_stage_validity", "28_platform_validity", "29_orphaned_comments", "30_data_freshness"],
+      team: ["13_team_health", "14_user_activity", "31_role_distribution", "32_member_completeness", "33_invite_conversion"],
+      content: ["15_pipeline_flow", "16_content_quality", "17_thumbnail_check", "18_media_health", "34_caption_quality", "35_source_vault_check", "36_revision_cycles", "37_scheduled_readiness", "38_platform_distribution"],
+      observability: ["19_audit_completeness", "20_growth_metrics", "39_audit_coverage"],
+    };
+    const weights: Record<string, number> = { infrastructure: 0.25, security: 0.20, data_integrity: 0.20, team: 0.10, content: 0.15, observability: 0.10 };
+
+    const categoryScores: Record<string, { score: number; pass: number; warn: number; fail: number }> = {};
+    let compositeScore = 0;
+    for (const [cat, checkKeys] of Object.entries(categoryChecks)) {
+      let catPass = 0, catWarn = 0, catFail = 0;
+      for (const key of checkKeys) {
+        const c = checks[key];
+        if (!c) continue;
+        if (c.status === "pass") catPass++;
+        else if (c.status === "warn") catWarn++;
+        else catFail++;
+      }
+      const total = catPass + catWarn + catFail;
+      const score = total > 0 ? Math.round(((catPass * 1 + catWarn * 0.5) / total) * 100) : 0;
+      categoryScores[cat] = { score, pass: catPass, warn: catWarn, fail: catFail };
+      compositeScore += score * (weights[cat] || 0);
+    }
+    const finalScore = Math.round(compositeScore);
+
+    checks["40_health_score"] = finalScore >= 80
+      ? pass(`Health score: ${finalScore}/100`, { score: finalScore, categories: categoryScores })
+      : finalScore >= 50
+        ? warn(`Health score: ${finalScore}/100 — needs improvement`, { score: finalScore, categories: categoryScores })
+        : fail(`Health score: ${finalScore}/100 — critical`, { score: finalScore, categories: categoryScores });
+  } catch (e: any) {
+    checks["40_health_score"] = fail(`Health score error: ${e.message}`);
+  }
+
   // ═══ SUMMARY ═══
   const all = Object.values(checks);
   const summary = {
