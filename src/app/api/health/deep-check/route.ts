@@ -56,6 +56,25 @@ export async function GET(req: Request) {
   const now = new Date();
   const todayStr = now.toISOString().split("T")[0];
 
+  // ═══ DATA CACHE — fetch once, reuse everywhere ═══
+  let allPosts: any[] = [];
+  let allMedia: any[] = [];
+  let allAuditLogs: any[] = [];
+  let allComments: any[] = [];
+
+  try {
+    const [pRes, mRes, aRes, cRes] = await Promise.all([
+      admin.from("posts").select("*"),
+      admin.from("media_assets").select("*"),
+      admin.from("post_audit_logs").select("*").order("created_at", { ascending: false }).limit(5000),
+      admin.from("post_comments").select("*"),
+    ]);
+    allPosts = pRes.data || [];
+    allMedia = mRes.data || [];
+    allAuditLogs = aRes.data || [];
+    allComments = cRes.data || [];
+  } catch {}
+
   // ╔══════════════════════════════════════════════════════════════╗
   // ║  INFRASTRUCTURE                                             ║
   // ╚══════════════════════════════════════════════════════════════╝
@@ -233,7 +252,7 @@ export async function GET(req: Request) {
 
   // ═══ 8. SECRETS SCAN ═══
   try {
-    const { data: posts } = await admin.from("posts").select("id, title, notes, caption");
+    const posts = allPosts;
     const secretPatterns = [
       /sk[-_]live[-_]\w+/i, /sk[-_]test[-_]\w+/i, // Stripe keys
       /eyJ[a-zA-Z0-9_-]{20,}\.[a-zA-Z0-9_-]{20,}/,  // JWT tokens
@@ -276,7 +295,7 @@ export async function GET(req: Request) {
 
   // ═══ 10. CROSS-TABLE INTEGRITY ═══
   try {
-    const { data: posts } = await admin.from("posts").select("id, created_by, thumbnail_url");
+    const posts = allPosts;
     const memberNames = new Set(allMembers.map((m) => m.name));
 
     // Posts created by people not in team
@@ -284,12 +303,12 @@ export async function GET(req: Request) {
     const uniqueUnknown = [...new Set(unknownCreators.map((p) => p.created_by))];
 
     // Media assets referencing non-existent posts
-    const { data: media } = await admin.from("media_assets").select("id, post_id");
+    const media = allMedia;
     const postIds = new Set((posts || []).map((p) => p.id));
     const orphanedMedia = (media || []).filter((m) => m.post_id && !postIds.has(m.post_id));
 
     // Audit logs referencing non-existent posts
-    const { data: auditSample } = await admin.from("post_audit_logs").select("id, post_id").limit(200);
+    const auditSample = allAuditLogs.slice(0, 200);
     const orphanedAudits = (auditSample || []).filter((a) => a.post_id && !postIds.has(a.post_id));
 
     const issues: string[] = [];
@@ -308,20 +327,20 @@ export async function GET(req: Request) {
   try {
     const issues: string[] = [];
     // Posts with created_at in the future
-    const { data: futurePosts } = await admin.from("posts").select("id").gt("created_at", now.toISOString());
-    if ((futurePosts || []).length > 0) issues.push(`${futurePosts!.length} post(s) with future created_at`);
+    const futurePosts = allPosts.filter(p => p.created_at && p.created_at > now.toISOString());
+    if (futurePosts.length > 0) issues.push(`${futurePosts.length} post(s) with future created_at`);
 
     // Team members with future joined_at
     const { data: futureMembers } = await admin.from("team_members").select("id, email").gt("joined_at", now.toISOString());
     if ((futureMembers || []).length > 0) issues.push(`${futureMembers!.length} member(s) with future joined_at`);
 
     // Posts with invalid scheduled dates (format check)
-    const { data: allPosts } = await admin.from("posts").select("id, scheduled_date").not("scheduled_date", "is", null);
-    const badDates = (allPosts || []).filter((p) => p.scheduled_date && !/^\d{4}-\d{2}-\d{2}$/.test(p.scheduled_date));
+    const postsWithDates = allPosts.filter(p => p.scheduled_date != null);
+    const badDates = postsWithDates.filter((p) => p.scheduled_date && !/^\d{4}-\d{2}-\d{2}$/.test(p.scheduled_date));
     if (badDates.length > 0) issues.push(`${badDates.length} post(s) with malformed scheduled_date`);
 
     checks["11_timestamp_sanity"] = issues.length > 0
-      ? warn(issues.join("; "), { futurePosts: (futurePosts || []).length, futureMembers: (futureMembers || []).length, badDates: badDates.length })
+      ? warn(issues.join("; "), { futurePosts: futurePosts.length, futureMembers: (futureMembers || []).length, badDates: badDates.length })
       : pass("All timestamps valid");
   } catch (e: any) {
     checks["11_timestamp_sanity"] = fail(`Timestamp check error: ${e.message}`);
@@ -329,8 +348,8 @@ export async function GET(req: Request) {
 
   // ═══ 12. NULL / EMPTY FIELD AUDIT ═══
   try {
-    const { data: posts } = await admin.from("posts").select("id, title, stage, platforms, created_by");
-    const { data: members } = await admin.from("team_members").select("id, name, email, role, status");
+    const posts = allPosts;
+    const members = allMembers;
 
     const postIssues: string[] = [];
     const noTitle = (posts || []).filter((p) => !p.title?.trim());
@@ -395,13 +414,13 @@ export async function GET(req: Request) {
 
     // Most active users by audit log (last 7 days)
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const { data: weekLogs } = await admin.from("post_audit_logs").select("user_name").gte("created_at", weekAgo);
+    const weekLogs = allAuditLogs.filter(a => a.created_at && a.created_at >= weekAgo);
     const activityMap: Record<string, number> = {};
     (weekLogs || []).forEach((l) => { activityMap[l.user_name] = (activityMap[l.user_name] || 0) + 1; });
     const topUsers = Object.entries(activityMap).sort(([, a], [, b]) => b - a).slice(0, 5);
 
     // Members with zero audit entries ever
-    const { data: allAuditNames } = await admin.from("post_audit_logs").select("user_name");
+    const allAuditNames = allAuditLogs;
     const auditNames = new Set((allAuditNames || []).map((a) => a.user_name));
     const ghostMembers = allMembers.filter((m) => m.status === "active" && !auditNames.has(m.name)).map((m) => m.name);
 
@@ -423,7 +442,7 @@ export async function GET(req: Request) {
 
   // ═══ 15. PIPELINE FLOW ANALYSIS ═══
   try {
-    const { data: posts } = await admin.from("posts").select("id, stage, scheduled_date, created_at, updated_at");
+    const posts = allPosts;
     if (!posts) throw new Error("No posts");
 
     const stages: Record<string, number> = {};
@@ -464,7 +483,7 @@ export async function GET(req: Request) {
 
   // ═══ 16. CONTENT QUALITY ═══
   try {
-    const { data: posts } = await admin.from("posts").select("id, title, caption, platforms, thumbnail_url, scheduled_date, stage");
+    const posts = allPosts;
     const issues: string[] = [];
 
     // Very short titles
@@ -494,25 +513,27 @@ export async function GET(req: Request) {
 
   // ═══ 17. THUMBNAIL SPOT-CHECK ═══
   try {
-    const { data: posts } = await admin.from("posts").select("id, thumbnail_url").not("thumbnail_url", "is", null).limit(10);
+    const thumbPosts = allPosts.filter(p => p.thumbnail_url).slice(0, 10);
     let broken = 0;
     let checked = 0;
-    for (const p of (posts || []).slice(0, 10)) {
-      if (!p.thumbnail_url) continue;
+    for (const p of thumbPosts) {
       checked++;
+      // Skip Drive stream URLs (they require auth, HEAD will always fail)
+      if (p.thumbnail_url.includes('/api/drive/stream') || p.thumbnail_url.includes('googleapis.com')) continue;
       const r = await timedFetch(p.thumbnail_url, { method: "HEAD", timeout: 5000 });
       if (!r.ok) broken++;
     }
     checks["17_thumbnail_check"] = broken > 0
       ? warn(`${broken}/${checked} sampled thumbnails returned errors`, { checked, broken })
-      : pass(`${checked} thumbnails spot-checked — all reachable`);
+      : pass(`${checked} thumbnails spot-checked — all reachable or Drive-hosted`);
   } catch (e: any) {
     checks["17_thumbnail_check"] = fail(`Thumbnail check error: ${e.message}`);
   }
 
   // ═══ 18. MEDIA HEALTH ═══
   try {
-    const { data: media, count } = await admin.from("media_assets").select("id, url, drive_file_id, added_by, post_id", { count: "exact" });
+    const media = allMedia;
+    const count = allMedia.length;
     const noUrl = (media || []).filter((m) => !m.url && !m.drive_file_id);
     const noOwner = (media || []).filter((m) => !m.added_by);
     const noPost = (media || []).filter((m) => !m.post_id);
@@ -535,22 +556,22 @@ export async function GET(req: Request) {
 
   // ═══ 19. AUDIT LOG COMPLETENESS ═══
   try {
-    const { count: total } = await admin.from("post_audit_logs").select("*", { count: "exact", head: true });
+    const totalAudit = allAuditLogs.length;
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const { count: last24h } = await admin.from("post_audit_logs").select("*", { count: "exact", head: true }).gte("created_at", yesterday);
+    const last24h = allAuditLogs.filter(a => a.created_at && a.created_at >= yesterday).length;
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const { count: lastWeek } = await admin.from("post_audit_logs").select("*", { count: "exact", head: true }).gte("created_at", weekAgo);
+    const lastWeek = allAuditLogs.filter(a => a.created_at && a.created_at >= weekAgo).length;
 
     // Action type breakdown this week
-    const { data: weekActions } = await admin.from("post_audit_logs").select("action_type").gte("created_at", weekAgo);
+    const weekActions = allAuditLogs.filter(a => a.created_at && a.created_at >= weekAgo);
     const breakdown: Record<string, number> = {};
     (weekActions || []).forEach((a) => { breakdown[a.action_type] = (breakdown[a.action_type] || 0) + 1; });
 
     const avgDaily = lastWeek ? Math.round((lastWeek || 0) / 7) : 0;
 
-    checks["19_audit_completeness"] = (total || 0) === 0
+    checks["19_audit_completeness"] = totalAudit === 0
       ? warn("Audit log empty — no activity tracked")
-      : pass(`${total} total, ${last24h || 0} today, ~${avgDaily}/day avg`, { total, last24h, lastWeek, avgDaily, weeklyBreakdown: breakdown });
+      : pass(`${totalAudit} total, ${last24h} today, ~${avgDaily}/day avg`, { total: totalAudit, last24h, lastWeek, avgDaily, weeklyBreakdown: breakdown });
   } catch (e: any) {
     checks["19_audit_completeness"] = fail(`Audit check error: ${e.message}`);
   }
@@ -559,7 +580,7 @@ export async function GET(req: Request) {
   try {
     // Posts created per day this week
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const { data: recentPosts } = await admin.from("posts").select("created_at").gte("created_at", weekAgo);
+    const recentPosts = allPosts.filter(p => p.created_at && p.created_at >= weekAgo);
     const dailyPosts: Record<string, number> = {};
     (recentPosts || []).forEach((p) => {
       const day = p.created_at?.split("T")[0] || "unknown";
@@ -654,7 +675,7 @@ export async function GET(req: Request) {
 
   // ═══ 26. DUPLICATE POSTS ═══
   try {
-    const { data: allPostTitles } = await admin.from("posts").select("id, title");
+    const allPostTitles = allPosts;
     const titleMap: Record<string, string[]> = {};
     (allPostTitles || []).forEach((p) => {
       const t = (p.title || "").trim().toLowerCase();
@@ -674,7 +695,7 @@ export async function GET(req: Request) {
   // ═══ 27. STAGE VALIDITY ═══
   try {
     const validStages = ["ideas", "awaiting_approval", "revision_needed", "approved_scheduled", "posted"];
-    const { data: allPostStages } = await admin.from("posts").select("id, stage");
+    const allPostStages = allPosts;
     const invalidStage = (allPostStages || []).filter((p) => !validStages.includes(p.stage));
     checks["27_stage_validity"] = invalidStage.length > 0
       ? fail(`${invalidStage.length} post(s) with invalid stage`, { invalid: invalidStage.map((p) => ({ id: p.id, stage: p.stage })), validStages })
@@ -686,7 +707,7 @@ export async function GET(req: Request) {
   // ═══ 28. PLATFORM VALIDITY ═══
   try {
     const validPlatforms = ["instagram", "facebook", "tiktok", "youtube", "linkedin", "x"];
-    const { data: allPostPlats } = await admin.from("posts").select("id, platforms");
+    const allPostPlats = allPosts;
     const unknownPlatforms: { id: string; unknown: string[] }[] = [];
     (allPostPlats || []).forEach((p) => {
       const bad = (p.platforms || []).filter((pl: string) => !validPlatforms.includes(pl));
@@ -701,9 +722,8 @@ export async function GET(req: Request) {
 
   // ═══ 29. ORPHANED COMMENTS ═══
   try {
-    const { data: comments } = await admin.from("post_comments").select("id, post_id");
-    const { data: postIdList } = await admin.from("posts").select("id");
-    const validPostIds = new Set((postIdList || []).map((p) => p.id));
+    const comments = allComments;
+    const validPostIds = new Set(allPosts.map((p) => p.id));
     const orphaned = (comments || []).filter((c) => c.post_id && !validPostIds.has(c.post_id));
     checks["29_orphaned_comments"] = orphaned.length > 0
       ? warn(`${orphaned.length} comment(s) referencing deleted posts`, { orphanedCount: orphaned.length, sampleIds: orphaned.slice(0, 5).map((c) => c.id) })
@@ -714,12 +734,11 @@ export async function GET(req: Request) {
 
   // ═══ 30. DATA FRESHNESS ═══
   try {
-    const { data: latestPost } = await admin.from("posts").select("created_at").order("created_at", { ascending: false }).limit(1);
-    const { data: latestAudit } = await admin.from("post_audit_logs").select("created_at").order("created_at", { ascending: false }).limit(1);
+    const sortedPosts = [...allPosts].sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    const lastPostDate = latestPost?.[0]?.created_at || null;
-    const lastAuditDate = latestAudit?.[0]?.created_at || null;
+    const lastPostDate = sortedPosts[0]?.created_at || null;
+    const lastAuditDate = allAuditLogs[0]?.created_at || null;
     const postStale = lastPostDate && lastPostDate < sevenDaysAgo;
     const auditStale = lastAuditDate && lastAuditDate < sevenDaysAgo;
 
@@ -781,8 +800,7 @@ export async function GET(req: Request) {
 
   // ═══ 34. CAPTION QUALITY ═══
   try {
-    const { data: captionPosts } = await admin.from("posts").select("id, title, caption, stage")
-      .in("stage", ["approved_scheduled", "awaiting_approval"]);
+    const captionPosts = allPosts.filter(p => p.stage === "approved_scheduled" || p.stage === "awaiting_approval");
     const tooShort = (captionPosts || []).filter((p) => p.caption && p.caption.trim().length < 20);
     const tooLong = (captionPosts || []).filter((p) => p.caption && p.caption.trim().length > 2000);
     const issues: string[] = [];
@@ -797,8 +815,7 @@ export async function GET(req: Request) {
 
   // ═══ 35. SOURCE VAULT CHECK ═══
   try {
-    const { data: approvedPosts } = await admin.from("posts").select("id, title, asset_source, stage")
-      .in("stage", ["approved_scheduled", "posted"]);
+    const approvedPosts = allPosts.filter(p => p.stage === "approved_scheduled" || p.stage === "posted");
     const missingSource = (approvedPosts || []).filter((p) => !p.asset_source);
     checks["35_source_vault_check"] = missingSource.length > 0
       ? warn(`${missingSource.length} approved/posted post(s) missing asset_source (compliance risk)`, {
@@ -812,7 +829,7 @@ export async function GET(req: Request) {
 
   // ═══ 36. REVISION CYCLES ═══
   try {
-    const { data: notePosts } = await admin.from("posts").select("id, title, notes");
+    const notePosts = allPosts;
     const highRevision = (notePosts || []).filter((p) => {
       if (!p.notes) return false;
       const revisionMarkers = (p.notes.match(/revision|revise|redo|change|update/gi) || []).length;
@@ -829,8 +846,7 @@ export async function GET(req: Request) {
 
   // ═══ 37. SCHEDULED READINESS ═══
   try {
-    const { data: scheduledPosts } = await admin.from("posts").select("id, title, caption, platforms, thumbnail_url, scheduled_date")
-      .eq("stage", "approved_scheduled");
+    const scheduledPosts = allPosts.filter(p => p.stage === "approved_scheduled");
     const requiredFields37 = ["title", "caption", "platforms", "thumbnail_url", "scheduled_date"];
     const incomplete = (scheduledPosts || []).filter((p) => {
       return !p.title?.trim() || !p.caption?.trim() || !p.platforms || p.platforms.length === 0 || !p.thumbnail_url || !p.scheduled_date;
@@ -852,7 +868,7 @@ export async function GET(req: Request) {
 
   // ═══ 38. PLATFORM DISTRIBUTION ═══
   try {
-    const { data: platPosts } = await admin.from("posts").select("platforms");
+    const platPosts = allPosts;
     const platUsage: Record<string, number> = {};
     let totalUsage = 0;
     (platPosts || []).forEach((p) => {
@@ -877,7 +893,7 @@ export async function GET(req: Request) {
 
   // ═══ 39. AUDIT COVERAGE ═══
   try {
-    const { data: allAuditEntries } = await admin.from("post_audit_logs").select("user_name");
+    const allAuditEntries = allAuditLogs;
     const auditedNames = new Set((allAuditEntries || []).map((a) => a.user_name));
     const activeMembersForAudit = allMembers.filter((m) => m.status === "active");
     const uncovered = activeMembersForAudit.filter((m) => !auditedNames.has(m.name));
