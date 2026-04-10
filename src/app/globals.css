@@ -463,6 +463,11 @@ html:not(.dark)[data-design="liquid"] select {
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
 }
 
+/* Premium dark card gradients — default theme only */
+html.dark:not([data-design]) .card-premium {
+  background: var(--card-gradient);
+}
+
 /* Dashboard pulse animation */
 @keyframes pulse {
   0%, 100% { opacity: 1; transform: scale(1); }

@@ -11,9 +11,20 @@ import { useAuth } from "@/lib/auth-context";
 
 const stageIcons = [Lightbulb, Clock, RotateCcw, CalendarCheck, Rocket];
 
+// Premium dark-mode gradient palette
+const darkCardGradients = [
+  'linear-gradient(135deg, #131316 0%, #1a1422 100%)',
+  'linear-gradient(225deg, #131316 0%, #121924 100%)',
+  'linear-gradient(160deg, #131316 0%, #1b1711 100%)',
+  'linear-gradient(320deg, #131316 0%, #111c1b 100%)',
+  'linear-gradient(200deg, #131316 0%, #1d1317 100%)',
+  'linear-gradient(45deg, #131316 0%, #151822 100%)',
+  'linear-gradient(280deg, #131316 0%, #191420 100%)',
+];
+
 // Luxury card wrapper
-const Card = ({ children, className = "", onClick }: { children: React.ReactNode; className?: string; onClick?: () => void }) => (
-  <div onClick={onClick} className={`bg-white dark:bg-[#131316] rounded-2xl border border-gray-100/80 dark:border-white/[0.06] p-6 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_6px_24px_rgba(0,0,0,0.03)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.2),0_6px_24px_rgba(0,0,0,0.15)] transition-all duration-300 ${onClick ? "cursor-pointer hover:shadow-[0_2px_8px_rgba(0,0,0,0.06),0_12px_40px_rgba(0,0,0,0.05)] dark:hover:shadow-[0_2px_8px_rgba(0,0,0,0.3),0_12px_40px_rgba(0,0,0,0.2)] hover:border-gray-200 dark:hover:border-white/[0.1]" : ""} ${className}`}>
+const Card = ({ children, className = "", onClick, idx = 0 }: { children: React.ReactNode; className?: string; onClick?: () => void; idx?: number }) => (
+  <div onClick={onClick} className={`card-premium bg-white dark:bg-[#131316] rounded-2xl border border-gray-100/80 dark:border-white/[0.06] p-6 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_6px_24px_rgba(0,0,0,0.03)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.2),0_6px_24px_rgba(0,0,0,0.15)] transition-all duration-300 ${onClick ? "cursor-pointer hover:shadow-[0_2px_8px_rgba(0,0,0,0.06),0_12px_40px_rgba(0,0,0,0.05)] dark:hover:shadow-[0_2px_8px_rgba(0,0,0,0.3),0_12px_40px_rgba(0,0,0,0.2)] hover:border-gray-200 dark:hover:border-white/[0.1]" : ""} ${className}`} style={{ '--card-gradient': darkCardGradients[idx % darkCardGradients.length] } as React.CSSProperties}>
     {children}
   </div>
 );
@@ -64,10 +75,10 @@ export function DashboardPage() {
   }));
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-5 w-full overflow-y-auto overflow-x-hidden pb-20 bg-[#f8f9fb] dark:bg-[#09090b]">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-5 w-full overflow-y-auto overflow-x-hidden pb-20 bg-[#ecedf2] dark:bg-[#09090b]">
 
       {/* ═══ Welcome Banner ═══ */}
-      <div className="relative bg-white dark:bg-[#131316] rounded-2xl border border-gray-100/80 dark:border-white/[0.06] p-6 sm:p-7 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_6px_24px_rgba(0,0,0,0.03)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.2),0_6px_24px_rgba(0,0,0,0.15)] overflow-hidden">
+      <div className="card-premium relative bg-white dark:bg-[#131316] rounded-2xl border border-gray-100/80 dark:border-white/[0.06] p-6 sm:p-7 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_6px_24px_rgba(0,0,0,0.03)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.2),0_6px_24px_rgba(0,0,0,0.15)] overflow-hidden" style={{ '--card-gradient': darkCardGradients[6] } as React.CSSProperties}>
         <div className="absolute inset-0 bg-gradient-to-r from-orange-50/80 via-orange-50/20 to-transparent dark:from-orange-500/[0.03] dark:via-transparent pointer-events-none" />
         <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -102,7 +113,7 @@ export function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-5">
 
         {/* Pipeline Funnel */}
-        <Card className="md:col-span-1 lg:col-span-5 flex flex-col">
+        <Card idx={0} className="md:col-span-1 lg:col-span-5 flex flex-col">
           <SectionLabel icon={<BarChart3 className="w-4 h-4 text-orange-500" />} badge={<span className="text-[8px] text-gray-400 bg-gray-50 dark:bg-white/[0.04] px-2.5 py-1 rounded-full font-semibold uppercase tracking-[0.1em]">This week</span>}>Pipeline Funnel</SectionLabel>
           <div className="space-y-3.5 flex-1">
             {stageCounts.map((col, i) => {
@@ -124,7 +135,7 @@ export function DashboardPage() {
         </Card>
 
         {/* Weekly Scorecard */}
-        <Card className="lg:col-span-3 flex flex-col">
+        <Card idx={1} className="lg:col-span-3 flex flex-col">
           <SectionLabel icon={<Target className="w-4 h-4 text-orange-500" />}>Scorecard</SectionLabel>
           <div className="space-y-4 flex-1 flex flex-col justify-center">
             <div>
@@ -157,7 +168,7 @@ export function DashboardPage() {
         </Card>
 
         {/* Platform Split */}
-        <Card className="lg:col-span-4 flex flex-col">
+        <Card idx={2} className="lg:col-span-4 flex flex-col">
           <SectionLabel icon={<TrendingUp className="w-4 h-4 text-amber-500" />}>Platform Split</SectionLabel>
           <div className="space-y-4 flex-1 flex flex-col justify-center">
             {platformCounts.map(([platform, count], i) => {
@@ -184,7 +195,7 @@ export function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
 
         {/* Upcoming */}
-        <Card className="lg:col-span-5 flex flex-col">
+        <Card idx={3} className="lg:col-span-5 flex flex-col">
           <SectionLabel icon={<Zap className="w-4 h-4 text-orange-500" />}>Upcoming Posts</SectionLabel>
           {upcomingPosts.length > 0 ? (
             <div className="space-y-1">
@@ -216,7 +227,7 @@ export function DashboardPage() {
         <MiniCalendar cards={cards} navigate={navigate} />
 
         {/* Recently Published */}
-        <Card className="lg:col-span-4 flex flex-col">
+        <Card idx={5} className="lg:col-span-4 flex flex-col">
           <SectionLabel icon={<Eye className="w-4 h-4 text-sky-500" />}>Recently Published</SectionLabel>
           <div className="space-y-1">
             {recentPosted.map((card) => (
@@ -270,7 +281,7 @@ function MiniCalendar({ cards, navigate }: { cards: any[]; navigate: (page: any)
   const isToday = (day: number) => today.getFullYear() === year && today.getMonth() === month && today.getDate() === day;
 
   return (
-    <Card onClick={() => navigate("calendar")} className="lg:col-span-3 flex flex-col group">
+    <Card idx={4} onClick={() => navigate("calendar")} className="lg:col-span-3 flex flex-col group">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-[11px] font-bold text-gray-500 dark:text-gray-400 flex items-center gap-2 uppercase tracking-[0.08em]"><Calendar className="w-4 h-4 text-blue-500" />Calendar</h2>
         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
