@@ -60,10 +60,16 @@ async function enrichFromTeamMembers(email: string, profile: UserProfile): Promi
   try {
     const { data } = await supabase
       .from("team_members")
-      .select("name, role, avatar_url")
+      .select("name, role, avatar_url, status")
       .eq("email", email)
       .single();
     if (data) {
+      // Auto-activate: if user has a valid auth session but is still pending, flip to active
+      if (data.status === "pending") {
+        supabase.from("team_members").update({ status: "active" }).eq("email", email).then(({ error }) => {
+          if (error) console.error("[auth] auto-activate failed:", error.message);
+        });
+      }
       const name = data.name || profile.name;
       return {
         ...profile,
