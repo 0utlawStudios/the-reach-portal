@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { usePipeline } from "@/lib/pipeline-context";
 import { useNavigation } from "@/lib/navigation-context";
 import { PIPELINE_COLUMNS, Platform } from "@/lib/types";
@@ -24,14 +24,14 @@ const darkCardGradients = [
 
 // Luxury card wrapper
 const Card = ({ children, className = "", onClick, idx = 0 }: { children: React.ReactNode; className?: string; onClick?: () => void; idx?: number }) => (
-  <div onClick={onClick} className={`card-premium bg-white dark:bg-[#131316] rounded-2xl border border-gray-100/80 dark:border-white/[0.06] p-6 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_6px_24px_rgba(0,0,0,0.03)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.2),0_6px_24px_rgba(0,0,0,0.15)] transition-all duration-300 ${onClick ? "cursor-pointer hover:shadow-[0_2px_8px_rgba(0,0,0,0.06),0_12px_40px_rgba(0,0,0,0.05)] dark:hover:shadow-[0_2px_8px_rgba(0,0,0,0.3),0_12px_40px_rgba(0,0,0,0.2)] hover:border-gray-200 dark:hover:border-white/[0.1]" : ""} ${className}`} style={{ '--card-gradient': darkCardGradients[idx % darkCardGradients.length] } as React.CSSProperties}>
+  <div onClick={onClick} className={`card-premium bg-white dark:bg-[#131316] rounded-2xl border border-gray-100/80 dark:border-white/[0.06] p-4 xl:p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_6px_24px_rgba(0,0,0,0.03)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.2),0_6px_24px_rgba(0,0,0,0.15)] transition-all duration-300 ${onClick ? "cursor-pointer hover:shadow-[0_2px_8px_rgba(0,0,0,0.06),0_12px_40px_rgba(0,0,0,0.05)] dark:hover:shadow-[0_2px_8px_rgba(0,0,0,0.3),0_12px_40px_rgba(0,0,0,0.2)] hover:border-gray-200 dark:hover:border-white/[0.1]" : ""} ${className}`} style={{ '--card-gradient': darkCardGradients[idx % darkCardGradients.length] } as React.CSSProperties}>
     {children}
   </div>
 );
 
 // Section label
 const SectionLabel = ({ icon, children, badge }: { icon: React.ReactNode; children: React.ReactNode; badge?: React.ReactNode }) => (
-  <div className="flex items-center justify-between mb-5">
+  <div className="flex items-center justify-between mb-3">
     <h2 className="text-[11px] font-bold text-gray-500 dark:text-gray-400 flex items-center gap-2 uppercase tracking-[0.08em]">{icon}{children}</h2>
     {badge}
   </div>
@@ -44,6 +44,25 @@ export function DashboardPage() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => { setMounted(true); }, []);
+
+  // Auto-fit: scale dashboard to fill viewport without scrolling
+  const containerRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    const inner = innerRef.current;
+    if (!el || !inner) return;
+    const fit = () => {
+      const s = Math.min(el.clientHeight / inner.scrollHeight, 1);
+      setScale(prev => Math.abs(prev - s) > 0.003 ? s : prev);
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [mounted]);
 
   const totalCards = cards.length;
   const pendingApproval = cards.filter((c) => c.stage === "awaiting_approval").length;
@@ -75,10 +94,11 @@ export function DashboardPage() {
   }));
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-5 w-full overflow-y-auto overflow-x-hidden pb-20 bg-[#ecedf2] dark:bg-[#09090b]">
+    <div ref={containerRef} className="h-full w-full overflow-hidden bg-[#ecedf2] dark:bg-[#09090b]">
+      <div ref={innerRef} className="p-3 sm:p-4 lg:p-5 space-y-3" style={scale < 1 ? { transform: `scale(${scale})`, transformOrigin: 'top left', width: `${100 / scale}%` } : undefined}>
 
       {/* ═══ Welcome Banner ═══ */}
-      <div className="card-premium relative bg-white dark:bg-[#131316] rounded-2xl border border-gray-100/80 dark:border-white/[0.06] p-6 sm:p-7 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_6px_24px_rgba(0,0,0,0.03)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.2),0_6px_24px_rgba(0,0,0,0.15)] overflow-hidden" style={{ '--card-gradient': darkCardGradients[6] } as React.CSSProperties}>
+      <div className="card-premium relative bg-white dark:bg-[#131316] rounded-2xl border border-gray-100/80 dark:border-white/[0.06] p-4 sm:p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_6px_24px_rgba(0,0,0,0.03)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.2),0_6px_24px_rgba(0,0,0,0.15)] overflow-hidden" style={{ '--card-gradient': darkCardGradients[6] } as React.CSSProperties}>
         <div className="absolute inset-0 bg-gradient-to-r from-orange-50/80 via-orange-50/20 to-transparent dark:from-orange-500/[0.03] dark:via-transparent pointer-events-none" />
         <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -110,7 +130,7 @@ export function DashboardPage() {
       </div>
 
       {/* ═══ Row 1: Funnel + Scorecard + Platforms ═══ */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3">
 
         {/* Pipeline Funnel */}
         <Card idx={0} className="md:col-span-1 lg:col-span-5 flex flex-col">
@@ -192,7 +212,7 @@ export function DashboardPage() {
       </div>
 
       {/* ═══ Row 2: Upcoming + Calendar + Published ═══ */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
 
         {/* Upcoming */}
         <Card idx={3} className="lg:col-span-5 flex flex-col">
@@ -248,6 +268,7 @@ export function DashboardPage() {
             <button onClick={() => { sessionStorage.setItem("t10_open_archive", "true"); navigate("pipeline"); }} className="text-[10px] text-orange-500 hover:text-orange-600 cursor-pointer font-semibold transition-colors duration-300">Go to archive →</button>
           </div>
         </Card>
+      </div>
       </div>
     </div>
   );
