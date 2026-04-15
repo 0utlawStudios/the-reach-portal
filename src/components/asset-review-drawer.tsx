@@ -148,7 +148,28 @@ export function AssetReviewDrawer() {
   const nextStage = idx < stages.length - 1 ? stages[idx + 1] : null;
   const nextColumn = nextStage ? PIPELINE_COLUMNS.find((c) => c.id === nextStage) : null;
 
-  const noteLines = selectedCard.notes ? selectedCard.notes.split("\n\n").filter(Boolean) : [];
+  // Parse the concatenated notes field into individual comments. Notes are
+  // stored as `Author (date): content\n\nAuthor (date): content\n\n...`, but a
+  // single comment may contain its own `\n\n` paragraph breaks. The naive
+  // split("\n\n") shreds multi-paragraph comments into anonymous "??" rows.
+  // Coalesce any chunk without an `Author (date):` prefix back into the
+  // previous chunk as a continuation paragraph.
+  const noteLines = (() => {
+    if (!selectedCard.notes) return [];
+    const chunks = selectedCard.notes.split("\n\n").filter(Boolean);
+    const merged: string[] = [];
+    const authorPrefix = /^.+?\s*\([^)]+\):\s*/;
+    for (const chunk of chunks) {
+      const looksLikeNewNote =
+        authorPrefix.test(chunk) || chunk.startsWith("Fix submitted");
+      if (looksLikeNewNote || merged.length === 0) {
+        merged.push(chunk);
+      } else {
+        merged[merged.length - 1] += "\n\n" + chunk;
+      }
+    }
+    return merged;
+  })();
 
   const addComment = () => {
     if (!newComment.trim()) return;
@@ -629,7 +650,13 @@ export function AssetReviewDrawer() {
                         const timestamp = hasAuthor ? closingMatch![2] : null;
                         const content = hasAuthor ? closingMatch![3].trim() : note;
                         const isRevisionNote = author === "Revision Note" || (content || "").startsWith("Fix submitted");
-                        const displayAuthor = isRevisionNote ? (author || "Team Member") : author;
+                        // Old DB rows from before commit 55d0312 stored the
+                        // literal "Revision Note" as the author. Treat that as
+                        // a placeholder and show "Team Member" instead so the
+                        // UI does not display the literal string.
+                        const displayAuthor = isRevisionNote
+                          ? (author && author !== "Revision Note" ? author : "Team Member")
+                          : author;
                         const authorMember = displayAuthor ? members.find((m) => m.name === displayAuthor) : null;
                         const initials = displayAuthor ? displayAuthor.split(" ").map((n) => n[0]).join("").slice(0, 2) : "??";
                         return (
