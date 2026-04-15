@@ -120,15 +120,34 @@ export function AssetReviewDrawer() {
     return () => clearTimeout(timer);
   }, [selectedCard, isDrawerOpen, currentUser.name]);
 
-  // ─── Fetch audit logs when tab switches to "audit" ───
+  // ─── Fetch audit logs eagerly when a card opens ───
+  // Was lazy (only on audit tab activation), but the comment renderer needs
+  // audit logs to recover the actual author for legacy notes that lost their
+  // attribution (stored as "Revision Note" before commit 55d0312).
   useEffect(() => {
-    if (activeTab !== "audit" || !selectedCard) return;
+    if (!selectedCard) return;
     setAuditLoading(true);
     fetchAuditLogs(selectedCard.id).then((logs) => {
       setAuditLogs(logs);
       setAuditLoading(false);
     });
-  }, [activeTab, selectedCard]);
+  }, [selectedCard]);
+
+  // Build a content→user_name map from post_audit_logs so legacy notes that
+  // lost their attribution (stored as the literal "Revision Note" before
+  // commit 55d0312) can be recovered to the actual user who performed the
+  // action. Must live BEFORE the early return below so the hook is called
+  // on every render unconditionally (react-hooks/rules-of-hooks).
+  const auditAuthorByContent = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const a of auditLogs) {
+      if (a.details && a.user_name) {
+        map.set(a.details, a.user_name);
+        map.set(a.details.trim().toLowerCase(), a.user_name);
+      }
+    }
+    return map;
+  }, [auditLogs]);
 
   if (!selectedCard || !isDrawerOpen) return null;
 
@@ -170,6 +189,18 @@ export function AssetReviewDrawer() {
     }
     return merged;
   })();
+
+  // Helper: best-effort author recovery for a note whose stored author is
+  // missing or the legacy "Revision Note" placeholder. Closes over the
+  // auditAuthorByContent useMemo defined above the early return.
+  const recoverAuthorFromAudit = (content: string): string | null => {
+    if (!content) return null;
+    return (
+      auditAuthorByContent.get(content) ||
+      auditAuthorByContent.get(content.trim().toLowerCase()) ||
+      null
+    );
+  };
 
   const addComment = () => {
     if (!newComment.trim()) return;
@@ -650,13 +681,20 @@ export function AssetReviewDrawer() {
                         const timestamp = hasAuthor ? closingMatch![2] : null;
                         const content = hasAuthor ? closingMatch![3].trim() : note;
                         const isRevisionNote = author === "Revision Note" || (content || "").startsWith("Fix submitted");
-                        // Old DB rows from before commit 55d0312 stored the
-                        // literal "Revision Note" as the author. Treat that as
-                        // a placeholder and show "Team Member" instead so the
-                        // UI does not display the literal string.
-                        const displayAuthor = isRevisionNote
-                          ? (author && author !== "Revision Note" ? author : "Team Member")
-                          : author;
+                        // For legacy notes that lost their author (stored as
+                        // the literal "Revision Note" or with no prefix at
+                        // all), look up the real user_name from the audit log
+                        // by matching the note content against audit.details.
+                        // This preserves the immutable audit trail even when
+                        // the original storage format hardcoded a placeholder.
+                        const recoveredAuthor =
+                          (!author || author === "Revision Note")
+                            ? recoverAuthorFromAudit(content)
+                            : null;
+                        const displayAuthor = recoveredAuthor
+                          || (isRevisionNote
+                            ? (author && author !== "Revision Note" ? author : "Team Member")
+                            : author);
                         const authorMember = displayAuthor ? members.find((m) => m.name === displayAuthor) : null;
                         const initials = displayAuthor ? displayAuthor.split(" ").map((n) => n[0]).join("").slice(0, 2) : "??";
                         return (
