@@ -16,6 +16,11 @@ alter table posts add column if not exists hook text;
 alter table team_members add column if not exists phone text;
 
 -- signup_requests table for the request-access flow.
+-- IMPORTANT: if this table already exists from an older setup file
+-- (e.g., supabase-setup-all.sql) without workspace_id, CREATE TABLE IF NOT
+-- EXISTS is a no-op and the missing columns would not get added. The
+-- explicit ALTER TABLE ADD COLUMN IF NOT EXISTS statements below bring
+-- any pre-existing table up to spec.
 create table if not exists signup_requests (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid references workspaces(id) on delete cascade,
@@ -32,6 +37,22 @@ create table if not exists signup_requests (
   reviewed_at timestamptz,
   created_at timestamptz not null default now()
 );
+
+-- Bring a pre-existing signup_requests table up to the expected schema.
+alter table signup_requests add column if not exists workspace_id uuid;
+alter table signup_requests add column if not exists phone text;
+alter table signup_requests add column if not exists company text;
+alter table signup_requests add column if not exists reason text;
+alter table signup_requests add column if not exists role text;
+alter table signup_requests add column if not exists requested_by text;
+alter table signup_requests add column if not exists reviewed_by text;
+alter table signup_requests add column if not exists reviewed_at timestamptz;
+
+-- Add FK on workspace_id if missing. Idempotent via DO block.
+do $$ begin
+  alter table signup_requests add constraint signup_requests_workspace_id_fkey
+    foreign key (workspace_id) references workspaces(id) on delete cascade;
+exception when duplicate_object then null; end $$;
 
 create index if not exists signup_requests_status_idx
   on signup_requests(status, created_at desc);
