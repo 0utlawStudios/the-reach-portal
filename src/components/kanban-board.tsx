@@ -1,8 +1,9 @@
 "use client";
 
+import { RawImage } from "@/components/raw-image";
 import { useCallback, useState, useMemo, useEffect } from "react";
 import {
-  DndContext, DragEndEvent, DragOverEvent, DragStartEvent, DragOverlay,
+  DndContext, DragEndEvent, DragStartEvent, DragOverlay,
   PointerSensor, TouchSensor, useSensor, useSensors, pointerWithin, rectIntersection,
 } from "@dnd-kit/core";
 import { usePipeline } from "@/lib/pipeline-context";
@@ -64,7 +65,10 @@ export function KanbanBoard() {
   const { addToast } = useToast();
   const { pendingOpenPostId, clearPendingPost } = useNavigation();
   const [activeCard, setActiveCard] = useState<ContentCardType | null>(null);
-  const [view, setView] = useState<"pipeline" | "archive">("pipeline");
+  const [view, setView] = useState<"pipeline" | "archive">(() => {
+    if (typeof window === "undefined") return "pipeline";
+    return sessionStorage.getItem("t10_open_archive") === "true" ? "archive" : "pipeline";
+  });
   const [repurposingCard, setRepurposingCard] = useState<ContentCardType | null>(null);
 
   const sensors = useSensors(
@@ -86,7 +90,6 @@ export function KanbanBoard() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (sessionStorage.getItem("t10_open_archive") === "true") {
-      setView("archive");
       sessionStorage.removeItem("t10_open_archive");
     }
   }, []);
@@ -112,7 +115,7 @@ export function KanbanBoard() {
     sunday.setDate(cstNow.getDate() - day);
     sunday.setHours(0, 0, 0, 0);
     return sunday;
-  }, [cards]);
+  }, []);
 
   const sortedColumnCards = useMemo(() => {
     const map: Record<string, ContentCardType[]> = {};
@@ -192,7 +195,7 @@ export function KanbanBoard() {
     moveCard(cardId, targetStage);
   }, [cards, moveCard, requestKickback, userIsApprover, addToast]);
 
-  const handleDragOver = useCallback((_event: DragOverEvent) => {
+  const handleDragOver = useCallback(() => {
     // Empty: all moves on drop. DragOverlay provides visual feedback.
   }, []);
 
@@ -239,7 +242,7 @@ export function KanbanBoard() {
               <div className="space-y-2">
                 {archivedCards.map((card) => (
                   <div key={card.id} onClick={() => selectCard(card)} className="flex items-center gap-3 p-3 bg-white dark:bg-[#151518] rounded-xl border border-gray-200/80 dark:border-white/[0.06] shadow-sm hover:shadow-md transition-shadow cursor-pointer">
-                    <img src={card.thumbnailUrl} alt="" className="w-16 h-12 rounded-lg object-cover shrink-0" />
+                    <RawImage src={card.thumbnailUrl} alt="" className="w-16 h-12 rounded-lg object-cover shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-[13px] font-medium text-gray-800 dark:text-gray-200 truncate">{card.title}</p>
                       <div className="flex items-center gap-2 mt-1">

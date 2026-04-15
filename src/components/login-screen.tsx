@@ -1,6 +1,8 @@
 "use client";
 
+import { RawImage } from "@/components/raw-image";
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { Mail, Lock, ArrowRight, AlertCircle, Eye, EyeOff, Zap, Shield, BarChart3, Send } from "lucide-react";
 import { motion } from "framer-motion";
@@ -11,26 +13,31 @@ const fadeUp = (delay: number) => ({
   animate: { opacity: 1, y: 0, transition: { duration: 0.5, delay, ease: ease as unknown as [number, number, number, number] } },
 });
 
+function getUrlError(): string {
+  if (typeof window === "undefined") return "";
+  const params = new URLSearchParams(window.location.search);
+  const urlError = params.get("error");
+  if (!urlError) return "";
+  const messages: Record<string, string> = {
+    invalid_token: "Your invite link has expired or is invalid. Ask an admin to resend your invite.",
+    missing_token: "Invalid link. Please use the invite link from your email.",
+    no_session: "Could not create a session. Ask an admin to resend your invite.",
+    config: "Server configuration error. Please contact your admin.",
+  };
+  return messages[urlError] || "Something went wrong. Please try again or contact your admin.";
+}
+
 export function LoginScreen() {
   const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(getUrlError);
   const [isLoading, setIsLoading] = useState(false);
 
   // Show error from URL params (e.g. expired invite link)
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const urlError = params.get("error");
-    if (urlError) {
-      const messages: Record<string, string> = {
-        invalid_token: "Your invite link has expired or is invalid. Ask an admin to resend your invite.",
-        missing_token: "Invalid link. Please use the invite link from your email.",
-        no_session: "Could not create a session. Ask an admin to resend your invite.",
-        config: "Server configuration error. Please contact your admin.",
-      };
-      setError(messages[urlError] || "Something went wrong. Please try again or contact your admin.");
+    if (window.location.search.includes("error=")) {
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);
@@ -63,7 +70,7 @@ export function LoginScreen() {
 
             {/* Logo + heading */}
             <motion.div className="mb-10" {...fadeUp(0)}>
-              <img src="/ten80ten-logo.png" alt="Ten80Ten" className="w-[130px] h-auto object-contain mb-8" />
+              <RawImage src="/ten80ten-logo.png" alt="Ten80Ten" className="w-[130px] h-auto object-contain mb-8" />
               <h1 className="text-[28px] font-extrabold text-gray-900 dark:text-white tracking-[-0.03em] leading-[1.1]">
                 Welcome back
               </h1>
@@ -93,7 +100,7 @@ export function LoginScreen() {
               <motion.div className="space-y-1.5" {...fadeUp(0.14)}>
                 <div className="flex items-center justify-between">
                   <label className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-[0.1em]">Password</label>
-                  <a href="/auth/forgot-password" className="text-[10px] font-semibold text-[#f59e0b] hover:text-orange-600 transition-colors">Forgot password?</a>
+                  <Link href="/auth/forgot-password" className="text-[10px] font-semibold text-[#f59e0b] hover:text-orange-600 transition-colors">Forgot password?</Link>
                 </div>
                 <div className="relative">
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300 dark:text-gray-600" />
@@ -238,7 +245,7 @@ export function LoginScreen() {
             </div>
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#f59e0b]/20 to-orange-500/10 border border-white/[0.06] flex items-center justify-center">
-                <img src="/ten80ten-logo.png" alt="" className="w-6 h-6 object-contain" />
+                <RawImage src="/ten80ten-logo.png" alt="" className="w-6 h-6 object-contain" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-[11px] text-white/60 font-medium truncate">Spring Campaign</p>

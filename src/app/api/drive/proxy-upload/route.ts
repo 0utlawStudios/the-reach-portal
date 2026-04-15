@@ -23,7 +23,6 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
     const folder = formData.get("folder") as string;
-    const cardId = formData.get("cardId") as string | null;
     const fileName = formData.get("fileName") as string || file?.name || "upload";
     const mimeType = formData.get("mimeType") as string || file?.type || "application/octet-stream";
 

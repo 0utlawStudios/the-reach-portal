@@ -44,14 +44,14 @@ const DEFAULT_USER: UserProfile = {
 };
 
 /** Build a profile from auth metadata, with proper capitalization */
-function buildProfile(email: string, meta: Record<string, any>): UserProfile {
-  const rawName = meta.name || email.split("@")[0] || "User";
+function buildProfile(email: string, meta: Record<string, unknown>): UserProfile {
+  const rawName = typeof meta.name === "string" ? meta.name : email.split("@")[0] || "User";
   const name = capitalize(rawName);
   return {
     name,
     email,
     initials: getInitials(name),
-    role: meta.role,
+    role: typeof meta.role === "string" ? meta.role : undefined,
   };
 }
 

@@ -158,8 +158,8 @@ export async function POST(request: NextRequest) {
           html: buildInviteEmailHtml(body.name, body.role, confirmUrl),
         });
         emailSent = true;
-      } catch (err: any) {
-        emailError = err?.message || "Unknown SMTP error";
+      } catch (err: unknown) {
+        emailError = err instanceof Error ? err.message : "Unknown SMTP error";
         console.error("[team/invite] Email send failed:", emailError);
       }
     }

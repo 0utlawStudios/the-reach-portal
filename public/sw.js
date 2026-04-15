@@ -1,6 +1,6 @@
 const CACHE_NAME = "ten80ten-smm-v1";
 
-self.addEventListener("install", (e) => {
+self.addEventListener("install", () => {
   self.skipWaiting();
 });
 

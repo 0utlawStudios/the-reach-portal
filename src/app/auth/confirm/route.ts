@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 const VALID_TYPES = ["invite", "recovery", "magiclink", "signup", "email"] as const;
+type ValidType = (typeof VALID_TYPES)[number];
+
+function isValidType(type: string): type is ValidType {
+  return (VALID_TYPES as readonly string[]).includes(type);
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
@@ -15,7 +20,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Reject unknown types
-  if (!VALID_TYPES.includes(type as any)) {
+  if (!isValidType(type)) {
     return NextResponse.redirect(`${siteUrl}?error=invalid_type`);
   }
 
@@ -31,7 +36,7 @@ export async function GET(request: NextRequest) {
   // Verify the OTP token
   const { data, error } = await supabase.auth.verifyOtp({
     token_hash: tokenHash,
-    type: type as "invite" | "recovery" | "magiclink" | "signup" | "email",
+    type,
   });
 
   if (error) {

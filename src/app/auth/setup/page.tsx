@@ -1,5 +1,6 @@
 "use client";
 
+import { RawImage } from "@/components/raw-image";
 import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { Lock, CheckCircle, AlertCircle, Eye, EyeOff, User, Phone, Shield, Camera } from "lucide-react";
@@ -163,7 +164,7 @@ export default function SetupPasswordPage() {
           {/* Header */}
           <div className="bg-gradient-to-r from-orange-500 to-orange-600 px-7 py-6">
             <div className="flex items-center gap-4">
-              <img src="/ten80ten-logo.png" alt="Ten80Ten" className="w-10 h-10 rounded-xl object-contain bg-white/20 backdrop-blur-sm p-1.5" />
+              <RawImage src="/ten80ten-logo.png" alt="Ten80Ten" className="w-10 h-10 rounded-xl object-contain bg-white/20 backdrop-blur-sm p-1.5" />
               <div>
                 <h1 className="text-[18px] font-bold text-white tracking-tight">Complete Your Profile</h1>
                 <p className="text-[12px] text-white/70 mt-0.5">Welcome to the Ten80Ten team</p>
@@ -200,7 +201,7 @@ export default function SetupPasswordPage() {
                 <input type="file" accept="image/*" onChange={handleAvatarSelect} className="hidden" />
                 <div className="w-20 h-20 rounded-full border-2 border-dashed border-gray-300 dark:border-white/[0.12] group-hover:border-orange-400 dark:group-hover:border-orange-500 transition-colors flex items-center justify-center overflow-hidden bg-gray-50 dark:bg-white/[0.04]">
                   {avatarPreview ? (
-                    <img src={avatarPreview} alt="Preview" className="w-full h-full object-cover" />
+                    <RawImage src={avatarPreview} alt="Preview" className="w-full h-full object-cover" />
                   ) : (
                     <Camera className="w-6 h-6 text-gray-300 dark:text-gray-600 group-hover:text-orange-400 transition-colors" />
                   )}

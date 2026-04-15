@@ -140,8 +140,8 @@ export async function POST(request: NextRequest) {
           html: buildApprovalEmailHtml(req.name, role, confirmUrl),
         });
         emailSent = true;
-      } catch (emailErr: any) {
-        console.error("[approve-request] Email send failed:", emailErr?.message);
+      } catch (emailErr: unknown) {
+        console.error("[approve-request] Email send failed:", emailErr instanceof Error ? emailErr.message : emailErr);
       }
     }
 

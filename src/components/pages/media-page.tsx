@@ -1,5 +1,6 @@
 "use client";
 
+import { RawImage } from "@/components/raw-image";
 import { useState, useMemo, useRef, useEffect } from "react";
 import { MediaAsset } from "@/lib/types";
 import { usePipeline } from "@/lib/pipeline-context";
@@ -10,22 +11,32 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   FolderOpen, Upload, Film, Image as ImageIcon, Search, Grid3X3, List,
-  CheckCircle, Clock, X, Trash2, Eye, Link2, ExternalLink, Download,
+  CheckCircle, Clock, X, Trash2, Eye, Link2, ExternalLink,
   ChevronLeft, ChevronRight,
 } from "lucide-react";
 
 type StatusFilter = "all" | "unused" | "inuse";
+type MediaAssetRow = {
+  id?: string;
+  name?: string;
+  url?: string;
+  file_type?: MediaAsset["type"];
+  folder?: string | null;
+  uploaded_at?: string | null;
+  added_by?: string | null;
+  used_in?: string[] | null;
+};
 
 function isSupabaseConfigured(): boolean {
   return !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 }
 
-function dbToAsset(row: any): MediaAsset {
+function dbToAsset(row: MediaAssetRow): MediaAsset {
   return {
-    id: row.id,
-    name: row.name,
-    url: row.url,
-    type: row.file_type,
+    id: row.id || crypto.randomUUID(),
+    name: row.name || "Untitled asset",
+    url: row.url || "",
+    type: row.file_type || "image",
     folder: row.folder || "Uploads",
     uploadedAt: row.uploaded_at?.split("T")[0] || new Date().toISOString().split("T")[0],
     addedBy: row.added_by || undefined,
@@ -290,7 +301,7 @@ export function MediaPage() {
                     <div key={asset.id} className={`group relative rounded-xl overflow-hidden cursor-pointer transition-all duration-200 ${selected ? "ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-[#0a0a0a]" : "border border-gray-200/70 dark:border-white/[0.06] hover:border-gray-300 hover:shadow-md"} bg-white dark:bg-[#151518] shadow-sm`}>
                       <div onClick={() => setLightboxAsset(asset)} className="relative aspect-square overflow-hidden bg-gray-50 dark:bg-white/[0.03]">
                         {asset.type === "image" ? (
-                          <img src={asset.url} alt={asset.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                          <RawImage src={asset.url} alt={asset.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                         ) : (
                           <div className="w-full h-full flex flex-col items-center justify-center bg-gray-100 dark:bg-white/[0.04]"><Film className="w-8 h-8 text-gray-300 dark:text-gray-600" /></div>
                         )}
@@ -341,7 +352,7 @@ export function MediaPage() {
                             {selected && <CheckCircle className="w-3 h-3 text-white" />}
                           </button>
                           <div className="w-8 h-8 rounded-lg overflow-hidden bg-gray-100 dark:bg-white/[0.04] shrink-0">
-                            {asset.type === "image" ? <img src={asset.url} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><Film className="w-4 h-4 text-gray-400" /></div>}
+                            {asset.type === "image" ? <RawImage src={asset.url} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><Film className="w-4 h-4 text-gray-400" /></div>}
                           </div>
                           <p className="text-[11px] font-medium text-gray-700 dark:text-gray-300 truncate">{asset.name}</p>
                         </div>
@@ -403,7 +414,7 @@ export function MediaPage() {
               </div>
               <div className="flex-1 overflow-hidden bg-gray-50 dark:bg-black flex items-center justify-center p-4 relative group/lb" onTouchStart={onSwipeStart} onTouchEnd={onSwipeEnd}>
                 {lightboxAsset.type === "image" ? (
-                  <img src={lightboxAsset.url} alt={lightboxAsset.name} className="max-w-full max-h-[60vh] object-contain rounded-lg select-none" draggable={false} />
+                  <RawImage src={lightboxAsset.url} alt={lightboxAsset.name} className="max-w-full max-h-[60vh] object-contain rounded-lg select-none" draggable={false} />
                 ) : (
                   <video src={lightboxAsset.url} controls playsInline className="max-w-full max-h-[60vh] rounded-lg bg-black" />
                 )}

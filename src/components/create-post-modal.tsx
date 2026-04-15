@@ -1,5 +1,6 @@
 "use client";
 
+import { RawImage } from "@/components/raw-image";
 import { useState, useRef } from "react";
 import { usePipeline } from "@/lib/pipeline-context";
 import { Platform, ContentType, ALL_PLATFORMS, DEFAULT_CHECKLIST } from "@/lib/types";
@@ -252,7 +253,7 @@ export function CreatePostModal({ open, onClose }: Props) {
                       {files.map((file) => (
                         <div key={file.id} className="relative group rounded-lg overflow-hidden border border-gray-200 dark:border-white/[0.08] bg-gray-50 dark:bg-white/[0.03]">
                           {file.type === "image" ? (
-                            <img src={file.preview} alt={file.name} className="w-full aspect-square object-cover" />
+                            <RawImage src={file.preview} alt={file.name} className="w-full aspect-square object-cover" />
                           ) : (
                             <div className="w-full aspect-square flex flex-col items-center justify-center bg-gray-100 dark:bg-white/[0.04]">
                               <FileVideo className="w-6 h-6 text-gray-400 dark:text-gray-500" />

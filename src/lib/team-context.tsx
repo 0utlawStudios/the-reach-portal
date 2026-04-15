@@ -45,11 +45,35 @@ interface TeamContextType {
 const TeamContext = createContext<TeamContextType | null>(null);
 const STORAGE_KEY = "team_members";
 
+type TeamMemberRow = {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string | null;
+  role: UserRole;
+  secondary_role?: string | null;
+  status: InviteStatus;
+  joined_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  avatar_url?: string | null;
+};
+
+type TeamMemberUpdate = {
+  name?: string;
+  email?: string;
+  role?: UserRole;
+  secondary_role?: string;
+  status?: InviteStatus;
+  avatar_url?: string;
+  phone?: string;
+};
+
 function isSupabaseConfigured(): boolean {
   return !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 }
 
-function dbToMember(row: any): TeamMember {
+function dbToMember(row: TeamMemberRow): TeamMember {
   return {
     id: row.id,
     name: row.name,
@@ -57,7 +81,7 @@ function dbToMember(row: any): TeamMember {
     role: row.role,
     secondaryRole: row.secondary_role || undefined,
     status: row.status,
-    joinedAt: row.joined_at || row.created_at?.split("T")[0],
+    joinedAt: row.joined_at || row.created_at?.split("T")[0] || new Date().toISOString().split("T")[0],
     updatedAt: row.updated_at || undefined,
     avatar: row.avatar_url || undefined,
     phone: row.phone || undefined,
@@ -116,15 +140,15 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     const channel = supabase
       .channel("team-realtime")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "team_members" }, (payload) => {
-        const member = dbToMember(payload.new);
+        const member = dbToMember(payload.new as TeamMemberRow);
         setMembers((prev) => prev.some((m) => m.id === member.id) ? prev : [...prev, member]);
       })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "team_members" }, (payload) => {
-        const updated = dbToMember(payload.new);
+        const updated = dbToMember(payload.new as TeamMemberRow);
         setMembers((prev) => prev.map((m) => m.id === updated.id ? updated : m));
       })
       .on("postgres_changes", { event: "DELETE", schema: "public", table: "team_members" }, (payload) => {
-        const deletedId = (payload.old as any)?.id;
+        const deletedId = (payload.old as Partial<TeamMemberRow>).id;
         if (deletedId) setMembers((prev) => prev.filter((m) => m.id !== deletedId));
       })
       .subscribe();
@@ -161,7 +185,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   const updateMember = useCallback((id: string, updates: Partial<TeamMember>) => {
     setMembers((prev) => prev.map((m) => m.id === id ? { ...m, ...updates } : m));
     if (useDb) {
-      const dbUpdates: any = {};
+      const dbUpdates: TeamMemberUpdate = {};
       if (updates.name !== undefined) dbUpdates.name = updates.name;
       if (updates.email !== undefined) dbUpdates.email = updates.email;
       if (updates.role !== undefined) dbUpdates.role = updates.role;

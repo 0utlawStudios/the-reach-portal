@@ -12,11 +12,82 @@ function unauthorized() {
 // ─── Types ───
 
 type Status = "pass" | "warn" | "fail";
-interface Check { status: Status; message: string; details?: any }
+interface Check { status: Status; message: string; details?: unknown }
 
-function pass(msg: string, d?: any): Check { return { status: "pass", message: msg, details: d }; }
-function warn(msg: string, d?: any): Check { return { status: "warn", message: msg, details: d }; }
-function fail(msg: string, d?: any): Check { return { status: "fail", message: msg, details: d }; }
+function pass(msg: string, d?: unknown): Check { return { status: "pass", message: msg, details: d }; }
+function warn(msg: string, d?: unknown): Check { return { status: "warn", message: msg, details: d }; }
+function fail(msg: string, d?: unknown): Check { return { status: "fail", message: msg, details: d }; }
+
+type PostRow = {
+  id?: string;
+  title?: string | null;
+  stage?: string | null;
+  platforms?: string[] | null;
+  thumbnail_url?: string | null;
+  scheduled_date?: string | null;
+  caption?: string | null;
+  notes?: string | null;
+  asset_source?: string | null;
+  created_by?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  [key: string]: unknown;
+};
+
+type MediaRow = {
+  id?: string;
+  url?: string | null;
+  drive_file_id?: string | null;
+  post_id?: string | null;
+  added_by?: string | null;
+};
+
+type AuditRow = {
+  id?: string;
+  post_id?: string | null;
+  user_name?: string | null;
+  action_type?: string | null;
+  created_at?: string | null;
+};
+
+type CommentRow = {
+  id?: string;
+  post_id?: string | null;
+};
+
+type TeamMemberRow = {
+  id?: string;
+  name?: string | null;
+  email?: string | null;
+  role?: string | null;
+  status?: string | null;
+  avatar_url?: string | null;
+  phone?: string | null;
+  joined_at?: string | null;
+  [key: string]: unknown;
+};
+
+type AuthUser = {
+  email?: string;
+  email_confirmed_at?: string | null;
+  last_sign_in_at?: string | null;
+  updated_at?: string | null;
+  created_at?: string | null;
+};
+
+type DriveFile = {
+  id?: string;
+  name?: string;
+  mimeType?: string;
+};
+
+type StorageBucket = {
+  name?: string;
+};
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 
 // ─── Helpers ───
 
@@ -28,8 +99,8 @@ async function timedFetch(url: string, opts?: RequestInit & { timeout?: number }
     const res = await fetch(url, { ...opts, signal: controller.signal });
     clearTimeout(timer);
     return { ok: res.ok, status: res.status, ms: Date.now() - start };
-  } catch (e: any) {
-    return { ok: false, status: 0, ms: Date.now() - start, body: e.message };
+  } catch (e: unknown) {
+    return { ok: false, status: 0, ms: Date.now() - start, body: errorMessage(e) };
   }
 }
 
@@ -57,10 +128,10 @@ export async function GET(req: Request) {
   const todayStr = now.toISOString().split("T")[0];
 
   // ═══ DATA CACHE — fetch once, reuse everywhere ═══
-  let allPosts: any[] = [];
-  let allMedia: any[] = [];
-  let allAuditLogs: any[] = [];
-  let allComments: any[] = [];
+  let allPosts: PostRow[] = [];
+  let allMedia: MediaRow[] = [];
+  let allAuditLogs: AuditRow[] = [];
+  let allComments: CommentRow[] = [];
 
   try {
     const [pRes, mRes, aRes, cRes] = await Promise.all([
@@ -69,10 +140,10 @@ export async function GET(req: Request) {
       admin.from("post_audit_logs").select("*").order("created_at", { ascending: false }).limit(5000),
       admin.from("post_comments").select("*"),
     ]);
-    allPosts = pRes.data || [];
-    allMedia = mRes.data || [];
-    allAuditLogs = aRes.data || [];
-    allComments = cRes.data || [];
+    allPosts = (pRes.data || []) as PostRow[];
+    allMedia = (mRes.data || []) as MediaRow[];
+    allAuditLogs = (aRes.data || []) as AuditRow[];
+    allComments = (cRes.data || []) as CommentRow[];
   } catch {}
 
   // ╔══════════════════════════════════════════════════════════════╗
@@ -107,8 +178,8 @@ export async function GET(req: Request) {
     checks["02_supabase_connection"] = max > 3000
       ? warn(`Connected but slow — avg ${avg}ms, max ${max}ms`, { times, avg, max })
       : pass(`Connected — avg ${avg}ms`, { times, avg, max });
-  } catch (e: any) {
-    checks["02_supabase_connection"] = fail(`Connection error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["02_supabase_connection"] = fail(`Connection error: ${errorMessage(e)}`);
   }
 
   // ═══ 3. GOOGLE DRIVE ═══
@@ -131,27 +202,27 @@ export async function GET(req: Request) {
       if (!folderRes.ok) {
         checks["03_google_drive"] = fail(`Root folder inaccessible — HTTP ${folderRes.status}`);
       } else {
-        const folder = await folderRes.json();
+        const folder = (await folderRes.json()) as DriveFile;
 
         // Count files in root folder
         const listRes = await fetch(
           `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents&fields=files(id,name,mimeType)&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true`,
           { headers: { Authorization: `Bearer ${driveToken}` } }
         );
-        const listData = listRes.ok ? await listRes.json() : { files: [] };
+        const listData = listRes.ok ? ((await listRes.json()) as { files?: DriveFile[] }) : { files: [] };
         const files = listData.files || [];
-        const folders = files.filter((f: any) => f.mimeType === "application/vnd.google-apps.folder");
-        const nonFolders = files.filter((f: any) => f.mimeType !== "application/vnd.google-apps.folder");
+        const folders = files.filter((f: DriveFile) => f.mimeType === "application/vnd.google-apps.folder");
+        const nonFolders = files.filter((f: DriveFile) => f.mimeType !== "application/vnd.google-apps.folder");
 
         checks["03_google_drive"] = pass(`Root: "${folder.name}" — ${folders.length} subfolders, ${nonFolders.length} files`, {
           rootFolder: folder.name,
-          subfolders: folders.map((f: any) => f.name),
+          subfolders: folders.map((f: DriveFile) => f.name),
           fileCount: nonFolders.length,
         });
       }
     }
-  } catch (e: any) {
-    checks["03_google_drive"] = fail(`Drive error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["03_google_drive"] = fail(`Drive error: ${errorMessage(e)}`);
   }
 
   // ═══ 4. SITE AVAILABILITY ═══
@@ -161,8 +232,8 @@ export async function GET(req: Request) {
     checks["04_site_availability"] = r.ok
       ? r.ms > 3000 ? warn(`Responding but slow (${r.ms}ms)`) : pass(`${siteUrl} — ${r.ms}ms, HTTP ${r.status}`)
       : fail(`Unreachable — ${r.body || `HTTP ${r.status}`} (${r.ms}ms)`);
-  } catch (e: any) {
-    checks["04_site_availability"] = fail(`Site check error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["04_site_availability"] = fail(`Site check error: ${errorMessage(e)}`);
   }
 
   // ═══ 5. API ENDPOINT SELF-TEST ═══
@@ -179,8 +250,8 @@ export async function GET(req: Request) {
     checks["05_api_endpoints"] = dead.length > 0
       ? fail(`${dead.length} endpoint(s) down: ${dead.map(([k]) => k).join(", ")}`, results)
       : pass(`All ${endpoints.length} API endpoints responding`, results);
-  } catch (e: any) {
-    checks["05_api_endpoints"] = fail(`API self-test error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["05_api_endpoints"] = fail(`API self-test error: ${errorMessage(e)}`);
   }
 
   // ╔══════════════════════════════════════════════════════════════╗
@@ -209,20 +280,20 @@ export async function GET(req: Request) {
         ? fail(issues.join("; "))
         : issues.length > 0 ? warn(issues.join("; ")) : pass("RLS policies blocking anonymous access correctly");
     }
-  } catch (e: any) {
-    checks["06_rls_security"] = fail(`RLS check error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["06_rls_security"] = fail(`RLS check error: ${errorMessage(e)}`);
   }
 
   // ═══ 7. AUTH CONSISTENCY ═══
-  let authUsers: any[] = [];
-  let allMembers: any[] = [];
+  let authUsers: AuthUser[] = [];
+  let allMembers: TeamMemberRow[] = [];
   try {
     const { data: authData, error: authError } = await admin.auth.admin.listUsers({ perPage: 1000 });
     if (authError) throw authError;
-    authUsers = authData?.users || [];
+    authUsers = (authData?.users || []) as AuthUser[];
 
     const { data: members } = await admin.from("team_members").select("*");
-    allMembers = members || [];
+    allMembers = (members || []) as TeamMemberRow[];
     const memberEmails = new Set(allMembers.map((m) => m.email?.toLowerCase()));
     const authEmails = new Set(authUsers.map((u) => u.email?.toLowerCase()).filter(Boolean));
 
@@ -246,8 +317,8 @@ export async function GET(req: Request) {
     checks["07_auth_consistency"] = issues.length > 0
       ? warn(issues.join("; "), { authUsers: authUsers.length, teamMembers: allMembers.length, orphanedAuth, orphanedMembers, pendingWithAuth, unconfirmed, neverLoggedIn })
       : pass(`${authUsers.length} auth users, ${allMembers.length} team members — all synced`);
-  } catch (e: any) {
-    checks["07_auth_consistency"] = fail(`Auth check error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["07_auth_consistency"] = fail(`Auth check error: ${errorMessage(e)}`);
   }
 
   // ═══ 8. SECRETS SCAN ═══
@@ -264,13 +335,13 @@ export async function GET(req: Request) {
     const exposedPosts: string[] = [];
     (posts || []).forEach((p) => {
       const text = `${p.title || ""} ${p.notes || ""} ${p.caption || ""}`;
-      if (secretPatterns.some((rx) => rx.test(text))) exposedPosts.push(p.id);
+      if (p.id && secretPatterns.some((rx) => rx.test(text))) exposedPosts.push(p.id);
     });
     checks["08_secrets_scan"] = exposedPosts.length > 0
       ? fail(`${exposedPosts.length} post(s) may contain exposed secrets/tokens`, { postIds: exposedPosts })
       : pass(`${(posts || []).length} posts scanned — no secrets found`);
-  } catch (e: any) {
-    checks["08_secrets_scan"] = fail(`Secrets scan error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["08_secrets_scan"] = fail(`Secrets scan error: ${errorMessage(e)}`);
   }
 
   // ╔══════════════════════════════════════════════════════════════╗
@@ -278,7 +349,7 @@ export async function GET(req: Request) {
   // ╚══════════════════════════════════════════════════════════════╝
 
   // ═══ 9. TABLE STATS ═══
-  let tableCounts: Record<string, number> = {};
+  const tableCounts: Record<string, number> = {};
   try {
     const tables = ["posts", "team_members", "post_audit_logs", "media_assets", "post_comments", "signup_requests"];
     for (const t of tables) {
@@ -289,8 +360,8 @@ export async function GET(req: Request) {
     checks["09_table_stats"] = failing.length > 0
       ? warn(`Unreachable: ${failing.join(", ")}`, tableCounts)
       : pass(`All ${tables.length} tables accessible`, tableCounts);
-  } catch (e: any) {
-    checks["09_table_stats"] = fail(`Table scan error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["09_table_stats"] = fail(`Table scan error: ${errorMessage(e)}`);
   }
 
   // ═══ 10. CROSS-TABLE INTEGRITY ═══
@@ -319,8 +390,8 @@ export async function GET(req: Request) {
     checks["10_cross_table_integrity"] = issues.length > 0
       ? warn(issues.join("; "), { unknownCreators: uniqueUnknown, orphanedMedia: orphanedMedia.length, orphanedAudits: orphanedAudits.length })
       : pass("All cross-table references valid");
-  } catch (e: any) {
-    checks["10_cross_table_integrity"] = fail(`Integrity check error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["10_cross_table_integrity"] = fail(`Integrity check error: ${errorMessage(e)}`);
   }
 
   // ═══ 11. TIMESTAMP SANITY ═══
@@ -342,8 +413,8 @@ export async function GET(req: Request) {
     checks["11_timestamp_sanity"] = issues.length > 0
       ? warn(issues.join("; "), { futurePosts: futurePosts.length, futureMembers: (futureMembers || []).length, badDates: badDates.length })
       : pass("All timestamps valid");
-  } catch (e: any) {
-    checks["11_timestamp_sanity"] = fail(`Timestamp check error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["11_timestamp_sanity"] = fail(`Timestamp check error: ${errorMessage(e)}`);
   }
 
   // ═══ 12. NULL / EMPTY FIELD AUDIT ═══
@@ -375,8 +446,8 @@ export async function GET(req: Request) {
     checks["12_field_audit"] = allIssues.length > 0
       ? warn(allIssues.join("; "), { posts: postIssues, members: memberIssues })
       : pass(`All required fields populated across ${(posts || []).length} posts and ${(members || []).length} members`);
-  } catch (e: any) {
-    checks["12_field_audit"] = fail(`Field audit error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["12_field_audit"] = fail(`Field audit error: ${errorMessage(e)}`);
   }
 
   // ╔══════════════════════════════════════════════════════════════╗
@@ -401,8 +472,8 @@ export async function GET(req: Request) {
       : issues.length > 0
         ? warn(issues.join("; "), { active: active.length, pending: pending.length, stalePending: stalePending.map((m) => m.email), noAvatar: noAvatar.map((m) => m.name) })
         : pass(`${active.length} active, ${pending.length} pending — all healthy`, { active: active.length, pending: pending.length });
-  } catch (e: any) {
-    checks["13_team_health"] = fail(`Team health error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["13_team_health"] = fail(`Team health error: ${errorMessage(e)}`);
   }
 
   // ═══ 14. USER ACTIVITY ANALYSIS ═══
@@ -416,7 +487,10 @@ export async function GET(req: Request) {
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
     const weekLogs = allAuditLogs.filter(a => a.created_at && a.created_at >= weekAgo);
     const activityMap: Record<string, number> = {};
-    (weekLogs || []).forEach((l) => { activityMap[l.user_name] = (activityMap[l.user_name] || 0) + 1; });
+    (weekLogs || []).forEach((l) => {
+      const userName = l.user_name || "unknown";
+      activityMap[userName] = (activityMap[userName] || 0) + 1;
+    });
     const topUsers = Object.entries(activityMap).sort(([, a], [, b]) => b - a).slice(0, 5);
 
     // Members with zero audit entries ever
@@ -432,8 +506,8 @@ export async function GET(req: Request) {
     checks["14_user_activity"] = issues.length > 0
       ? warn(issues.join("; "), { inactive: inactive.map((u) => u.email), neverSignedIn: neverSignedIn.map((u) => u.email), ghostMembers, topUsersThisWeek: topUsers })
       : pass(`All users active, top this week: ${topUsers.map(([n, c]) => `${n} (${c})`).join(", ")}`, { topUsersThisWeek: topUsers });
-  } catch (e: any) {
-    checks["14_user_activity"] = fail(`Activity analysis error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["14_user_activity"] = fail(`Activity analysis error: ${errorMessage(e)}`);
   }
 
   // ╔══════════════════════════════════════════════════════════════╗
@@ -446,7 +520,10 @@ export async function GET(req: Request) {
     if (!posts) throw new Error("No posts");
 
     const stages: Record<string, number> = {};
-    posts.forEach((p) => { stages[p.stage] = (stages[p.stage] || 0) + 1; });
+    posts.forEach((p) => {
+      const stage = p.stage || "unknown";
+      stages[stage] = (stages[stage] || 0) + 1;
+    });
 
     // Bottleneck: which stage has the most posts (excluding "posted")
     const activeStages = Object.entries(stages).filter(([k]) => k !== "posted");
@@ -477,8 +554,8 @@ export async function GET(req: Request) {
     checks["15_pipeline_flow"] = issues.length > 0
       ? warn(issues.join("; "), { stages, overdue: overdue.length, stuck: stuck.length, bottleneck: bottleneck ? { stage: bottleneck[0], count: bottleneck[1] } : null })
       : pass(`Pipeline healthy — ${posts.length} total posts`, { stages, bottleneck: bottleneck ? { stage: bottleneck[0], count: bottleneck[1] } : null });
-  } catch (e: any) {
-    checks["15_pipeline_flow"] = fail(`Pipeline analysis error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["15_pipeline_flow"] = fail(`Pipeline analysis error: ${errorMessage(e)}`);
   }
 
   // ═══ 16. CONTENT QUALITY ═══
@@ -507,8 +584,8 @@ export async function GET(req: Request) {
     checks["16_content_quality"] = issues.length > 0
       ? warn(issues.join("; "), { shortTitles: shortTitles.length, noCaptions: noCaptions.length, platformDistribution: platCounts, todayNoThumbnail: todayNoThumb.length })
       : pass(`Content quality good across ${(posts || []).length} posts`, { platformDistribution: platCounts });
-  } catch (e: any) {
-    checks["16_content_quality"] = fail(`Content quality error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["16_content_quality"] = fail(`Content quality error: ${errorMessage(e)}`);
   }
 
   // ═══ 17. THUMBNAIL SPOT-CHECK ═══
@@ -519,15 +596,17 @@ export async function GET(req: Request) {
     for (const p of thumbPosts) {
       checked++;
       // Skip Drive stream URLs (they require auth, HEAD will always fail)
-      if (p.thumbnail_url.includes('/api/drive/stream') || p.thumbnail_url.includes('googleapis.com')) continue;
-      const r = await timedFetch(p.thumbnail_url, { method: "HEAD", timeout: 5000 });
+      const thumbnailUrl = p.thumbnail_url;
+      if (!thumbnailUrl) continue;
+      if (thumbnailUrl.includes('/api/drive/stream') || thumbnailUrl.includes('googleapis.com')) continue;
+      const r = await timedFetch(thumbnailUrl, { method: "HEAD", timeout: 5000 });
       if (!r.ok) broken++;
     }
     checks["17_thumbnail_check"] = broken > 0
       ? warn(`${broken}/${checked} sampled thumbnails returned errors`, { checked, broken })
       : pass(`${checked} thumbnails spot-checked — all reachable or Drive-hosted`);
-  } catch (e: any) {
-    checks["17_thumbnail_check"] = fail(`Thumbnail check error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["17_thumbnail_check"] = fail(`Thumbnail check error: ${errorMessage(e)}`);
   }
 
   // ═══ 18. MEDIA HEALTH ═══
@@ -546,8 +625,8 @@ export async function GET(req: Request) {
     checks["18_media_health"] = issues.length > 0
       ? warn(issues.join("; "), { total: count, noUrl: noUrl.length, noOwner: noOwner.length, noPost: noPost.length })
       : pass(`${count || 0} media assets — all linked and intact`);
-  } catch (e: any) {
-    checks["18_media_health"] = fail(`Media check error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["18_media_health"] = fail(`Media check error: ${errorMessage(e)}`);
   }
 
   // ╔══════════════════════════════════════════════════════════════╗
@@ -565,15 +644,18 @@ export async function GET(req: Request) {
     // Action type breakdown this week
     const weekActions = allAuditLogs.filter(a => a.created_at && a.created_at >= weekAgo);
     const breakdown: Record<string, number> = {};
-    (weekActions || []).forEach((a) => { breakdown[a.action_type] = (breakdown[a.action_type] || 0) + 1; });
+    (weekActions || []).forEach((a) => {
+      const actionType = a.action_type || "unknown";
+      breakdown[actionType] = (breakdown[actionType] || 0) + 1;
+    });
 
     const avgDaily = lastWeek ? Math.round((lastWeek || 0) / 7) : 0;
 
     checks["19_audit_completeness"] = totalAudit === 0
       ? warn("Audit log empty — no activity tracked")
       : pass(`${totalAudit} total, ${last24h} today, ~${avgDaily}/day avg`, { total: totalAudit, last24h, lastWeek, avgDaily, weeklyBreakdown: breakdown });
-  } catch (e: any) {
-    checks["19_audit_completeness"] = fail(`Audit check error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["19_audit_completeness"] = fail(`Audit check error: ${errorMessage(e)}`);
   }
 
   // ═══ 20. GROWTH METRICS ═══
@@ -599,17 +681,17 @@ export async function GET(req: Request) {
       `${(recentPosts || []).length} posts this week, ${newMembers} new member(s), ${postsPerMember} posts/member`,
       { postsThisWeek: (recentPosts || []).length, dailyBreakdown: dailyPosts, newMembers, postsPerActiveMember: postsPerMember }
     );
-  } catch (e: any) {
-    checks["20_growth_metrics"] = fail(`Growth metrics error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["20_growth_metrics"] = fail(`Growth metrics error: ${errorMessage(e)}`);
   }
 
   // ═══ 21. SUPABASE STORAGE ═══
   try {
     const { data: buckets, error: bucketsErr } = await admin.storage.listBuckets();
     if (bucketsErr) throw bucketsErr;
-    checks["21_supabase_storage"] = pass(`Storage accessible — ${(buckets || []).length} bucket(s)`, { buckets: (buckets || []).map((b: any) => b.name) });
-  } catch (e: any) {
-    checks["21_supabase_storage"] = fail(`Storage inaccessible: ${e.message}`);
+    checks["21_supabase_storage"] = pass(`Storage accessible — ${(buckets || []).length} bucket(s)`, { buckets: ((buckets || []) as StorageBucket[]).map((b) => b.name) });
+  } catch (e: unknown) {
+    checks["21_supabase_storage"] = fail(`Storage inaccessible: ${errorMessage(e)}`);
   }
 
   // ═══ 22. TABLE LATENCY ═══
@@ -625,8 +707,8 @@ export async function GET(req: Request) {
     checks["22_table_latency"] = slowTables.length > 0
       ? warn(`Slow tables (>2000ms): ${slowTables.map(([t, ms]) => `${t}=${ms}ms`).join(", ")}`, latencies)
       : pass(`All table queries fast — ${Object.entries(latencies).map(([t, ms]) => `${t}=${ms}ms`).join(", ")}`, latencies);
-  } catch (e: any) {
-    checks["22_table_latency"] = fail(`Latency check error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["22_table_latency"] = fail(`Latency check error: ${errorMessage(e)}`);
   }
 
   // ═══ 23. SUPERADMIN CHECK ═══
@@ -634,9 +716,9 @@ export async function GET(req: Request) {
     const superadmins = allMembers.filter((m) => m.role === "superadmin" && m.status === "active");
     checks["23_superadmin_check"] = superadmins.length === 0
       ? fail("No active superadmin found — system has no top-level admin", { count: 0 })
-      : pass(`${superadmins.length} active superadmin(s)`, { superadmins: superadmins.map((m: any) => m.email) });
-  } catch (e: any) {
-    checks["23_superadmin_check"] = fail(`Superadmin check error: ${e.message}`);
+      : pass(`${superadmins.length} active superadmin(s)`, { superadmins: superadmins.map((m) => m.email) });
+  } catch (e: unknown) {
+    checks["23_superadmin_check"] = fail(`Superadmin check error: ${errorMessage(e)}`);
   }
 
   // ═══ 24. PASSWORD AGE ═══
@@ -649,10 +731,10 @@ export async function GET(req: Request) {
       return lastUpdate && lastUpdate < ninetyDaysAgo;
     });
     checks["24_password_age"] = staleAccounts.length > 0
-      ? warn(`${staleAccounts.length} active user(s) haven't updated account in 90+ days`, { users: staleAccounts.map((u: any) => u.email) })
+      ? warn(`${staleAccounts.length} active user(s) haven't updated account in 90+ days`, { users: staleAccounts.map((u) => u.email) })
       : pass("All active users have recent account updates");
-  } catch (e: any) {
-    checks["24_password_age"] = fail(`Password age check error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["24_password_age"] = fail(`Password age check error: ${errorMessage(e)}`);
   }
 
   // ═══ 25. SESSION ANALYSIS ═══
@@ -669,8 +751,8 @@ export async function GET(req: Request) {
       `Sign-ins: ${signedInToday} today, ${signedInWeek} this week, ${signedInMonth} this month`,
       { today: signedInToday, thisWeek: signedInWeek, thisMonth: signedInMonth, totalAuthUsers: authUsers.length }
     );
-  } catch (e: any) {
-    checks["25_session_analysis"] = fail(`Session analysis error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["25_session_analysis"] = fail(`Session analysis error: ${errorMessage(e)}`);
   }
 
   // ═══ 26. DUPLICATE POSTS ═══
@@ -681,27 +763,27 @@ export async function GET(req: Request) {
       const t = (p.title || "").trim().toLowerCase();
       if (t) {
         if (!titleMap[t]) titleMap[t] = [];
-        titleMap[t].push(p.id);
+        if (p.id) titleMap[t].push(p.id);
       }
     });
     const dupes = Object.entries(titleMap).filter(([, ids]) => ids.length > 1);
     checks["26_duplicate_posts"] = dupes.length > 0
       ? warn(`${dupes.length} duplicate title(s) found`, { duplicates: dupes.map(([title, ids]) => ({ title, count: ids.length })) })
       : pass(`No duplicate post titles found across ${(allPostTitles || []).length} posts`);
-  } catch (e: any) {
-    checks["26_duplicate_posts"] = fail(`Duplicate check error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["26_duplicate_posts"] = fail(`Duplicate check error: ${errorMessage(e)}`);
   }
 
   // ═══ 27. STAGE VALIDITY ═══
   try {
     const validStages = ["ideas", "awaiting_approval", "revision_needed", "approved_scheduled", "posted"];
     const allPostStages = allPosts;
-    const invalidStage = (allPostStages || []).filter((p) => !validStages.includes(p.stage));
+    const invalidStage = (allPostStages || []).filter((p) => !p.stage || !validStages.includes(p.stage));
     checks["27_stage_validity"] = invalidStage.length > 0
       ? fail(`${invalidStage.length} post(s) with invalid stage`, { invalid: invalidStage.map((p) => ({ id: p.id, stage: p.stage })), validStages })
       : pass(`All ${(allPostStages || []).length} posts have valid stages`, { validStages });
-  } catch (e: any) {
-    checks["27_stage_validity"] = fail(`Stage validity error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["27_stage_validity"] = fail(`Stage validity error: ${errorMessage(e)}`);
   }
 
   // ═══ 28. PLATFORM VALIDITY ═══
@@ -711,13 +793,13 @@ export async function GET(req: Request) {
     const unknownPlatforms: { id: string; unknown: string[] }[] = [];
     (allPostPlats || []).forEach((p) => {
       const bad = (p.platforms || []).filter((pl: string) => !validPlatforms.includes(pl));
-      if (bad.length > 0) unknownPlatforms.push({ id: p.id, unknown: bad });
+      if (bad.length > 0) unknownPlatforms.push({ id: p.id || "unknown", unknown: bad });
     });
     checks["28_platform_validity"] = unknownPlatforms.length > 0
       ? warn(`${unknownPlatforms.length} post(s) with unknown platforms`, { posts: unknownPlatforms, validPlatforms })
       : pass(`All platforms valid across ${(allPostPlats || []).length} posts`, { validPlatforms });
-  } catch (e: any) {
-    checks["28_platform_validity"] = fail(`Platform validity error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["28_platform_validity"] = fail(`Platform validity error: ${errorMessage(e)}`);
   }
 
   // ═══ 29. ORPHANED COMMENTS ═══
@@ -728,8 +810,8 @@ export async function GET(req: Request) {
     checks["29_orphaned_comments"] = orphaned.length > 0
       ? warn(`${orphaned.length} comment(s) referencing deleted posts`, { orphanedCount: orphaned.length, sampleIds: orphaned.slice(0, 5).map((c) => c.id) })
       : pass(`All ${(comments || []).length} comments reference valid posts`);
-  } catch (e: any) {
-    checks["29_orphaned_comments"] = fail(`Orphaned comments check error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["29_orphaned_comments"] = fail(`Orphaned comments check error: ${errorMessage(e)}`);
   }
 
   // ═══ 30. DATA FRESHNESS ═══
@@ -751,8 +833,8 @@ export async function GET(req: Request) {
     checks["30_data_freshness"] = issues.length > 0
       ? warn(issues.join("; "), { lastPost: lastPostDate, lastAudit: lastAuditDate })
       : pass(`Data fresh — last post ${lastPostDate?.split("T")[0]}, last audit ${lastAuditDate?.split("T")[0]}`, { lastPost: lastPostDate, lastAudit: lastAuditDate });
-  } catch (e: any) {
-    checks["30_data_freshness"] = fail(`Freshness check error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["30_data_freshness"] = fail(`Freshness check error: ${errorMessage(e)}`);
   }
 
   // ═══ 31. ROLE DISTRIBUTION ═══
@@ -763,8 +845,8 @@ export async function GET(req: Request) {
     checks["31_role_distribution"] = emptyRoles.length > 0
       ? warn(`Role(s) with zero members: ${emptyRoles.map(([r]) => r).join(", ")}`, roleCounts)
       : pass(`Role distribution: ${Object.entries(roleCounts).map(([r, c]) => `${r}=${c}`).join(", ")}`, roleCounts);
-  } catch (e: any) {
-    checks["31_role_distribution"] = fail(`Role distribution error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["31_role_distribution"] = fail(`Role distribution error: ${errorMessage(e)}`);
   }
 
   // ═══ 32. MEMBER COMPLETENESS ═══
@@ -778,11 +860,11 @@ export async function GET(req: Request) {
     checks["32_member_completeness"] = pct < 100
       ? warn(`${pct}% complete profiles (${completeCount}/${activeMembers.length})`, {
           percentage: pct,
-          incomplete: incomplete.map((m: any) => ({ name: m.name, missing: requiredFields.filter((f) => !m[f]) })),
+          incomplete: incomplete.map((m) => ({ name: m.name, missing: requiredFields.filter((f) => !m[f]) })),
         })
       : pass(`100% complete profiles (${activeMembers.length}/${activeMembers.length})`, { percentage: 100 });
-  } catch (e: any) {
-    checks["32_member_completeness"] = fail(`Member completeness error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["32_member_completeness"] = fail(`Member completeness error: ${errorMessage(e)}`);
   }
 
   // ═══ 33. INVITE CONVERSION ═══
@@ -794,8 +876,8 @@ export async function GET(req: Request) {
     checks["33_invite_conversion"] = rate < 50
       ? warn(`Low invite conversion: ${rate}% (${active} active / ${total} total)`, { active, pending, rate })
       : pass(`Invite conversion: ${rate}% (${active} active, ${pending} pending)`, { active, pending, rate });
-  } catch (e: any) {
-    checks["33_invite_conversion"] = fail(`Invite conversion error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["33_invite_conversion"] = fail(`Invite conversion error: ${errorMessage(e)}`);
   }
 
   // ═══ 34. CAPTION QUALITY ═══
@@ -807,10 +889,10 @@ export async function GET(req: Request) {
     if (tooShort.length > 0) issues.push(`${tooShort.length} post(s) with captions <20 chars`);
     if (tooLong.length > 0) issues.push(`${tooLong.length} post(s) with captions >2000 chars`);
     checks["34_caption_quality"] = issues.length > 0
-      ? warn(issues.join("; "), { tooShort: tooShort.map((p: any) => p.title), tooLong: tooLong.map((p: any) => p.title) })
+      ? warn(issues.join("; "), { tooShort: tooShort.map((p) => p.title), tooLong: tooLong.map((p) => p.title) })
       : pass(`All ${(captionPosts || []).length} approved/scheduled post captions within range`);
-  } catch (e: any) {
-    checks["34_caption_quality"] = fail(`Caption quality error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["34_caption_quality"] = fail(`Caption quality error: ${errorMessage(e)}`);
   }
 
   // ═══ 35. SOURCE VAULT CHECK ═══
@@ -820,11 +902,11 @@ export async function GET(req: Request) {
     checks["35_source_vault_check"] = missingSource.length > 0
       ? warn(`${missingSource.length} approved/posted post(s) missing asset_source (compliance risk)`, {
           count: missingSource.length,
-          posts: missingSource.slice(0, 10).map((p: any) => p.title),
+          posts: missingSource.slice(0, 10).map((p) => p.title),
         })
       : pass(`All ${(approvedPosts || []).length} approved/posted posts have asset_source`);
-  } catch (e: any) {
-    checks["35_source_vault_check"] = fail(`Source vault check error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["35_source_vault_check"] = fail(`Source vault check error: ${errorMessage(e)}`);
   }
 
   // ═══ 36. REVISION CYCLES ═══
@@ -837,11 +919,11 @@ export async function GET(req: Request) {
     });
     checks["36_revision_cycles"] = highRevision.length > 0
       ? warn(`${highRevision.length} post(s) with 3+ revision indicators in notes (quality concern)`, {
-          posts: highRevision.map((p: any) => p.title),
+          posts: highRevision.map((p) => p.title),
         })
       : pass(`No posts with excessive revision cycles`);
-  } catch (e: any) {
-    checks["36_revision_cycles"] = fail(`Revision cycles error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["36_revision_cycles"] = fail(`Revision cycles error: ${errorMessage(e)}`);
   }
 
   // ═══ 37. SCHEDULED READINESS ═══
@@ -853,7 +935,7 @@ export async function GET(req: Request) {
     });
     checks["37_scheduled_readiness"] = incomplete.length > 0
       ? warn(`${incomplete.length} scheduled post(s) missing required fields`, {
-          incomplete: incomplete.map((p: any) => ({
+          incomplete: incomplete.map((p) => ({
             title: p.title,
             missing: requiredFields37.filter((f) => {
               if (f === "platforms") return !p.platforms || p.platforms.length === 0;
@@ -862,8 +944,8 @@ export async function GET(req: Request) {
           })),
         })
       : pass(`All ${(scheduledPosts || []).length} scheduled posts are ready to publish`);
-  } catch (e: any) {
-    checks["37_scheduled_readiness"] = fail(`Scheduled readiness error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["37_scheduled_readiness"] = fail(`Scheduled readiness error: ${errorMessage(e)}`);
   }
 
   // ═══ 38. PLATFORM DISTRIBUTION ═══
@@ -887,8 +969,8 @@ export async function GET(req: Request) {
           distribution: Object.fromEntries(Object.entries(platUsage).map(([p, c]) => [p, `${c} (${Math.round((c / totalUsage) * 100)}%)`])),
           totalUsage,
         });
-  } catch (e: any) {
-    checks["38_platform_distribution"] = fail(`Platform distribution error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["38_platform_distribution"] = fail(`Platform distribution error: ${errorMessage(e)}`);
   }
 
   // ═══ 39. AUDIT COVERAGE ═══
@@ -898,10 +980,10 @@ export async function GET(req: Request) {
     const activeMembersForAudit = allMembers.filter((m) => m.status === "active");
     const uncovered = activeMembersForAudit.filter((m) => !auditedNames.has(m.name));
     checks["39_audit_coverage"] = uncovered.length > 0
-      ? warn(`${uncovered.length} active member(s) with zero audit log entries`, { members: uncovered.map((m: any) => m.name) })
+      ? warn(`${uncovered.length} active member(s) with zero audit log entries`, { members: uncovered.map((m) => m.name) })
       : pass(`All ${activeMembersForAudit.length} active members have audit trail`);
-  } catch (e: any) {
-    checks["39_audit_coverage"] = fail(`Audit coverage error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["39_audit_coverage"] = fail(`Audit coverage error: ${errorMessage(e)}`);
   }
 
   // ═══ 40. HEALTH SCORE ═══
@@ -939,8 +1021,8 @@ export async function GET(req: Request) {
       : finalScore >= 50
         ? warn(`Health score: ${finalScore}/100 — needs improvement`, { score: finalScore, categories: categoryScores })
         : fail(`Health score: ${finalScore}/100 — critical`, { score: finalScore, categories: categoryScores });
-  } catch (e: any) {
-    checks["40_health_score"] = fail(`Health score error: ${e.message}`);
+  } catch (e: unknown) {
+    checks["40_health_score"] = fail(`Health score error: ${errorMessage(e)}`);
   }
 
   // ═══ SUMMARY ═══

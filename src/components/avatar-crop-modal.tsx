@@ -66,7 +66,7 @@ export function AvatarCropModal({ imageSrc, onCropComplete, onClose }: Props) {
   const onCropChange = useCallback((crop: { x: number; y: number }) => setCrop(crop), []);
   const onZoomChange = useCallback((zoom: number) => setZoom(zoom), []);
 
-  const onCropAreaComplete = useCallback((_: any, croppedAreaPixels: CropArea) => {
+  const onCropAreaComplete = useCallback((_croppedArea: CropArea, croppedAreaPixels: CropArea) => {
     setCroppedAreaPixels(croppedAreaPixels);
   }, []);
 

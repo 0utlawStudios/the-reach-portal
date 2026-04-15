@@ -1,5 +1,6 @@
 "use client";
 
+import { RawImage } from "@/components/raw-image";
 import { useState, useRef } from "react";
 import { usePipeline } from "@/lib/pipeline-context";
 import { useToast } from "@/lib/toast-context";
@@ -153,7 +154,7 @@ export function KickbackModal() {
                 </button>
               ) : (
                 <div className="relative bg-gray-50 dark:bg-white/[0.03] rounded-xl border border-gray-200 dark:border-white/[0.08] p-3 flex items-center gap-3">
-                  {filePreview && <img src={filePreview} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0" />}
+                  {filePreview && <RawImage src={filePreview} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0" />}
                   <div className="flex-1 min-w-0">
                     <p className="text-[12px] font-medium text-gray-700 dark:text-gray-300 truncate">{file.name}</p>
                     <p className="text-[10px] text-gray-400 mt-0.5">{(file.size / 1024).toFixed(0)} KB</p>

@@ -1,5 +1,6 @@
 "use client";
 
+import { RawImage } from "@/components/raw-image";
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { NavigationProvider, useNavigation } from "@/lib/navigation-context";
@@ -21,6 +22,19 @@ import { SettingsPage } from "./pages/settings-page";
 import { BrandKitPage } from "./pages/brand-kit-page";
 import { RevisionModal } from "./revision-modal";
 import { KickbackModal } from "./kickback-modal";
+import {
+  CalendarDays,
+  ChevronLeft,
+  Eye,
+  FolderOpen,
+  Kanban,
+  LayoutDashboard,
+  Palette,
+  Pin,
+  PinOff,
+  Plus,
+  Settings,
+} from "lucide-react";
 
 function PageContent() {
   const { currentPage } = useNavigation();
@@ -79,10 +93,6 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
   const { currentPage, navigate, sidebarCollapsed, sidebarPinned, setSidebarCollapsed, togglePin } = useNavigation();
   const autoCollapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hoverExpandRef = useRef(false);
-  const {
-    LayoutDashboard, Kanban, CalendarDays, Eye, FolderOpen, Settings, ChevronLeft, Plus, Palette, Pin, PinOff,
-  } = require("lucide-react");
-
   // Auto-collapse after 6s on desktop (not mobile, not pinned)
   useEffect(() => {
     if (sidebarPinned) return;
@@ -131,7 +141,7 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
       <>
         {/* Logo */}
         <div className="relative flex items-center justify-center h-[60px] px-4 shrink-0">
-          <img src="/ten80ten-logo.png" alt="Ten80Ten" className={`${expanded ? "w-[48px]" : "w-7"} h-auto object-contain`} />
+          <RawImage src="/ten80ten-logo.png" alt="Ten80Ten" className={`${expanded ? "w-[48px]" : "w-7"} h-auto object-contain`} />
           {isMobile && (
             <button className="absolute right-3 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-400 cursor-pointer" onClick={closeMobile}>
               <ChevronLeft className="w-4 h-4" />

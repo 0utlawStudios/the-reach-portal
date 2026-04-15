@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useMemo } from "react";
+import { RawImage } from "@/components/raw-image";
+import { useState, useMemo } from "react";
 import { usePipeline } from "@/lib/pipeline-context";
 import { useToast } from "@/lib/toast-context";
 import { X, Upload, FolderOpen, Image as ImageIcon, Film, Search, CheckCircle, Clock, Link2, ExternalLink } from "lucide-react";
@@ -219,7 +220,7 @@ export function MediaPicker({ open, onClose, onSelect, folder = "raw-files", car
                         <button key={i} onClick={() => setSelectedAsset(asset)}
                           className={`group relative aspect-square rounded-xl overflow-hidden border-2 transition-all cursor-pointer bg-gray-50 dark:bg-white/[0.03] ${isSelected ? "border-orange-500 ring-2 ring-orange-200 dark:ring-orange-500/20" : "border-transparent hover:border-orange-400"}`}>
                           {asset.type === "image" ? (
-                            <img src={asset.url} alt={asset.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
+                            <RawImage src={asset.url} alt={asset.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
                           ) : (
                             <div className="w-full h-full flex flex-col items-center justify-center"><Film className="w-6 h-6 text-gray-400" /><p className="text-[8px] text-gray-400 mt-1 truncate max-w-full px-1">{asset.name}</p></div>
                           )}
@@ -251,7 +252,7 @@ export function MediaPicker({ open, onClose, onSelect, folder = "raw-files", car
                   {/* Preview */}
                   <div className="rounded-xl overflow-hidden bg-white dark:bg-white/[0.03] border border-gray-200/60 dark:border-white/[0.06] shadow-sm">
                     {selectedAsset.type === "image" ? (
-                      <img src={selectedAsset.url} alt={selectedAsset.name} className="w-full aspect-video object-cover" />
+                      <RawImage src={selectedAsset.url} alt={selectedAsset.name} className="w-full aspect-video object-cover" />
                     ) : (
                       <div className="w-full aspect-video flex items-center justify-center bg-gray-100 dark:bg-white/[0.04]"><Film className="w-8 h-8 text-gray-400" /></div>
                     )}

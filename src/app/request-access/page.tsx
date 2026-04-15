@@ -1,6 +1,8 @@
 "use client";
 
+import { RawImage } from "@/components/raw-image";
 import { useState } from "react";
+import Link from "next/link";
 import { User, Mail, Phone, Building2, MessageSquare, CheckCircle, AlertCircle, ArrowLeft } from "lucide-react";
 
 export default function RequestAccessPage() {
@@ -59,9 +61,9 @@ export default function RequestAccessPage() {
           <p className="text-[14px] text-gray-500 dark:text-gray-400 leading-relaxed">
             Your access request has been sent to the team admin. You&apos;ll receive an email once your account is approved.
           </p>
-          <a href="/" className="inline-flex items-center gap-2 text-[13px] text-orange-500 hover:text-orange-600 font-semibold transition-colors">
+          <Link href="/" className="inline-flex items-center gap-2 text-[13px] text-orange-500 hover:text-orange-600 font-semibold transition-colors">
             <ArrowLeft className="w-4 h-4" />Back to login
-          </a>
+          </Link>
         </div>
       </div>
     );
@@ -75,7 +77,7 @@ export default function RequestAccessPage() {
           {/* Header */}
           <div className="bg-gradient-to-r from-gray-900 to-gray-800 dark:from-[#1a1a1e] dark:to-[#131316] px-7 py-6">
             <div className="flex items-center gap-4">
-              <img src="/ten80ten-logo.png" alt="Ten80Ten" className="w-10 h-10 rounded-xl object-contain" />
+              <RawImage src="/ten80ten-logo.png" alt="Ten80Ten" className="w-10 h-10 rounded-xl object-contain" />
               <div>
                 <h1 className="text-[18px] font-bold text-white tracking-tight">Request Access</h1>
                 <p className="text-[12px] text-white/50 mt-0.5">Tell us about yourself and why you need access</p>
@@ -142,7 +144,7 @@ export default function RequestAccessPage() {
             </button>
 
             <p className="text-center text-[12px] text-gray-400">
-              Already have an account? <a href="/" className="text-orange-500 hover:text-orange-600 font-semibold transition-colors">Sign in</a>
+              Already have an account? <Link href="/" className="text-orange-500 hover:text-orange-600 font-semibold transition-colors">Sign in</Link>
             </p>
           </form>
         </div>

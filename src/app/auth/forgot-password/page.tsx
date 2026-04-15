@@ -1,7 +1,9 @@
 "use client";
 
+import { RawImage } from "@/components/raw-image";
 import { useState } from "react";
-import { Mail, ArrowLeft, CheckCircle, AlertCircle, KeyRound, Shield, BarChart3, Send } from "lucide-react";
+import Link from "next/link";
+import { Mail, ArrowLeft, CheckCircle, AlertCircle, KeyRound, Shield } from "lucide-react";
 import { motion } from "framer-motion";
 
 const ease = [0.25, 0.4, 0.25, 1] as const;
@@ -51,11 +53,11 @@ export default function ForgotPasswordPage() {
               </div>
               <h1 className="text-[24px] font-extrabold text-gray-900 dark:text-white tracking-[-0.03em]">Check your email</h1>
               <p className="text-[14px] text-gray-500 dark:text-gray-400 leading-relaxed">
-                If an account exists for <strong className="text-gray-700 dark:text-gray-300">{email}</strong>, we've sent a password reset link.
+                If an account exists for <strong className="text-gray-700 dark:text-gray-300">{email}</strong>, we&apos;ve sent a password reset link.
               </p>
-              <a href="/" className="inline-flex items-center gap-2 text-[13px] text-[#f59e0b] hover:text-orange-600 font-semibold transition-colors">
+              <Link href="/" className="inline-flex items-center gap-2 text-[13px] text-[#f59e0b] hover:text-orange-600 font-semibold transition-colors">
                 <ArrowLeft className="w-4 h-4" />Back to login
-              </a>
+              </Link>
             </div>
           </div>
         </div>
@@ -72,12 +74,12 @@ export default function ForgotPasswordPage() {
           <motion.div className="w-full max-w-[360px]" variants={stagger} initial="hidden" animate="show">
             {/* Logo + heading */}
             <motion.div className="mb-10" variants={fadeUp}>
-              <img src="/ten80ten-logo.png" alt="Ten80Ten" className="w-[130px] h-auto object-contain mb-8" />
+              <RawImage src="/ten80ten-logo.png" alt="Ten80Ten" className="w-[130px] h-auto object-contain mb-8" />
               <h1 className="text-[28px] font-extrabold text-gray-900 dark:text-white tracking-[-0.03em] leading-[1.1]">
                 Forgot password?
               </h1>
               <p className="text-[14px] text-gray-400 dark:text-gray-500 mt-2.5">
-                Enter your email and we'll send you a reset link
+                Enter your email and we&apos;ll send you a reset link
               </p>
             </motion.div>
 
@@ -118,7 +120,7 @@ export default function ForgotPasswordPage() {
 
             <motion.p className="text-center text-[12px] text-gray-400 mt-6" variants={fadeUp}>
               Remember your password?{" "}
-              <a href="/" className="text-[#f59e0b] hover:text-orange-600 font-semibold transition-colors">Sign in</a>
+              <Link href="/" className="text-[#f59e0b] hover:text-orange-600 font-semibold transition-colors">Sign in</Link>
             </motion.p>
           </motion.div>
         </div>

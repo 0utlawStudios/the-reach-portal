@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { RawImage } from "@/components/raw-image";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { usePipeline } from "@/lib/pipeline-context";
 import { PIPELINE_COLUMNS, PipelineStage, ALL_PLATFORMS, Platform } from "@/lib/types";
-import { SOCIAL_PROFILES } from "@/lib/social-profiles";
 import { logAudit, fetchAuditLogs, AuditEntry } from "@/lib/audit";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import {
-  X, Calendar, Clock, PlayCircle, ChevronRight, CheckCircle2, MessageSquare,
+  X, Calendar, Clock, ChevronRight, CheckCircle2, MessageSquare,
   ArrowRightLeft, Pencil, Save, ExternalLink, Hash, Type, Trash2, Send,
   Upload, FolderOpen, Link2, FileText, History, Image as ImageIcon,
   FileVideo, Paperclip, AlertCircle, Maximize2,
@@ -118,7 +118,7 @@ export function AssetReviewDrawer() {
       viewLoggedRef.current = selectedCard.id;
     }, 800);
     return () => clearTimeout(timer);
-  }, [selectedCard?.id, isDrawerOpen, currentUser.name]);
+  }, [selectedCard, isDrawerOpen, currentUser.name]);
 
   // ─── Fetch audit logs when tab switches to "audit" ───
   useEffect(() => {
@@ -128,7 +128,7 @@ export function AssetReviewDrawer() {
       setAuditLogs(logs);
       setAuditLoading(false);
     });
-  }, [activeTab, selectedCard?.id]);
+  }, [activeTab, selectedCard]);
 
   if (!selectedCard || !isDrawerOpen) return null;
 
@@ -298,7 +298,7 @@ export function AssetReviewDrawer() {
                 return (
                   <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/[0.05] font-medium text-gray-500 dark:text-gray-400">
                     {creator?.avatar ? (
-                      <img src={creator.avatar} alt={creator.name} className="w-4 h-4 rounded-full object-cover shrink-0" />
+                      <RawImage src={creator.avatar} alt={creator.name} className="w-4 h-4 rounded-full object-cover shrink-0" />
                     ) : (
                       <span className="w-4 h-4 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-[7px] font-bold text-white shrink-0">
                         {selectedCard.createdBy.split(" ").map((n) => n[0]).join("").slice(0, 2)}
@@ -399,7 +399,7 @@ export function AssetReviewDrawer() {
                   className="w-full flex items-center justify-center bg-gray-100 dark:bg-black/40 cursor-pointer"
                   onClick={() => selectedCard.thumbnailUrl && setShowLightbox(true)}
                 >
-                  <img src={selectedCard.thumbnailUrl} alt={selectedCard.title} className="w-full h-auto object-contain transition-transform duration-300 group-hover:scale-[1.01]" />
+                  <RawImage src={selectedCard.thumbnailUrl} alt={selectedCard.title} className="w-full h-auto object-contain transition-transform duration-300 group-hover:scale-[1.01]" />
                   <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
                     <div className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center">
                       <Maximize2 className="w-4 h-4 text-white" />
@@ -431,7 +431,7 @@ export function AssetReviewDrawer() {
 
             {selectedCard.contentType === "carousel" && (
               <div className="flex gap-2 overflow-x-auto pb-1">
-                <div className="w-16 h-16 rounded-lg overflow-hidden border-2 border-orange-500 shrink-0"><img src={selectedCard.thumbnailUrl} alt="Slide 1" className="w-full h-full object-cover" /></div>
+                <div className="w-16 h-16 rounded-lg overflow-hidden border-2 border-orange-500 shrink-0"><RawImage src={selectedCard.thumbnailUrl} alt="Slide 1" className="w-full h-full object-cover" /></div>
                 {[2, 3, 4].map((n) => (
                   <div key={n} className="w-16 h-16 rounded-lg border-2 border-dashed border-gray-200 dark:border-white/[0.08] flex items-center justify-center shrink-0 text-gray-300 dark:text-gray-600 hover:border-orange-300 dark:hover:border-orange-500/30 transition-colors cursor-pointer">
                     <span className="text-[9px] font-medium">Slide {n}</span>
@@ -466,7 +466,7 @@ export function AssetReviewDrawer() {
                   return (
                     <div key={i} className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-white dark:bg-white/[0.02] border border-gray-100 dark:border-white/[0.05] hover:border-orange-200 dark:hover:border-orange-500/20 transition-colors group">
                       {isImage ? (
-                        <img src={file.url} alt={file.name} className="w-8 h-8 rounded object-cover shrink-0" />
+                        <RawImage src={file.url} alt={file.name} className="w-8 h-8 rounded object-cover shrink-0" />
                       ) : isVideo ? (
                         <div className="w-8 h-8 rounded bg-violet-50 dark:bg-violet-500/10 flex items-center justify-center shrink-0"><FileVideo className="w-3.5 h-3.5 text-violet-500" /></div>
                       ) : (
@@ -635,7 +635,7 @@ export function AssetReviewDrawer() {
                         return (
                           <div key={i} className="flex gap-2.5 group">
                             {authorMember?.avatar ? (
-                              <img src={authorMember.avatar} alt={displayAuthor || ""} className="w-7 h-7 rounded-full object-cover shrink-0 mt-0.5" />
+                              <RawImage src={authorMember.avatar} alt={displayAuthor || ""} className="w-7 h-7 rounded-full object-cover shrink-0 mt-0.5" />
                             ) : (
                               <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[8px] font-bold text-white shrink-0 mt-0.5 ${isRevisionNote ? "bg-gradient-to-br from-violet-500 to-purple-600" : "bg-gradient-to-br from-amber-400 to-orange-500"}`}>{initials}</div>
                             )}
@@ -657,7 +657,7 @@ export function AssetReviewDrawer() {
                   {/* New comment */}
                   <div className="flex gap-2 items-start">
                     {currentUser.avatar ? (
-                      <img src={currentUser.avatar} alt={currentUser.name} className="w-7 h-7 rounded-full object-cover shrink-0 mt-0.5" />
+                      <RawImage src={currentUser.avatar} alt={currentUser.name} className="w-7 h-7 rounded-full object-cover shrink-0 mt-0.5" />
                     ) : (
                       <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-[8px] font-bold text-white shrink-0 mt-0.5">{currentUser.initials}</div>
                     )}
@@ -951,7 +951,7 @@ export function AssetReviewDrawer() {
           />
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-8 pointer-events-none">
             <div className="relative max-w-4xl w-full max-h-[90vh] pointer-events-auto">
-              <img
+              <RawImage
                 src={selectedCard.thumbnailUrl}
                 alt={selectedCard.title}
                 className="max-w-full max-h-[85vh] object-contain mx-auto rounded-lg shadow-2xl"

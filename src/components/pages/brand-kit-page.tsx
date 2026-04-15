@@ -1,18 +1,18 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { RawImage } from "@/components/raw-image";
+import { useState, useEffect } from "react";
 import { CopyBlock, ColorSwatch } from "@/components/copy-block";
 import { useToast } from "@/lib/toast-context";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabaseClient";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import {
   Hash, Type, Palette, Shield, Download, Megaphone, Phone, Globe, Mail,
   CheckCircle, XCircle, Star, Award, Eye, Pencil, Save, X,
-  Clock, Zap, Video, Sparkles, Target, ArrowRight, Layers, BookOpen,
+  Clock, Zap, Target, ArrowRight, Layers, BookOpen,
 } from "lucide-react";
 
 type Tab = "copy" | "strategy" | "visual" | "guardrails";
@@ -92,7 +92,7 @@ export function BrandKitPage() {
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [editMode]);
+  }, [editMode, addToast]);
 
   const startEdit = () => { setEditData({ ...data }); setEditMode(true); };
   const cancelEdit = () => { setEditMode(false); };
@@ -109,7 +109,7 @@ export function BrandKitPage() {
   };
 
   const d = editMode ? editData : data;
-  const updateField = (key: keyof PlaybookData, value: any) => setEditData((prev) => ({ ...prev, [key]: value }));
+  const updateField = <K extends keyof PlaybookData>(key: K, value: PlaybookData[K]) => setEditData((prev) => ({ ...prev, [key]: value }));
   const updateHook = (i: number, value: string) => setEditData((prev) => ({ ...prev, hooks: prev.hooks.map((h, idx) => idx === i ? value : h) }));
   const updateCta = (i: number, value: string) => setEditData((prev) => ({ ...prev, ctas: prev.ctas.map((c, idx) => idx === i ? value : c) }));
   const updatePillar = (i: number, key: "title" | "desc", value: string) => setEditData((prev) => ({ ...prev, contentPillars: prev.contentPillars.map((p, idx) => idx === i ? { ...p, [key]: value } : p) }));
@@ -353,7 +353,7 @@ export function BrandKitPage() {
                   <hr className="border-gray-100 dark:border-white/[0.06]" />
                   <div>
                     <p className="text-[9px] font-bold text-orange-500/60 uppercase tracking-[0.15em] mb-3">Caption — Social Copy</p>
-                    <p className="text-[14px] text-gray-500 dark:text-gray-500 leading-relaxed italic">"Structure reduces stress. Delegation creates freedom. That's the 10/80/10 way."</p>
+                    <p className="text-[14px] text-gray-500 dark:text-gray-500 leading-relaxed italic">&quot;Structure reduces stress. Delegation creates freedom. That&apos;s the 10/80/10 way.&quot;</p>
                   </div>
                 </div>
               </div>
@@ -368,7 +368,7 @@ export function BrandKitPage() {
                 ].map((a) => (
                   <div key={a.name} className="bg-white dark:bg-[#151518] rounded-2xl border border-gray-200 dark:border-white/[0.06] overflow-hidden shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
                     <div className={`${a.bg} h-36 flex items-center justify-center`}>
-                      <img src="/ten80ten-logo.png" alt={a.name} className="h-14 object-contain" style={a.name === "Light Logo" ? { filter: "brightness(0) invert(1)" } : {}} />
+                      <RawImage src="/ten80ten-logo.png" alt={a.name} className="h-14 object-contain" style={a.name === "Light Logo" ? { filter: "brightness(0) invert(1)" } : {}} />
                     </div>
                     <div className="p-5 flex items-center justify-between border-t border-gray-100 dark:border-white/[0.06]">
                       <div><p className="text-[13px] font-semibold text-slate-800 dark:text-gray-200">{a.name}</p><p className="text-[11px] text-gray-400 mt-0.5">{a.desc}</p></div>
@@ -404,7 +404,7 @@ export function BrandKitPage() {
         {activeTab === "guardrails" && (
           <div className="space-y-12 max-w-3xl mx-auto">
 
-            <Section icon={<Shield className="w-4 h-4 text-orange-500" />} title="Brand Do's & Don'ts" sub="Non-negotiable guidelines for every piece of content">
+            <Section icon={<Shield className="w-4 h-4 text-orange-500" />} title="Brand Do&apos;s & Don&apos;ts" sub="Non-negotiable guidelines for every piece of content">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* DO */}
                 <div className="bg-white dark:bg-[#151518] rounded-2xl border border-yellow-200/60 dark:border-yellow-500/10 overflow-hidden shadow-sm">
@@ -439,7 +439,7 @@ export function BrandKitPage() {
                     <div className="flex items-center gap-2.5">
                       <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-orange-600 to-red-600 flex items-center justify-center shadow-sm"><XCircle className="w-4 h-4 text-white" /></div>
                       <div>
-                        <h3 className="text-[14px] font-bold text-orange-800 dark:text-orange-300">DON'T</h3>
+                        <h3 className="text-[14px] font-bold text-orange-800 dark:text-orange-300">DON&apos;T</h3>
                         <p className="text-[10px] text-orange-700/60 dark:text-orange-400/50">Never do these</p>
                       </div>
                     </div>

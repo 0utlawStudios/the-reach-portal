@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { setPublicPermission, getImageUrl, getStreamUrl, getFileMetadata } from "@/lib/google-drive";
+import { setPublicPermission, getStreamUrl, getFileMetadata } from "@/lib/google-drive";
 
 export const maxDuration = 10;
 

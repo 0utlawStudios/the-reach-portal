@@ -1,11 +1,10 @@
 "use client";
 
+import { RawImage } from "@/components/raw-image";
 import { useState } from "react";
 import { ExternalLink, FileText, Play, Phone, MessageCircle } from "lucide-react";
 import { useTeam } from "@/lib/team-context";
 
-const URL_REGEX = /(https?:\/\/[^\s<>"{}|\\^`[\]]+)/g;
-const MENTION_REGEX = /@([A-Za-z][A-Za-z\s]*?)(?=\s@|\s*$|[.,!?;:\n])/g;
 const IMAGE_EXT = /\.(png|jpg|jpeg|gif|webp|svg)(\?|$)/i;
 const VIDEO_EXT = /\.(mp4|mov|webm|avi|mkv)(\?|$)/i;
 const DOC_EXT = /\.(pdf|txt|doc|docx|xls|xlsx|ppt|pptx)(\?|$)/i;
@@ -44,7 +43,7 @@ function MentionBadge({ name }: { name: string }) {
             {/* Avatar + name */}
             <div className="flex items-center gap-3">
               {member.avatar ? (
-                <img src={member.avatar} alt={member.name} className="w-10 h-10 rounded-full object-cover" />
+                <RawImage src={member.avatar} alt={member.name} className="w-10 h-10 rounded-full object-cover" />
               ) : (
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-[12px] font-bold text-white">
                   {member.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
@@ -88,8 +87,6 @@ interface Props {
 export function RichComment({ text, className = "" }: Props) {
   // First pass: split by URLs and mentions into segments
   const segments: { type: "text" | "url" | "mention"; value: string }[] = [];
-  let remaining = text;
-
   // Combined regex for URLs and mentions
   // Match @FirstName LastName (exactly 2-3 capitalized words) or URLs
   const combined = /(@[A-Z][a-z]+(?:\s[A-Z][a-z]+){0,2})|(https?:\/\/[^\s<>"{}|\\^`[\]]+)/g;
@@ -132,7 +129,7 @@ export function RichComment({ text, className = "" }: Props) {
         if (type === "image") {
           return (
             <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="block mt-2 mb-1">
-              <img src={url} alt="Attachment" className="max-w-full max-h-[200px] rounded-lg border border-gray-200/60 dark:border-white/[0.06] object-cover shadow-sm hover:shadow-md transition-shadow" />
+              <RawImage src={url} alt="Attachment" className="max-w-full max-h-[200px] rounded-lg border border-gray-200/60 dark:border-white/[0.06] object-cover shadow-sm hover:shadow-md transition-shadow" />
             </a>
           );
         }

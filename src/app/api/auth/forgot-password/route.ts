@@ -51,8 +51,8 @@ export async function POST(request: NextRequest) {
         subject: "Reset your Ten80Ten password",
         html: buildPasswordResetEmailHtml(confirmUrl),
       });
-    } catch (emailErr: any) {
-      console.error("[forgot-password] Email send failed:", emailErr?.message);
+    } catch (emailErr: unknown) {
+      console.error("[forgot-password] Email send failed:", emailErr instanceof Error ? emailErr.message : emailErr);
     }
 
     return successResponse;

@@ -1,12 +1,13 @@
 "use client";
 
+import { RawImage } from "@/components/raw-image";
 import { useMemo, useState, useEffect, useRef } from "react";
 import { usePipeline } from "@/lib/pipeline-context";
-import { useNavigation } from "@/lib/navigation-context";
-import { PIPELINE_COLUMNS, Platform } from "@/lib/types";
+import { Page, useNavigation } from "@/lib/navigation-context";
+import { ContentCard, PIPELINE_COLUMNS, Platform } from "@/lib/types";
 import { PlatformIcon } from "@/components/platform-icons";
 import { AnimatedCounter, AnimatedBar } from "@/components/animated";
-import { Lightbulb, Clock, RotateCcw, CalendarCheck, Rocket, ArrowRight, Zap, Eye, TrendingUp, BarChart3, Target, AlertCircle, Calendar, CheckCircle, ChevronLeft, ChevronRight, Plus, Palette, Users, Kanban } from "lucide-react";
+import { Lightbulb, Clock, RotateCcw, CalendarCheck, Rocket, ArrowRight, Zap, Eye, TrendingUp, BarChart3, Target, AlertCircle, Calendar, CheckCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 const stageIcons = [Lightbulb, Clock, RotateCcw, CalendarCheck, Rocket];
@@ -41,9 +42,8 @@ export function DashboardPage() {
   const { cards } = usePipeline();
   const { navigate } = useNavigation();
   const { currentUser } = useAuth();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => { setMounted(true); }, []);
+  const [renderTime] = useState(() => Date.now());
+  const mounted = true;
 
   // Auto-fit: scale dashboard to fill viewport without scrolling
   const containerRef = useRef<HTMLDivElement>(null);
@@ -62,7 +62,7 @@ export function DashboardPage() {
     const ro = new ResizeObserver(fit);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [mounted]);
+  }, []);
 
   const totalCards = cards.length;
   const pendingApproval = cards.filter((c) => c.stage === "awaiting_approval").length;
@@ -103,7 +103,7 @@ export function DashboardPage() {
         <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             {currentUser.avatar ? (
-              <img src={currentUser.avatar} alt={currentUser.name} className="w-12 h-12 rounded-xl object-cover shadow-lg ring-2 ring-white dark:ring-white/10" />
+              <RawImage src={currentUser.avatar} alt={currentUser.name} className="w-12 h-12 rounded-xl object-cover shadow-lg ring-2 ring-white dark:ring-white/10" />
             ) : (
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center text-white text-[15px] font-bold shadow-lg shadow-orange-500/25">{currentUser.initials}</div>
             )}
@@ -221,10 +221,10 @@ export function DashboardPage() {
             <div className="space-y-1">
               {upcomingPosts.map((card) => {
                 const col = PIPELINE_COLUMNS.find((c) => c.id === card.stage);
-                const daysUntil = card.scheduledDate ? Math.ceil((new Date(card.scheduledDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
+                const daysUntil = card.scheduledDate ? Math.ceil((new Date(card.scheduledDate).getTime() - renderTime) / (1000 * 60 * 60 * 24)) : null;
                 return (
                   <button key={card.id} onClick={() => navigate("pipeline")} className="w-full flex items-center gap-3 px-2 py-2.5 rounded-xl hover:bg-gray-50/80 dark:hover:bg-white/[0.02] transition-all duration-300 cursor-pointer text-left group">
-                    <img src={card.thumbnailUrl} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0 shadow-sm group-hover:shadow-md transition-shadow duration-300" />
+                    <RawImage src={card.thumbnailUrl} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0 shadow-sm group-hover:shadow-md transition-shadow duration-300" />
                     <div className="flex-1 min-w-0">
                       <p className="text-[12px] text-gray-800 dark:text-gray-200 font-medium truncate">{card.title}</p>
                       <div className="flex items-center gap-1 mt-0.5">{card.platforms.slice(0, 3).map((p) => <span key={p} className="text-gray-400"><PlatformIcon platform={p} className="w-2.5 h-2.5" /></span>)}</div>
@@ -252,7 +252,7 @@ export function DashboardPage() {
           <div className="space-y-1">
             {recentPosted.map((card) => (
               <div key={card.id} className="flex items-center gap-3 px-2 py-2.5 rounded-xl hover:bg-gray-50/80 dark:hover:bg-white/[0.02] transition-all duration-300">
-                <img src={card.thumbnailUrl} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0 shadow-sm" />
+                <RawImage src={card.thumbnailUrl} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0 shadow-sm" />
                 <div className="flex-1 min-w-0">
                   <p className="text-[12px] text-gray-800 dark:text-gray-200 font-medium truncate">{card.title}</p>
                   <div className="flex items-center gap-1.5 mt-0.5">
@@ -279,7 +279,7 @@ export function DashboardPage() {
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const stageColors: Record<string, string> = { ideas: "#8b5cf6", awaiting_approval: "#f59e0b", revision_needed: "#ef4444", approved_scheduled: "#22c55e", posted: "#0ea5e9" };
 
-function MiniCalendar({ cards, navigate }: { cards: any[]; navigate: (page: any) => void }) {
+function MiniCalendar({ cards, navigate }: { cards: ContentCard[]; navigate: (page: Page) => void }) {
   const [calDate, setCalDate] = useState(() => new Date());
   const year = calDate.getFullYear();
   const month = calDate.getMonth();
@@ -295,7 +295,7 @@ function MiniCalendar({ cards, navigate }: { cards: any[]; navigate: (page: any)
 
   const getCardsForDay = (day: number) => {
     const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    return cards.filter((c: any) => c.scheduledDate === dateStr);
+    return cards.filter((c) => c.scheduledDate === dateStr);
   };
 
   const today = new Date();
@@ -330,14 +330,14 @@ function MiniCalendar({ cards, navigate }: { cards: any[]; navigate: (page: any)
               <span className={`text-[9px] font-medium ${isTodayDate ? "text-white font-bold" : hasCards ? "text-gray-800 dark:text-gray-200" : "text-gray-400 dark:text-gray-600"}`}>{day}</span>
               {hasCards && !isTodayDate && (
                 <div className="flex gap-[2px] mt-[1px]">
-                  {dayCards.slice(0, 3).map((c: any, j: number) => (
+                  {dayCards.slice(0, 3).map((c, j) => (
                     <div key={j} className="w-[4px] h-[4px] rounded-full" style={{ backgroundColor: stageColors[c.stage] || "#3b82f6" }} />
                   ))}
                 </div>
               )}
               {hasCards && isTodayDate && (
                 <div className="flex gap-[2px] mt-[1px]">
-                  {dayCards.slice(0, 3).map((_: any, j: number) => <div key={j} className="w-[4px] h-[4px] rounded-full bg-white/70" />)}
+                  {dayCards.slice(0, 3).map((_, j) => <div key={j} className="w-[4px] h-[4px] rounded-full bg-white/70" />)}
                 </div>
               )}
             </div>

@@ -25,17 +25,13 @@ const SIDEBAR_KEY = "nav_sidebar";
 const PIN_KEY = "nav_sidebar_pinned";
 
 export function NavigationProvider({ children }: { children: ReactNode }) {
-  const [currentPage, setCurrentPage] = useState<Page>("dashboard");
-  const [sidebarCollapsed, setSidebarCollapsedState] = useState(false);
-  const [sidebarPinned, setSidebarPinned] = useState(false);
+  const [currentPage, setCurrentPage] = useState<Page>(() => loadState<Page>(PAGE_KEY, "dashboard"));
+  const [sidebarCollapsed, setSidebarCollapsedState] = useState(() => loadState<boolean>(PIN_KEY, false) ? false : loadState<boolean>(SIDEBAR_KEY, false));
+  const [sidebarPinned, setSidebarPinned] = useState(() => loadState<boolean>(PIN_KEY, false));
   const [pendingOpenPostId, setPendingOpenPostId] = useState<string | null>(null);
   const hydrated = useRef(false);
 
   useEffect(() => {
-    setCurrentPage(loadState<Page>(PAGE_KEY, "dashboard"));
-    const pinned = loadState<boolean>(PIN_KEY, false);
-    setSidebarPinned(pinned);
-    setSidebarCollapsedState(pinned ? false : loadState<boolean>(SIDEBAR_KEY, false));
     hydrated.current = true;
   }, []);
 

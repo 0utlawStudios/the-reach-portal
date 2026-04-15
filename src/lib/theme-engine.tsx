@@ -12,18 +12,21 @@ interface ThemeEngineCtx {
 const Ctx = createContext<ThemeEngineCtx>({ theme: "default", setTheme: () => {} });
 
 const STORAGE_KEY = "t10_design_theme";
+const THEMES: DesignTheme[] = ["default", "glass", "clay", "liquid", "brutalism"];
+
+function loadInitialTheme(): DesignTheme {
+  if (typeof window === "undefined") return "default";
+  const stored = localStorage.getItem(STORAGE_KEY) as DesignTheme | null;
+  return stored && THEMES.includes(stored) ? stored : "default";
+}
 
 export function ThemeEngineProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<DesignTheme>("default");
+  const [theme, setThemeState] = useState<DesignTheme>(loadInitialTheme);
 
   // Hydrate from localStorage on mount
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY) as DesignTheme | null;
-    if (stored && ["default", "glass", "clay", "liquid", "brutalism"].includes(stored)) {
-      setThemeState(stored);
-      document.documentElement.setAttribute("data-design", stored);
-    }
-  }, []);
+    document.documentElement.setAttribute("data-design", theme);
+  }, [theme]);
 
   const setTheme = useCallback((t: DesignTheme) => {
     setThemeState(t);

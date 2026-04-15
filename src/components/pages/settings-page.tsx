@@ -1,5 +1,6 @@
 "use client";
 
+import { RawImage } from "@/components/raw-image";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { AvatarCropModal } from "@/components/avatar-crop-modal";
@@ -11,7 +12,8 @@ import { usePresence, PresenceStatus } from "@/lib/use-presence";
 import { usePipeline } from "@/lib/pipeline-context";
 import { ThemeSelector } from "@/components/theme-selector";
 import { logAudit, fetchAllAuditLogs, AuditEntry } from "@/lib/audit";
-import { History, ArrowUpRight, SlidersHorizontal, Search, FileText as FileTextIcon, Shield as ShieldIcon, AtSign, ArrowUpDown, Filter, ChevronRight, CheckCircle, Activity, Clock as ClockIcon } from "lucide-react";
+import { History, ArrowUpRight, Search, FileText as FileTextIcon, Shield as ShieldIcon, AtSign, ArrowUpDown, Filter, ChevronRight, CheckCircle, Activity, Clock as ClockIcon } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,7 +22,7 @@ import {
   Database, Key, Bell, Palette, HardDrive, ExternalLink, Globe, Clock,
   Shield, Download, Sun, Moon, Mail,
   Smartphone, Calendar, BarChart3, Zap, Link2, Webhook, FileText,
-  UserPlus, ShieldCheck, Pencil, Eye, Crown, X, Send, Megaphone, Code, Users, Settings as SettingsIcon,
+  UserPlus, ShieldCheck, Pencil, Eye, Crown, X, Send, Megaphone, Users, Settings as SettingsIcon,
   Camera, Save, Upload, Trash2, RefreshCw,
 } from "lucide-react";
 
@@ -109,7 +111,7 @@ function EditProfileModal({ member, onClose, onDelete, canDelete }: { member: Te
             <div className="flex justify-center">
               <div className="relative group">
                 {avatarUrl ? (
-                  <img src={avatarUrl} alt={name} className="w-20 h-20 rounded-full object-cover" />
+                  <RawImage src={avatarUrl} alt={name} className="w-20 h-20 rounded-full object-cover" />
                 ) : (
                   <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-[22px] font-bold text-white">
                     {name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
@@ -531,7 +533,7 @@ export function SettingsPage() {
                       className={`w-full flex items-start gap-3 px-4 py-3.5 hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors cursor-pointer text-left ${i > 0 ? "border-t border-gray-50 dark:border-white/[0.03]" : ""}`}>
                       <div className="relative shrink-0 mt-0.5">
                         {member.avatar ? (
-                          <img src={member.avatar} alt={member.name} className="w-9 h-9 rounded-full object-cover" />
+                          <RawImage src={member.avatar} alt={member.name} className="w-9 h-9 rounded-full object-cover" />
                         ) : (
                           <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-[11px] font-bold text-white">
                             {member.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
@@ -881,9 +883,9 @@ function AuditLogTab({ auditLogs, auditLoading, setAuditLogs, setAuditLoading }:
   useEffect(() => {
     setAuditLoading(true);
     fetchAllAuditLogs(500).then((logs) => { setAuditLogs(logs); setAuditLoading(false); });
-  }, []);
+  }, [setAuditLoading, setAuditLogs]);
 
-  const actionMeta: Record<string, { label: string; color: string; icon: "content" | "system" | "mention" }> = {
+  const actionMeta = useMemo<Record<string, { label: string; color: string; icon: "content" | "system" | "mention" }>>(() => ({
     stage_change: { label: "Stage Changed", color: "bg-blue-500", icon: "content" },
     revision_submitted: { label: "Fix Submitted", color: "bg-violet-500", icon: "content" },
     revision_requested: { label: "Revision Requested", color: "bg-red-500", icon: "content" },
@@ -900,7 +902,7 @@ function AuditLogTab({ auditLogs, auditLoading, setAuditLogs, setAuditLoading }:
     role_changed: { label: "Role Changed", color: "bg-cyan-500", icon: "system" },
     member_removed: { label: "Member Removed", color: "bg-red-600", icon: "system" },
     settings_changed: { label: "Settings Changed", color: "bg-gray-500", icon: "system" },
-  };
+  }), []);
 
   const filteredLogs = useMemo(() => {
     let logs = [...auditLogs];
@@ -923,7 +925,7 @@ function AuditLogTab({ auditLogs, auditLoading, setAuditLogs, setAuditLoading }:
     // Sort
     if (sortOrder === "oldest") logs.reverse();
     return logs;
-  }, [auditLogs, sortOrder, category, search]);
+  }, [auditLogs, sortOrder, category, search, actionMeta]);
 
   // Category counts
   const counts = useMemo(() => ({
@@ -1071,7 +1073,7 @@ function Section({ title, icon, children }: { title: string; icon: React.ReactNo
   );
 }
 
-function SettingRow({ icon: Icon, label, desc, children }: { icon: any; label: string; desc: string; children: React.ReactNode }) {
+function SettingRow({ icon: Icon, label, desc, children }: { icon: LucideIcon; label: string; desc: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 dark:border-white/[0.03] last:border-0">
       <div className="w-7 h-7 rounded-lg bg-gray-50 dark:bg-white/[0.04] border border-gray-100 dark:border-white/[0.06] flex items-center justify-center shrink-0">

@@ -1,5 +1,6 @@
 "use client";
 
+import { RawImage } from "@/components/raw-image";
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
@@ -44,7 +45,7 @@ export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
           className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
         >
           {currentUser.avatar ? (
-            <img src={currentUser.avatar} alt={currentUser.name} className="w-7 h-7 rounded-full object-cover" />
+            <RawImage src={currentUser.avatar} alt={currentUser.name} className="w-7 h-7 rounded-full object-cover" />
           ) : (
             <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-[10px] font-bold text-white">
               {currentUser.initials}

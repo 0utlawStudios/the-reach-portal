@@ -12,7 +12,48 @@ const STORAGE_KEY = "pipeline_cards";
 
 // ─── Supabase <-> ContentCard mappers ───
 
-function dbToCard(row: any): ContentCard {
+type PostRow = {
+  id: string;
+  title: string;
+  stage: PipelineStage;
+  platforms?: ContentCard["platforms"] | null;
+  content_type: ContentCard["contentType"];
+  thumbnail_url?: string | null;
+  scheduled_date?: string | null;
+  scheduled_time?: string | null;
+  caption?: string | null;
+  hook?: string | null;
+  notes?: string | null;
+  checklist?: ContentCard["checklist"] | null;
+  media_ids?: string[] | null;
+  source_vault?: ContentCard["sourceVault"] | null;
+  asset_source?: ContentCard["assetSource"] | null;
+  license_file_id?: string | null;
+  created_by?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+type PostUpdate = {
+  title?: string;
+  stage?: PipelineStage;
+  platforms?: string[];
+  content_type?: ContentCard["contentType"];
+  thumbnail_url?: string | null;
+  scheduled_date?: string | null;
+  scheduled_time?: string | null;
+  caption?: string | null;
+  hook?: string | null;
+  notes?: string | null;
+  checklist?: ContentCard["checklist"];
+  media_ids?: string[];
+  source_vault?: ContentCard["sourceVault"];
+  asset_source?: ContentCard["assetSource"] | null;
+  license_file_id?: string | null;
+  created_by?: string | null;
+};
+
+function dbToCard(row: PostRow): ContentCard {
   const notes = row.notes || undefined;
   // Reconstruct revised flag from notes — if notes contain "Revision Note" entries, card was revised
   const revised = notes ? /(Revision Note \(|Fix submitted —)/.test(notes) : false;
@@ -49,8 +90,8 @@ function dbToCard(row: any): ContentCard {
   };
 }
 
-function cardToDb(card: Partial<ContentCard> & { id?: string }) {
-  const obj: any = {};
+function cardToDb(card: Partial<ContentCard> & { id?: string }): PostUpdate {
+  const obj: PostUpdate = {};
   if (card.title !== undefined) obj.title = card.title;
   if (card.stage !== undefined) obj.stage = card.stage;
   if (card.platforms !== undefined) obj.platforms = card.platforms;
@@ -160,7 +201,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "posts" },
         (payload) => {
-          const newCard = dbToCard(payload.new);
+          const newCard = dbToCard(payload.new as PostRow);
           // Skip if this was our own insert (dedup)
           if (recentMutations.current.has("create")) return;
           setCards((prev) => {
@@ -173,7 +214,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "posts" },
         (payload) => {
-          const updated = dbToCard(payload.new);
+          const updated = dbToCard(payload.new as PostRow);
           // Skip if this was our own update (dedup)
           if (recentMutations.current.has(updated.id)) return;
           setCards((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
@@ -185,7 +226,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
         "postgres_changes",
         { event: "DELETE", schema: "public", table: "posts" },
         (payload) => {
-          const deletedId = (payload.old as any)?.id;
+          const deletedId = (payload.old as Partial<PostRow>).id;
           if (!deletedId || recentMutations.current.has(deletedId)) return;
           setCards((prev) => prev.filter((c) => c.id !== deletedId));
           setSelectedCard((prev) => (prev?.id === deletedId ? null : prev));
@@ -252,7 +293,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
       });
     }
     logAudit(cardId, currentUser.name, "stage_change", `Moved from ${fromLabel} to ${toLabel}`);
-  }, [useSupabase, cards]);
+  }, [useSupabase, cards, currentUser.name]);
 
   const requestReapproval = useCallback((cardId: string) => {
     const card = cards.find((c) => c.id === cardId);
@@ -290,7 +331,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
 
     setPendingReapproval(null);
     logAudit(cardId, author, "revision_submitted", `Fix submitted: ${note}`);
-  }, [useSupabase, cards]);
+  }, [useSupabase, cards, currentUser.name]);
 
   const cancelReapproval = useCallback(() => {
     setPendingReapproval(null);
@@ -332,7 +373,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
 
     setPendingKickback(null);
     logAudit(cardId, author, "revision_requested", `Kickback: ${note}`);
-  }, [useSupabase, cards]);
+  }, [useSupabase, cards, currentUser.name]);
 
   const cancelKickback = useCallback(() => {
     setPendingKickback(null);

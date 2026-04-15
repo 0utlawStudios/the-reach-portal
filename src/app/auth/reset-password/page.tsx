@@ -1,6 +1,8 @@
 "use client";
 
+import { RawImage } from "@/components/raw-image";
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
 import { Lock, CheckCircle, AlertCircle, Eye, EyeOff, ArrowLeft, Shield } from "lucide-react";
 import { motion } from "framer-motion";
@@ -103,7 +105,7 @@ export default function ResetPasswordPage() {
           <motion.div className="w-full max-w-[360px]" variants={stagger} initial="hidden" animate="show">
             {/* Logo + heading */}
             <motion.div className="mb-10" variants={fadeUp}>
-              <img src="/ten80ten-logo.png" alt="Ten80Ten" className="w-[130px] h-auto object-contain mb-8" />
+              <RawImage src="/ten80ten-logo.png" alt="Ten80Ten" className="w-[130px] h-auto object-contain mb-8" />
               <h1 className="text-[28px] font-extrabold text-gray-900 dark:text-white tracking-[-0.03em] leading-[1.1]">
                 Set new password
               </h1>
@@ -146,7 +148,7 @@ export default function ResetPasswordPage() {
                     className="w-full h-[52px] pl-11 pr-4 rounded-xl bg-slate-50/80 dark:bg-white/[0.04] border border-gray-200/70 dark:border-white/[0.08] text-[14px] text-gray-900 dark:text-gray-100 placeholder:text-gray-300 dark:placeholder:text-gray-600 outline-none focus:bg-white dark:focus:bg-white/[0.06] focus:border-[#f59e0b] focus:ring-2 focus:ring-[#f59e0b]/15 transition-all"
                   />
                 </div>
-                {confirm.length > 0 && password !== confirm && <p className="text-[10px] text-red-500">Passwords don't match</p>}
+                {confirm.length > 0 && password !== confirm && <p className="text-[10px] text-red-500">Passwords don&apos;t match</p>}
               </motion.div>
 
               {error && (
@@ -168,9 +170,9 @@ export default function ResetPasswordPage() {
             </form>
 
             <motion.p className="text-center text-[12px] text-gray-400 mt-6" variants={fadeUp}>
-              <a href="/" className="inline-flex items-center gap-1.5 text-[#f59e0b] hover:text-orange-600 font-semibold transition-colors">
+              <Link href="/" className="inline-flex items-center gap-1.5 text-[#f59e0b] hover:text-orange-600 font-semibold transition-colors">
                 <ArrowLeft className="w-3.5 h-3.5" />Back to login
-              </a>
+              </Link>
             </motion.p>
           </motion.div>
         </div>

@@ -101,8 +101,8 @@ export async function POST(request: NextRequest) {
             }),
           });
         }
-      } catch (emailErr: any) {
-        console.error("[request-access] Email FAILED:", emailErr?.message || emailErr);
+      } catch (emailErr: unknown) {
+        console.error("[request-access] Email FAILED:", emailErr instanceof Error ? emailErr.message : emailErr);
       }
     }
 

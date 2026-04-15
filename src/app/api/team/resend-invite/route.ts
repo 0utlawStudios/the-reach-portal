@@ -111,8 +111,8 @@ export async function POST(request: NextRequest) {
           html: buildInviteEmailHtml(name, role, confirmUrl),
         });
         emailSent = true;
-      } catch (err: any) {
-        console.error("[resend-invite] Email failed:", err?.message);
+      } catch (err: unknown) {
+        console.error("[resend-invite] Email failed:", err instanceof Error ? err.message : err);
       }
     }
 

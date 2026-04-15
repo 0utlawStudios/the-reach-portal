@@ -14,6 +14,7 @@ export function AnimatedCounter({ value, duration = 700, suffix = "", prefix = "
   const frameRef = useRef<number>(0);
   const startRef = useRef<number>(0);
   const fromRef = useRef(0);
+  const displayRef = useRef(value);
   const initialRender = useRef(true);
 
   useEffect(() => {
@@ -22,7 +23,7 @@ export function AnimatedCounter({ value, duration = 700, suffix = "", prefix = "
       fromRef.current = 0;
       initialRender.current = false;
     } else {
-      fromRef.current = display;
+      fromRef.current = displayRef.current;
     }
     startRef.current = performance.now();
 
@@ -30,7 +31,9 @@ export function AnimatedCounter({ value, duration = 700, suffix = "", prefix = "
       const elapsed = now - startRef.current;
       const progress = Math.min(elapsed / duration, 1);
       const eased = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
-      setDisplay(Math.round(fromRef.current + (value - fromRef.current) * eased));
+      const next = Math.round(fromRef.current + (value - fromRef.current) * eased);
+      displayRef.current = next;
+      setDisplay(next);
       if (progress < 1) frameRef.current = requestAnimationFrame(animate);
     };
 
