@@ -41,7 +41,7 @@ as $$
     where wm.workspace_id = p_workspace_id
       and wm.user_id = auth.uid()
       and wm.status = 'active'
-      and (p_allowed_roles is null or wm.role = any(p_allowed_roles))
+      and (p_allowed_roles is null or wm.role::text = any(p_allowed_roles))
   );
 $$;
 
@@ -73,17 +73,17 @@ create policy "posts_select_v2" on posts for select
 create policy "posts_insert_v2" on posts for insert
   with check (is_active_workspace_member(
     workspace_id,
-    array['superadmin','admin','approver','creative_director','editor']
+    array['superadmin','admin','owner','approver','creative_director','editor','social_media_specialist','video_editor','graphic_designer','specialist']
   ));
 
 create policy "posts_update_v2" on posts for update
   using (is_active_workspace_member(
     workspace_id,
-    array['superadmin','admin','approver','creative_director','editor']
+    array['superadmin','admin','owner','approver','creative_director','editor','social_media_specialist','video_editor','graphic_designer','specialist']
   ))
   with check (is_active_workspace_member(
     workspace_id,
-    array['superadmin','admin','approver','creative_director','editor']
+    array['superadmin','admin','owner','approver','creative_director','editor','social_media_specialist','video_editor','graphic_designer','specialist']
   ));
 
 create policy "posts_delete_v2" on posts for delete
@@ -108,17 +108,17 @@ create policy "media_assets_select_v2" on media_assets for select
 create policy "media_assets_insert_v2" on media_assets for insert
   with check (is_active_workspace_member(
     workspace_id,
-    array['superadmin','admin','approver','creative_director','editor']
+    array['superadmin','admin','owner','approver','creative_director','editor','social_media_specialist','video_editor','graphic_designer','specialist']
   ));
 
 create policy "media_assets_update_v2" on media_assets for update
   using (is_active_workspace_member(
     workspace_id,
-    array['superadmin','admin','approver','creative_director','editor']
+    array['superadmin','admin','owner','approver','creative_director','editor','social_media_specialist','video_editor','graphic_designer','specialist']
   ))
   with check (is_active_workspace_member(
     workspace_id,
-    array['superadmin','admin','approver','creative_director','editor']
+    array['superadmin','admin','owner','approver','creative_director','editor','social_media_specialist','video_editor','graphic_designer','specialist']
   ));
 
 create policy "media_assets_delete_v2" on media_assets for delete

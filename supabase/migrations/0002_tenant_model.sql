@@ -13,12 +13,15 @@ create table if not exists workspaces (
   updated_at timestamptz not null default now()
 );
 
+-- role uses the existing user_role enum directly so every value the app
+-- already supports (owner, admin, superadmin, approver, creative_director,
+-- editor, viewer, social_media_specialist, video_editor, graphic_designer,
+-- specialist, technician, and any future additions) is automatically valid
+-- without schema churn.
 create table if not exists workspace_members (
   workspace_id uuid not null references workspaces(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,
-  role text not null check (role in (
-    'superadmin','admin','approver','creative_director','editor','viewer'
-  )),
+  role user_role not null,
   status text not null default 'pending' check (status in (
     'pending','active','suspended'
   )),

@@ -19,24 +19,21 @@ on conflict (slug) do nothing;
 -- Copy team_members into workspace_members where an auth.users row exists for the email.
 -- Rows in team_members without a matching auth.users entry are skipped; they are
 -- typically stale invites or external references.
+--
+-- workspace_members.role is now the user_role enum, so we can just pass tm.role
+-- through untouched. Every legitimate production role (owner/admin/editor/viewer/
+-- superadmin/approver/creative_director/social_media_specialist/video_editor/
+-- graphic_designer/specialist/technician) is preserved 1:1.
 insert into workspace_members (workspace_id, user_id, role, status)
 select
   '00000000-0000-0000-0000-000000000001'::uuid as workspace_id,
   u.id as user_id,
-  case
-    when tm.role::text = 'owner' then 'superadmin'
-    when tm.role::text = 'admin' then 'admin'
-    when tm.role::text = 'approver' then 'approver'
-    when tm.role::text = 'creative_director' then 'creative_director'
-    when tm.role::text = 'editor' then 'editor'
-    when tm.role::text in ('viewer','member','guest') then 'viewer'
-    else 'viewer'
-  end as role,
+  tm.role as role,
   case
     when tm.status::text = 'active' then 'active'
-    when tm.status::text = 'pending' then 'pending'
-    when tm.status::text = 'suspended' then 'suspended'
-    else 'active'
+    when tm.status::text in ('pending','invited') then 'pending'
+    when tm.status::text in ('suspended','removed','inactive','deactivated') then 'suspended'
+    else 'pending'
   end as status
 from team_members tm
 join auth.users u on lower(u.email) = lower(tm.email)
