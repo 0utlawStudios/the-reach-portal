@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getTransporter, getFromAddress, buildAdminNotificationHtml } from "@/lib/email-utils";
+import { consume, getClientIp } from "@/lib/rate-limit";
 
 export const maxDuration = 10;
 
@@ -21,6 +22,16 @@ interface RequestBody {
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit: 5 per minute per IP. Anti-spam for the public signup form.
+    const ip = getClientIp(request);
+    const ipCheck = await consume("request-access:ip", ip, 5, 60);
+    if (!ipCheck.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        { status: 429 },
+      );
+    }
+
     const body: RequestBody = await request.json();
 
     if (!body.name?.trim() || !body.email?.trim()) {

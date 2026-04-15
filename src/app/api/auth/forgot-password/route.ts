@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getTransporter, getFromAddress, getSiteUrl, buildPasswordResetEmailHtml } from "@/lib/email-utils";
+import { consume, getClientIp } from "@/lib/rate-limit";
 
 export const maxDuration = 10;
 
@@ -13,6 +14,17 @@ function getAdminClient() {
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit: 5 requests per minute per IP. Fails open on infrastructure
+    // errors so an outage in the rate limiter does not block legitimate users.
+    const ip = getClientIp(request);
+    const ipCheck = await consume("forgot-password:ip", ip, 5, 60);
+    if (!ipCheck.allowed) {
+      console.warn(`[forgot-password] rate-limited IP ${ip}`);
+      // Anti-enumeration: still return success so the attacker cannot
+      // distinguish rate-limited from unknown-email.
+      return NextResponse.json({ success: true });
+    }
+
     const { email } = await request.json();
 
     // ALWAYS return success to prevent email enumeration

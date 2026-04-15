@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getTransporter, getFromAddress, esc, safeSubject } from "@/lib/email-utils";
+import { consume, getClientIp } from "@/lib/rate-limit";
 
 export const maxDuration = 10;
 
@@ -28,6 +29,13 @@ interface MentionRequest {
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit: 10 per minute per IP.
+    const ip = getClientIp(request);
+    const ipCheck = await consume("notifications:mention:ip", ip, 10, 60);
+    if (!ipCheck.allowed) {
+      return NextResponse.json({ error: "Rate limited" }, { status: 429 });
+    }
+
     const body: MentionRequest = await request.json();
 
     if (!body.comment || !body.postTitle || !body.authorName) {
