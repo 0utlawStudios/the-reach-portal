@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { getTransporter, getFromAddress } from "@/lib/email-utils";
+import { getTransporter, getFromAddress, esc, safeSubject } from "@/lib/email-utils";
 
 export const maxDuration = 10;
 
@@ -76,16 +76,16 @@ export async function POST(request: NextRequest) {
               </div>
               <div>
                 <p style="color: #f97316; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; margin: 0;">Revision Requested</p>
-                <p style="color: #6b7280; font-size: 12px; margin: 2px 0 0;">by ${body.requestedBy}</p>
+                <p style="color: #6b7280; font-size: 12px; margin: 2px 0 0;">by ${esc(body.requestedBy)}</p>
               </div>
             </div>
-            <h2 style="color: #ffffff; font-size: 20px; font-weight: 700; margin: 0 0 16px; letter-spacing: -0.02em;">${body.postTitle}</h2>
+            <h2 style="color: #ffffff; font-size: 20px; font-weight: 700; margin: 0 0 16px; letter-spacing: -0.02em;">${esc(body.postTitle)}</h2>
             <div style="background: rgba(249,115,22,0.08); border-left: 3px solid #ea580c; padding: 14px 18px; border-radius: 0 10px 10px 0;">
-              <p style="color: #fdba74; font-size: 13px; line-height: 1.6; margin: 0; white-space: pre-wrap;">${body.revisionNote}</p>
+              <p style="color: #fdba74; font-size: 13px; line-height: 1.6; margin: 0; white-space: pre-wrap;">${esc(body.revisionNote)}</p>
             </div>
           </div>
           <div style="padding: 24px 28px;">
-            <a href="${siteUrl}" style="display: inline-block; background: #ea580c; color: white; text-decoration: none; padding: 12px 28px; border-radius: 10px; font-size: 13px; font-weight: 700; letter-spacing: 0.01em;">
+            <a href="${esc(siteUrl)}" style="display: inline-block; background: #ea580c; color: white; text-decoration: none; padding: 12px 28px; border-radius: 10px; font-size: 13px; font-weight: 700; letter-spacing: 0.01em;">
               View Revision in Portal
             </a>
             <p style="color: #374151; font-size: 11px; margin: 16px 0 0;">Ten80Ten Content Pipeline</p>
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
           await transporter.sendMail({
             from: getFromAddress(),
             to: email,
-            subject: `Revision Requested: "${body.postTitle}"`,
+            subject: safeSubject(`Revision Requested: "${body.postTitle}"`),
             html: htmlEmail,
           });
           sent++;

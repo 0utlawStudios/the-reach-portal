@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { getTransporter, getFromAddress } from "@/lib/email-utils";
+import { getTransporter, getFromAddress, esc, safeSubject } from "@/lib/email-utils";
 
 export const maxDuration = 10;
 
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
           await transporter.sendMail({
             from: getFromAddress(),
             to: member.email,
-            subject: `${body.authorName} mentioned you in "${body.postTitle}"`,
+            subject: safeSubject(`${body.authorName} mentioned you in "${body.postTitle}"`),
             html: `
               <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 520px; margin: 0 auto;">
                 <div style="background: linear-gradient(135deg, #ea580c, #dc2626); padding: 24px; border-radius: 12px 12px 0 0;">
@@ -74,12 +74,12 @@ export async function POST(request: NextRequest) {
                 </div>
                 <div style="background: #ffffff; padding: 24px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
                   <p style="color: #374151; font-size: 14px; line-height: 1.6; margin: 0 0 16px;">
-                    <strong>${body.authorName}</strong> mentioned you in a comment on <strong>"${body.postTitle}"</strong>:
+                    <strong>${esc(body.authorName)}</strong> mentioned you in a comment on <strong>"${esc(body.postTitle)}"</strong>:
                   </p>
                   <div style="background: #f9fafb; border-left: 3px solid #ea580c; padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 0 0 20px;">
-                    <p style="color: #4b5563; font-size: 13px; line-height: 1.5; margin: 0; white-space: pre-wrap;">${body.comment}</p>
+                    <p style="color: #4b5563; font-size: 13px; line-height: 1.5; margin: 0; white-space: pre-wrap;">${esc(body.comment)}</p>
                   </div>
-                  <a href="${siteUrl}" style="display: inline-block; background: #ea580c; color: white; text-decoration: none; padding: 10px 24px; border-radius: 8px; font-size: 13px; font-weight: 600;">
+                  <a href="${esc(siteUrl)}" style="display: inline-block; background: #ea580c; color: white; text-decoration: none; padding: 10px 24px; border-radius: 8px; font-size: 13px; font-weight: 600;">
                     Open Portal
                   </a>
                   <p style="color: #9ca3af; font-size: 11px; margin: 16px 0 0;">Ten80Ten Social Media Management Portal</p>

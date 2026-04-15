@@ -24,13 +24,20 @@ export function getSiteUrl() {
 
 // ─── HTML Escaping (prevent XSS injection) ───
 
-function esc(str: string): string {
-  return str
+export function esc(value: unknown): string {
+  if (value == null) return "";
+  return String(value)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+/** Strip CR/LF from email subject lines to prevent header injection. */
+export function safeSubject(value: unknown): string {
+  if (value == null) return "";
+  return String(value).replace(/[\r\n]+/g, " ").trim().slice(0, 200);
 }
 
 // ─── Shared HTML Wrapper ───
