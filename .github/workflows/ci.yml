@@ -1,5 +1,11 @@
 name: CI
 
+# Force v4 checkout/setup-node actions to run on Node.js 24 now, ahead of
+# GitHub's June 2, 2026 deprecation of Node.js 20 on actions. Removes the
+# deprecation warning and keeps the workflow forward-compatible.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 on:
   push:
     branches: [main]

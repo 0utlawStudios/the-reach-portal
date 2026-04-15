@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "preflight": "npm ci && npm run lint && npm run typecheck && npm run build",
     "db:diff": "supabase db diff --schema public",
     "db:types": "supabase gen types typescript --project-id \"$SUPABASE_PROJECT_ID\" --schema public > src/lib/database.types.ts",
     "db:types:check": "tsx scripts/db-types-check.ts"
