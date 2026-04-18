@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ten80Ten Content Engine — Product Manual</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --surface-2: #1a1a1a;
+    --surface-3: #222222;
+    --border: #2a2a2a;
+    --border-accent: #333333;
+    --text: #e8e8e8;
+    --text-muted: #888888;
+    --text-dim: #555555;
+    --accent: #3b82f6;
+    --accent-dim: #1e40af;
+    --green: #22c55e;
+    --green-dim: #166534;
+    --amber: #f59e0b;
+    --amber-dim: #92400e;
+    --red: #ef4444;
+    --purple: #a855f7;
+    --cyan: #06b6d4;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .container {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 0 32px;
+  }
+
+  /* ── HERO ── */
+  .hero {
+    padding: 80px 0 60px;
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+  }
+  .hero-badge {
+    display: inline-block;
+    padding: 6px 16px;
+    border: 1px solid var(--border-accent);
+    border-radius: 100px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 28px;
+  }
+  .hero h1 {
+    font-size: 42px;
+    font-weight: 800;
+    letter-spacing: -1.5px;
+    line-height: 1.1;
+    margin-bottom: 16px;
+  }
+  .hero h1 span { color: var(--accent); }
+  .hero .subtitle {
+    font-size: 17px;
+    color: var(--text-muted);
+    max-width: 580px;
+    margin: 0 auto 32px;
+    line-height: 1.6;
+  }
+  .hero-meta {
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+    font-size: 12px;
+    color: var(--text-dim);
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .hero-meta span { display: flex; align-items: center; gap: 6px; }
+
+  /* ── TABLE OF CONTENTS ── */
+  .toc {
+    padding: 48px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .toc h2 {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 20px;
+  }
+  .toc-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .toc a {
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 14px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .toc a:hover {
+    color: var(--text);
+    background: var(--surface-2);
+  }
+  .toc a .num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    min-width: 24px;
+  }
+
+  /* ── SECTIONS ── */
+  section {
+    padding: 56px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  section:last-of-type { border-bottom: none; }
+
+  .section-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 12px;
+  }
+
+  h2 {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    margin-bottom: 20px;
+    line-height: 1.2;
+  }
+
+  h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 32px 0 12px;
+    color: var(--text);
+  }
+
+  h4 {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 24px 0 8px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  p {
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+
+  /* ── PIPELINE FLOW ── */
+  .pipeline-flow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 28px 0;
+    overflow-x: auto;
+    margin: 20px 0;
+  }
+  .pipeline-stage {
+    flex-shrink: 0;
+    padding: 14px 20px;
+    border-radius: 10px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    min-width: 130px;
+    position: relative;
+  }
+  .pipeline-stage .label {
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+    opacity: 0.6;
+  }
+  .stage-ideas { background: var(--surface-2); border: 1px solid var(--border-accent); color: var(--text-muted); }
+  .stage-awaiting { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.2); color: var(--amber); }
+  .stage-revision { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); color: var(--red); }
+  .stage-approved { background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.2); color: var(--green); }
+  .stage-posted { background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.2); color: var(--accent); }
+
+  .arrow {
+    flex-shrink: 0;
+    width: 32px;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 16px;
+  }
+
+  .revision-loop {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: -8px 0 8px;
+    font-size: 11px;
+    color: var(--text-dim);
+    gap: 8px;
+  }
+  .revision-loop .loop-arrow {
+    font-size: 18px;
+    color: var(--red);
+    opacity: 0.5;
+  }
+
+  /* ── CARDS ── */
+  .card-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 20px 0;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+  }
+  .card-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    margin-bottom: 14px;
+  }
+  .card h3 {
+    font-size: 15px;
+    margin: 0 0 8px;
+  }
+  .card p {
+    font-size: 13px;
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  .card-blue .card-icon { background: rgba(59,130,246,0.1); color: var(--accent); }
+  .card-green .card-icon { background: rgba(34,197,94,0.1); color: var(--green); }
+  .card-amber .card-icon { background: rgba(245,158,11,0.1); color: var(--amber); }
+  .card-purple .card-icon { background: rgba(168,85,247,0.1); color: var(--purple); }
+  .card-cyan .card-icon { background: rgba(6,182,212,0.1); color: var(--cyan); }
+  .card-red .card-icon { background: rgba(239,68,68,0.1); color: var(--red); }
+
+  /* ── TABLES ── */
+  .table-wrap {
+    overflow-x: auto;
+    margin: 20px 0;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  thead {
+    background: var(--surface-2);
+  }
+  th {
+    padding: 12px 16px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-dim);
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-muted);
+    vertical-align: top;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface); }
+
+  /* ── CODE / MONO ── */
+  code, .mono {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    background: var(--surface-2);
+    padding: 2px 7px;
+    border-radius: 4px;
+    color: var(--cyan);
+  }
+
+  .code-block {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 24px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 1.8;
+    color: var(--text-muted);
+    overflow-x: auto;
+    margin: 16px 0;
+  }
+  .code-block .comment { color: var(--text-dim); }
+  .code-block .keyword { color: var(--purple); }
+  .code-block .string { color: var(--green); }
+  .code-block .type { color: var(--cyan); }
+
+  /* ── TAGS ── */
+  .tag {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 100px;
+    font-size: 11px;
+    font-weight: 500;
+    margin: 2px 4px 2px 0;
+  }
+  .tag-blue { background: rgba(59,130,246,0.12); color: var(--accent); }
+  .tag-green { background: rgba(34,197,94,0.12); color: var(--green); }
+  .tag-amber { background: rgba(245,158,11,0.12); color: var(--amber); }
+  .tag-purple { background: rgba(168,85,247,0.12); color: var(--purple); }
+  .tag-cyan { background: rgba(6,182,212,0.12); color: var(--cyan); }
+  .tag-red { background: rgba(239,68,68,0.12); color: var(--red); }
+
+  /* ── CALLOUT ── */
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: var(--surface);
+    padding: 16px 20px;
+    border-radius: 0 8px 8px 0;
+    margin: 24px 0;
+  }
+  .callout p { margin: 0; font-size: 13px; }
+  .callout-green { border-left-color: var(--green); }
+  .callout-amber { border-left-color: var(--amber); }
+  .callout-purple { border-left-color: var(--purple); }
+
+  /* ── SPEC LIST ── */
+  .spec-list {
+    list-style: none;
+    margin: 12px 0;
+  }
+  .spec-list li {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+  }
+  .spec-list li:last-child { border-bottom: none; }
+  .spec-list .label { color: var(--text-dim); }
+  .spec-list .value { color: var(--text); font-weight: 500; }
+
+  /* ── FOOTER ── */
+  footer {
+    padding: 48px 0;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 12px;
+  }
+  footer .logo-text {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: -0.3px;
+    margin-bottom: 8px;
+  }
+
+  /* ── AI SECTION ── */
+  .ai-gradient {
+    background: linear-gradient(135deg, rgba(168,85,247,0.06), rgba(59,130,246,0.06), rgba(6,182,212,0.06));
+    border: 1px solid rgba(168,85,247,0.15);
+    border-radius: 12px;
+    padding: 28px;
+    margin: 24px 0;
+  }
+  .ai-gradient h3 {
+    background: linear-gradient(90deg, var(--purple), var(--cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin: 0 0 12px;
+    font-size: 17px;
+  }
+
+  .automation-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .automation-step:last-child { border-bottom: none; }
+  .step-num {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+    background: rgba(168,85,247,0.12);
+    color: var(--purple);
+  }
+  .step-content h4 {
+    margin: 0 0 4px;
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 14px;
+    color: var(--text);
+  }
+  .step-content p {
+    font-size: 13px;
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 640px) {
+    .container { padding: 0 20px; }
+    .hero h1 { font-size: 28px; }
+    .card-grid { grid-template-columns: 1fr; }
+    .toc-grid { grid-template-columns: 1fr; }
+    .hero-meta { flex-direction: column; gap: 8px; }
+    .pipeline-flow { flex-direction: column; align-items: stretch; }
+    .arrow { transform: rotate(90deg); width: auto; padding: 4px 0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════ HERO ═══════════════════════════════════════ -->
+<div class="container">
+  <div class="hero">
+    <div class="hero-badge">Product Manual v1.0</div>
+    <h1>Ten80Ten <span>Content Engine</span></h1>
+    <p class="subtitle">
+      A multi-tenant content operations platform that moves social media posts from ideation to publication through a structured, role-gated pipeline with autonomous automation at every stage.
+    </p>
+    <div class="hero-meta">
+      <span>Platform: Web Application</span>
+      <span>Version: 0.1.0</span>
+      <span>Classification: Internal</span>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════ TOC ═══════════════════════════════════════ -->
+  <div class="toc">
+    <h2>Contents</h2>
+    <div class="toc-grid">
+      <a href="#overview"><span class="num">01</span> System Overview</a>
+      <a href="#architecture"><span class="num">02</span> Architecture</a>
+      <a href="#pipeline"><span class="num">03</span> Content Pipeline</a>
+      <a href="#roles"><span class="num">04</span> Roles and Permissions</a>
+      <a href="#workspaces"><span class="num">05</span> Workspace Model</a>
+      <a href="#assets"><span class="num">06</span> Asset Management</a>
+      <a href="#brandkit"><span class="num">07</span> Brand Kit</a>
+      <a href="#collaboration"><span class="num">08</span> Collaboration Layer</a>
+      <a href="#automation"><span class="num">09</span> Automation Engine</a>
+      <a href="#ai"><span class="num">10</span> AI Content System</a>
+      <a href="#platforms"><span class="num">11</span> Platform Specifications</a>
+      <a href="#security"><span class="num">12</span> Security and Audit</a>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════ 01. OVERVIEW ═══════════════════════════════════════ -->
+  <section id="overview">
+    <div class="section-label">01</div>
+    <h2>System Overview</h2>
+    <p>
+      The Ten80Ten Content Engine is a full-stack content operations platform built to manage the complete lifecycle of social media content. It replaces fragmented toolchains (spreadsheets, shared folders, group chats, manual posting) with a single system that controls ideation, review, approval, scheduling, and publication across six major platforms.
+    </p>
+    <p>
+      The system operates on a five-stage Kanban pipeline. Content enters as raw ideas. It moves through structured review gates where approvers accept or reject work with written feedback. Approved content is scheduled with a target date and time. At the scheduled moment, the automation engine extracts the post data, pulls assets from Google Drive, and publishes to the designated platforms without human intervention.
+    </p>
+    <p>
+      Every action is logged in an append-only audit trail. Every file lives in a governed storage layer. Every user operates within a role-scoped permission boundary. The system is designed for creative teams that need both creative freedom and operational control.
+    </p>
+
+    <div class="card-grid">
+      <div class="card card-blue">
+        <div class="card-icon">&#9632;</div>
+        <h3>Kanban Pipeline</h3>
+        <p>Five-stage workflow with drag-and-drop card management, stage-specific sorting, and role-gated transitions.</p>
+      </div>
+      <div class="card card-green">
+        <div class="card-icon">&#9670;</div>
+        <h3>Auto-Publish Engine</h3>
+        <p>n8n automation monitors approved posts and executes publication at the exact scheduled date and time.</p>
+      </div>
+      <div class="card card-amber">
+        <div class="card-icon">&#9679;</div>
+        <h3>Asset Governance</h3>
+        <p>Google Drive integration with resumable uploads, folder taxonomy, and per-post asset tracking.</p>
+      </div>
+      <div class="card card-purple">
+        <div class="card-icon">&#11044;</div>
+        <h3>AI Content Layer</h3>
+        <p>Generative AI produces graphics, captions, and video assets, feeding them directly into the approval pipeline.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════ 02. ARCHITECTURE ═══════════════════════════════════════ -->
+  <section id="architecture">
+    <div class="section-label">02</div>
+    <h2>Architecture</h2>
+    <p>
+      The Content Engine is a server-rendered React application deployed on edge infrastructure. The frontend handles all user interaction, real-time state synchronization, and optimistic UI updates. The backend manages authentication, file operations, notification dispatch, and external service orchestration through API routes that execute server-side.
+    </p>
+
+    <h3>Technology Stack</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Layer</th><th>Technology</th><th>Purpose</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Runtime</td>
+            <td><code>Next.js 16.2</code> / <code>React 19</code></td>
+            <td>App Router, Server Components, API Routes</td>
+          </tr>
+          <tr>
+            <td>Database</td>
+            <td><code>Supabase (PostgreSQL)</code></td>
+            <td>Relational storage, Row-Level Security, Realtime channels</td>
+          </tr>
+          <tr>
+            <td>Authentication</td>
+            <td><code>Supabase Auth</code></td>
+            <td>JWT sessions, invite flows, password reset</td>
+          </tr>
+          <tr>
+            <td>File Storage</td>
+            <td><code>Google Drive API</code></td>
+            <td>Resumable uploads, folder management, service account auth</td>
+          </tr>
+          <tr>
+            <td>Avatar Storage</td>
+            <td><code>Supabase Storage</code></td>
+            <td>Profile images with public bucket access</td>
+          </tr>
+          <tr>
+            <td>Automation</td>
+            <td><code>n8n (self-hosted)</code></td>
+            <td>Scheduled publishing, health monitoring, webhook orchestration</td>
+          </tr>
+          <tr>
+            <td>Notifications</td>
+            <td><code>Nodemailer (SMTP)</code></td>
+            <td>Mention alerts, revision requests, invite emails, health reports</td>
+          </tr>
+          <tr>
+            <td>UI Framework</td>
+            <td><code>Tailwind CSS 4</code> / <code>shadcn/ui</code></td>
+            <td>Component library, dark/light theme, responsive layout</td>
+          </tr>
+          <tr>
+            <td>Drag and Drop</td>
+            <td><code>@dnd-kit</code></td>
+            <td>Kanban card movement between pipeline stages</td>
+          </tr>
+          <tr>
+            <td>Animation</td>
+            <td><code>Framer Motion</code></td>
+            <td>Transition effects, layout animations, presence detection</td>
+          </tr>
+          <tr>
+            <td>Hosting</td>
+            <td><code>Vercel</code></td>
+            <td>Edge deployment, automatic CI/CD from main branch</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Data Model</h3>
+    <p>The database consists of nine core tables governed by PostgreSQL enums and Row-Level Security policies.</p>
+    <div class="code-block">
+      <span class="comment">-- Core Enums</span><br>
+      <span class="keyword">pipeline_stage</span>: ideas, awaiting_approval, revision_needed, approved_scheduled, posted<br>
+      <span class="keyword">content_type</span>&nbsp;&nbsp;: video, image, carousel, reel, story<br>
+      <span class="keyword">user_role</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: superadmin, admin, owner, approver, creative_director,<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;social_media_specialist, video_editor, graphic_designer,<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;specialist, technician, editor, developer, viewer<br><br>
+      <span class="comment">-- Core Tables</span><br>
+      <span class="type">posts</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Content cards with stage, platforms[], checklist (JSONB), schedule<br>
+      <span class="type">team_members</span>&nbsp;&nbsp;&nbsp;&nbsp;User directory with role, status, avatar, contact info<br>
+      <span class="type">media_assets</span>&nbsp;&nbsp;&nbsp;&nbsp;File registry with usage tracking (used_in[] post references)<br>
+      <span class="type">post_comments</span>&nbsp;&nbsp;&nbsp;Discussion threads with @mention support<br>
+      <span class="type">post_audit_logs</span>&nbsp;Immutable event log (append-only, service-role insert)<br>
+      <span class="type">brand_playbook</span>&nbsp;&nbsp;Singleton JSONB document per workspace<br>
+      <span class="type">workspaces</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Tenant isolation (name, slug, timezone)<br>
+      <span class="type">workspace_members</span>RBAC bridge (auth.users to workspaces, many-to-many)<br>
+      <span class="type">signup_requests</span>&nbsp;Public access request queue
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════ 03. PIPELINE ═══════════════════════════════════════ -->
+  <section id="pipeline">
+    <div class="section-label">03</div>
+    <h2>Content Pipeline</h2>
+    <p>
+      The pipeline is the operational core of the system. Every piece of content passes through a deterministic sequence of stages. Stage transitions are permission-gated: only users with the appropriate role can move content forward or backward. Each transition generates an immutable audit record.
+    </p>
+
+    <div class="pipeline-flow">
+      <div class="pipeline-stage stage-ideas">
+        <div class="label">Stage 1</div>
+        Ideas
+      </div>
+      <div class="arrow">&rarr;</div>
+      <div class="pipeline-stage stage-awaiting">
+        <div class="label">Stage 2</div>
+        Awaiting Approval
+      </div>
+      <div class="arrow">&rarr;</div>
+      <div class="pipeline-stage stage-revision">
+        <div class="label">Stage 3</div>
+        Revision Needed
+      </div>
+      <div class="arrow">&rarr;</div>
+      <div class="pipeline-stage stage-approved">
+        <div class="label">Stage 4</div>
+        Approved / Scheduled
+      </div>
+      <div class="arrow">&rarr;</div>
+      <div class="pipeline-stage stage-posted">
+        <div class="label">Stage 5</div>
+        Posted
+      </div>
+    </div>
+
+    <div class="revision-loop">
+      <span class="loop-arrow">&#8634;</span>
+      Revision Needed and Awaiting Approval loop until the approver is satisfied
+    </div>
+
+    <h3>Stage Definitions</h3>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Stage</th><th>Sort Order</th><th>Who Moves Forward</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="tag tag-blue">Ideas</span></td>
+            <td>Newest first</td>
+            <td>Any creator</td>
+            <td>Raw concepts. Incomplete checklist items, no schedule required. Brainstorming zone with no approval pressure.</td>
+          </tr>
+          <tr>
+            <td><span class="tag tag-amber">Awaiting Approval</span></td>
+            <td>Earliest deadline first</td>
+            <td>Creator submits</td>
+            <td>Content is review-ready. Checklist complete, assets attached, caption finalized. Waiting for an approver to accept or reject.</td>
+          </tr>
+          <tr>
+            <td><span class="tag tag-red">Revision Needed</span></td>
+            <td>Closest deadline first</td>
+            <td>Approver kicks back</td>
+            <td>Approver rejected the content with written feedback. Creator must address the notes, attach updated assets if needed, and resubmit. A mandatory "Fix submitted" note is logged on resubmission.</td>
+          </tr>
+          <tr>
+            <td><span class="tag tag-green">Approved / Scheduled</span></td>
+            <td>Earliest schedule first</td>
+            <td>Approver only</td>
+            <td>Content passed review. Scheduled date and time are locked. The automation engine picks up this post and handles publication.</td>
+          </tr>
+          <tr>
+            <td><span class="tag tag-purple">Posted</span></td>
+            <td>Most recent first</td>
+            <td>Automation engine</td>
+            <td>Published content. Archived in reverse chronological order. Any posted card can be cloned back to Ideas for repurposing.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Post Card Data</h3>
+    <p>Each card in the pipeline carries a structured payload:</p>
+    <ul class="spec-list">
+      <li><span class="label">Title</span><span class="value">Required. Short descriptor for internal tracking.</span></li>
+      <li><span class="label">Caption</span><span class="value">Full post text with hashtags. Platform-validated before approval.</span></li>
+      <li><span class="label">Hook</span><span class="value">Opening line or attention-grabbing phrase for the post.</span></li>
+      <li><span class="label">Platforms</span><span class="value">Array of target platforms (Instagram, Facebook, LinkedIn, X, TikTok, YouTube).</span></li>
+      <li><span class="label">Content Type</span><span class="value">Video, Image, Carousel, Reel, or Story.</span></li>
+      <li><span class="label">Scheduled Date/Time</span><span class="value">Publication target. Timezone-aware per workspace setting.</span></li>
+      <li><span class="label">Thumbnail URL</span><span class="value">Cover image reference for the card preview.</span></li>
+      <li><span class="label">Checklist</span><span class="value">JSONB array of pre-flight items (thumbnail ready, caption done, CTA added, etc.).</span></li>
+      <li><span class="label">Notes</span><span class="value">Revision history. Append-only log of feedback and fix submissions.</span></li>
+      <li><span class="label">Source Vault</span><span class="value">JSONB object linking master assets and publishable files.</span></li>
+      <li><span class="label">Media IDs</span><span class="value">Array of Google Drive file references attached to this post.</span></li>
+    </ul>
+
+    <h3>Content Calendar</h3>
+    <p>
+      The calendar view renders all scheduled posts on a date-axis timeline. Posts appear on their scheduled date with platform badges and content type indicators. Clicking any calendar entry opens the full post detail. The calendar respects the workspace timezone setting (default: Asia/Dubai, configurable per workspace).
+    </p>
+
+    <h3>Post Repurposing</h3>
+    <p>
+      Any card in any stage can be cloned back to the Ideas column through the repurpose action. The system creates a new card with a fresh ID and reset checklist, preserving the caption, hook, platforms, and media references from the original. This supports content recycling workflows where a single concept gets adapted across formats or platforms.
+    </p>
+  </section>
+
+  <!-- ═══════════════════════════════════════ 04. ROLES ═══════════════════════════════════════ -->
+  <section id="roles">
+    <div class="section-label">04</div>
+    <h2>Roles and Permissions</h2>
+    <p>
+      The system enforces Role-Based Access Control at both the application layer and the database layer. Every query passes through Supabase Row-Level Security policies scoped to the user's workspace membership and role. There are no client-side-only permission checks.
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Role</th><th>Read</th><th>Create</th><th>Edit</th><th>Delete</th><th>Approve</th><th>Invite</th><th>Scope</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Superadmin</strong></td><td>All</td><td>Yes</td><td>Yes</td><td>Yes</td><td>Yes</td><td>Yes</td><td>Cross-workspace</td></tr>
+          <tr><td><strong>Admin</strong></td><td>All</td><td>Yes</td><td>Yes</td><td>Yes</td><td>Yes</td><td>Yes</td><td>Own workspace</td></tr>
+          <tr><td><strong>Owner</strong></td><td>All</td><td>Yes</td><td>Yes</td><td>Yes</td><td>Yes</td><td>Yes</td><td>Own workspace</td></tr>
+          <tr><td><strong>Approver</strong></td><td>All</td><td>Yes</td><td>Yes</td><td>No</td><td>Yes</td><td>No</td><td>Own workspace</td></tr>
+          <tr><td><strong>Creative Director</strong></td><td>All</td><td>Yes</td><td>Yes</td><td>No</td><td>Yes</td><td>No</td><td>Own workspace</td></tr>
+          <tr><td><strong>SMM Specialist</strong></td><td>All</td><td>Yes</td><td>Own</td><td>No</td><td>No</td><td>No</td><td>Own workspace</td></tr>
+          <tr><td><strong>Video Editor</strong></td><td>All</td><td>Yes</td><td>Own</td><td>No</td><td>No</td><td>No</td><td>Own workspace</td></tr>
+          <tr><td><strong>Graphic Designer</strong></td><td>All</td><td>Yes</td><td>Own</td><td>No</td><td>No</td><td>No</td><td>Own workspace</td></tr>
+          <tr><td><strong>Viewer</strong></td><td>All</td><td>No</td><td>No</td><td>No</td><td>No</td><td>No</td><td>Own workspace</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout">
+      <p><strong>Approval gate:</strong> Only roles with <code>Approve</code> permission can move cards into the Approved/Scheduled or Posted columns. This is enforced at both the UI layer (drag targets are disabled) and the database layer (RLS policy check on stage transition).</p>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════ 05. WORKSPACES ═══════════════════════════════════════ -->
+  <section id="workspaces">
+    <div class="section-label">05</div>
+    <h2>Workspace Model</h2>
+    <p>
+      The Content Engine operates on a multi-tenant architecture. Each workspace is a fully isolated environment with its own posts, team members, media assets, brand configuration, and audit trail. Data never leaks between workspaces. Database queries are scoped through the <code>is_active_workspace_member()</code> RLS helper function that validates the requesting user's membership and role before returning any rows.
+    </p>
+
+    <ul class="spec-list">
+      <li><span class="label">Isolation</span><span class="value">Row-Level Security on every table. Workspace ID foreign key required.</span></li>
+      <li><span class="label">Membership</span><span class="value">Many-to-many via workspace_members table (user can belong to multiple workspaces).</span></li>
+      <li><span class="label">Timezone</span><span class="value">Per-workspace timezone setting. Affects calendar rendering and scheduled post display.</span></li>
+      <li><span class="label">Slug</span><span class="value">URL-safe unique identifier for workspace routing.</span></li>
+      <li><span class="label">Status</span><span class="value">Members carry active/pending/suspended status within each workspace independently.</span></li>
+    </ul>
+  </section>
+
+  <!-- ═══════════════════════════════════════ 06. ASSETS ═══════════════════════════════════════ -->
+  <section id="assets">
+    <div class="section-label">06</div>
+    <h2>Asset Management</h2>
+    <p>
+      All media files are stored in Google Drive through a service account integration. The system uses the Google Drive API v3 with resumable upload protocol (RFC 7578) for reliable large-file transfers. Files are organized into a governed folder taxonomy and tracked in the database for usage auditing.
+    </p>
+
+    <h3>Folder Taxonomy</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Folder</th><th>Contents</th><th>Access</th></tr></thead>
+        <tbody>
+          <tr><td><code>/thumbnails</code></td><td>Post cover images, preview graphics</td><td>All team members</td></tr>
+          <tr><td><code>/raw-files</code></td><td>Source materials, PSDs, project files</td><td>Creators, admins</td></tr>
+          <tr><td><code>/media-library</code></td><td>Finalized, approved assets ready for publication</td><td>All team members</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Upload Protocol</h3>
+    <p>File uploads follow a three-phase resumable protocol that handles network interruptions and large file sizes:</p>
+    <div class="code-block">
+      <span class="comment">// Phase 1: Initiate</span><br>
+      POST /api/drive/upload { fileName, mimeType, folder, cardId }<br>
+      <span class="comment">// Returns: { uploadUri, isImage, driveFileName }</span><br><br>
+
+      <span class="comment">// Phase 2: Stream</span><br>
+      PUT {uploadUri} <span class="comment">// Binary chunks sent directly to Google Drive</span><br><br>
+
+      <span class="comment">// Phase 3: Finalize</span><br>
+      POST /api/drive/finalize { uploadUri, fileName, cardId }<br>
+      <span class="comment">// Returns: { driveFileId, url, name }</span><br>
+      <span class="comment">// Writes media_assets row, links to post via used_in[]</span>
+    </div>
+
+    <h3>Two-Tier Asset Model</h3>
+    <p>Each post card maintains two distinct asset categories through the Asset Review Drawer:</p>
+    <div class="card-grid">
+      <div class="card card-amber">
+        <div class="card-icon">&#9636;</div>
+        <h3>Master Assets</h3>
+        <p>Source files, design links, Google Drive folders, and raw materials. The editable originals that the creative team works from.</p>
+      </div>
+      <div class="card card-green">
+        <div class="card-icon">&#9635;</div>
+        <h3>Publishable Files</h3>
+        <p>Final approved media ready for posting. These are the exact files the automation engine pulls when publishing to social platforms.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════ 07. BRAND KIT ═══════════════════════════════════════ -->
+  <section id="brandkit">
+    <div class="section-label">07</div>
+    <h2>Brand Kit</h2>
+    <p>
+      Each workspace has a singleton Brand Playbook document stored as a JSONB column. This is the single source of truth for brand voice, hashtag strategy, content pillars, hooks, and calls-to-action. Admins and Creative Directors can edit the playbook in real-time. All team members reference it when creating content.
+    </p>
+
+    <ul class="spec-list">
+      <li><span class="label">Tagline</span><span class="value">Company positioning statement.</span></li>
+      <li><span class="label">Website</span><span class="value">Primary domain for link-in-bio and CTA references.</span></li>
+      <li><span class="label">Service Area</span><span class="value">Geographic or industry scope.</span></li>
+      <li><span class="label">Hashtag Sets</span><span class="value">Core, seasonal, engagement, and commercial hashtag groups.</span></li>
+      <li><span class="label">Content Pillars</span><span class="value">Three primary content themes with descriptions.</span></li>
+      <li><span class="label">Hooks</span><span class="value">Sample opening phrases for posts and videos.</span></li>
+      <li><span class="label">CTAs</span><span class="value">Call-to-action templates (e.g., "DM us", "Link in bio", "Book a call").</span></li>
+      <li><span class="label">Posting Schedule</span><span class="value">Recommended days and times per platform.</span></li>
+      <li><span class="label">Brand Voice</span><span class="value">Tone, personality, and language guidelines for all content.</span></li>
+    </ul>
+  </section>
+
+  <!-- ═══════════════════════════════════════ 08. COLLABORATION ═══════════════════════════════════════ -->
+  <section id="collaboration">
+    <div class="section-label">08</div>
+    <h2>Collaboration Layer</h2>
+
+    <h3>Comments and Mentions</h3>
+    <p>
+      Every post card has a threaded comment section. Team members can tag others using <code>@First Last</code> syntax. The mention parser extracts names, resolves them against the team directory, and triggers an email notification to the mentioned user with a direct link back to the post.
+    </p>
+    <p>
+      Mention notifications are rate-limited to 10 per minute per IP address to prevent abuse. The email template includes the author name, post title, comment content, and a one-click link to the portal.
+    </p>
+
+    <h3>Revision Feedback Loop</h3>
+    <p>
+      When an approver kicks a post back to Revision Needed, the system captures their written feedback, attaches an optional reference URL, and sends a notification email to the content creator. The creator addresses the feedback, submits a "Fix submitted" note (required for resubmission), and the card moves back to Awaiting Approval. This loop continues until the approver is satisfied.
+    </p>
+
+    <h3>Real-Time Sync</h3>
+    <p>
+      The system uses Supabase Realtime channels to push database changes to all connected clients. When one user moves a card, edits a comment, or updates the brand kit, every other user sees the change within seconds. A deduplication layer (2-second TTL mutation set) prevents echo effects from the user's own actions.
+    </p>
+
+    <h3>Team Onboarding</h3>
+    <p>The invite flow is a four-step process:</p>
+    <div class="automation-step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <h4>Admin Creates Invite</h4>
+        <p>Admin enters the new member's email, name, and assigned role. The system creates an auth record and generates a secure invite link.</p>
+      </div>
+    </div>
+    <div class="automation-step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <h4>Email Delivered</h4>
+        <p>A branded HTML email with the confirmation link is sent via SMTP. If email delivery fails, the admin receives a fallback URL to share manually.</p>
+      </div>
+    </div>
+    <div class="automation-step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <h4>User Completes Setup</h4>
+        <p>The new member sets their password, uploads a profile photo (with circular crop), and enters their WhatsApp number.</p>
+      </div>
+    </div>
+    <div class="automation-step">
+      <div class="step-num">4</div>
+      <div class="step-content">
+        <h4>Auto-Activation</h4>
+        <p>On first login, the system transitions the member's status from <code>pending</code> to <code>active</code> and populates their profile from the team directory.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════ 09. AUTOMATION ENGINE ═══════════════════════════════════════ -->
+  <section id="automation">
+    <div class="section-label">09</div>
+    <h2>Automation Engine</h2>
+    <p>
+      The Content Engine runs on n8n, a self-hosted workflow automation platform. The n8n instance continuously monitors the pipeline and executes actions based on post state and schedule data. This removes manual posting from the workflow entirely.
+    </p>
+
+    <h3>Auto-Publish Workflow</h3>
+    <div class="callout callout-green">
+      <p>When a post card reaches the <strong>Approved / Scheduled</strong> stage, the automation engine takes over. No human action is required beyond the approval itself.</p>
+    </div>
+
+    <div class="automation-step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <h4>Schedule Detection</h4>
+        <p>n8n polls the <code>posts</code> table for cards in the <code>approved_scheduled</code> stage where <code>scheduled_date</code> and <code>scheduled_time</code> match the current window.</p>
+      </div>
+    </div>
+    <div class="automation-step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <h4>Payload Extraction</h4>
+        <p>The automation engine reads the post's full payload: caption, hashtags, hook, target platforms, content type, and the <code>source_vault</code> JSONB object that references publishable files.</p>
+      </div>
+    </div>
+    <div class="automation-step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <h4>Asset Retrieval</h4>
+        <p>The engine pulls the publishable media files from Google Drive using the stored file IDs. Assets are downloaded and prepared in the format required by each target platform.</p>
+      </div>
+    </div>
+    <div class="automation-step">
+      <div class="step-num">4</div>
+      <div class="step-content">
+        <h4>Multi-Platform Publication</h4>
+        <p>The post is published to each selected platform (Instagram, Facebook, LinkedIn, X, TikTok, YouTube) using their respective APIs. The caption, media, and metadata are formatted per-platform to respect character limits, aspect ratios, and file size constraints.</p>
+      </div>
+    </div>
+    <div class="automation-step">
+      <div class="step-num">5</div>
+      <div class="step-content">
+        <h4>Stage Transition</h4>
+        <p>On successful publication, the post card moves to the <strong>Posted</strong> stage. An audit log entry records the exact publication timestamp, platforms published, and automation execution ID. Publishable files are marked with an "Auto-Posted" badge in the Asset Review Drawer.</p>
+      </div>
+    </div>
+
+    <h3>System Health Monitoring</h3>
+    <p>
+      n8n runs a daily health check at 7:00 AM (Asia/Manila) that probes all critical integrations. The check hits the <code>/api/health/deep-check</code> endpoint, which tests database connectivity, Google Drive API access, SMTP delivery, and n8n API availability. Results are compiled into an HTML email report sent to the operations team with pass/warn/fail status for each subsystem.
+    </p>
+  </section>
+
+  <!-- ═══════════════════════════════════════ 10. AI CONTENT SYSTEM ═══════════════════════════════════════ -->
+  <section id="ai">
+    <div class="section-label">10</div>
+    <h2>AI Content System</h2>
+
+    <div class="ai-gradient">
+      <h3>Autonomous Content Generation</h3>
+      <p>
+        The AI Content System transforms the pipeline from a human-operated workflow into a supervised autonomous loop. The AI generates complete, publish-ready content (graphics, video edits, captions, and hashtags) and places it directly into the Awaiting Approval stage. The only required human action is a binary decision: approve or send to revision.
+      </p>
+    </div>
+
+    <h3>How It Works</h3>
+
+    <div class="automation-step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <h4>Content Generation</h4>
+        <p>The AI engine reads the workspace's Brand Playbook (content pillars, voice, hashtag strategy, posting schedule) and generates complete post packages. Each package includes a platform-optimized graphic or video, a caption with hashtags, a hook line, and a CTA pulled from the brand kit. Generated assets are uploaded to Google Drive and linked to a new post card.</p>
+      </div>
+    </div>
+    <div class="automation-step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <h4>Pipeline Injection</h4>
+        <p>The AI places each generated card directly into <strong>Awaiting Approval</strong> with a pre-filled checklist, scheduled date/time based on the brand's posting calendar, and all publishable files attached. The card is indistinguishable from human-created content in the pipeline.</p>
+      </div>
+    </div>
+    <div class="automation-step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <h4>Human Gate</h4>
+        <p>An approver reviews the AI-generated content. Two outcomes:</p>
+        <p style="margin-top:6px"><span class="tag tag-green">Approve</span> The card moves to Approved/Scheduled. The n8n engine handles publication at the scheduled time.</p>
+        <p style="margin-top:4px"><span class="tag tag-red">Revision Needed</span> The approver writes specific feedback (e.g., "change the CTA", "wrong color palette", "shorten caption"). The card moves to Revision Needed with the feedback attached.</p>
+      </div>
+    </div>
+    <div class="automation-step">
+      <div class="step-num">4</div>
+      <div class="step-content">
+        <h4>Autonomous Revision</h4>
+        <p>The AI reads the revision feedback from the card's notes field, interprets the requested changes, regenerates or modifies the affected assets, updates the caption or creative as needed, logs a "Fix submitted" note, and moves the card back to Awaiting Approval. The revision loop continues until the human approver is satisfied.</p>
+      </div>
+    </div>
+    <div class="automation-step">
+      <div class="step-num">5</div>
+      <div class="step-content">
+        <h4>Publication</h4>
+        <p>Once approved, the n8n automation engine takes over. It extracts the post data, pulls the finalized assets from Google Drive, and publishes to the scheduled platforms at the exact scheduled time. The card moves to Posted. The full loop, from AI generation to live publication, requires only a single human approval click.</p>
+      </div>
+    </div>
+
+    <div class="callout callout-purple">
+      <p><strong>The AI-to-publish pipeline reduces the human role to quality control.</strong> Content ideation, creation, revision, and publication are handled by the system. The approver's job is to confirm that the output meets brand standards. One click to approve. One click to request changes. Everything else is automated.</p>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════ 11. PLATFORMS ═══════════════════════════════════════ -->
+  <section id="platforms">
+    <div class="section-label">11</div>
+    <h2>Platform Specifications</h2>
+    <p>
+      The system validates every post against per-platform constraints before allowing approval. The validation engine checks caption length, hashtag count, file size, video duration, carousel limits, and aspect ratios. Posts that violate any platform's constraints cannot pass the approval gate.
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Platform</th><th>Caption Max</th><th>Hashtags</th><th>Image Max</th><th>Video Max</th><th>Duration</th><th>Carousel</th><th>Aspect Ratios</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Instagram</strong></td>
+            <td>2,200 chars</td>
+            <td>30</td>
+            <td>30 MB</td>
+            <td>250 MB</td>
+            <td>90 min</td>
+            <td>10 items</td>
+            <td>1:1, 4:5, 9:16, 16:9</td>
+          </tr>
+          <tr>
+            <td><strong>Facebook</strong></td>
+            <td>63,206 chars</td>
+            <td>30</td>
+            <td>10 MB</td>
+            <td>10 GB</td>
+            <td>4 hours</td>
+            <td>10 items</td>
+            <td>1:1, 4:5, 9:16, 16:9</td>
+          </tr>
+          <tr>
+            <td><strong>LinkedIn</strong></td>
+            <td>3,000 chars</td>
+            <td>30</td>
+            <td>10 MB</td>
+            <td>5 GB</td>
+            <td>10 min</td>
+            <td>10 items</td>
+            <td>1:1, 4:5, 9:16, 16:9</td>
+          </tr>
+          <tr>
+            <td><strong>X (Twitter)</strong></td>
+            <td>280 chars</td>
+            <td>10</td>
+            <td>5 MB</td>
+            <td>512 MB</td>
+            <td>2 min 20s</td>
+            <td>4 items</td>
+            <td>1:1, 4:5, 9:16, 16:9</td>
+          </tr>
+          <tr>
+            <td><strong>TikTok</strong></td>
+            <td>2,200 chars</td>
+            <td>100</td>
+            <td>20 MB</td>
+            <td>287 MB</td>
+            <td>10 min</td>
+            <td>35 items</td>
+            <td>9:16, 1:1, 16:9</td>
+          </tr>
+          <tr>
+            <td><strong>YouTube</strong></td>
+            <td>5,000 chars</td>
+            <td>15</td>
+            <td>2 MB</td>
+            <td>256 GB</td>
+            <td>12 hours</td>
+            <td>1 item</td>
+            <td>16:9, 9:16</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════ 12. SECURITY ═══════════════════════════════════════ -->
+  <section id="security">
+    <div class="section-label">12</div>
+    <h2>Security and Audit</h2>
+
+    <h3>Data Access Control</h3>
+    <p>
+      Every database table is protected by PostgreSQL Row-Level Security policies. The <code>is_active_workspace_member()</code> function validates that the authenticated user holds an active membership in the target workspace with the required role before any read or write operation proceeds. Queries that fail this check return zero rows. There is no application-level bypass.
+    </p>
+
+    <h3>Audit Trail</h3>
+    <p>
+      The <code>post_audit_logs</code> table is append-only. No authenticated user can INSERT, UPDATE, or DELETE rows. Only the service role (server-side API routes) can write to this table. Every stage transition, mention notification, revision submission, and team invite generates an audit entry with a timestamp, acting user, action type, and detail payload.
+    </p>
+
+    <h3>Email Security</h3>
+    <ul class="spec-list">
+      <li><span class="label">XSS Prevention</span><span class="value">All user-generated content is HTML-escaped before email template injection.</span></li>
+      <li><span class="label">Header Injection</span><span class="value">Subject lines are sanitized to strip newlines and control characters.</span></li>
+      <li><span class="label">Authentication</span><span class="value">SMTP uses app-specific passwords, not account credentials.</span></li>
+    </ul>
+
+    <h3>Rate Limiting</h3>
+    <p>
+      The <code>rate_limit_buckets</code> table implements token-bucket rate limiting. Mention notifications are capped at 10 per minute per IP address. The bucket refills on a rolling window with configurable token count and TTL.
+    </p>
+
+    <h3>Infrastructure</h3>
+    <ul class="spec-list">
+      <li><span class="label">Hosting</span><span class="value">Vercel edge network with automatic TLS. No self-managed certificates.</span></li>
+      <li><span class="label">Database</span><span class="value">Supabase managed PostgreSQL with automated backups and point-in-time recovery.</span></li>
+      <li><span class="label">Secrets</span><span class="value">All API keys, service account credentials, and SMTP passwords stored in server-side environment variables. Never exposed to the client bundle.</span></li>
+      <li><span class="label">Auth Tokens</span><span class="value">JWT-based sessions with Supabase Auth. Tokens expire and refresh automatically.</span></li>
+    </ul>
+  </section>
+
+  <!-- ═══════════════════════════════════════ FOOTER ═══════════════════════════════════════ -->
+  <footer>
+    <div class="logo-text">Ten80Ten</div>
+    <p>Content Engine Product Manual v1.0</p>
+    <p style="margin-top:4px">Internal document. Confidential.</p>
+  </footer>
+
+</div>
+</body>
+</html>

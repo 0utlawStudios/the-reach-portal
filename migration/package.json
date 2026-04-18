@@ -1,0 +1,11 @@
+{
+  "name": "ten80ten-notion-migration",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "@notionhq/client": "^2.2.0",
+    "@supabase/supabase-js": "^2.49.0",
+    "dotenv": "^16.4.0",
+    "google-auth-library": "^9.14.0"
+  }
+}
