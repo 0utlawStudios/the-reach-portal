@@ -4,22 +4,14 @@
     {
       "parameters": {
         "rule": {
-          "interval": [
-            {
-              "field": "minutes",
-              "minutesInterval": 5
-            }
-          ]
+          "interval": [{ "field": "minutes", "minutesInterval": 5 }]
         }
       },
       "id": "trigger-schedule",
       "name": "Every 5 Minutes",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [
-        220,
-        440
-      ]
+      "position": [220, 440]
     },
     {
       "parameters": {},
@@ -27,10 +19,7 @@
       "name": "Manual Test",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
-      "position": [
-        220,
-        620
-      ]
+      "position": [220, 640]
     },
     {
       "parameters": {
@@ -44,10 +33,7 @@
       "name": "Get Scheduled Posts",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
-      "position": [
-        480,
-        440
-      ],
+      "position": [480, 440],
       "credentials": {
         "supabaseApi": {
           "id": "CONFIGURE_ME",
@@ -58,16 +44,13 @@
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "// ─── Filter posts that are due NOW (CST timezone) ───\n// The portal schedules posts in CST (UTC-6).\n// Only returns posts whose date+time has arrived.\n\nconst items = $input.all();\nif (!items || items.length === 0) return [];\n\nconst now = new Date();\nconst cstOffset = -6 * 60;\nconst utcMs = now.getTime() + now.getTimezoneOffset() * 60000;\nconst cstNow = new Date(utcMs + cstOffset * 60000);\nconst nowDate = cstNow.toISOString().split('T')[0];\nconst nowHH = String(cstNow.getHours()).padStart(2, '0');\nconst nowMM = String(cstNow.getMinutes()).padStart(2, '0');\nconst nowTime = `${nowHH}:${nowMM}`;\n\nconst due = items.filter(item => {\n  const d = item.json.scheduled_date;\n  const t = (item.json.scheduled_time || '').substring(0, 5);\n  if (!d || !t) return false;\n  if (d < nowDate) return true;\n  if (d === nowDate && t <= nowTime) return true;\n  return false;\n});\n\nreturn due;"
+        "jsCode": "// Filter posts whose scheduled date+time has passed (CST / UTC-6)\nconst items = $input.all();\nif (!items || items.length === 0) return [];\n\nconst now = new Date();\nconst cstMs = now.getTime() + (now.getTimezoneOffset() - 360) * 60000;\nconst cstNow = new Date(cstMs);\nconst nowDate = cstNow.toISOString().split('T')[0];\nconst nowTime = String(cstNow.getHours()).padStart(2,'0') + ':' + String(cstNow.getMinutes()).padStart(2,'0');\n\nreturn items.filter(item => {\n  const d = item.json.scheduled_date;\n  const t = (item.json.scheduled_time || '').substring(0, 5);\n  if (!d || !t) return false;\n  return d < nowDate || (d === nowDate && t <= nowTime);\n});"
       },
       "id": "filter-due",
       "name": "Filter Due Now",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        720,
-        440
-      ]
+      "position": [720, 440]
     },
     {
       "parameters": {
@@ -78,10 +61,7 @@
       "name": "Process Each Post",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
-      "position": [
-        960,
-        440
-      ]
+      "position": [960, 440]
     },
     {
       "parameters": {
@@ -91,10 +71,7 @@
         "filterString": "=id=eq.{{ $json.id }}",
         "fieldsUi": {
           "fieldValues": [
-            {
-              "fieldId": "stage",
-              "fieldValue": "posted"
-            }
+            { "fieldId": "stage", "fieldValue": "posted" }
           ]
         }
       },
@@ -102,10 +79,7 @@
       "name": "Mark as Posted",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
-      "position": [
-        1200,
-        440
-      ],
+      "position": [1200, 440],
       "credentials": {
         "supabaseApi": {
           "id": "CONFIGURE_ME",
@@ -116,17 +90,49 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "// ═══════════════════════════════════════════════════════\n// Ten80Ten Auto-Publisher — Platform Posting Engine\n// ═══════════════════════════════════════════════════════\n//\n// SETUP: Replace the placeholders below with your real credentials.\n//\n// Facebook + Instagram:\n//   1. Create a Meta App at developers.facebook.com\n//   2. Add Facebook Login + Pages API + Instagram Graph API\n//   3. Generate a long-lived Page Access Token\n//   4. Get your FB Page ID and IG Business Account ID\n//\n// LinkedIn:\n//   1. Create a LinkedIn App at linkedin.com/developers\n//   2. Request 'w_member_social' or 'w_organization_social' scope\n//   3. Generate an OAuth2 access token\n//   4. Get your Organization URN\n//\n// ═══════════════════════════════════════════════════════\n\n// ─── CREDENTIALS (edit these) ───\nconst META_ACCESS_TOKEN = 'YOUR_META_PAGE_ACCESS_TOKEN';\nconst FB_PAGE_ID         = 'YOUR_FACEBOOK_PAGE_ID';\nconst IG_USER_ID         = 'YOUR_INSTAGRAM_BUSINESS_ACCOUNT_ID';\nconst LI_ACCESS_TOKEN    = 'YOUR_LINKEDIN_ACCESS_TOKEN';\nconst LI_ORG_URN         = 'urn:li:organization:YOUR_ORG_ID';\n// ─────────────────────────────────\n\nconst _http = this.helpers.httpRequest.bind(this.helpers);\n\nconst post = $input.item.json;\nconst platforms = Array.isArray(post.platforms) ? post.platforms : [];\nconst caption = post.caption || '';\nconst contentType = post.content_type || 'image';\n\n// Parse source_vault (may be string or object)\nlet vault = post.source_vault || {};\nif (typeof vault === 'string') {\n  try { vault = JSON.parse(vault); } catch { vault = {}; }\n}\nconst rawFiles = vault.rawFiles || [];\nconst master = rawFiles.find(f => f.usageType === 'master') || rawFiles[0];\n\nif (!master) {\n  return { json: { postId: post.id, title: post.title, error: 'No content file in source vault', results: [] } };\n}\n\n// Resolve Google Drive URL to direct download format\nfunction driveUrl(url) {\n  if (!url) return url;\n  // If it's a portal-relative URL, we can't use it externally\n  if (url.startsWith('/')) return null;\n  // Convert Drive view links to direct download\n  if (url.includes('drive.google.com')) {\n    const m = url.match(/\\/d\\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);\n    if (m) return `https://drive.google.com/uc?export=download&id=${m[1]}`;\n  }\n  return url;\n}\n\nconst fileUrl = driveUrl(master.url);\nif (!fileUrl) {\n  return { json: { postId: post.id, title: post.title, error: 'File URL is not publicly accessible', results: [] } };\n}\n\nconst results = [];\n\n// ─── FACEBOOK ───\nasync function postToFacebook() {\n  if (contentType === 'video' || contentType === 'reel') {\n    const res = await _http({\n      method: 'POST',\n      url: `https://graph.facebook.com/v21.0/${FB_PAGE_ID}/videos`,\n      qs: { file_url: fileUrl, description: caption, access_token: META_ACCESS_TOKEN },\n    });\n    return { platform: 'facebook', success: true, id: res.id };\n  }\n  // Image or carousel (FB treats carousel as album — post first image)\n  const res = await _http({\n    method: 'POST',\n    url: `https://graph.facebook.com/v21.0/${FB_PAGE_ID}/photos`,\n    qs: { url: fileUrl, message: caption, access_token: META_ACCESS_TOKEN },\n  });\n  return { platform: 'facebook', success: true, id: res.id || res.post_id };\n}\n\n// ─── INSTAGRAM ───\nasync function postToInstagram() {\n  // Carousel with multiple files\n  if (contentType === 'carousel' && rawFiles.length > 1) {\n    const childIds = [];\n    for (const file of rawFiles) {\n      const url = driveUrl(file.url);\n      if (!url) continue;\n      const child = await _http({\n        method: 'POST',\n        url: `https://graph.facebook.com/v21.0/${IG_USER_ID}/media`,\n        qs: { image_url: url, is_carousel_item: true, access_token: META_ACCESS_TOKEN },\n      });\n      childIds.push(child.id);\n    }\n    const container = await _http({\n      method: 'POST',\n      url: `https://graph.facebook.com/v21.0/${IG_USER_ID}/media`,\n      qs: { media_type: 'CAROUSEL', children: childIds.join(','), caption, access_token: META_ACCESS_TOKEN },\n    });\n    // Poll until container is ready\n    await waitForContainer(container.id);\n    const pub = await _http({\n      method: 'POST',\n      url: `https://graph.facebook.com/v21.0/${IG_USER_ID}/media_publish`,\n      qs: { creation_id: container.id, access_token: META_ACCESS_TOKEN },\n    });\n    return { platform: 'instagram', success: true, id: pub.id };\n  }\n\n  // Video / Reel\n  if (contentType === 'video' || contentType === 'reel') {\n    const container = await _http({\n      method: 'POST',\n      url: `https://graph.facebook.com/v21.0/${IG_USER_ID}/media`,\n      qs: { media_type: 'REELS', video_url: fileUrl, caption, access_token: META_ACCESS_TOKEN },\n    });\n    await waitForContainer(container.id);\n    const pub = await _http({\n      method: 'POST',\n      url: `https://graph.facebook.com/v21.0/${IG_USER_ID}/media_publish`,\n      qs: { creation_id: container.id, access_token: META_ACCESS_TOKEN },\n    });\n    return { platform: 'instagram', success: true, id: pub.id };\n  }\n\n  // Single image\n  const container = await _http({\n    method: 'POST',\n    url: `https://graph.facebook.com/v21.0/${IG_USER_ID}/media`,\n    qs: { image_url: fileUrl, caption, access_token: META_ACCESS_TOKEN },\n  });\n  await waitForContainer(container.id);\n  const pub = await _http({\n    method: 'POST',\n    url: `https://graph.facebook.com/v21.0/${IG_USER_ID}/media_publish`,\n    qs: { creation_id: container.id, access_token: META_ACCESS_TOKEN },\n  });\n  return { platform: 'instagram', success: true, id: pub.id };\n}\n\n// Poll IG container status until FINISHED (required for video/carousel)\nasync function waitForContainer(containerId) {\n  for (let i = 0; i < 30; i++) {\n    await new Promise(r => setTimeout(r, 5000));\n    const check = await _http({\n      method: 'GET',\n      url: `https://graph.facebook.com/v21.0/${containerId}`,\n      qs: { fields: 'status_code', access_token: META_ACCESS_TOKEN },\n    });\n    if (check.status_code === 'FINISHED') return;\n    if (check.status_code === 'ERROR') throw new Error(`IG container failed: ${JSON.stringify(check)}`);\n  }\n  throw new Error('IG container processing timed out after 150s');\n}\n\n// ─── LINKEDIN ───\nasync function postToLinkedin() {\n  // Step 1: Register image upload\n  const register = await _http({\n    method: 'POST',\n    url: 'https://api.linkedin.com/v2/assets?action=registerUpload',\n    headers: { Authorization: `Bearer ${LI_ACCESS_TOKEN}`, 'Content-Type': 'application/json' },\n    body: {\n      registerUploadRequest: {\n        recipes: ['urn:li:digitalmediaRecipe:feedshare-image'],\n        owner: LI_ORG_URN,\n        serviceRelationships: [{ relationshipType: 'OWNER', identifier: 'urn:li:userGeneratedContent' }],\n      },\n    },\n  });\n\n  const uploadUrl = register.value?.uploadMechanism?.['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest']?.uploadUrl;\n  const asset = register.value?.asset;\n  if (!uploadUrl || !asset) throw new Error('LinkedIn upload registration failed');\n\n  // Step 2: Download file from Drive and upload to LinkedIn\n  const fileData = await _http({ method: 'GET', url: fileUrl, encoding: 'arraybuffer' });\n  await _http({\n    method: 'PUT',\n    url: uploadUrl,\n    headers: { Authorization: `Bearer ${LI_ACCESS_TOKEN}` },\n    body: fileData,\n  });\n\n  // Step 3: Create post\n  const postRes = await _http({\n    method: 'POST',\n    url: 'https://api.linkedin.com/v2/ugcPosts',\n    headers: { Authorization: `Bearer ${LI_ACCESS_TOKEN}`, 'Content-Type': 'application/json' },\n    body: {\n      author: LI_ORG_URN,\n      lifecycleState: 'PUBLISHED',\n      specificContent: {\n        'com.linkedin.ugc.ShareContent': {\n          shareCommentary: { text: caption },\n          shareMediaCategory: 'IMAGE',\n          media: [{ status: 'READY', media: asset }],\n        },\n      },\n      visibility: { 'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC' },\n    },\n  });\n  return { platform: 'linkedin', success: true, id: postRes.id };\n}\n\n// ─── EXECUTE ───\nfor (const platform of platforms) {\n  try {\n    switch (platform) {\n      case 'facebook': results.push(await postToFacebook()); break;\n      case 'instagram': results.push(await postToInstagram()); break;\n      case 'linkedin': results.push(await postToLinkedin()); break;\n      case 'x':\n      case 'youtube':\n      case 'tiktok':\n        results.push({ platform, success: false, error: `${platform} not configured. Post manually.` });\n        break;\n      default:\n        results.push({ platform, success: false, error: `Unknown platform: ${platform}` });\n    }\n  } catch (err) {\n    results.push({ platform, success: false, error: err.message || String(err) });\n  }\n}\n\nconst succeeded = results.filter(r => r.success).map(r => r.platform);\nconst failed = results.filter(r => !r.success);\n\nreturn {\n  json: {\n    postId: post.id,\n    title: post.title,\n    publishedAt: new Date().toISOString(),\n    results,\n    succeededPlatforms: succeeded,\n    failedPlatforms: failed,\n    summary: succeeded.length > 0\n      ? `Published to ${succeeded.join(', ')}${failed.length > 0 ? `. Failed: ${failed.map(f => f.platform + ' (' + f.error + ')').join(', ')}` : ''}`\n      : `All platforms failed: ${failed.map(f => f.platform + ' (' + f.error + ')').join(', ')}`,\n  },\n};"
+        "jsCode": "// ═══ FACEBOOK PUBLISHER ═══\n// Posts images and videos to a Facebook Page via Graph API v21.\n//\n// Setup:\n//   1. Create Meta App at developers.facebook.com\n//   2. Add Pages API product\n//   3. Generate long-lived Page Access Token\n//   4. Paste credentials below\n\nconst FB_TOKEN = 'YOUR_META_PAGE_ACCESS_TOKEN';\nconst FB_PAGE  = 'YOUR_FACEBOOK_PAGE_ID';\n\nconst item = $input.item.json;\nconst results = item._results || [];\nconst platforms = Array.isArray(item.platforms) ? item.platforms : [];\n\nif (!platforms.includes('facebook')) {\n  return { json: { ...item, _results: [...results, { platform: 'facebook', skipped: true }] } };\n}\n\nlet vault = item.source_vault || {};\nif (typeof vault === 'string') try { vault = JSON.parse(vault); } catch { vault = {}; }\nconst files = vault.rawFiles || [];\nconst master = files.find(f => f.usageType === 'master') || files[0];\nif (!master) {\n  return { json: { ...item, _results: [...results, { platform: 'facebook', success: false, error: 'No content file' }] } };\n}\n\nfunction driveUrl(url) {\n  if (!url || url.startsWith('/')) return null;\n  if (url.includes('drive.google.com')) {\n    const m = url.match(/\\/d\\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);\n    if (m) return 'https://drive.google.com/uc?export=download&id=' + m[1];\n  }\n  return url;\n}\n\nconst fileUrl = driveUrl(master.url);\nif (!fileUrl) {\n  return { json: { ...item, _results: [...results, { platform: 'facebook', success: false, error: 'File URL not public' }] } };\n}\n\ntry {\n  const ct = item.content_type || 'image';\n  let res;\n  if (ct === 'video' || ct === 'reel') {\n    res = await this.helpers.httpRequest({\n      method: 'POST',\n      url: `https://graph.facebook.com/v21.0/${FB_PAGE}/videos`,\n      qs: { file_url: fileUrl, description: item.caption || '', access_token: FB_TOKEN },\n    });\n  } else {\n    res = await this.helpers.httpRequest({\n      method: 'POST',\n      url: `https://graph.facebook.com/v21.0/${FB_PAGE}/photos`,\n      qs: { url: fileUrl, message: item.caption || '', access_token: FB_TOKEN },\n    });\n  }\n  return { json: { ...item, _results: [...results, { platform: 'facebook', success: true, id: res.id || res.post_id }] } };\n} catch (err) {\n  return { json: { ...item, _results: [...results, { platform: 'facebook', success: false, error: err.message }] } };\n}"
       },
-      "id": "publish",
-      "name": "Publish to Platforms",
+      "id": "pub-facebook",
+      "name": "Publish Facebook",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        1440,
-        440
-      ],
+      "position": [1460, 300],
       "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// ═══ INSTAGRAM PUBLISHER ═══\n// Handles single image, video/reel, and carousel posts.\n// Uses container -> poll -> publish pattern.\n//\n// Setup: Same Meta App as Facebook.\n//   1. Add Instagram Graph API product\n//   2. Connect IG Business Account to FB Page\n//   3. Get IG Business Account ID\n\nconst IG_TOKEN = 'YOUR_META_PAGE_ACCESS_TOKEN';\nconst IG_USER  = 'YOUR_INSTAGRAM_BUSINESS_ACCOUNT_ID';\n\nconst _http = this.helpers.httpRequest.bind(this.helpers);\nconst item = $input.item.json;\nconst results = item._results || [];\nconst platforms = Array.isArray(item.platforms) ? item.platforms : [];\n\nif (!platforms.includes('instagram')) {\n  return { json: { ...item, _results: [...results, { platform: 'instagram', skipped: true }] } };\n}\n\nlet vault = item.source_vault || {};\nif (typeof vault === 'string') try { vault = JSON.parse(vault); } catch { vault = {}; }\nconst files = vault.rawFiles || [];\nconst master = files.find(f => f.usageType === 'master') || files[0];\nif (!master) {\n  return { json: { ...item, _results: [...results, { platform: 'instagram', success: false, error: 'No content file' }] } };\n}\n\nfunction driveUrl(url) {\n  if (!url || url.startsWith('/')) return null;\n  if (url.includes('drive.google.com')) {\n    const m = url.match(/\\/d\\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);\n    if (m) return 'https://drive.google.com/uc?export=download&id=' + m[1];\n  }\n  return url;\n}\n\nasync function waitForContainer(id) {\n  for (let i = 0; i < 30; i++) {\n    await new Promise(r => setTimeout(r, 5000));\n    const s = await _http({ method: 'GET', url: `https://graph.facebook.com/v21.0/${id}`, qs: { fields: 'status_code', access_token: IG_TOKEN } });\n    if (s.status_code === 'FINISHED') return;\n    if (s.status_code === 'ERROR') throw new Error('Container failed: ' + JSON.stringify(s));\n  }\n  throw new Error('Container timed out after 150s');\n}\n\nconst fileUrl = driveUrl(master.url);\nif (!fileUrl) {\n  return { json: { ...item, _results: [...results, { platform: 'instagram', success: false, error: 'File URL not public' }] } };\n}\n\ntry {\n  const ct = item.content_type || 'image';\n  const caption = item.caption || '';\n  let publishId;\n\n  if (ct === 'carousel' && files.length > 1) {\n    // Carousel: create child containers, then carousel container, then publish\n    const childIds = [];\n    for (const f of files) {\n      const u = driveUrl(f.url);\n      if (!u) continue;\n      const c = await _http({ method: 'POST', url: `https://graph.facebook.com/v21.0/${IG_USER}/media`, qs: { image_url: u, is_carousel_item: true, access_token: IG_TOKEN } });\n      childIds.push(c.id);\n    }\n    const container = await _http({ method: 'POST', url: `https://graph.facebook.com/v21.0/${IG_USER}/media`, qs: { media_type: 'CAROUSEL', children: childIds.join(','), caption, access_token: IG_TOKEN } });\n    await waitForContainer(container.id);\n    const pub = await _http({ method: 'POST', url: `https://graph.facebook.com/v21.0/${IG_USER}/media_publish`, qs: { creation_id: container.id, access_token: IG_TOKEN } });\n    publishId = pub.id;\n  } else if (ct === 'video' || ct === 'reel') {\n    // Video/Reel: create REELS container, poll, publish\n    const container = await _http({ method: 'POST', url: `https://graph.facebook.com/v21.0/${IG_USER}/media`, qs: { media_type: 'REELS', video_url: fileUrl, caption, access_token: IG_TOKEN } });\n    await waitForContainer(container.id);\n    const pub = await _http({ method: 'POST', url: `https://graph.facebook.com/v21.0/${IG_USER}/media_publish`, qs: { creation_id: container.id, access_token: IG_TOKEN } });\n    publishId = pub.id;\n  } else {\n    // Single image: create container, poll, publish\n    const container = await _http({ method: 'POST', url: `https://graph.facebook.com/v21.0/${IG_USER}/media`, qs: { image_url: fileUrl, caption, access_token: IG_TOKEN } });\n    await waitForContainer(container.id);\n    const pub = await _http({ method: 'POST', url: `https://graph.facebook.com/v21.0/${IG_USER}/media_publish`, qs: { creation_id: container.id, access_token: IG_TOKEN } });\n    publishId = pub.id;\n  }\n\n  return { json: { ...item, _results: [...results, { platform: 'instagram', success: true, id: publishId }] } };\n} catch (err) {\n  return { json: { ...item, _results: [...results, { platform: 'instagram', success: false, error: err.message }] } };\n}"
+      },
+      "id": "pub-instagram",
+      "name": "Publish Instagram",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1720, 440],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// ═══ LINKEDIN PUBLISHER ═══\n// Posts to LinkedIn Organization Page with image upload.\n// Uses register upload -> binary upload -> UGC post pattern.\n//\n// Setup:\n//   1. Create LinkedIn App at linkedin.com/developers\n//   2. Request 'w_organization_social' scope\n//   3. Generate OAuth2 access token\n//   4. Get Organization ID from admin URL\n\nconst LI_TOKEN = 'YOUR_LINKEDIN_ACCESS_TOKEN';\nconst LI_ORG   = 'urn:li:organization:YOUR_ORG_ID';\n\nconst _http = this.helpers.httpRequest.bind(this.helpers);\nconst item = $input.item.json;\nconst results = item._results || [];\nconst platforms = Array.isArray(item.platforms) ? item.platforms : [];\n\nif (!platforms.includes('linkedin')) {\n  return { json: { ...item, _results: [...results, { platform: 'linkedin', skipped: true }] } };\n}\n\nlet vault = item.source_vault || {};\nif (typeof vault === 'string') try { vault = JSON.parse(vault); } catch { vault = {}; }\nconst files = vault.rawFiles || [];\nconst master = files.find(f => f.usageType === 'master') || files[0];\nif (!master) {\n  return { json: { ...item, _results: [...results, { platform: 'linkedin', success: false, error: 'No content file' }] } };\n}\n\nfunction driveUrl(url) {\n  if (!url || url.startsWith('/')) return null;\n  if (url.includes('drive.google.com')) {\n    const m = url.match(/\\/d\\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);\n    if (m) return 'https://drive.google.com/uc?export=download&id=' + m[1];\n  }\n  return url;\n}\n\nconst fileUrl = driveUrl(master.url);\nif (!fileUrl) {\n  return { json: { ...item, _results: [...results, { platform: 'linkedin', success: false, error: 'File URL not public' }] } };\n}\n\ntry {\n  // Step 1: Register upload\n  const reg = await _http({\n    method: 'POST',\n    url: 'https://api.linkedin.com/v2/assets?action=registerUpload',\n    headers: { Authorization: 'Bearer ' + LI_TOKEN, 'Content-Type': 'application/json' },\n    body: { registerUploadRequest: { recipes: ['urn:li:digitalmediaRecipe:feedshare-image'], owner: LI_ORG, serviceRelationships: [{ relationshipType: 'OWNER', identifier: 'urn:li:userGeneratedContent' }] } },\n  });\n  const uploadUrl = reg.value?.uploadMechanism?.['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest']?.uploadUrl;\n  const asset = reg.value?.asset;\n  if (!uploadUrl || !asset) throw new Error('Upload registration failed');\n\n  // Step 2: Download from Drive, upload to LinkedIn\n  const binary = await _http({ method: 'GET', url: fileUrl, encoding: 'arraybuffer' });\n  await _http({ method: 'PUT', url: uploadUrl, headers: { Authorization: 'Bearer ' + LI_TOKEN }, body: binary });\n\n  // Step 3: Create post\n  const post = await _http({\n    method: 'POST',\n    url: 'https://api.linkedin.com/v2/ugcPosts',\n    headers: { Authorization: 'Bearer ' + LI_TOKEN, 'Content-Type': 'application/json' },\n    body: { author: LI_ORG, lifecycleState: 'PUBLISHED', specificContent: { 'com.linkedin.ugc.ShareContent': { shareCommentary: { text: item.caption || '' }, shareMediaCategory: 'IMAGE', media: [{ status: 'READY', media: asset }] } }, visibility: { 'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC' } },\n  });\n\n  return { json: { ...item, _results: [...results, { platform: 'linkedin', success: true, id: post.id }] } };\n} catch (err) {\n  return { json: { ...item, _results: [...results, { platform: 'linkedin', success: false, error: err.message }] } };\n}"
+      },
+      "id": "pub-linkedin",
+      "name": "Publish LinkedIn",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1980, 580],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Collect results from all platform nodes and build audit summary\nconst item = $input.item.json;\nconst results = item._results || [];\nconst published = results.filter(r => r.success);\nconst failed = results.filter(r => !r.success && !r.skipped);\nconst skipped = results.filter(r => r.skipped);\n\nlet summary;\nif (published.length > 0 && failed.length === 0) {\n  summary = 'Published to ' + published.map(r => r.platform).join(', ');\n} else if (published.length > 0) {\n  summary = 'Published to ' + published.map(r => r.platform).join(', ') + '. Failed: ' + failed.map(r => r.platform + ' (' + r.error + ')').join(', ');\n} else if (failed.length > 0) {\n  summary = 'All failed: ' + failed.map(r => r.platform + ' (' + r.error + ')').join(', ');\n} else {\n  summary = 'No active platforms (skipped: ' + skipped.map(r => r.platform).join(', ') + ')';\n}\n\nreturn { json: { postId: item.id, title: item.title, summary, publishedCount: published.length, failedCount: failed.length } };"
+      },
+      "id": "audit-summary",
+      "name": "Build Audit Entry",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2240, 440]
     },
     {
       "parameters": {
@@ -134,22 +140,10 @@
         "tableId": "post_audit_logs",
         "fieldsUi": {
           "fieldValues": [
-            {
-              "fieldId": "post_id",
-              "fieldValue": "={{ $json.postId }}"
-            },
-            {
-              "fieldId": "user_name",
-              "fieldValue": "n8n Auto-Publisher"
-            },
-            {
-              "fieldId": "action_type",
-              "fieldValue": "auto_published"
-            },
-            {
-              "fieldId": "details",
-              "fieldValue": "={{ $json.summary }}"
-            }
+            { "fieldId": "post_id", "fieldValue": "={{ $json.postId }}" },
+            { "fieldId": "user_name", "fieldValue": "n8n Auto-Publisher" },
+            { "fieldId": "action_type", "fieldValue": "auto_published" },
+            { "fieldId": "details", "fieldValue": "={{ $json.summary }}" }
           ]
         }
       },
@@ -157,10 +151,7 @@
       "name": "Log to Audit Trail",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
-      "position": [
-        1680,
-        440
-      ],
+      "position": [2480, 440],
       "credentials": {
         "supabaseApi": {
           "id": "CONFIGURE_ME",
@@ -170,8 +161,8 @@
     },
     {
       "parameters": {
-        "content": "## Setup Guide\n\n### 1. Supabase Credential\nCreate an n8n credential of type **Supabase**:\n- **Host**: Your Supabase project URL (e.g. `https://abc123.supabase.co`)\n- **Service Role Key**: Found in Supabase > Settings > API > `service_role` key\n\nApply this credential to all three Supabase nodes.\n\n### 2. Platform Credentials\nOpen the **Publish to Platforms** Code node and replace the placeholder values at the top:\n- `META_ACCESS_TOKEN` — Long-lived Facebook Page Access Token\n- `FB_PAGE_ID` — Your Facebook Page ID\n- `IG_USER_ID` — Your Instagram Business Account ID\n- `LI_ACCESS_TOKEN` — LinkedIn OAuth2 token\n- `LI_ORG_URN` — Your LinkedIn Organization URN\n\n### 3. Google Drive Sharing\nAll files in your Drive `raw-files` folder must have sharing set to **\"Anyone with the link can view\"**. Without this, Meta and LinkedIn APIs cannot fetch the files.\n\n### 4. Activate\nToggle the workflow **Active** once credentials are configured.\n\n### How It Works\n1. Runs every 5 minutes\n2. Queries Supabase for posts in `approved_scheduled` stage\n3. Filters to only posts whose date+time has passed (CST)\n4. For each due post: marks as `posted`, publishes to each platform, logs to audit trail\n5. Individual platform failures don't block other platforms\n6. All results are logged to `post_audit_logs` for traceability",
-        "height": 580,
+        "content": "## Ten80Ten Auto-Publisher v2\n\n### Architecture\nEach platform is its own Code node in a sequential chain.\nData flows left-to-right: post data + accumulated `_results` array.\nEach node checks if its platform is in the post's platforms list,\npublishes (or skips), appends result, and passes forward.\n\n### Flow\n```\nSchedule (5min)\n  -> Supabase: Get approved_scheduled\n  -> Code: Filter by CST datetime\n  -> SplitInBatches (1 post at a time)\n    -> Supabase: Mark as posted (lock)\n    -> Code: Publish Facebook\n    -> Code: Publish Instagram\n    -> Code: Publish LinkedIn\n    -> Code: Build Audit Entry\n    -> Supabase: Log to audit trail\n    -> Loop back\n```\n\n### Setup Checklist\n- [ ] Create Supabase credential (URL + Service Role Key)\n- [ ] Apply credential to all 3 Supabase nodes\n- [ ] Edit Publish Facebook: set FB_TOKEN and FB_PAGE\n- [ ] Edit Publish Instagram: set IG_TOKEN and IG_USER\n- [ ] Edit Publish LinkedIn: set LI_TOKEN and LI_ORG\n- [ ] Ensure Drive files have 'Anyone with link' sharing\n- [ ] Run Manual Test before activating schedule",
+        "height": 560,
         "width": 460,
         "color": 5
       },
@@ -179,15 +170,12 @@
       "name": "Sticky Note",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [
-        140,
-        -160
-      ]
+      "position": [140, -120]
     },
     {
       "parameters": {
-        "content": "## Platform Support\n\n| Platform | Status | Method |\n|----------|--------|--------|\n| Facebook | Ready | Graph API v21 — image + video |\n| Instagram | Ready | Container → Poll → Publish (image, reel, carousel) |\n| LinkedIn | Ready | Register Upload → Binary Upload → UGC Post |\n| X / Twitter | Manual | Requires OAuth 1.0a signing — post manually |\n| YouTube | Manual | Requires video upload API — post manually |\n| TikTok | Manual | Limited API access — post manually |\n\n### Meta Token Refresh\nFacebook Page tokens expire after ~60 days. To refresh:\n1. Go to developers.facebook.com > Your App > Tools > Graph API Explorer\n2. Select your Page, generate a new token\n3. Exchange for long-lived token via the API\n4. Update `META_ACCESS_TOKEN` in the Code node\n\n### Instagram Carousel\nThe workflow handles multi-image carousels automatically. Each file in `rawFiles` becomes a carousel slide. The master file is slide 1.",
-        "height": 420,
+        "content": "## Per-Platform Nodes\n\n| Node | Platform | API | Content Types |\n|------|----------|-----|---------------|\n| Publish Facebook | FB Page | Graph API v21 | Image, Video, Reel |\n| Publish Instagram | IG Business | Container/Poll/Publish | Image, Video, Reel, Carousel |\n| Publish LinkedIn | LI Org | Register/Upload/UGC | Image |\n\n### Why Separate Nodes?\n- Green/red status per platform on canvas\n- Debug one platform without touching others\n- Disconnect a node to disable that platform\n- Each node is ~60 lines, not 250\n\n### Adding X / YouTube / TikTok\n1. Duplicate any platform Code node\n2. Replace API logic inside\n3. Insert between Publish LinkedIn and Build Audit Entry\n4. Read `_results`, append your result, pass forward\n\n### Token Refresh (every ~60 days)\n- Meta: Graph API Explorer -> generate -> exchange for long-lived\n- LinkedIn: OAuth2 refresh flow\n- Update the constants at the top of each Code node",
+        "height": 500,
         "width": 460,
         "color": 4
       },
@@ -195,15 +183,12 @@
       "name": "Sticky Note1",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [
-        640,
-        -160
-      ]
+      "position": [640, -120]
     },
     {
       "parameters": {
-        "content": "## Error Handling\n\n- Each platform is wrapped in try/catch — one platform failing does not block others\n- The Code node has **Continue On Fail** enabled so a crash in publishing still logs the audit\n- If ALL platforms fail, the post is still marked `posted` to prevent infinite retry loops\n- Failed platforms are listed in the audit log details\n- Check the n8n execution log for full error traces\n\n### Duplicate Prevention\n- The post is marked `posted` BEFORE publishing starts\n- If n8n crashes mid-publish, the post won't be retried on the next 5-min cycle\n- To retry a failed post: change its stage back to `approved_scheduled` in the portal",
-        "height": 340,
+        "content": "## Error Handling & Safety\n\n### Per-Platform Isolation\nEvery platform node wraps API calls in try/catch.\nFacebook failing does NOT block Instagram or LinkedIn.\n`onError: continueRegularOutput` on all platform nodes.\n\n### Duplicate Prevention\nPosts marked `posted` BEFORE publishing starts.\nIf n8n crashes mid-publish, post will NOT retry.\nTo retry: change stage back to `approved_scheduled` in portal.\n\n### Instagram Polling\nIG containers (especially video/carousel) need processing time.\nThe node polls status every 5s, up to 30 attempts (150s max).\nIf container fails or times out, error is logged but other\nplatforms still proceed.\n\n### Audit Trail\nEvery execution logs to `post_audit_logs`:\n- Which platforms succeeded\n- Which failed (with error messages)\n- Which were skipped (not in platform list)",
+        "height": 460,
         "width": 460,
         "color": 6
       },
@@ -211,101 +196,45 @@
       "name": "Sticky Note2",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [
-        1140,
-        -160
-      ]
+      "position": [1140, -120]
     }
   ],
   "connections": {
     "Every 5 Minutes": {
-      "main": [
-        [
-          {
-            "node": "Get Scheduled Posts",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Get Scheduled Posts", "type": "main", "index": 0 }]]
     },
     "Manual Test": {
-      "main": [
-        [
-          {
-            "node": "Get Scheduled Posts",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Get Scheduled Posts", "type": "main", "index": 0 }]]
     },
     "Get Scheduled Posts": {
-      "main": [
-        [
-          {
-            "node": "Filter Due Now",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Filter Due Now", "type": "main", "index": 0 }]]
     },
     "Filter Due Now": {
-      "main": [
-        [
-          {
-            "node": "Process Each Post",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Process Each Post", "type": "main", "index": 0 }]]
     },
     "Process Each Post": {
       "main": [
-        [
-          {
-            "node": "Mark as Posted",
-            "type": "main",
-            "index": 0
-          }
-        ],
+        [{ "node": "Mark as Posted", "type": "main", "index": 0 }],
         []
       ]
     },
     "Mark as Posted": {
-      "main": [
-        [
-          {
-            "node": "Publish to Platforms",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Publish Facebook", "type": "main", "index": 0 }]]
     },
-    "Publish to Platforms": {
-      "main": [
-        [
-          {
-            "node": "Log to Audit Trail",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Publish Facebook": {
+      "main": [[{ "node": "Publish Instagram", "type": "main", "index": 0 }]]
+    },
+    "Publish Instagram": {
+      "main": [[{ "node": "Publish LinkedIn", "type": "main", "index": 0 }]]
+    },
+    "Publish LinkedIn": {
+      "main": [[{ "node": "Build Audit Entry", "type": "main", "index": 0 }]]
+    },
+    "Build Audit Entry": {
+      "main": [[{ "node": "Log to Audit Trail", "type": "main", "index": 0 }]]
     },
     "Log to Audit Trail": {
-      "main": [
-        [
-          {
-            "node": "Process Each Post",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Process Each Post", "type": "main", "index": 0 }]]
     }
   },
   "pinData": {},
@@ -317,5 +246,5 @@
   "staticData": null,
   "tags": [],
   "triggerCount": 1,
-  "versionId": "ten80ten-auto-publisher-v1"
+  "versionId": "ten80ten-auto-publisher-v2"
 }
