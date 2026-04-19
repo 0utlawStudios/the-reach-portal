@@ -203,8 +203,8 @@
   "hotPaths": [
     {
       "path": "src/components/asset-review-drawer.tsx",
-      "accessCount": 72,
-      "lastAccessed": 1776276723936,
+      "accessCount": 75,
+      "lastAccessed": 1776618894518,
       "type": "file"
     },
     {
@@ -214,16 +214,16 @@
       "type": "directory"
     },
     {
+      "path": "src",
+      "accessCount": 34,
+      "lastAccessed": 1776618788190,
+      "type": "directory"
+    },
+    {
       "path": "src/components/pages/settings-page.tsx",
       "accessCount": 33,
       "lastAccessed": 1775845381843,
       "type": "file"
-    },
-    {
-      "path": "src",
-      "accessCount": 32,
-      "lastAccessed": 1776276039265,
-      "type": "directory"
     },
     {
       "path": "src/app/auth/setup/page.tsx",
@@ -239,8 +239,8 @@
     },
     {
       "path": "src/lib/pipeline-context.tsx",
-      "accessCount": 14,
-      "lastAccessed": 1776529367884,
+      "accessCount": 15,
+      "lastAccessed": 1776618792420,
       "type": "file"
     },
     {
@@ -268,6 +268,12 @@
       "type": "file"
     },
     {
+      "path": "src/components/kanban-board.tsx",
+      "accessCount": 11,
+      "lastAccessed": 1776618871576,
+      "type": "file"
+    },
+    {
       "path": "src/app/auth/confirm/route.ts",
       "accessCount": 9,
       "lastAccessed": 1775819304646,
@@ -283,12 +289,6 @@
       "path": "src/lib/email-utils.ts",
       "accessCount": 9,
       "lastAccessed": 1776529378891,
-      "type": "file"
-    },
-    {
-      "path": "src/components/kanban-board.tsx",
-      "accessCount": 9,
-      "lastAccessed": 1776529384492,
       "type": "file"
     },
     {
@@ -316,6 +316,12 @@
       "type": "directory"
     },
     {
+      "path": "src/lib/types.ts",
+      "accessCount": 7,
+      "lastAccessed": 1776618792894,
+      "type": "file"
+    },
+    {
       "path": "src/app/api/team/resend-invite/route.ts",
       "accessCount": 6,
       "lastAccessed": 1775819307409,
@@ -325,12 +331,6 @@
       "path": "supabase-schema.sql",
       "accessCount": 6,
       "lastAccessed": 1775845357920,
-      "type": "file"
-    },
-    {
-      "path": "src/lib/types.ts",
-      "accessCount": 6,
-      "lastAccessed": 1776529377879,
       "type": "file"
     },
     {

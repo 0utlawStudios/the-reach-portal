@@ -1,3 +1,4 @@
 {"t":0,"agent":"a65c060","agent_type":"Explore","event":"agent_start","parent_mode":"none"}
 {"t":0,"agent":"a65c060","agent_type":"Explore","event":"agent_stop","success":true,"duration_ms":56007}
 {"t":0,"agent":"a0b2a45","agent_type":"unknown","event":"agent_stop","success":true}
+{"t":0,"agent":"system","event":"keyword_detected","keyword":"ultrathink"}
