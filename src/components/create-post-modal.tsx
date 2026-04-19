@@ -22,7 +22,7 @@ const contentTypes: { id: ContentType; label: string; icon: React.ReactNode }[] 
   { id: "story", label: "Story", icon: <Film className="w-3.5 h-3.5" /> },
 ];
 
-const ASSET_SOURCES = ["Envato Elements", "Pexels", "Shot by Team", "Client Provided", "Google Images", "AI Generated"];
+const ASSET_SOURCES = ["Canva Pro", "Envato Elements", "Pexels", "Shot by Team", "Client Provided", "Google Images", "AI Generated"];
 
 interface UploadedFile {
   id: string;
@@ -409,6 +409,7 @@ export function CreatePostModal({ open, onClose }: Props) {
                 {/* License upload */}
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">License / Release <span className="text-gray-300 dark:text-gray-600 text-[8px] normal-case">Optional</span></label>
+                  <p className="text-[9px] text-gray-400 dark:text-gray-500 leading-relaxed -mt-0.5 mb-1">Attach the license, model release, or proof of rights. Stored in Google Drive for copyright protection and compliance.</p>
                   {licenseFileId ? (
                     <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-500/5 border border-emerald-200 dark:border-emerald-500/20 rounded-lg px-3 py-2">
                       <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium flex-1">License uploaded</span>

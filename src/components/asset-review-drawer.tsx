@@ -630,10 +630,11 @@ export function AssetReviewDrawer() {
 
                   {/* License upload */}
                   <div className="p-4">
-                    <label className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.1em] flex items-center gap-1.5 mb-2.5">
+                    <label className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.1em] flex items-center gap-1.5 mb-1">
                       <Paperclip className="w-3 h-3 text-orange-400" />License / Release
                       <span className="text-gray-300 dark:text-gray-600 text-[8px] normal-case ml-auto">Optional</span>
                     </label>
+                    <p className="text-[9px] text-gray-400 dark:text-gray-500 leading-relaxed mb-2">Attach the license, model release, or proof of rights. Stored in Google Drive for copyright protection and compliance.</p>
                     {selectedCard.licenseFileId ? (
                       <div className="flex items-center gap-2.5 bg-emerald-50 dark:bg-emerald-500/5 border border-emerald-200/60 dark:border-emerald-500/20 rounded-lg px-3.5 py-2.5">
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
@@ -1088,7 +1089,7 @@ export function AssetReviewDrawer() {
 }
 
 // ─── Asset Source with "Other" conditional input ───
-const PRESET_SOURCES = ["Envato Elements", "Pexels", "Shot by Team", "Client Provided", "Google Images", "AI Generated"];
+const PRESET_SOURCES = ["Canva Pro", "Envato Elements", "Pexels", "Shot by Team", "Client Provided", "Google Images", "AI Generated"];
 
 function AssetSourceBlock({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const isOther = !!value && !PRESET_SOURCES.includes(value);

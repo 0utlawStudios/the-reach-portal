@@ -7,7 +7,7 @@ import { useToast } from "@/lib/toast-context";
 import { X, Upload, FolderOpen, Image as ImageIcon, Film, Search, CheckCircle, Clock, Link2, ExternalLink } from "lucide-react";
 import { PLACEHOLDER_MEDIA } from "@/lib/placeholder-data";
 
-const ASSET_SOURCES = ["Envato Elements", "Pexels", "Shot by Team", "Client Provided", "Google Images", "AI Generated"];
+const ASSET_SOURCES = ["Canva Pro", "Envato Elements", "Pexels", "Shot by Team", "Client Provided", "Google Images", "AI Generated"];
 
 type PickerTab = "upload" | "library";
 
