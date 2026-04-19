@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1776527496611,
+  "lastScanned": 1776617296074,
   "projectRoot": "/Users/ace/Documents/CURSOR MAIN/ten80ten-smm-portal",
   "techStack": {
     "languages": [
@@ -68,6 +68,7 @@
     "isMonorepo": false,
     "workspaces": [],
     "mainDirectories": [
+      "docs",
       "public",
       "scripts",
       "src"
@@ -80,7 +81,7 @@
       "path": "SANITY",
       "purpose": null,
       "fileCount": 8,
-      "lastAccessed": 1776527496596,
+      "lastAccessed": 1776617296062,
       "keyFiles": [
         "04152026231041@2x.png",
         "04152026231115@2x.png",
@@ -89,11 +90,20 @@
         "04152026231158@2x.png"
       ]
     },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 1,
+      "lastAccessed": 1776617296062,
+      "keyFiles": [
+        "TEN80TEN-SMM-MANUAL.html"
+      ]
+    },
     "migration": {
       "path": "migration",
       "purpose": null,
       "fileCount": 4,
-      "lastAccessed": 1776527496596,
+      "lastAccessed": 1776617296064,
       "keyFiles": [
         "migrate.mjs",
         "package-lock.json",
@@ -104,7 +114,7 @@
       "path": "public",
       "purpose": "Public files",
       "fileCount": 11,
-      "lastAccessed": 1776527496597,
+      "lastAccessed": 1776617296064,
       "keyFiles": [
         "file.svg",
         "globe.svg",
@@ -117,7 +127,7 @@
       "path": "scripts",
       "purpose": "Build/utility scripts",
       "fileCount": 1,
-      "lastAccessed": 1776527496598,
+      "lastAccessed": 1776617296064,
       "keyFiles": [
         "db-types-check.ts"
       ]
@@ -126,14 +136,14 @@
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1776527496599,
+      "lastAccessed": 1776617296064,
       "keyFiles": []
     },
     "supabase": {
       "path": "supabase",
       "purpose": null,
       "fileCount": 3,
-      "lastAccessed": 1776527496599,
+      "lastAccessed": 1776617296064,
       "keyFiles": [
         "config.toml"
       ]
@@ -142,14 +152,14 @@
       "path": "migration/node_modules",
       "purpose": "Dependencies",
       "fileCount": 1,
-      "lastAccessed": 1776527496599,
+      "lastAccessed": 1776617296065,
       "keyFiles": []
     },
     "src/app": {
       "path": "src/app",
       "purpose": "Application code",
       "fileCount": 5,
-      "lastAccessed": 1776527496599,
+      "lastAccessed": 1776617296065,
       "keyFiles": [
         "favicon.ico",
         "globals.css",
@@ -160,7 +170,7 @@
       "path": "src/components",
       "purpose": "UI components",
       "fileCount": 23,
-      "lastAccessed": 1776527496599,
+      "lastAccessed": 1776617296065,
       "keyFiles": [
         "animated.tsx",
         "app-shell.tsx",
@@ -171,7 +181,7 @@
       "path": "src/lib",
       "purpose": "Library code",
       "fileCount": 22,
-      "lastAccessed": 1776527496600,
+      "lastAccessed": 1776617296065,
       "keyFiles": [
         "audit.ts",
         "auth-context.tsx",
@@ -182,7 +192,7 @@
       "path": "supabase/migrations",
       "purpose": "Database migrations",
       "fileCount": 14,
-      "lastAccessed": 1776527496600,
+      "lastAccessed": 1776617296065,
       "keyFiles": [
         "0000_baseline.sql",
         "0001_feature_flags.sql",
@@ -199,8 +209,8 @@
     },
     {
       "path": "",
-      "accessCount": 43,
-      "lastAccessed": 1775845405756,
+      "accessCount": 46,
+      "lastAccessed": 1776617673009,
       "type": "directory"
     },
     {
@@ -384,6 +394,12 @@
       "type": "file"
     },
     {
+      "path": "src/components/app-shell.tsx",
+      "accessCount": 4,
+      "lastAccessed": 1776617362833,
+      "type": "file"
+    },
+    {
       "path": ".vercel/project.json",
       "accessCount": 3,
       "lastAccessed": 1775600206867,
@@ -423,12 +439,6 @@
       "path": "src/app/api/drive/upload/route.ts",
       "accessCount": 3,
       "lastAccessed": 1776529368138,
-      "type": "file"
-    },
-    {
-      "path": "src/components/app-shell.tsx",
-      "accessCount": 3,
-      "lastAccessed": 1776529379529,
       "type": "file"
     },
     {
