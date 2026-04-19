@@ -339,7 +339,7 @@ export function CreatePostModal({ open, onClose }: Props) {
 
                 {/* Content type */}
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Content Type</label>
+                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Content Type <span className="text-red-400">*</span></label>
                   <div className="flex flex-wrap gap-1.5">
                     {contentTypes.map((ct) => (
                       <button key={ct.id} type="button" onClick={() => setContentType(ct.id)}
@@ -356,19 +356,22 @@ export function CreatePostModal({ open, onClose }: Props) {
 
                 {/* Hook */}
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Hook (First 3 Seconds) <span className="text-red-400">*</span></label>
-                  <input value={hook} onChange={(e) => setHook(e.target.value)} placeholder="What grabs attention?" className={inputClass} />
+                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Hook <span className="text-red-400">*</span></label>
+                  <p className="text-[9px] text-gray-400 dark:text-gray-500 leading-relaxed -mt-0.5">Internal only. Describe the attention-grabbing opening: what happens in the first 3 seconds of a video, or the first line viewers see before "See more".</p>
+                  <input value={hook} onChange={(e) => setHook(e.target.value)} placeholder='e.g. "Did you know 80% of businesses..." or "Quick zoom into product reveal"' className={inputClass} />
                 </div>
 
                 {/* Caption */}
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Caption <span className="text-red-400">*</span></label>
+                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Caption <span className="text-red-400">*</span> <span className="text-emerald-500 dark:text-emerald-400 text-[8px] normal-case font-medium">Posted to platforms</span></label>
+                  <p className="text-[9px] text-gray-400 dark:text-gray-500 leading-relaxed -mt-0.5">The full text published with this post. Include hashtags, mentions, and CTAs. This is what n8n sends to each platform.</p>
                   <MentionTextarea value={caption} onChange={setCaption} placeholder="Write your caption... Type @ to mention team members" className="min-h-[70px] w-full bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-lg text-[12px] text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-600 resize-none p-3 outline-none focus:ring-2 focus:ring-orange-100 dark:focus:ring-orange-500/10 focus:border-orange-400 transition-all" rows={3} />
                 </div>
 
-                {/* Schedule */}
+                {/* Post Date & Time */}
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Schedule Date & Time <span className="text-red-400">*</span></label>
+                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Post Date & Time <span className="text-red-400">*</span></label>
+                  <p className="text-[9px] text-gray-400 dark:text-gray-500 leading-relaxed -mt-0.5">When this post goes live on social media. n8n publishes automatically at this exact date and time.</p>
                   <div className="flex gap-2">
                     <input type="date" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} className={`${inputClass} flex-[3]`} required />
                     <input type="time" value={scheduledTime} onChange={(e) => setScheduledTime(e.target.value)} className={`${inputClass} flex-[2]`} required />

@@ -594,7 +594,8 @@ export function AssetReviewDrawer() {
               <>
                 {/* Hook — containerized card */}
                 <div className="bg-slate-50/70 dark:bg-white/[0.02] rounded-xl border border-gray-100 dark:border-white/[0.05] p-5">
-                  <label className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1.5 mb-3"><Hash className="w-3.5 h-3.5 text-orange-400" />Hook / First 3 Seconds</label>
+                  <label className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1.5 mb-1"><Hash className="w-3.5 h-3.5 text-orange-400" />Hook <span className="text-[8px] font-medium normal-case text-gray-400 dark:text-gray-500">Internal only</span></label>
+                  <p className="text-[9px] text-gray-400 dark:text-gray-500 leading-relaxed mb-2">The attention-grabbing opening: first 3 seconds of video, or the first line before "See more".</p>
                   <InlineEdit
                     value={selectedCard.hook || ""}
                     onSave={(v) => { updateCard(selectedCard.id, { hook: v || undefined }); logAudit(selectedCard.id, currentUser.name, "content_edited", "Updated hook"); }}
@@ -606,7 +607,8 @@ export function AssetReviewDrawer() {
 
                 {/* Caption — containerized card */}
                 <div className="bg-slate-50/70 dark:bg-white/[0.02] rounded-xl border border-gray-100 dark:border-white/[0.05] p-5">
-                  <label className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1.5 mb-3"><Type className="w-3.5 h-3.5 text-orange-400" />Caption</label>
+                  <label className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1.5 mb-1"><Type className="w-3.5 h-3.5 text-orange-400" />Caption <span className="text-[8px] font-medium normal-case text-emerald-500 dark:text-emerald-400">Posted to platforms</span></label>
+                  <p className="text-[9px] text-gray-400 dark:text-gray-500 leading-relaxed mb-2">The full text published with this post. Include hashtags, mentions, and CTAs.</p>
                   <InlineEdit
                     value={selectedCard.caption || ""}
                     onSave={(v) => { updateCard(selectedCard.id, { caption: v || undefined }); logAudit(selectedCard.id, currentUser.name, "content_edited", "Updated caption"); }}
