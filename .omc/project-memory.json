@@ -203,8 +203,8 @@
   "hotPaths": [
     {
       "path": "src/components/asset-review-drawer.tsx",
-      "accessCount": 87,
-      "lastAccessed": 1776619561088,
+      "accessCount": 89,
+      "lastAccessed": 1776619781527,
       "type": "file"
     },
     {
@@ -215,8 +215,8 @@
     },
     {
       "path": "src",
-      "accessCount": 34,
-      "lastAccessed": 1776618788190,
+      "accessCount": 35,
+      "lastAccessed": 1776619769267,
       "type": "directory"
     },
     {
@@ -274,6 +274,12 @@
       "type": "file"
     },
     {
+      "path": "src/components/media-picker.tsx",
+      "accessCount": 10,
+      "lastAccessed": 1776619793889,
+      "type": "file"
+    },
+    {
       "path": "src/app/auth/confirm/route.ts",
       "accessCount": 9,
       "lastAccessed": 1775819304646,
@@ -289,12 +295,6 @@
       "path": "src/lib/email-utils.ts",
       "accessCount": 9,
       "lastAccessed": 1776529378891,
-      "type": "file"
-    },
-    {
-      "path": "src/components/media-picker.tsx",
-      "accessCount": 9,
-      "lastAccessed": 1776619631976,
       "type": "file"
     },
     {
