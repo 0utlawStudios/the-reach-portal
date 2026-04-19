@@ -1,0 +1,202 @@
+IMPORTANT: Read every file before editing it. Never guess file paths, component names, or prop types. If a component or feature mentioned below does not exist in this codebase, skip that section and tell me what was skipped and why. Build after every major change. Do not add features beyond what is listed.
+
+Apply all of the following changes to this social media management portal. The app is a Next.js + Supabase + Tailwind project with a Kanban pipeline, content cards, a create post modal, an asset review drawer, and a dashboard page. Adapt class names, component names, and brand colors to match THIS project, but the logic and UX must be identical.
+
+---
+
+## 1. Mobile-Responsive Dashboard
+
+The dashboard page has cards (pipeline funnel, scorecard, calendar, platform split, upcoming posts, recently published). Fix the mobile layout:
+
+- Card padding: p-4 to p-3 sm:p-4, border radius rounded-2xl to rounded-xl sm:rounded-2xl
+- Section gaps: space-y-3 to space-y-2 sm:space-y-3 between all cards
+- Grid gaps: gap-3 to gap-2 sm:gap-3 in all grid rows
+- Container padding: outer wrapper p-3 to p-2 sm:p-4
+- Welcome banner: avatar w-12 h-12 to w-9 h-9 sm:w-12 sm:h-12, title text-[22px] to text-[17px] sm:text-[22px], padding p-4 sm:p-5 to p-3 sm:p-5
+- Pipeline funnel rows: space-y-3.5 to space-y-2 sm:space-y-3.5
+- Scorecard numbers: text-[26px] to text-[20px] sm:text-[26px], approval rate text-[24px] to text-[20px] sm:text-[24px], grid gap-3 p-3 to gap-2 sm:gap-3 p-2 sm:p-3
+- Platform split: space-y-4 to space-y-2.5 sm:space-y-4
+- Calendar cells: replace aspect-square with h-8 sm:aspect-square (fixed 32px height on mobile instead of massive square cells). Empty cells same treatment. Calendar header/legend margins tighter on mobile.
+- Recently Published section: add hidden sm:flex to hide on mobile (cuts scroll length)
+- Section labels: mb-3 to mb-2 sm:mb-3
+- Upcoming post rows: thumbnails w-10 h-10 to w-8 h-8 sm:w-10 sm:h-10, row padding py-2.5 to py-1.5 sm:py-2.5
+
+---
+
+## 2. Disable Auto-Fit Scaling on Mobile
+
+If the dashboard has an auto-fit feature that scales content to fit viewport height (using ResizeObserver + CSS transform scale), disable it on mobile. Add a check: if window.innerWidth < 640, set scale to 1 and return. Mobile users should scroll naturally. Also change the outer container from overflow-hidden to overflow-y-auto sm:overflow-hidden.
+
+---
+
+## 3. PWA Service Worker Cache Busting
+
+If the app has a service worker (public/sw.js):
+- Replace static cache name ("app-v1" or similar) with Date.now() so every SW evaluation invalidates old caches
+- Exclude /_next/ paths from SW caching (Next.js handles its own cache busting with hashed filenames)
+- Never cache the service worker itself (skip /sw.js requests)
+- In next.config.ts, add response headers for /sw.js: Cache-Control: no-cache, no-store, must-revalidate and Service-Worker-Allowed: /
+
+---
+
+## 4. Completeness Gate on All Paths to Awaiting Approval
+
+The pipeline has a completeness check (scheduled date, time, thumbnail, caption, content files, asset source, checklist) that blocks cards from moving forward. This gate must fire on ALL paths into the approval queue, not just from "ideas". Add targetStage === "awaiting_approval" to the gate condition in:
+- Kanban drag-and-drop handler
+- Drawer "Move to [next stage]" button
+- Drawer "Ready for Re-Approval" button (add full validation before opening the reapproval modal)
+
+Also add designLink (editable design file link) to the required fields in all completeness gates. Check sourceVault.designLink is not empty.
+
+---
+
+## 5. Glassmorphism Validation Error Modal
+
+Create a new component ValidationErrorModal that replaces tiny toast error messages for validation failures.
+
+Props: errors (string array), onClose (function)
+
+Design specs:
+- Fixed overlay with backdrop-blur-sm, centered card
+- Glassmorphism: bg-white/80 dark:bg-[#18181b]/85 backdrop-blur-2xl, border border-gray-200/60 dark:border-white/[0.12]
+- Shadow: 0_8px_32px for depth
+- Header: red AlertTriangle icon in a rounded container, "Missing Required Fields" title, subtitle "Complete these before continuing", X close button
+- Body: scrollable list of errors. Each error is a rounded card with bg-red-50/60 dark:bg-red-500/[0.06], numbered circle on the left, bold field name, and plain-language guidance text below it
+- Footer: full-width "Got it" button, dark bg (bg-gray-900 dark:bg-white with inverted text)
+- Dismissible by clicking overlay or the button
+- Mobile responsive: max-w-sm sm:max-w-md, max-h-[75vh] sm:max-h-[80vh], tighter padding on mobile
+- z-index 100 to appear above everything
+
+Guidance text per field (define as a lookup map):
+- title: "Enter a descriptive title at the top of the form."
+- content file: "Upload at least one image or video, or browse the Media Library."
+- platform: "Select one or more target platforms."
+- date: "Set the date this post goes live. Found in the Post Date & Time section."
+- time: "Set the exact time this post gets published, next to the date field."
+- scheduled date: "Set the date this post goes live. Click the schedule area in the drawer."
+- scheduled time: "Set the exact time this post gets published, next to the date picker."
+- caption: "Write the full caption text that gets published to social media platforms. Include hashtags and CTAs."
+- asset source: "Select where the media came from (Canva Pro, Envato, Pexels, etc.)."
+- thumbnail: "Upload or select a cover image for the post card."
+- content for publishing: "Upload at least one file that will be posted to social platforms."
+- design file link: "Go to the Details tab and paste the editable Canva/Figma link. Sharing must be set to 'Anyone with the link can edit'."
+- Any field containing "checklist item": "Complete all items in the Pre-Submit Checklist before moving forward."
+- Fallback: "This field is required before the post can move forward."
+
+Replace all addToast(..., "error") calls for validation failures with setValidationErrors(missing) and render the ValidationErrorModal component. Add validationErrors state (string[]) to the kanban board, create post modal, and asset review drawer.
+
+---
+
+## 6. Media Library in Create Post Modal
+
+The create post modal only has a file upload button for content. Add a "Browse Library" option alongside it:
+
+- When no files are added yet: show two side-by-side dashed border buttons: "Upload from device" (with Upload icon) and "Browse Library" (with FolderOpen icon)
+- Browse Library opens the MediaPicker component with defaultTab="library" so it goes straight to the media grid, not the upload tab
+- Add a defaultTab prop to MediaPicker (type: the tab union type, default: "upload"). Add a useEffect that resets the active tab to defaultTab whenever the open prop changes to true.
+- Library-selected files skip re-upload since they are already on Drive. Extend the uploaded file interface with optional driveUrl, driveFileId, mimeType fields. In the submit handler, if a file has driveUrl set, use it directly as the URL/fileId instead of uploading to Drive.
+
+---
+
+## 7. Design File Link Required
+
+In the create post modal (Details tab) and the asset review drawer (Source Vault tab):
+- Rename label to "Editable Design Link" with red asterisk (required)
+- Add helper text below the label: "Paste the editable Canva, Figma, or Adobe link. Make sure sharing is set to 'Anyone with the link can edit' so the team can make revisions."
+- Placeholder: "https://www.canva.com/design/..."
+- Add to form validation in create post (missing.push("design file link") if empty)
+- Add to the submit button disabled check
+- Add to all completeness gates in kanban board and drawer (check sourceVault.designLink)
+
+---
+
+## 8. License/Release Field Description
+
+Add helper text under the License/Release label in both create post modal and drawer:
+"Attach the license, model release, or proof of rights. Stored in Google Drive for copyright protection and compliance."
+
+---
+
+## 9. Asset Source Options
+
+The asset source dropdown should have these options in this order:
+Canva Pro, Envato Elements, Pexels, Shot by Team, Client Provided, Google Images, AI Generated
+
+Plus an "Other (specify)" option that reveals a text input when selected.
+
+Update in all places where the asset source list is defined (create post modal, asset review drawer, media picker).
+
+---
+
+## 10. Remove Hook Field
+
+Remove the "Hook / First 3 Seconds" field entirely from the UI:
+- Remove from the create post modal: state variable, form field JSX, validation check, submit data, state reset, disabled button check
+- Remove from the asset review drawer: the containerized card section with InlineEdit for hook
+- Remove from validation error modal guidance map
+- Clean up any unused imports (e.g., Hash icon from lucide-react)
+- KEEP the hook field in the TypeScript interface and database schema for backwards compatibility with existing data. Just remove it from the UI.
+
+---
+
+## 11. Remove Story Content Type
+
+Remove "Story" from the UI:
+- Remove from content type options array in create post modal
+- Remove from content type select/dropdown in the asset review drawer
+- KEEP "story" in the ContentType TypeScript union for backwards compatibility
+
+---
+
+## 12. Platform / Content-Type Compatibility Matrix
+
+Add bidirectional constraints between content type and platform selection in the create post modal.
+
+Define a compatibility map:
+- Image: Facebook, Instagram, X, LinkedIn
+- Video: Facebook, Instagram, X, LinkedIn, YouTube, TikTok
+- Reel: Facebook, Instagram, YouTube, TikTok
+- Carousel: Facebook, Instagram only
+
+Forward function (getCompatiblePlatforms): given a content type, return the list of platforms that support it.
+
+Reverse function (getCompatibleContentTypes): given selected platforms, return the set of content types supported by ALL of them. If no platforms selected, return all types.
+
+UI behavior:
+- When user selects a content type: gray out incompatible platform buttons (opacity-30 cursor-not-allowed, disabled). Auto-deselect any currently selected platforms that are no longer compatible by filtering the platforms state.
+- When user has platforms selected: gray out content type buttons that are not in the compatible set (opacity-30 cursor-not-allowed, disabled).
+- Use a handleContentTypeChange function that sets the content type AND filters platforms in one action.
+
+---
+
+## 13. Caption Field Improvements
+
+In the create post modal:
+- Label: "Caption" with red asterisk, plus a green tag "Posted to platforms" (text-emerald-500)
+- Helper text: "The full text published with this post. Include hashtags, mentions, and CTAs. This is what gets sent to each platform."
+- Textarea: rows=6, min-h-[120px], resize-y (user can drag to expand vertically), no overflow-hidden or scroll lock
+
+In the asset review drawer:
+- Same label with green "Posted to platforms" tag
+- Same helper text
+
+---
+
+## 14. Post Date & Time Label
+
+In the create post modal, rename "Schedule Date & Time" to "Post Date & Time" with helper text:
+"When this post goes live on social media. Published automatically at this exact date and time."
+
+Mark with red asterisk (required).
+
+---
+
+## 15. Content Type Required
+
+Mark Content Type with a red asterisk in the label in the create post modal.
+
+---
+
+## 16. Carousel Slide Count on Content Cards
+
+On the pipeline Kanban content card thumbnail overlay (the badge that shows "Video", "Image", etc.), add a slide count for carousel posts. If contentType === "carousel" and sourceVault.rawFiles has more than 1 file, show the count next to the label, e.g., the badge reads "Carousel" with a small "3" count next to it in a semi-transparent pill (bg-white/20 px-1 rounded text-[8px]).
