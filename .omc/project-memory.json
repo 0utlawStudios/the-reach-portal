@@ -203,8 +203,8 @@
   "hotPaths": [
     {
       "path": "src/components/asset-review-drawer.tsx",
-      "accessCount": 75,
-      "lastAccessed": 1776618894518,
+      "accessCount": 81,
+      "lastAccessed": 1776619418252,
       "type": "file"
     },
     {
@@ -244,6 +244,12 @@
       "type": "file"
     },
     {
+      "path": "src/components/kanban-board.tsx",
+      "accessCount": 15,
+      "lastAccessed": 1776619380551,
+      "type": "file"
+    },
+    {
       "path": "src/app/api/notifications/revision/route.ts",
       "accessCount": 13,
       "lastAccessed": 1776247332452,
@@ -265,12 +271,6 @@
       "path": "src/app/api/team/invite/route.ts",
       "accessCount": 11,
       "lastAccessed": 1776529372127,
-      "type": "file"
-    },
-    {
-      "path": "src/components/kanban-board.tsx",
-      "accessCount": 11,
-      "lastAccessed": 1776618871576,
       "type": "file"
     },
     {
@@ -371,8 +371,8 @@
     },
     {
       "path": "src/components/media-picker.tsx",
-      "accessCount": 4,
-      "lastAccessed": 1775665144512,
+      "accessCount": 5,
+      "lastAccessed": 1776619168160,
       "type": "file"
     },
     {
