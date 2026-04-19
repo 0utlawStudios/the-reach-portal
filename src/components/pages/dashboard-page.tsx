@@ -55,6 +55,11 @@ export function DashboardPage() {
     const inner = innerRef.current;
     if (!el || !inner) return;
     const fit = () => {
+      // Disable auto-scaling on mobile — let users scroll naturally
+      if (window.innerWidth < 640) {
+        setScale(1);
+        return;
+      }
       const s = Math.min(el.clientHeight / inner.scrollHeight, 1);
       setScale(prev => Math.abs(prev - s) > 0.003 ? s : prev);
     };
@@ -94,7 +99,7 @@ export function DashboardPage() {
   }));
 
   return (
-    <div ref={containerRef} className="h-full w-full overflow-hidden bg-[#ecedf2] dark:bg-[#09090b]">
+    <div ref={containerRef} className="h-full w-full overflow-y-auto sm:overflow-hidden bg-[#ecedf2] dark:bg-[#09090b]">
       <div ref={innerRef} className="p-2 sm:p-4 lg:p-5 space-y-2 sm:space-y-3" style={scale < 1 ? { transform: `scale(${scale})`, transformOrigin: 'top left', width: `${100 / scale}%` } : undefined}>
 
       {/* ═══ Welcome Banner ═══ */}
