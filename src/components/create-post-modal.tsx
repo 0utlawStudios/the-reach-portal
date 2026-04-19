@@ -118,6 +118,7 @@ export function CreatePostModal({ open, onClose }: Props) {
     if (!hook.trim()) missing.push("hook");
     if (!caption.trim()) missing.push("caption");
     if (!assetSource.trim()) missing.push("asset source");
+    if (!designLink.trim()) missing.push("design file link");
     if (missing.length > 0) { setValidationErrors(missing); return; }
 
     setSubmitting(true);
@@ -470,8 +471,9 @@ export function CreatePostModal({ open, onClose }: Props) {
             {activeTab === "details" && (
               <div className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Design File Link</label>
-                  <input value={designLink} onChange={(e) => setDesignLink(e.target.value)} placeholder="e.g. Figma, Canva, or Adobe link" className={`${inputClass} font-mono text-[11px]`} />
+                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Editable Design Link <span className="text-red-400">*</span></label>
+                  <input value={designLink} onChange={(e) => setDesignLink(e.target.value)} placeholder="https://www.canva.com/design/..." className={`${inputClass} font-mono text-[11px]`} />
+                  <p className="text-[9px] text-gray-400 dark:text-gray-500 leading-relaxed">Paste the editable Canva, Figma, or Adobe link. Make sure sharing is set to "Anyone with the link can edit" so the team can make revisions.</p>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Google Drive Folder</label>
@@ -496,7 +498,7 @@ export function CreatePostModal({ open, onClose }: Props) {
             {/* Actions */}
             <div className="flex gap-2 pt-2">
               <Button type="button" variant="outline" onClick={onClose} disabled={submitting} className="flex-1 h-10 rounded-lg text-[12px]">Cancel</Button>
-              <Button type="submit" disabled={submitting || !title.trim() || files.length === 0 || platforms.length === 0 || !scheduledDate || !scheduledTime || !hook.trim() || !caption.trim() || !assetSource.trim()} className="flex-1 h-10 rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white text-[12px] disabled:opacity-40 shadow-sm">
+              <Button type="submit" disabled={submitting || !title.trim() || files.length === 0 || platforms.length === 0 || !scheduledDate || !scheduledTime || !hook.trim() || !caption.trim() || !assetSource.trim() || !designLink.trim()} className="flex-1 h-10 rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white text-[12px] disabled:opacity-40 shadow-sm">
                 {submitting ? "Uploading..." : "Create Post"}
               </Button>
             </div>
