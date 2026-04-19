@@ -5,12 +5,14 @@ import { useState, useRef } from "react";
 import { usePipeline } from "@/lib/pipeline-context";
 import { Platform, ContentType, ALL_PLATFORMS, DEFAULT_CHECKLIST } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { X, Image as ImageIcon, Film, Layers, PlayCircle, Upload, FileVideo, Plus, CheckSquare, FileText, Link2, MessageSquare } from "lucide-react";
+import { X, Image as ImageIcon, Film, Layers, PlayCircle, Upload, FileVideo, Plus, CheckSquare, FileText, Link2, MessageSquare, FolderOpen } from "lucide-react";
 import { PlatformIcon } from "./platform-icons";
 import { useToast } from "@/lib/toast-context";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabaseClient";
 import { MentionTextarea } from "./mention-textarea";
+import { MediaPicker } from "./media-picker";
+import { ValidationErrorModal } from "./validation-error-modal";
 
 const contentTypes: { id: ContentType; label: string; icon: React.ReactNode }[] = [
   { id: "image", label: "Image", icon: <ImageIcon className="w-3.5 h-3.5" /> },
@@ -28,6 +30,9 @@ interface UploadedFile {
   size: string;
   type: "image" | "video";
   preview: string;
+  driveUrl?: string;
+  driveFileId?: string;
+  mimeType?: string;
 }
 
 interface Props {
@@ -62,6 +67,8 @@ export function CreatePostModal({ open, onClose }: Props) {
   const [uploadingFileName, setUploadingFileName] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const rawFilesRef = useRef<Map<string, File>>(new Map());
+  const [showMediaPicker, setShowMediaPicker] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   if (!open) return null;
 
@@ -111,7 +118,7 @@ export function CreatePostModal({ open, onClose }: Props) {
     if (!hook.trim()) missing.push("hook");
     if (!caption.trim()) missing.push("caption");
     if (!assetSource.trim()) missing.push("asset source");
-    if (missing.length > 0) { addToast(`Missing required fields: ${missing.join(", ")}`, "error"); return; }
+    if (missing.length > 0) { setValidationErrors(missing); return; }
 
     setSubmitting(true);
 
@@ -124,6 +131,22 @@ export function CreatePostModal({ open, onClose }: Props) {
       const { uploadToDrive } = await import("@/lib/drive-upload");
       for (let i = 0; i < files.length; i++) {
         const f = files[i];
+
+        // Library file: already on Drive, skip upload
+        if (f.driveUrl) {
+          rawFiles.push({
+            name: f.name,
+            url: f.driveUrl,
+            fileId: f.driveFileId,
+            usageType: i === 0 ? "master" : "supplementary",
+            mimeType: f.mimeType || (f.type === "video" ? "video/mp4" : "image/jpeg"),
+            size: 0,
+            uploadedAt: new Date().toISOString(),
+          });
+          if (i === 0) thumbnailUrl = f.driveUrl;
+          continue;
+        }
+
         const rawFile = rawFilesRef.current.get(f.id);
         if (!rawFile) continue;
         setUploadingFileName(rawFile.name);
@@ -277,13 +300,22 @@ export function CreatePostModal({ open, onClose }: Props) {
                   )}
 
                   {files.length === 0 && (
-                    <button type="button" onClick={() => fileInputRef.current?.click()} className="w-full p-6 rounded-xl border-2 border-dashed border-gray-200 dark:border-white/[0.1] flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 hover:text-orange-500 hover:border-orange-300 dark:hover:border-orange-500/30 transition-colors cursor-pointer group">
-                      <div className="w-10 h-10 rounded-xl bg-gray-50 dark:bg-white/[0.04] flex items-center justify-center mb-2 group-hover:bg-orange-50 dark:group-hover:bg-orange-500/10 transition-colors">
-                        <Upload className="w-5 h-5" />
-                      </div>
-                      <p className="text-[12px] font-medium text-gray-600 dark:text-gray-400">Upload the actual content to publish</p>
-                      <p className="text-[10px] text-gray-300 dark:text-gray-600 mt-0.5">First file becomes the card thumbnail</p>
-                    </button>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => fileInputRef.current?.click()} className="flex-1 p-6 rounded-xl border-2 border-dashed border-gray-200 dark:border-white/[0.1] flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 hover:text-orange-500 hover:border-orange-300 dark:hover:border-orange-500/30 transition-colors cursor-pointer group">
+                        <div className="w-10 h-10 rounded-xl bg-gray-50 dark:bg-white/[0.04] flex items-center justify-center mb-2 group-hover:bg-orange-50 dark:group-hover:bg-orange-500/10 transition-colors">
+                          <Upload className="w-5 h-5" />
+                        </div>
+                        <p className="text-[12px] font-medium text-gray-600 dark:text-gray-400">Upload from device</p>
+                        <p className="text-[10px] text-gray-300 dark:text-gray-600 mt-0.5">First file = card thumbnail</p>
+                      </button>
+                      <button type="button" onClick={() => setShowMediaPicker(true)} className="flex-1 p-6 rounded-xl border-2 border-dashed border-gray-200 dark:border-white/[0.1] flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 hover:text-blue-500 hover:border-blue-300 dark:hover:border-blue-500/30 transition-colors cursor-pointer group">
+                        <div className="w-10 h-10 rounded-xl bg-gray-50 dark:bg-white/[0.04] flex items-center justify-center mb-2 group-hover:bg-blue-50 dark:group-hover:bg-blue-500/10 transition-colors">
+                          <FolderOpen className="w-5 h-5" />
+                        </div>
+                        <p className="text-[12px] font-medium text-gray-600 dark:text-gray-400">Browse Library</p>
+                        <p className="text-[10px] text-gray-300 dark:text-gray-600 mt-0.5">Pick from existing media</p>
+                      </button>
+                    </div>
                   )}
                 </div>
 
@@ -471,6 +503,31 @@ export function CreatePostModal({ open, onClose }: Props) {
           </form>
         </div>
       </div>
+
+      {/* Media Library Picker */}
+      <MediaPicker
+        open={showMediaPicker}
+        onClose={() => setShowMediaPicker(false)}
+        folder="raw-files"
+        onSelect={(result) => {
+          const id = Date.now().toString() + Math.random().toString(36).slice(2);
+          const isVideo = result.mimeType?.startsWith("video") || false;
+          setFiles((prev) => [...prev, {
+            id,
+            name: result.name,
+            size: "Library",
+            type: isVideo ? "video" : "image",
+            preview: result.url,
+            driveUrl: result.url,
+            driveFileId: result.fileId,
+            mimeType: result.mimeType,
+          }]);
+          setShowMediaPicker(false);
+        }}
+      />
+
+      {/* Validation Error Modal */}
+      <ValidationErrorModal errors={validationErrors} onClose={() => setValidationErrors([])} />
     </>
   );
 }

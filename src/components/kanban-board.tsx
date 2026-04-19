@@ -17,6 +17,7 @@ import { PlatformIcon } from "./platform-icons";
 import { createPortal } from "react-dom";
 import { Archive, RotateCcw, Calendar } from "lucide-react";
 import { RepurposeModal } from "./repurpose-modal";
+import { ValidationErrorModal } from "./validation-error-modal";
 import { useNavigation } from "@/lib/navigation-context";
 
 // ─── Context-aware sorting per column ───
@@ -70,6 +71,7 @@ export function KanbanBoard() {
     return sessionStorage.getItem("t10_open_archive") === "true" ? "archive" : "pipeline";
   });
   const [repurposingCard, setRepurposingCard] = useState<ContentCardType | null>(null);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -172,7 +174,7 @@ export function KanbanBoard() {
       const unchecked = (sourceCard.checklist || []).filter((c) => !c.checked).length;
       if (unchecked > 0) missing.push(`${unchecked} checklist item${unchecked > 1 ? "s" : ""}`);
       if (missing.length > 0) {
-        addToast(`Cannot move — missing: ${missing.join(", ")}. Click the card to complete them.`, "error");
+        setValidationErrors(missing);
         return;
       }
     }
@@ -275,6 +277,9 @@ export function KanbanBoard() {
 
       {/* Repurpose Modal */}
       {repurposingCard && <RepurposeModal card={repurposingCard} onClose={() => setRepurposingCard(null)} />}
+
+      {/* Validation Error Modal */}
+      <ValidationErrorModal errors={validationErrors} onClose={() => setValidationErrors([])} />
     </div>
   );
 }

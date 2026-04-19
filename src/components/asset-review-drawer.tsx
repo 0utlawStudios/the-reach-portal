@@ -21,6 +21,7 @@ import { MentionTextarea } from "./mention-textarea";
 import { RichComment } from "./rich-comment";
 import { MediaPicker } from "./media-picker";
 import { InlineEdit } from "./inline-edit";
+import { ValidationErrorModal } from "./validation-error-modal";
 import { useAuth } from "@/lib/auth-context";
 import { useTeam } from "@/lib/team-context";
 import { useToast } from "@/lib/toast-context";
@@ -81,6 +82,7 @@ export function AssetReviewDrawer() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadingFileName, setUploadingFileName] = useState("");
   const [showLightbox, setShowLightbox] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   useEffect(() => {
     if (selectedCard && isEditingOnOpen && prevCardRef.current !== selectedCard.id) {
@@ -944,7 +946,7 @@ export function AssetReviewDrawer() {
                   if (!selectedCard.assetSource?.trim()) missing.push("asset source");
                   const unchk = checklist.filter((c) => !c.checked).length;
                   if (unchk > 0) missing.push(`${unchk} checklist item${unchk > 1 ? "s" : ""}`);
-                  if (missing.length > 0) { addToast(`Cannot approve — missing: ${missing.join(", ")}`, "error"); return; }
+                  if (missing.length > 0) { setValidationErrors(missing); return; }
                   moveCard(selectedCard.id, "approved_scheduled"); addToast("Post approved and scheduled.", "success");
                 }}
                   className="flex-1 h-9 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[12px] shadow-sm shadow-emerald-500/20 transition-all duration-150">
@@ -970,7 +972,7 @@ export function AssetReviewDrawer() {
                 if (!selectedCard.assetSource?.trim()) missing.push("asset source");
                 const unchk = checklist.filter((c) => !c.checked).length;
                 if (unchk > 0) missing.push(`${unchk} checklist item${unchk > 1 ? "s" : ""}`);
-                if (missing.length > 0) { addToast(`Cannot re-submit — missing: ${missing.join(", ")}`, "error"); return; }
+                if (missing.length > 0) { setValidationErrors(missing); return; }
                 requestReapproval(selectedCard.id);
               }} className="flex-1 h-9 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-[12px] shadow-sm shadow-violet-500/20 transition-all duration-150">
                 <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />Ready for Re-Approval
@@ -1003,7 +1005,7 @@ export function AssetReviewDrawer() {
                       const unchecked = checklist.filter((c) => !c.checked).length;
                       if (unchecked > 0) missing.push(`${unchecked} checklist item${unchecked > 1 ? "s" : ""}`);
                       if (missing.length > 0) {
-                        addToast(`Cannot move — missing: ${missing.join(", ")}`, "error");
+                        setValidationErrors(missing);
                         return;
                       }
                     }
@@ -1043,6 +1045,9 @@ export function AssetReviewDrawer() {
           </div>
         </>
       )}
+
+      {/* ─── Validation Error Modal ─── */}
+      <ValidationErrorModal errors={validationErrors} onClose={() => setValidationErrors([])} />
 
       {/* ─── Media Library Picker ─── */}
       <MediaPicker
