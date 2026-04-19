@@ -511,6 +511,7 @@ export function CreatePostModal({ open, onClose }: Props) {
         open={showMediaPicker}
         onClose={() => setShowMediaPicker(false)}
         folder="raw-files"
+        defaultTab="library"
         onSelect={(result) => {
           const id = Date.now().toString() + Math.random().toString(36).slice(2);
           const isVideo = result.mimeType?.startsWith("video") || false;

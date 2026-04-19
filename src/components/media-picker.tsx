@@ -1,7 +1,7 @@
 "use client";
 
 import { RawImage } from "@/components/raw-image";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { usePipeline } from "@/lib/pipeline-context";
 import { useToast } from "@/lib/toast-context";
 import { X, Upload, FolderOpen, Image as ImageIcon, Film, Search, CheckCircle, Clock, Link2, ExternalLink } from "lucide-react";
@@ -26,12 +26,13 @@ interface MediaPickerProps {
   onSelect: (result: { url: string; fileId?: string; name: string; mimeType?: string; size?: number }) => void;
   folder?: "thumbnails" | "raw-files" | "media-library";
   cardId?: string;
+  defaultTab?: PickerTab;
 }
 
-export function MediaPicker({ open, onClose, onSelect, folder = "raw-files", cardId }: MediaPickerProps) {
+export function MediaPicker({ open, onClose, onSelect, folder = "raw-files", cardId, defaultTab = "upload" }: MediaPickerProps) {
   const { cards } = usePipeline();
   const { addToast } = useToast();
-  const [tab, setTab] = useState<PickerTab>("upload");
+  const [tab, setTab] = useState<PickerTab>(defaultTab);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [assetSource, setAssetSource] = useState("");
@@ -39,6 +40,11 @@ export function MediaPicker({ open, onClose, onSelect, folder = "raw-files", car
   const [search, setSearch] = useState("");
   const [unusedOnly, setUnusedOnly] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<MediaEntry | null>(null);
+
+  // Reset tab to defaultTab when picker opens
+  useEffect(() => {
+    if (open) { setTab(defaultTab); setSelectedAsset(null); }
+  }, [open, defaultTab]);
 
   // Build media index: accumulate ALL card references per URL
   const allMedia = useMemo(() => {
