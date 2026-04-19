@@ -203,8 +203,8 @@
   "hotPaths": [
     {
       "path": "src/components/asset-review-drawer.tsx",
-      "accessCount": 81,
-      "lastAccessed": 1776619418252,
+      "accessCount": 87,
+      "lastAccessed": 1776619561088,
       "type": "file"
     },
     {
@@ -232,6 +232,12 @@
       "type": "file"
     },
     {
+      "path": "src/components/kanban-board.tsx",
+      "accessCount": 17,
+      "lastAccessed": 1776619521181,
+      "type": "file"
+    },
+    {
       "path": "src/lib/team-context.tsx",
       "accessCount": 15,
       "lastAccessed": 1776529383889,
@@ -241,12 +247,6 @@
       "path": "src/lib/pipeline-context.tsx",
       "accessCount": 15,
       "lastAccessed": 1776618792420,
-      "type": "file"
-    },
-    {
-      "path": "src/components/kanban-board.tsx",
-      "accessCount": 15,
-      "lastAccessed": 1776619380551,
       "type": "file"
     },
     {
