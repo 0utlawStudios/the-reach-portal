@@ -960,7 +960,19 @@ export function AssetReviewDrawer() {
 
           {!revisionMode && selectedCard.stage === "revision_needed" && (
             <div className="flex gap-2">
-              <Button size="sm" onClick={() => { requestReapproval(selectedCard.id); }} className="flex-1 h-9 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-[12px] shadow-sm shadow-violet-500/20 transition-all duration-150">
+              <Button size="sm" onClick={() => {
+                const missing: string[] = [];
+                if (!selectedCard.scheduledDate) missing.push("scheduled date");
+                if (!selectedCard.scheduledTime) missing.push("scheduled time");
+                if (!selectedCard.thumbnailUrl) missing.push("thumbnail");
+                if (!selectedCard.sourceVault?.rawFiles?.length) missing.push("content for publishing");
+                if (!selectedCard.caption?.trim()) missing.push("caption");
+                if (!selectedCard.assetSource?.trim()) missing.push("asset source");
+                const unchk = checklist.filter((c) => !c.checked).length;
+                if (unchk > 0) missing.push(`${unchk} checklist item${unchk > 1 ? "s" : ""}`);
+                if (missing.length > 0) { addToast(`Cannot re-submit — missing: ${missing.join(", ")}`, "error"); return; }
+                requestReapproval(selectedCard.id);
+              }} className="flex-1 h-9 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-[12px] shadow-sm shadow-violet-500/20 transition-all duration-150">
                 <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />Ready for Re-Approval
               </Button>
             </div>
@@ -980,7 +992,7 @@ export function AssetReviewDrawer() {
                   </div>
                 ) : (
                   <Button size="sm" onClick={() => {
-                    if (selectedCard.stage === "ideas" || nextStage === "approved_scheduled" || nextStage === "posted") {
+                    if (selectedCard.stage === "ideas" || nextStage === "awaiting_approval" || nextStage === "approved_scheduled" || nextStage === "posted") {
                       const missing: string[] = [];
                       if (!selectedCard.scheduledDate) missing.push("scheduled date");
                       if (!selectedCard.scheduledTime) missing.push("scheduled time");

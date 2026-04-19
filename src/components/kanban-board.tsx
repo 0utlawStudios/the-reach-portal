@@ -160,8 +160,8 @@ export function KanbanBoard() {
 
     if (!targetStage || sourceCard.stage === targetStage) return;
 
-    // ── Completeness gate: required fields must be filled before leaving Ideas OR entering Approved/Posted ──
-    if (sourceCard.stage === "ideas" || targetStage === "approved_scheduled" || targetStage === "posted") {
+    // ── Completeness gate: required fields must be filled before entering Awaiting Approval, Approved, or Posted ──
+    if (sourceCard.stage === "ideas" || targetStage === "awaiting_approval" || targetStage === "approved_scheduled" || targetStage === "posted") {
       const missing: string[] = [];
       if (!sourceCard.scheduledDate) missing.push("scheduled date");
       if (!sourceCard.scheduledTime) missing.push("scheduled time");
