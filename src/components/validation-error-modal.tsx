@@ -10,7 +10,6 @@ const FIELD_GUIDANCE: Record<string, string> = {
   "time": "Set the exact time this post gets published, next to the date field.",
   "scheduled date": "Set the date this post goes live. Click the schedule area in the drawer.",
   "scheduled time": "Set the exact time this post gets published, next to the date picker.",
-  "hook": "Describe the attention-grabbing opening (internal only, not posted). What happens in the first 3 seconds?",
   "caption": "Write the full caption text that gets published to social media platforms. Include hashtags and CTAs.",
   "asset source": "Select where the media came from (Envato, Pexels, Shot by Team, etc.).",
   "thumbnail": "Upload or select a cover image for the post card.",

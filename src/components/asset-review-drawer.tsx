@@ -12,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import {
   X, Calendar, Clock, ChevronRight, CheckCircle2, MessageSquare,
-  ArrowRightLeft, Pencil, Save, ExternalLink, Hash, Type, Trash2, Send,
+  ArrowRightLeft, Pencil, Save, ExternalLink, Type, Trash2, Send,
   Upload, FolderOpen, Link2, FileText, History, Image as ImageIcon,
   FileVideo, Paperclip, AlertCircle, Maximize2,
 } from "lucide-react";
@@ -470,7 +470,6 @@ export function AssetReviewDrawer() {
                 <option value="image" className="text-gray-900">Image</option>
                 <option value="reel" className="text-gray-900">Reel</option>
                 <option value="carousel" className="text-gray-900">Carousel</option>
-                <option value="story" className="text-gray-900">Story</option>
               </select>
               <input ref={assetInputRef} type="file" accept="image/*,video/*" onChange={handleAssetReplace} className="hidden" />
               <div className="absolute bottom-3 right-3 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
@@ -592,19 +591,6 @@ export function AssetReviewDrawer() {
             {/* ──── TAB 1: CONTENT ──── */}
             {activeTab === "content" && (
               <>
-                {/* Hook — containerized card */}
-                <div className="bg-slate-50/70 dark:bg-white/[0.02] rounded-xl border border-gray-100 dark:border-white/[0.05] p-5">
-                  <label className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1.5 mb-1"><Hash className="w-3.5 h-3.5 text-orange-400" />Hook <span className="text-[8px] font-medium normal-case text-gray-400 dark:text-gray-500">Internal only</span></label>
-                  <p className="text-[9px] text-gray-400 dark:text-gray-500 leading-relaxed mb-2">The attention-grabbing opening: first 3 seconds of video, or the first line before "See more".</p>
-                  <InlineEdit
-                    value={selectedCard.hook || ""}
-                    onSave={(v) => { updateCard(selectedCard.id, { hook: v || undefined }); logAudit(selectedCard.id, currentUser.name, "content_edited", "Updated hook"); }}
-                    placeholder="Click to add a hook..."
-                    className="text-[14px] text-gray-700 dark:text-gray-300 italic leading-relaxed"
-                    inputClassName="text-[14px] italic"
-                  />
-                </div>
-
                 {/* Caption — containerized card */}
                 <div className="bg-slate-50/70 dark:bg-white/[0.02] rounded-xl border border-gray-100 dark:border-white/[0.05] p-5">
                   <label className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1.5 mb-1"><Type className="w-3.5 h-3.5 text-orange-400" />Caption <span className="text-[8px] font-medium normal-case text-emerald-500 dark:text-emerald-400">Posted to platforms</span></label>

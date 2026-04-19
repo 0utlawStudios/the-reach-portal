@@ -19,8 +19,28 @@ const contentTypes: { id: ContentType; label: string; icon: React.ReactNode }[] 
   { id: "video", label: "Video", icon: <Film className="w-3.5 h-3.5" /> },
   { id: "reel", label: "Reel", icon: <PlayCircle className="w-3.5 h-3.5" /> },
   { id: "carousel", label: "Carousel", icon: <Layers className="w-3.5 h-3.5" /> },
-  { id: "story", label: "Story", icon: <Film className="w-3.5 h-3.5" /> },
 ];
+
+// Platform compatibility: which platforms support each content type
+const CONTENT_PLATFORM_COMPAT: Record<string, Platform[]> = {
+  image: ["facebook", "instagram", "x", "linkedin"],
+  video: ["facebook", "instagram", "x", "linkedin", "youtube", "tiktok"],
+  reel: ["facebook", "instagram", "youtube", "tiktok"],
+  carousel: ["facebook", "instagram"],
+};
+
+function getCompatiblePlatforms(ct: ContentType): Platform[] {
+  return CONTENT_PLATFORM_COMPAT[ct] || [];
+}
+
+function getCompatibleContentTypes(selectedPlatforms: Platform[]): Set<string> {
+  if (selectedPlatforms.length === 0) return new Set(Object.keys(CONTENT_PLATFORM_COMPAT));
+  const result = new Set<string>();
+  for (const [type, platforms] of Object.entries(CONTENT_PLATFORM_COMPAT)) {
+    if (selectedPlatforms.every((p) => platforms.includes(p))) result.add(type);
+  }
+  return result;
+}
 
 const ASSET_SOURCES = ["Canva Pro", "Envato Elements", "Pexels", "Shot by Team", "Client Provided", "Google Images", "AI Generated"];
 
@@ -48,7 +68,6 @@ export function CreatePostModal({ open, onClose }: Props) {
   const { currentUser } = useAuth();
   const [title, setTitle] = useState("");
   const [caption, setCaption] = useState("");
-  const [hook, setHook] = useState("");
   const [platforms, setPlatforms] = useState<Platform[]>([]);
   const [contentType, setContentType] = useState<ContentType>("video");
   const [scheduledDate, setScheduledDate] = useState("");
@@ -72,8 +91,17 @@ export function CreatePostModal({ open, onClose }: Props) {
 
   if (!open) return null;
 
+  const compatiblePlatforms = getCompatiblePlatforms(contentType);
+  const compatibleContentTypes = getCompatibleContentTypes(platforms);
+
   const togglePlatform = (p: Platform) => {
     setPlatforms((prev) => prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]);
+  };
+
+  const handleContentTypeChange = (ct: ContentType) => {
+    setContentType(ct);
+    const compat = CONTENT_PLATFORM_COMPAT[ct] || [];
+    setPlatforms((prev) => prev.filter((p) => compat.includes(p)));
   };
 
   const toggleChecklist = (id: string) => {
@@ -115,7 +143,6 @@ export function CreatePostModal({ open, onClose }: Props) {
     if (platforms.length === 0) missing.push("platform");
     if (!scheduledDate) missing.push("date");
     if (!scheduledTime) missing.push("time");
-    if (!hook.trim()) missing.push("hook");
     if (!caption.trim()) missing.push("caption");
     if (!assetSource.trim()) missing.push("asset source");
     if (!designLink.trim()) missing.push("design file link");
@@ -184,7 +211,6 @@ export function CreatePostModal({ open, onClose }: Props) {
       contentType,
       thumbnailUrl,
       caption: caption.trim() || undefined,
-      hook: hook.trim() || undefined,
       scheduledDate: scheduledDate || undefined,
       scheduledTime: scheduledTime || undefined,
       createdBy: currentUser.name,
@@ -211,7 +237,7 @@ export function CreatePostModal({ open, onClose }: Props) {
     }
 
     rawFilesRef.current.clear();
-    setTitle(""); setCaption(""); setHook(""); setPlatforms([]); setContentType("video");
+    setTitle(""); setCaption(""); setPlatforms([]); setContentType("video");
     setScheduledDate(""); setScheduledTime(""); setFiles([]); setAssetSource(""); setAssetSourceOther(false); setLicenseFileId("");
     setDesignLink(""); setDriveFolder(""); setNotes(""); setActiveTab("content");
     setChecklist(DEFAULT_CHECKLIST.map((c) => ({ ...c })));
@@ -324,16 +350,22 @@ export function CreatePostModal({ open, onClose }: Props) {
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Platforms <span className="text-red-400">*</span></label>
                   <div className="flex flex-wrap gap-1.5">
-                    {ALL_PLATFORMS.map((p) => (
-                      <button key={p.id} type="button" onClick={() => togglePlatform(p.id)}
-                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-colors cursor-pointer ${
-                          platforms.includes(p.id)
-                            ? "bg-orange-50 border-orange-200 text-orange-700 dark:bg-orange-500/10 dark:border-orange-500/30 dark:text-orange-400"
-                            : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50 dark:bg-transparent dark:border-white/[0.08] dark:text-gray-400"
-                        }`}>
-                        <PlatformIcon platform={p.id} className="w-3.5 h-3.5" />{p.label}
-                      </button>
-                    ))}
+                    {ALL_PLATFORMS.map((p) => {
+                      const isCompat = compatiblePlatforms.includes(p.id);
+                      const active = platforms.includes(p.id);
+                      return (
+                        <button key={p.id} type="button" onClick={() => isCompat && togglePlatform(p.id)} disabled={!isCompat}
+                          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-colors ${
+                            !isCompat
+                              ? "opacity-30 cursor-not-allowed border-gray-200 text-gray-400 dark:border-white/[0.04] dark:text-gray-600"
+                              : active
+                                ? "bg-orange-50 border-orange-200 text-orange-700 dark:bg-orange-500/10 dark:border-orange-500/30 dark:text-orange-400 cursor-pointer"
+                                : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50 dark:bg-transparent dark:border-white/[0.08] dark:text-gray-400 cursor-pointer"
+                          }`}>
+                          <PlatformIcon platform={p.id} className="w-3.5 h-3.5" />{p.label}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -341,31 +373,30 @@ export function CreatePostModal({ open, onClose }: Props) {
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Content Type <span className="text-red-400">*</span></label>
                   <div className="flex flex-wrap gap-1.5">
-                    {contentTypes.map((ct) => (
-                      <button key={ct.id} type="button" onClick={() => setContentType(ct.id)}
-                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-colors cursor-pointer ${
-                          contentType === ct.id
-                            ? "bg-gray-900 border-gray-900 text-white dark:bg-white dark:border-white dark:text-gray-900"
-                            : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50 dark:bg-transparent dark:border-white/[0.08] dark:text-gray-400"
-                        }`}>
-                        {ct.icon}{ct.label}
-                      </button>
-                    ))}
+                    {contentTypes.map((ct) => {
+                      const isCompat = compatibleContentTypes.has(ct.id);
+                      const active = contentType === ct.id;
+                      return (
+                        <button key={ct.id} type="button" onClick={() => isCompat && handleContentTypeChange(ct.id)} disabled={!isCompat}
+                          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-colors ${
+                            !isCompat
+                              ? "opacity-30 cursor-not-allowed border-gray-200 text-gray-400 dark:border-white/[0.04] dark:text-gray-600"
+                              : active
+                                ? "bg-gray-900 border-gray-900 text-white dark:bg-white dark:border-white dark:text-gray-900 cursor-pointer"
+                                : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50 dark:bg-transparent dark:border-white/[0.08] dark:text-gray-400 cursor-pointer"
+                          }`}>
+                          {ct.icon}{ct.label}
+                        </button>
+                      );
+                    })}
                   </div>
-                </div>
-
-                {/* Hook */}
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Hook <span className="text-red-400">*</span></label>
-                  <p className="text-[9px] text-gray-400 dark:text-gray-500 leading-relaxed -mt-0.5">Internal only. Describe the attention-grabbing opening: what happens in the first 3 seconds of a video, or the first line viewers see before "See more".</p>
-                  <input value={hook} onChange={(e) => setHook(e.target.value)} placeholder='e.g. "Did you know 80% of businesses..." or "Quick zoom into product reveal"' className={inputClass} />
                 </div>
 
                 {/* Caption */}
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Caption <span className="text-red-400">*</span> <span className="text-emerald-500 dark:text-emerald-400 text-[8px] normal-case font-medium">Posted to platforms</span></label>
                   <p className="text-[9px] text-gray-400 dark:text-gray-500 leading-relaxed -mt-0.5">The full text published with this post. Include hashtags, mentions, and CTAs. This is what n8n sends to each platform.</p>
-                  <MentionTextarea value={caption} onChange={setCaption} placeholder="Write your caption... Type @ to mention team members" className="min-h-[70px] w-full bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-lg text-[12px] text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-600 resize-none p-3 outline-none focus:ring-2 focus:ring-orange-100 dark:focus:ring-orange-500/10 focus:border-orange-400 transition-all" rows={3} />
+                  <MentionTextarea value={caption} onChange={setCaption} placeholder="Write your caption... Type @ to mention team members" className="min-h-[120px] w-full bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-lg text-[12px] text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-600 resize-y p-3 outline-none focus:ring-2 focus:ring-orange-100 dark:focus:ring-orange-500/10 focus:border-orange-400 transition-all" rows={6} />
                 </div>
 
                 {/* Post Date & Time */}
@@ -502,7 +533,7 @@ export function CreatePostModal({ open, onClose }: Props) {
             {/* Actions */}
             <div className="flex gap-2 pt-2">
               <Button type="button" variant="outline" onClick={onClose} disabled={submitting} className="flex-1 h-10 rounded-lg text-[12px]">Cancel</Button>
-              <Button type="submit" disabled={submitting || !title.trim() || files.length === 0 || platforms.length === 0 || !scheduledDate || !scheduledTime || !hook.trim() || !caption.trim() || !assetSource.trim() || !designLink.trim()} className="flex-1 h-10 rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white text-[12px] disabled:opacity-40 shadow-sm">
+              <Button type="submit" disabled={submitting || !title.trim() || files.length === 0 || platforms.length === 0 || !scheduledDate || !scheduledTime || !caption.trim() || !assetSource.trim() || !designLink.trim()} className="flex-1 h-10 rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white text-[12px] disabled:opacity-40 shadow-sm">
                 {submitting ? "Uploading..." : "Create Post"}
               </Button>
             </div>

@@ -54,7 +54,12 @@ export function ContentCard({ card, isDragOverlay, stageColor }: Props) {
       <div className="h-[3px] w-full" style={{ backgroundColor: overdue ? "#dc2626" : (stageColor || "#3b82f6") }} />
       <div className="relative h-[76px] w-full overflow-hidden bg-gray-50 dark:bg-white/[0.03]">
         <RawImage src={card.thumbnailUrl} alt={card.title} className="w-full h-full object-cover" />
-        <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded bg-black/50 backdrop-blur-sm text-white text-[9px] font-medium capitalize">{card.contentType}</div>
+        <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded bg-black/50 backdrop-blur-sm text-white text-[9px] font-medium capitalize flex items-center gap-1">
+          {card.contentType}
+          {card.contentType === "carousel" && (card.sourceVault?.rawFiles?.length || 0) > 1 && (
+            <span className="bg-white/20 px-1 rounded text-[8px]">{card.sourceVault!.rawFiles!.length}</span>
+          )}
+        </div>
         {overdue && <div className="absolute bottom-1.5 left-1.5 px-2 py-[3px] rounded-full bg-red-600 text-[8px] font-bold text-white uppercase tracking-wider shadow-md shadow-red-500/30 flex items-center gap-1 animate-pulse"><span className="w-1.5 h-1.5 rounded-full bg-white" />Action Needed</div>}
         {card.revised && !overdue && <div className="absolute bottom-1.5 left-1.5 px-2 py-[3px] rounded-full bg-violet-600 text-[8px] font-bold text-white uppercase tracking-wider shadow-md shadow-violet-500/30 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-white/80 animate-pulse" />Revised</div>}
         {card.notes && !card.revised && <div className="absolute top-1.5 left-1.5 w-4 h-4 rounded-full bg-amber-500 flex items-center justify-center" title="Has revision notes"><AlertCircle className="w-2.5 h-2.5 text-white" /></div>}
