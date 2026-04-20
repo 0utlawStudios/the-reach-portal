@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
             <a href="${esc(siteUrl)}" style="display: inline-block; background: #ea580c; color: white; text-decoration: none; padding: 12px 28px; border-radius: 10px; font-size: 13px; font-weight: 700; letter-spacing: 0.01em;">
               View Revision in Portal
             </a>
-            <p style="color: #374151; font-size: 11px; margin: 16px 0 0;">Ten80Ten Content Pipeline</p>
+            <p style="color: #374151; font-size: 11px; margin: 16px 0 0;">Ten80Ten Content Engine</p>
           </div>
         </div>
       `;

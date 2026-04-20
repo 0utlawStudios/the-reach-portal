@@ -249,20 +249,19 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     async function load() {
       if (useSupabase) {
         try {
-          // Resolve user's workspace for future inserts
+          // Resolve workspace + auto-provision membership if missing (breaks RLS chicken-and-egg)
           try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-              const { data: membership } = await supabase
-                .from("workspace_members")
-                .select("workspace_id")
-                .eq("user_id", user.id)
-                .eq("status", "active")
-                .limit(1)
-                .maybeSingle();
-              if (membership) workspaceIdRef.current = membership.workspace_id;
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.access_token) {
+              const res = await fetch("/api/workspace/provision", {
+                headers: { Authorization: `Bearer ${session.access_token}` },
+              });
+              if (res.ok) {
+                const json = await res.json();
+                if (json.workspaceId) workspaceIdRef.current = json.workspaceId;
+              }
             }
-          } catch { /* workspace_members may not exist yet */ }
+          } catch { /* continue — workspace_id fallback applies on insert */ }
 
           // Try full select (with publish_jobs join); fall back if tables missing
           let result = await supabase.from("posts").select(POSTS_SELECT_FULL).order("created_at", { ascending: false });

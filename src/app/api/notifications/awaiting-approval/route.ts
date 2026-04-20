@@ -12,6 +12,43 @@ function getAdminClient() {
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
 }
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://smm.ten80ten.com";
+const LOGO_URL = `${SITE_URL}/ten80ten-logo.png`;
+
+const PLATFORM_META: Record<string, { label: string; color: string }> = {
+  facebook:  { label: "Facebook",  color: "#1877f2" },
+  instagram: { label: "Instagram", color: "#e1306c" },
+  linkedin:  { label: "LinkedIn",  color: "#0a66c2" },
+  youtube:   { label: "YouTube",   color: "#ff0000" },
+  tiktok:    { label: "TikTok",    color: "#fe2c55" },
+};
+
+const CONTENT_TYPE_LABELS: Record<string, string> = {
+  video:    "Video",
+  image:    "Image",
+  carousel: "Carousel",
+  reel:     "Reel",
+  story:    "Story",
+};
+
+function platformBadgesHtml(platforms: string[]): string {
+  if (!platforms?.length) return '<span style="color:#6b7280;font-size:13px;">No platforms set</span>';
+  return platforms.map((p) => {
+    const m = PLATFORM_META[p] || { label: p, color: "#4b5563" };
+    return `<span style="display:inline-block;background:${m.color};color:#fff;font-size:11px;font-weight:700;padding:4px 12px;border-radius:100px;margin:0 6px 6px 0;letter-spacing:0.02em;">${esc(m.label)}</span>`;
+  }).join("");
+}
+
+function formatScheduled(date?: string | null, time?: string | null): string | null {
+  if (!date) return null;
+  try {
+    const d = new Date(`${date}T${time || "00:00"}`);
+    const dateStr = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+    const timeStr = time ? d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }) : null;
+    return timeStr ? `${dateStr} at ${timeStr}` : dateStr;
+  } catch { return date; }
+}
+
 interface AwaitingApprovalRequest {
   postId: string;
   postTitle: string;
@@ -33,9 +70,22 @@ export async function POST(request: NextRequest) {
     }
 
     const admin = getAdminClient();
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://smm.ten80ten.com";
 
-    // All roles with approval authority
+    // Fetch full post data for rich email
+    const { data: post } = await admin
+      .from("posts")
+      .select("title, platforms, content_type, scheduled_date, scheduled_time, caption")
+      .eq("id", body.postId)
+      .maybeSingle();
+
+    const platforms: string[] = (post?.platforms as string[]) || [];
+    const contentType = CONTENT_TYPE_LABELS[(post?.content_type as string) || ""] || (post?.content_type as string) || "";
+    const scheduled = formatScheduled(post?.scheduled_date as string, post?.scheduled_time as string);
+    const caption = (post?.caption as string | null) || null;
+    const captionPreview = caption ? caption.slice(0, 220) + (caption.length > 220 ? "…" : "") : null;
+    const fromLabel = body.fromStage === "revision_needed" ? "Revision Needed" : "Ideas";
+
+    // All roles with approval authority — scoped to team_members since this is a single-tenant portal
     const { data: admins } = await admin
       .from("team_members")
       .select("email, role, name")
@@ -54,49 +104,94 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ sent: 0, reason: "No admin recipients found" });
     }
 
-    const fromLabel =
-      body.fromStage === "revision_needed" ? "Revision Needed" : "Ideas";
-
     const smtpConfigured = process.env.SMTP_USER && process.env.SMTP_PASS;
     let sent = 0;
 
     if (smtpConfigured) {
       const transporter = getTransporter();
 
-      const htmlEmail = `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 540px; margin: 0 auto; background: #0a0a0e; border-radius: 16px; overflow: hidden;">
-          <div style="padding: 32px 28px 24px; border-bottom: 1px solid rgba(255,255,255,0.06);">
-            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
-              <div style="width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, #2563eb, #7c3aed); display: flex; align-items: center; justify-content: center;">
-                <span style="color: white; font-size: 20px; font-weight: 800;">&#10003;</span>
-              </div>
-              <div>
-                <p style="color: #60a5fa; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; margin: 0;">Ready for Review</p>
-                <p style="color: #6b7280; font-size: 12px; margin: 2px 0 0;">submitted by ${esc(body.movedBy)}</p>
-              </div>
-            </div>
-            <h2 style="color: #ffffff; font-size: 20px; font-weight: 700; margin: 0 0 16px; letter-spacing: -0.02em;">${esc(body.postTitle)}</h2>
-            <div style="background: rgba(37,99,235,0.08); border-left: 3px solid #2563eb; padding: 14px 18px; border-radius: 0 10px 10px 0;">
-              <p style="color: #93c5fd; font-size: 13px; line-height: 1.6; margin: 0;">
-                Moved from <strong style="color: #bfdbfe;">${esc(fromLabel)}</strong> to <strong style="color: #bfdbfe;">Awaiting Approval</strong>. Your review is needed.
-              </p>
-            </div>
-          </div>
-          <div style="padding: 24px 28px;">
-            <a href="${esc(siteUrl)}" style="display: inline-block; background: #2563eb; color: white; text-decoration: none; padding: 12px 28px; border-radius: 10px; font-size: 13px; font-weight: 700; letter-spacing: 0.01em;">
-              Review in Portal
-            </a>
-            <p style="color: #374151; font-size: 11px; margin: 16px 0 0;">Ten80Ten Content Pipeline</p>
-          </div>
-        </div>
-      `;
+      const scheduledRow = scheduled
+        ? `<td style="padding-right:32px;"><p style="color:#6b7280;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 4px;">Scheduled</p><p style="color:#e5e7eb;font-size:13px;font-weight:600;margin:0;">${esc(scheduled)}</p></td>`
+        : "";
+
+      const captionBlock = captionPreview
+        ? `<div style="background:rgba(255,255,255,0.04);border-left:3px solid rgba(255,255,255,0.12);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:20px;">
+             <p style="color:#9ca3af;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 6px;">Caption</p>
+             <p style="color:#d1d5db;font-size:13px;line-height:1.6;margin:0;white-space:pre-wrap;">${esc(captionPreview)}</p>
+           </div>`
+        : "";
+
+      const htmlEmail = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:20px 0;background:#f3f4f6;">
+<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;background:#09090b;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,0.08);">
+
+  <!-- Header -->
+  <div style="background:linear-gradient(135deg,#1e1b4b 0%,#1e3a8a 100%);padding:24px 32px 20px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+      <tr>
+        <td style="vertical-align:middle;">
+          <img src="${LOGO_URL}" alt="Ten80Ten" height="26" style="display:block;height:26px;width:auto;" />
+        </td>
+        <td style="text-align:right;vertical-align:middle;">
+          <span style="background:#f97316;color:#fff;font-size:9px;font-weight:800;padding:4px 12px;border-radius:100px;letter-spacing:0.12em;text-transform:uppercase;">ACTION REQUIRED</span>
+        </td>
+      </tr>
+    </table>
+    <p style="color:#93c5fd;font-size:12px;margin:12px 0 0;letter-spacing:0.01em;">Ten80Ten Content Engine &nbsp;·&nbsp; Awaiting Your Review</p>
+  </div>
+
+  <!-- Post block -->
+  <div style="padding:28px 32px 24px;border-bottom:1px solid rgba(255,255,255,0.06);">
+    <p style="color:#6b7280;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 10px;">
+      Submitted by <strong style="color:#9ca3af;">${esc(body.movedBy)}</strong> &nbsp;·&nbsp; moved from <strong style="color:#9ca3af;">${esc(fromLabel)}</strong>
+    </p>
+    <h1 style="color:#ffffff;font-size:22px;font-weight:800;margin:0 0 20px;line-height:1.25;letter-spacing:-0.02em;">${esc(body.postTitle)}</h1>
+
+    <!-- Platforms -->
+    <div style="margin-bottom:20px;">
+      <p style="color:#6b7280;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 8px;">Posting to</p>
+      <div>${platformBadgesHtml(platforms)}</div>
+    </div>
+
+    <!-- Metadata -->
+    <table cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:4px;">
+      <tr>
+        ${contentType ? `<td style="padding-right:32px;"><p style="color:#6b7280;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 4px;">Content Type</p><p style="color:#e5e7eb;font-size:13px;font-weight:600;margin:0;">${esc(contentType)}</p></td>` : ""}
+        ${scheduledRow}
+      </tr>
+    </table>
+
+    ${captionBlock}
+  </div>
+
+  <!-- CTA -->
+  <div style="padding:24px 32px 28px;">
+    <a href="${esc(SITE_URL)}" style="display:inline-block;background:linear-gradient(135deg,#2563eb,#4f46e5);color:#fff;text-decoration:none;padding:14px 32px;border-radius:10px;font-size:14px;font-weight:700;letter-spacing:0.01em;">Open in Content Engine &rarr;</a>
+    <p style="color:#4b5563;font-size:11px;margin:16px 0 0;">Review the post, leave feedback, or approve it for publishing.</p>
+  </div>
+
+  <!-- Footer -->
+  <div style="padding:14px 32px;border-top:1px solid rgba(255,255,255,0.05);background:rgba(0,0,0,0.2);">
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+      <tr>
+        <td><img src="${LOGO_URL}" alt="Ten80Ten" height="14" style="display:inline-block;height:14px;width:auto;opacity:0.4;" /></td>
+        <td style="text-align:right;"><span style="color:#374151;font-size:11px;">Ten80Ten Content Engine</span></td>
+      </tr>
+    </table>
+  </div>
+
+</div>
+</body>
+</html>`;
 
       for (const email of recipients) {
         try {
           await transporter.sendMail({
             from: getFromAddress(),
             to: email,
-            subject: safeSubject(`Ready for Review: "${body.postTitle}"`),
+            subject: safeSubject(`Action Required: "${body.postTitle}" is awaiting your review`),
             html: htmlEmail,
           });
           sent++;
@@ -106,11 +201,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    await admin.from("post_audit_logs").insert({
-      post_id: body.postId,
-      user_name: body.movedBy,
-      action_type: "awaiting_approval_notified",
-      details: `Notified admins: ${recipients.join(", ")}`,
+    await admin.rpc("record_audit_event", {
+      p_entity_type: "post",
+      p_action: "awaiting_approval_notified",
+      p_entity_id: body.postId,
+      p_metadata: { movedBy: body.movedBy, notified: recipients },
     });
 
     return NextResponse.json({ sent, recipients });
