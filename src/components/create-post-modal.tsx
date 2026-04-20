@@ -23,8 +23,8 @@ const contentTypes: { id: ContentType; label: string; icon: React.ReactNode }[] 
 
 // Platform compatibility: which platforms support each content type
 const CONTENT_PLATFORM_COMPAT: Record<string, Platform[]> = {
-  image: ["facebook", "instagram", "x", "linkedin"],
-  video: ["facebook", "instagram", "x", "linkedin", "youtube", "tiktok"],
+  image: ["facebook", "instagram", "linkedin"],
+  video: ["facebook", "instagram", "linkedin", "youtube", "tiktok"],
   reel: ["facebook", "instagram", "youtube", "tiktok"],
   carousel: ["facebook", "instagram"],
 };
@@ -508,7 +508,7 @@ export function CreatePostModal({ open, onClose }: Props) {
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Editable Design Link <span className="text-red-400">*</span></label>
                   <input value={designLink} onChange={(e) => setDesignLink(e.target.value)} placeholder="https://www.canva.com/design/..." className={`${inputClass} font-mono text-[11px]`} />
-                  <p className="text-[9px] text-gray-400 dark:text-gray-500 leading-relaxed">Paste the editable Canva, Figma, or Adobe link. Make sure sharing is set to "Anyone with the link can edit" so the team can make revisions.</p>
+                  <p className="text-[9px] text-gray-400 dark:text-gray-500 leading-relaxed">Paste the editable Canva, Figma, or Adobe link. Make sure sharing is set to &quot;Anyone with the link can edit&quot; so the team can make revisions.</p>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Google Drive Folder</label>

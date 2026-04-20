@@ -752,7 +752,7 @@ export function AssetReviewDrawer() {
                   {/* Design Link */}
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em] flex items-center gap-1.5"><Link2 className="w-3 h-3 text-blue-500" />Editable Design Link <span className="text-red-400">*</span></label>
-                    <p className="text-[9px] text-gray-400 dark:text-gray-500 mb-1.5 leading-relaxed">Paste the editable Canva, Figma, or Adobe link. Sharing must be set to "Anyone with the link can edit".</p>
+                    <p className="text-[9px] text-gray-400 dark:text-gray-500 mb-1.5 leading-relaxed">Paste the editable Canva, Figma, or Adobe link. Sharing must be set to &quot;Anyone with the link can edit&quot;.</p>
                     <div className="flex gap-2">
                       <Input value={designLink} onChange={(e) => setDesignLink(e.target.value)} placeholder="https://www.canva.com/design/..." className="flex-1 h-9 bg-gray-50 dark:bg-white/[0.03] border-gray-200 dark:border-white/[0.08] rounded-lg text-[12px] text-gray-800 dark:text-gray-200" />
                       {designLink && <a href={designLink} target="_blank" rel="noopener noreferrer" className="h-9 px-3 flex items-center rounded-lg bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[11px] hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors border border-blue-200 dark:border-blue-500/20"><ExternalLink className="w-3 h-3" /></a>}

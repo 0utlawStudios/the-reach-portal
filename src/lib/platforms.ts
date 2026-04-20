@@ -10,7 +10,6 @@ export type Platform =
   | "instagram"
   | "facebook"
   | "linkedin"
-  | "x"
   | "tiktok"
   | "youtube";
 
@@ -71,15 +70,6 @@ const CONSTRAINTS: Record<Platform, PlatformConstraints> = {
     videoMaxBytes: 5 * GB,
     videoDurationMaxSec: 10 * 60,
     carouselMax: 10,
-    aspectAllow: ["1:1", "4:5", "9:16", "16:9"],
-  },
-  x: {
-    captionMax: 280,
-    hashtagMax: 10,
-    imageMaxBytes: 5 * MB,
-    videoMaxBytes: 512 * MB,
-    videoDurationMaxSec: 140,
-    carouselMax: 4,
     aspectAllow: ["1:1", "4:5", "9:16", "16:9"],
   },
   tiktok: {

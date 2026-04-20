@@ -18,7 +18,7 @@ function getUrlType(url: string): "image" | "video" | "document" | "link" {
 }
 
 function getFileName(url: string): string {
-  try { return decodeURIComponent(new URL(url, "https://x.com").pathname.split("/").pop() || "file"); }
+  try { return decodeURIComponent(new URL(url, "https://example.com").pathname.split("/").pop() || "file"); }
   catch { return "file"; }
 }
 

@@ -54,27 +54,6 @@ function FacebookPreview({ card }: { card: ContentCard }) {
   );
 }
 
-function XPreview({ card }: { card: ContentCard }) {
-  return (
-    <div className="w-[400px] bg-white rounded-xl overflow-hidden border border-gray-200 shadow-lg p-4">
-      <div className="flex gap-3">
-        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-[10px] font-bold text-white shrink-0">10</div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1"><span className="text-[13px] font-bold text-gray-900">Ten80Ten</span><span className="text-[12px] text-gray-500">@teneightyten · 2h</span></div>
-          <p className="text-[14px] text-gray-900 leading-relaxed mt-1">{card.caption || "No caption..."}</p>
-          <div className="mt-3 rounded-2xl overflow-hidden border border-gray-200"><RawImage src={card.thumbnailUrl} alt="" className="w-full aspect-video object-cover" /></div>
-          <div className="flex items-center justify-between mt-3 text-gray-500 max-w-[360px]">
-            <button className="flex items-center gap-1.5 text-[12px] hover:text-blue-500 cursor-pointer"><MessageCircle className="w-[18px] h-[18px]" /><span>42</span></button>
-            <button className="flex items-center gap-1.5 text-[12px] hover:text-green-500 cursor-pointer"><Share2 className="w-[18px] h-[18px]" /><span>128</span></button>
-            <button className="flex items-center gap-1.5 text-[12px] hover:text-red-500 cursor-pointer"><Heart className="w-[18px] h-[18px]" /><span>1.2K</span></button>
-            <button className="flex items-center gap-1.5 text-[12px] hover:text-blue-500 cursor-pointer"><Bookmark className="w-[18px] h-[18px]" /></button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function YouTubePreview({ card }: { card: ContentCard }) {
   return (
     <div className="w-[420px] bg-white rounded-xl overflow-hidden border border-gray-200 shadow-lg">
@@ -136,7 +115,6 @@ function TikTokPreview({ card }: { card: ContentCard }) {
 const previewComponents: Record<Platform, (c: ContentCard) => React.ReactNode> = {
   instagram: (c) => <InstagramPreview card={c} />,
   facebook: (c) => <FacebookPreview card={c} />,
-  x: (c) => <XPreview card={c} />,
   tiktok: (c) => <TikTokPreview card={c} />,
   youtube: (c) => <YouTubePreview card={c} />,
   linkedin: (c) => <LinkedInPreview card={c} />,

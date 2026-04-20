@@ -788,7 +788,7 @@ export async function GET(req: Request) {
 
   // ═══ 28. PLATFORM VALIDITY ═══
   try {
-    const validPlatforms = ["instagram", "facebook", "tiktok", "youtube", "linkedin", "x"];
+    const validPlatforms = ["instagram", "facebook", "tiktok", "youtube", "linkedin"];
     const allPostPlats = allPosts;
     const unknownPlatforms: { id: string; unknown: string[] }[] = [];
     (allPostPlats || []).forEach((p) => {

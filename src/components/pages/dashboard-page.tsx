@@ -197,7 +197,7 @@ export function DashboardPage() {
           <SectionLabel icon={<TrendingUp className="w-4 h-4 text-amber-500" />}>Platform Split</SectionLabel>
           <div className="space-y-2.5 sm:space-y-4 flex-1 flex flex-col justify-center">
             {platformCounts.map(([platform, count], i) => {
-              const brandColors: Record<string, string> = { instagram: "#E4405F", facebook: "#1877F2", tiktok: "#000000", youtube: "#FF0000", linkedin: "#0A66C2", x: "#000000" };
+              const brandColors: Record<string, string> = { instagram: "#E4405F", facebook: "#1877F2", tiktok: "#000000", youtube: "#FF0000", linkedin: "#0A66C2" };
               const brandColor = brandColors[platform] || "#3b82f6";
               return (
                 <div key={platform} className="flex items-center gap-3">

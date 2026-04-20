@@ -3,10 +3,10 @@
 import { RawImage } from "@/components/raw-image";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ContentCard as ContentCardType } from "@/lib/types";
+import { ContentCard as ContentCardType, Platform, isPlatform } from "@/lib/types";
 import { usePipeline } from "@/lib/pipeline-context";
 import { PlatformIcon } from "./platform-icons";
-import { Calendar, AlertCircle } from "lucide-react";
+import { Calendar, AlertCircle, Bot } from "lucide-react";
 
 interface Props {
   card: ContentCardType;
@@ -47,6 +47,17 @@ export function ContentCard({ card, isDragOverlay, stageColor }: Props) {
   const totalChecklist = card.checklist.length;
   const urgent = isUrgent(card.scheduledDate);
   const overdue = card.stage !== "posted" && card.stage !== "ideas" && isOverdue(card.scheduledDate);
+  const publishState = card.publishJob?.state;
+  const verifiedPlatforms = Array.from(new Set(
+    (card.publishJob?.platformAttempts || [])
+      .filter((attempt) => attempt.externalPostId !== null && isPlatform(attempt.platform))
+      .map((attempt) => attempt.platform as Platform)
+  ));
+  const showAutoPostedBadge =
+    card.stage === "posted" &&
+    !!card.publishJob &&
+    (publishState === "succeeded" || publishState === "partial") &&
+    verifiedPlatforms.length > 0;
 
   const cardContent = (
     <>
@@ -62,6 +73,21 @@ export function ContentCard({ card, isDragOverlay, stageColor }: Props) {
         </div>
         {overdue && <div className="absolute bottom-1.5 left-1.5 px-2 py-[3px] rounded-full bg-red-600 text-[8px] font-bold text-white uppercase tracking-wider shadow-md shadow-red-500/30 flex items-center gap-1 animate-pulse"><span className="w-1.5 h-1.5 rounded-full bg-white" />Action Needed</div>}
         {card.revised && !overdue && <div className="absolute bottom-1.5 left-1.5 px-2 py-[3px] rounded-full bg-violet-600 text-[8px] font-bold text-white uppercase tracking-wider shadow-md shadow-violet-500/30 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-white/80 animate-pulse" />Revised</div>}
+        {showAutoPostedBadge && (
+          <div className={`absolute bottom-1.5 left-1.5 px-2 py-[3px] rounded-full text-[8px] font-bold text-white uppercase tracking-wider shadow-md flex items-center gap-1 ${
+            publishState === "partial"
+              ? "bg-amber-500 shadow-amber-500/30"
+              : "bg-emerald-600 shadow-emerald-500/30"
+          }`}>
+            <Bot className="w-2.5 h-2.5" />
+            <span>{publishState === "partial" ? "Partial" : "Auto-posted"}</span>
+            <span className="flex items-center gap-0.5 pl-0.5">
+              {verifiedPlatforms.map((platform) => (
+                <PlatformIcon key={platform} platform={platform} className="w-2.5 h-2.5" />
+              ))}
+            </span>
+          </div>
+        )}
         {card.notes && !card.revised && <div className="absolute top-1.5 left-1.5 w-4 h-4 rounded-full bg-amber-500 flex items-center justify-center" title="Has revision notes"><AlertCircle className="w-2.5 h-2.5 text-white" /></div>}
       </div>
       <div className="px-2.5 pt-2 pb-1.5 space-y-1">

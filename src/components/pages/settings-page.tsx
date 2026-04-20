@@ -404,11 +404,11 @@ export function SettingsPage() {
           </Section>
 
           <Section title="Connected Accounts" icon={<Link2 className="w-3.5 h-3.5 text-emerald-500" />}>
-            {(["facebook", "instagram", "x", "linkedin", "youtube", "tiktok"] as const).map((p) => (
+            {(["facebook", "instagram", "linkedin", "youtube", "tiktok"] as const).map((p) => (
               <div key={p} className="flex items-center gap-3 px-4 py-2.5 border-b border-gray-50 dark:border-white/[0.03] last:border-0">
                 <span className="text-gray-600 dark:text-gray-400"><PlatformIcon platform={p} className="w-4.5 h-4.5" /></span>
-                <span className="flex-1 text-[12px] font-medium text-gray-700 dark:text-gray-300 capitalize">{p === "x" ? "X (Twitter)" : p}</span>
-                <Button size="sm" variant="outline" onClick={() => addToast(`${p === "x" ? "X" : p.charAt(0).toUpperCase() + p.slice(1)} integration coming soon`, "info")} className="h-7 text-[10px] rounded-lg px-3 cursor-pointer">Connect</Button>
+                <span className="flex-1 text-[12px] font-medium text-gray-700 dark:text-gray-300 capitalize">{p}</span>
+                <Button size="sm" variant="outline" onClick={() => addToast(`${p.charAt(0).toUpperCase() + p.slice(1)} integration coming soon`, "info")} className="h-7 text-[10px] rounded-lg px-3 cursor-pointer">Connect</Button>
               </div>
             ))}
           </Section>

@@ -25,12 +25,6 @@ export const metadata: Metadata = {
     images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "Ten80Ten SMM" }],
     type: "website",
   },
-  twitter: {
-    card: "summary_large_image",
-    title: "Ten80Ten SMM",
-    description: "Content Pipeline & Social Media Management for Ten80Ten",
-    images: ["/og-image.png"],
-  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",

@@ -5,7 +5,13 @@ export type PipelineStage =
   | "approved_scheduled"
   | "posted";
 
-export type Platform = "instagram" | "tiktok" | "facebook" | "youtube" | "linkedin" | "x";
+export const PLATFORM_IDS = ["instagram", "tiktok", "facebook", "youtube", "linkedin"] as const;
+
+export type Platform = (typeof PLATFORM_IDS)[number];
+
+export function isPlatform(value: string): value is Platform {
+  return (PLATFORM_IDS as readonly string[]).includes(value);
+}
 
 export type ContentType = "video" | "image" | "carousel" | "reel" | "story";
 
@@ -53,6 +59,10 @@ export interface ContentCard {
   assetSource?: string;
   licenseFileId?: string;
   createdBy?: string;
+  publishJob?: {
+    state: string;
+    platformAttempts: { platform: string; state: string; externalPostId: string | null }[];
+  };
 }
 
 export interface MediaAsset {
@@ -95,7 +105,6 @@ export const DEFAULT_CHECKLIST: ChecklistItem[] = [
 export const ALL_PLATFORMS: { id: Platform; label: string }[] = [
   { id: "facebook", label: "Facebook" },
   { id: "instagram", label: "Instagram" },
-  { id: "x", label: "X" },
   { id: "linkedin", label: "LinkedIn" },
   { id: "youtube", label: "YouTube" },
   { id: "tiktok", label: "TikTok" },

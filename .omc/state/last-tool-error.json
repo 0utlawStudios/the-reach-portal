@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd /Users/ace/Documents/CURSOR\\\\ MAIN/ten80ten-smm-portal && node -e \\\"\\nconst data = JSON.parse(require('fs').readFileSync('n8n/ten80ten-auto-publisher.json', 'utf8'));\\nfor (const n of d...",
-  "error": "Exit code 1\n[eval]:6\n  const matches = code.match(/\\/g);\n                             ^\nUnterminated regexp literal\n\nSyntaxError: Invalid regular expression: missing /\n    at makeContextifyScript (node:internal/vm:194:14)\n    at compileScript (node:internal/process/execution:388:10)\n    at evalTypeScript (node:internal/process/execution:260:22)\n    at node:internal/main/eval_string:71:3\n\nNode.js v25.7.0",
-  "timestamp": "2026-04-19T18:34:54.584Z",
-  "retry_count": 1
-}

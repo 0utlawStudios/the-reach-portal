@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef, ReactNode } from "react";
-import { ContentCard, PipelineStage, DEFAULT_CHECKLIST, PIPELINE_COLUMNS } from "./types";
+import { ContentCard, PipelineStage, DEFAULT_CHECKLIST, PIPELINE_COLUMNS, isPlatform } from "./types";
 import { PLACEHOLDER_CARDS } from "./placeholder-data";
 import { loadState, saveState } from "./persistence";
 import { supabase } from "./supabaseClient";
@@ -9,18 +9,31 @@ import { logAudit } from "./audit";
 import { useAuth } from "./auth-context";
 
 const STORAGE_KEY = "pipeline_cards";
+const POSTS_SELECT = "*, publish_jobs(state, platform_publish_attempts(platform, state, external_post_id))";
 
 // ─── Supabase <-> ContentCard mappers ───
+
+type PublishAttemptRow = {
+  platform?: string | null;
+  state?: string | null;
+  external_post_id?: string | null;
+};
+
+type PublishJobRow = {
+  state?: string | null;
+  platform_publish_attempts?: PublishAttemptRow[] | PublishAttemptRow | null;
+};
 
 type PostRow = {
   id: string;
   title: string;
   stage: PipelineStage;
-  platforms?: ContentCard["platforms"] | null;
+  platforms?: string[] | null;
   content_type: ContentCard["contentType"];
   thumbnail_url?: string | null;
   scheduled_date?: string | null;
   scheduled_time?: string | null;
+  scheduled_at?: string | null;
   caption?: string | null;
   hook?: string | null;
   notes?: string | null;
@@ -32,6 +45,7 @@ type PostRow = {
   created_by?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
+  publish_jobs?: PublishJobRow[] | PublishJobRow | null;
 };
 
 type PostUpdate = {
@@ -42,6 +56,7 @@ type PostUpdate = {
   thumbnail_url?: string | null;
   scheduled_date?: string | null;
   scheduled_time?: string | null;
+  scheduled_at?: string | null;
   caption?: string | null;
   hook?: string | null;
   notes?: string | null;
@@ -52,6 +67,36 @@ type PostUpdate = {
   license_file_id?: string | null;
   created_by?: string | null;
 };
+
+function normalizePlatforms(platforms?: string[] | null): ContentCard["platforms"] {
+  return (platforms || []).filter(isPlatform);
+}
+
+function normalizePublishJob(raw: PostRow["publish_jobs"]): ContentCard["publishJob"] | undefined {
+  const job = Array.isArray(raw) ? raw[0] : raw;
+  if (!job) return undefined;
+
+  const rawAttempts = job.platform_publish_attempts;
+  const attempts = Array.isArray(rawAttempts) ? rawAttempts : rawAttempts ? [rawAttempts] : [];
+
+  return {
+    state: job.state || "",
+    platformAttempts: attempts.map((attempt) => ({
+      platform: attempt.platform || "",
+      state: attempt.state || "",
+      externalPostId: attempt.external_post_id ?? null,
+    })),
+  };
+}
+
+function toScheduledAt(date?: string, time?: string): string | null | undefined {
+  if (date === undefined && time === undefined) return undefined;
+  if (!date || !time) return null;
+
+  const parsed = new Date(`${date}T${time}`);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString();
+}
 
 function dbToCard(row: PostRow): ContentCard {
   const notes = row.notes || undefined;
@@ -69,7 +114,7 @@ function dbToCard(row: PostRow): ContentCard {
     id: row.id,
     title: row.title,
     stage: row.stage,
-    platforms: row.platforms || [],
+    platforms: normalizePlatforms(row.platforms),
     contentType: row.content_type,
     thumbnailUrl: row.thumbnail_url || "",
     scheduledDate: row.scheduled_date || undefined,
@@ -85,6 +130,7 @@ function dbToCard(row: PostRow): ContentCard {
     assetSource: row.asset_source || undefined,
     licenseFileId: row.license_file_id || undefined,
     createdBy: row.created_by || undefined,
+    publishJob: normalizePublishJob(row.publish_jobs),
     createdAt: row.created_at?.split("T")[0] || new Date().toISOString().split("T")[0],
     updatedAt: row.updated_at?.split("T")[0] || new Date().toISOString().split("T")[0],
   };
@@ -99,6 +145,7 @@ function cardToDb(card: Partial<ContentCard> & { id?: string }): PostUpdate {
   if (card.thumbnailUrl !== undefined) obj.thumbnail_url = card.thumbnailUrl;
   if (card.scheduledDate !== undefined) obj.scheduled_date = card.scheduledDate || null;
   if (card.scheduledTime !== undefined) obj.scheduled_time = card.scheduledTime || null;
+  if (card.scheduledDate !== undefined || card.scheduledTime !== undefined) obj.scheduled_at = toScheduledAt(card.scheduledDate, card.scheduledTime) ?? null;
   if (card.caption !== undefined) obj.caption = card.caption || null;
   if (card.hook !== undefined) obj.hook = card.hook || null;
   if (card.notes !== undefined) obj.notes = card.notes || null;
@@ -113,6 +160,27 @@ function cardToDb(card: Partial<ContentCard> & { id?: string }): PostUpdate {
 
 function isSupabaseConfigured(): boolean {
   return !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+}
+
+async function createPublishJob(postId: string): Promise<void> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const headers: HeadersInit = { "Content-Type": "application/json" };
+  if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+
+  const res = await fetch("/api/publish-jobs", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ postId }),
+  });
+
+  if (!res.ok) {
+    let message = "Failed to create publish job";
+    try {
+      const body = await res.json();
+      if (typeof body?.error === "string") message = body.error;
+    } catch { /* keep fallback */ }
+    throw new Error(message);
+  }
 }
 
 // ─── Context ───
@@ -174,7 +242,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     async function load() {
       if (useSupabase) {
         try {
-          const { data, error } = await supabase.from("posts").select("*").order("created_at", { ascending: false });
+          const { data, error } = await supabase.from("posts").select(POSTS_SELECT).order("created_at", { ascending: false });
           if (!error && data && data.length > 0) {
             setCards(data.map(dbToCard));
           } else {
@@ -214,12 +282,15 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "posts" },
         (payload) => {
-          const updated = dbToCard(payload.new as PostRow);
+          const fallback = dbToCard(payload.new as PostRow);
           // Skip if this was our own update (dedup)
-          if (recentMutations.current.has(updated.id)) return;
-          setCards((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
-          // Also update selectedCard if it's the same post
-          setSelectedCard((prev) => (prev?.id === updated.id ? updated : prev));
+          if (recentMutations.current.has(fallback.id)) return;
+          supabase.from("posts").select(POSTS_SELECT).eq("id", fallback.id).maybeSingle().then(({ data }) => {
+            const updated = dbToCard((data as PostRow | null) || (payload.new as PostRow));
+            setCards((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+            // Also update selectedCard if it's the same post
+            setSelectedCard((prev) => (prev?.id === updated.id ? updated : prev));
+          });
         }
       )
       .on(
@@ -282,15 +353,31 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     }));
     setSelectedCard((prev) => (prev?.id === cardId ? { ...prev, stage: newStage } : prev));
     if (useSupabase) {
+      const rollback = () => {
+        setCards((prev) => prev.map((c) => c.id === cardId ? { ...c, stage: fromStage as PipelineStage } : c));
+        setSelectedCard((prev) => prev?.id === cardId ? { ...prev, stage: fromStage as PipelineStage } : prev);
+      };
       markMutation(cardId);
-      supabase.from("posts").update({ stage: newStage }).eq("id", cardId).then(({ error }) => {
-        if (error) {
-          console.error("[pipeline] stage_change failed:", error.message);
-          // Rollback
-          setCards((prev) => prev.map((c) => c.id === cardId ? { ...c, stage: fromStage as PipelineStage } : c));
-          setSelectedCard((prev) => prev?.id === cardId ? { ...prev, stage: fromStage as PipelineStage } : prev);
+      (async () => {
+        let stageUpdated = false;
+        try {
+          const { error } = await supabase.from("posts").update({ stage: newStage }).eq("id", cardId);
+          if (error) throw error;
+          stageUpdated = true;
+
+          if (newStage === "approved_scheduled" && card?.scheduledDate && card.scheduledTime) {
+            await createPublishJob(cardId);
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          console.error("[pipeline] stage_change failed:", message);
+          rollback();
+          if (stageUpdated) {
+            markMutation(cardId);
+            await supabase.from("posts").update({ stage: fromStage }).eq("id", cardId);
+          }
         }
-      });
+      })();
     }
     logAudit(cardId, currentUser.name, "stage_change", `Moved from ${fromLabel} to ${toLabel}`);
   }, [useSupabase, cards, currentUser.name]);
