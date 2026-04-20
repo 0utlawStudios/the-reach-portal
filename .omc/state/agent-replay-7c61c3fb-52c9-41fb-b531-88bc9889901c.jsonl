@@ -8,3 +8,4 @@
 {"t":0,"agent":"a8f98dc","agent_type":"verifier","event":"agent_start","parent_mode":"none"}
 {"t":0,"agent":"a8f98dc","agent_type":"verifier","event":"agent_stop","success":true,"duration_ms":69982}
 {"t":0,"agent":"abff509","agent_type":"verifier","event":"agent_stop","success":true,"duration_ms":138796}
+{"t":0,"agent":"system","event":"skill_invoked","skill_name":"oh-my-claudecode:cancel"}
