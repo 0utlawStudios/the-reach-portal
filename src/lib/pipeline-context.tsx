@@ -395,6 +395,18 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
           if (newStage === "approved_scheduled" && card?.scheduledDate && card.scheduledTime) {
             await createPublishJob(cardId);
           }
+
+          if (newStage === "awaiting_approval") {
+            supabase.auth.getSession().then(({ data: { session } }) => {
+              const headers: HeadersInit = { "Content-Type": "application/json" };
+              if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+              fetch("/api/notifications/awaiting-approval", {
+                method: "POST",
+                headers,
+                body: JSON.stringify({ postId: cardId, postTitle: card?.title || "", movedBy: currentUser.name, fromStage }),
+              }).catch((e) => console.error("[pipeline] awaiting-approval notify failed:", e));
+            }).catch(() => {});
+          }
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           console.error("[pipeline] stage_change failed:", message);
@@ -439,7 +451,16 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
       const card = cards.find((c) => c.id === cardId);
       const notes = card?.notes ? card.notes + "\n\n" + noteLine : noteLine;
       supabase.from("posts").update({ stage: "awaiting_approval", notes }).eq("id", cardId).then(({ error }) => {
-        if (error) console.error("[pipeline] reapproval sync failed:", error.message);
+        if (error) { console.error("[pipeline] reapproval sync failed:", error.message); return; }
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          const headers: HeadersInit = { "Content-Type": "application/json" };
+          if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+          fetch("/api/notifications/awaiting-approval", {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ postId: cardId, postTitle: card?.title || "", movedBy: author, fromStage: "revision_needed" }),
+          }).catch((e) => console.error("[pipeline] awaiting-approval notify failed:", e));
+        }).catch(() => {});
       });
     }
 
