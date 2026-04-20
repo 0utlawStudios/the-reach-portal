@@ -57,10 +57,11 @@ export async function POST(request: NextRequest) {
 
     // ─── Audit log ───
     try {
-      await admin.from("post_audit_logs").insert({
-        user_name: body.requestedBy,
-        action_type: "member_removed",
-        details: `Removed ${body.memberEmail} from team and auth`,
+      await admin.rpc("record_audit_event", {
+        p_entity_type: "team",
+        p_action: "member_removed",
+        p_entity_id: null,
+        p_metadata: { user_name: body.requestedBy, details: `Removed ${body.memberEmail} from team and auth` },
       });
     } catch { /* best-effort */ }
 

@@ -117,11 +117,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Log to audit
-    await admin.from("post_audit_logs").insert({
-      post_id: body.postId,
-      user_name: body.requestedBy,
-      action_type: "revision_requested",
-      details: `Notified: ${recipients.join(", ")}. Note: ${body.revisionNote.slice(0, 100)}`,
+    await admin.rpc("record_audit_event", {
+      p_entity_type: "post",
+      p_action: "revision_requested",
+      p_entity_id: body.postId,
+      p_metadata: { user_name: body.requestedBy, details: `Notified: ${recipients.join(", ")}. Note: ${body.revisionNote.slice(0, 100)}` },
     });
 
     return NextResponse.json({ sent, recipients });

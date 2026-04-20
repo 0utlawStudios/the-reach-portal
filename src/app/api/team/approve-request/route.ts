@@ -153,12 +153,16 @@ export async function POST(request: NextRequest) {
 
     // Audit log
     try {
-      await admin.from("post_audit_logs").insert({
-        user_name: body.reviewedBy,
-        action_type: "request_approved",
-        details: emailSent
-          ? `Approved ${req.name} (${req.email}) as ${role} — email sent`
-          : `Approved ${req.name} (${req.email}) as ${role} — email failed, invite link generated`,
+      await admin.rpc("record_audit_event", {
+        p_entity_type: "team",
+        p_action: "request_approved",
+        p_entity_id: null,
+        p_metadata: {
+          user_name: body.reviewedBy,
+          details: emailSent
+            ? `Approved ${req.name} (${req.email}) as ${role} — email sent`
+            : `Approved ${req.name} (${req.email}) as ${role} — email failed, invite link generated`,
+        },
       });
     } catch { /* best-effort */ }
 

@@ -104,11 +104,11 @@ export async function POST(request: NextRequest) {
 
     // Log to audit
     if (body.postId) {
-      await admin.from("post_audit_logs").insert({
-        post_id: body.postId,
-        user_name: body.authorName,
-        action_type: "mention_sent",
-        details: `Mentioned ${members.map((m) => m.name).join(", ")} in comment`,
+      await admin.rpc("record_audit_event", {
+        p_entity_type: "post",
+        p_action: "mention_sent",
+        p_entity_id: body.postId,
+        p_metadata: { user_name: body.authorName, details: `Mentioned ${members.map((m) => m.name).join(", ")} in comment` },
       });
     }
 

@@ -118,10 +118,11 @@ export async function POST(request: NextRequest) {
 
     // Audit log
     try {
-      await admin.from("post_audit_logs").insert({
-        user_name: requestedBy,
-        action_type: "invite_resent",
-        details: `Resent invite to ${name} (${email})`,
+      await admin.rpc("record_audit_event", {
+        p_entity_type: "team",
+        p_action: "invite_resent",
+        p_entity_id: null,
+        p_metadata: { user_name: requestedBy, details: `Resent invite to ${name} (${email})` },
       });
     } catch { /* best-effort */ }
 

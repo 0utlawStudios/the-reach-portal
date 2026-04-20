@@ -101,7 +101,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       if (useDb) {
         try {
           const { data, error } = await supabase.from("team_members").select("*").order("joined_at");
-          if (!error && data && data.length > 0) {
+          if (!error && data) {
             setMembers(data.map(dbToMember));
           } else {
             setMembers(loadState(STORAGE_KEY, DEFAULT_MEMBERS));
