@@ -207,6 +207,7 @@ interface PipelineContextType {
   isEditingOnOpen: boolean;
   pendingReapproval: PendingReapproval | null;
   pendingKickback: PendingKickback | null;
+  workspaceId: string;
   selectCard: (card: ContentCard) => void;
   selectCardForEditing: (card: ContentCard) => void;
   closeDrawer: () => void;
@@ -232,6 +233,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
   const [isEditingOnOpen, setIsEditingOnOpen] = useState(false);
   const [pendingReapproval, setPendingReapproval] = useState<PendingReapproval | null>(null);
   const [pendingKickback, setPendingKickback] = useState<PendingKickback | null>(null);
+  const [workspaceId, setWorkspaceId] = useState<string>("00000000-0000-0000-0000-000000000001");
   const hydrated = useRef(false);
   const postsSelect = useRef(POSTS_SELECT_FULL);
   const workspaceIdRef = useRef<string | null>(null);
@@ -258,7 +260,10 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
               });
               if (res.ok) {
                 const json = await res.json();
-                if (json.workspaceId) workspaceIdRef.current = json.workspaceId;
+                if (json.workspaceId) {
+                  workspaceIdRef.current = json.workspaceId;
+                  setWorkspaceId(json.workspaceId);
+                }
               }
             }
           } catch { /* continue — workspace_id fallback applies on insert */ }
@@ -568,8 +573,8 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
   }, [selectedCard, useSupabase]);
 
   const value = useMemo(
-    () => ({ cards, selectedCard, isDrawerOpen, isEditingOnOpen, pendingReapproval, pendingKickback, selectCard, selectCardForEditing, closeDrawer, moveCard, requestReapproval, submitReapproval, cancelReapproval, requestKickback, submitKickback, cancelKickback, updateCard, createCard, deleteCard }),
-    [cards, selectedCard, isDrawerOpen, isEditingOnOpen, pendingReapproval, pendingKickback, selectCard, selectCardForEditing, closeDrawer, moveCard, requestReapproval, submitReapproval, cancelReapproval, requestKickback, submitKickback, cancelKickback, updateCard, createCard, deleteCard]
+    () => ({ cards, selectedCard, isDrawerOpen, isEditingOnOpen, pendingReapproval, pendingKickback, workspaceId, selectCard, selectCardForEditing, closeDrawer, moveCard, requestReapproval, submitReapproval, cancelReapproval, requestKickback, submitKickback, cancelKickback, updateCard, createCard, deleteCard }),
+    [cards, selectedCard, isDrawerOpen, isEditingOnOpen, pendingReapproval, pendingKickback, workspaceId, selectCard, selectCardForEditing, closeDrawer, moveCard, requestReapproval, submitReapproval, cancelReapproval, requestKickback, submitKickback, cancelKickback, updateCard, createCard, deleteCard]
   );
 
   return <PipelineContext.Provider value={value}>{children}</PipelineContext.Provider>;

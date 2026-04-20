@@ -63,7 +63,7 @@ interface Props {
 type ModalTab = "content" | "checklist" | "details";
 
 export function CreatePostModal({ open, onClose }: Props) {
-  const { createCard } = usePipeline();
+  const { createCard, workspaceId } = usePipeline();
   const { addToast } = useToast();
   const { currentUser } = useAuth();
   const [title, setTitle] = useState("");
@@ -233,7 +233,10 @@ export function CreatePostModal({ open, onClose }: Props) {
         file_type: rf.mimeType?.startsWith("video") ? "video" : "image",
         folder: "Pipeline Uploads",
         added_by: currentUser.name,
-      }).then(() => {});
+        workspace_id: workspaceId,
+      }).then(({ error }) => {
+        if (error) console.error("[create-post] media_assets insert failed:", error.message);
+      });
     }
 
     rawFilesRef.current.clear();
