@@ -9,7 +9,12 @@ import { logAudit } from "./audit";
 import { useAuth } from "./auth-context";
 
 const STORAGE_KEY = "pipeline_cards";
-const POSTS_SELECT = "*, publish_jobs(state, platform_publish_attempts(platform, state, external_post_id))";
+const POSTS_SELECT_FULL = "*, publish_jobs(state, platform_publish_attempts(platform, state, external_post_id))";
+const POSTS_SELECT_BASIC = "*";
+
+function isValidUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+}
 
 // ─── Supabase <-> ContentCard mappers ───
 
@@ -228,6 +233,8 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
   const [pendingReapproval, setPendingReapproval] = useState<PendingReapproval | null>(null);
   const [pendingKickback, setPendingKickback] = useState<PendingKickback | null>(null);
   const hydrated = useRef(false);
+  const postsSelect = useRef(POSTS_SELECT_FULL);
+  const workspaceIdRef = useRef<string | null>(null);
   const useSupabase = isSupabaseConfigured();
 
   // Track local mutations to prevent realtime echo (dedup)
@@ -242,9 +249,29 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     async function load() {
       if (useSupabase) {
         try {
-          const { data, error } = await supabase.from("posts").select(POSTS_SELECT).order("created_at", { ascending: false });
-          if (!error && data && data.length > 0) {
-            setCards(data.map(dbToCard));
+          // Resolve user's workspace for future inserts
+          try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+              const { data: membership } = await supabase
+                .from("workspace_members")
+                .select("workspace_id")
+                .eq("user_id", user.id)
+                .eq("status", "active")
+                .limit(1)
+                .maybeSingle();
+              if (membership) workspaceIdRef.current = membership.workspace_id;
+            }
+          } catch { /* workspace_members may not exist yet */ }
+
+          // Try full select (with publish_jobs join); fall back if tables missing
+          let result = await supabase.from("posts").select(POSTS_SELECT_FULL).order("created_at", { ascending: false });
+          if (result.error) {
+            postsSelect.current = POSTS_SELECT_BASIC;
+            result = await supabase.from("posts").select(POSTS_SELECT_BASIC).order("created_at", { ascending: false });
+          }
+          if (!result.error && result.data && result.data.length > 0) {
+            setCards(result.data.map(dbToCard));
           } else {
             setCards(loadState(STORAGE_KEY, PLACEHOLDER_CARDS));
           }
@@ -285,7 +312,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
           const fallback = dbToCard(payload.new as PostRow);
           // Skip if this was our own update (dedup)
           if (recentMutations.current.has(fallback.id)) return;
-          supabase.from("posts").select(POSTS_SELECT).eq("id", fallback.id).maybeSingle().then(({ data }) => {
+          supabase.from("posts").select(postsSelect.current).eq("id", fallback.id).maybeSingle().then(({ data }) => {
             const updated = dbToCard((data as PostRow | null) || (payload.new as PostRow));
             setCards((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
             // Also update selectedCard if it's the same post
@@ -352,7 +379,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
       return { ...c, stage: newStage, updatedAt: new Date().toISOString().split("T")[0] };
     }));
     setSelectedCard((prev) => (prev?.id === cardId ? { ...prev, stage: newStage } : prev));
-    if (useSupabase) {
+    if (useSupabase && isValidUuid(cardId)) {
       const rollback = () => {
         setCards((prev) => prev.map((c) => c.id === cardId ? { ...c, stage: fromStage as PipelineStage } : c));
         setSelectedCard((prev) => prev?.id === cardId ? { ...prev, stage: fromStage as PipelineStage } : prev);
@@ -407,7 +434,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
       return { ...prev, stage: "awaiting_approval" as PipelineStage, revised: true, revisionHistory, notes };
     });
 
-    if (useSupabase) {
+    if (useSupabase && isValidUuid(cardId)) {
       markMutation(cardId);
       const card = cards.find((c) => c.id === cardId);
       const notes = card?.notes ? card.notes + "\n\n" + noteLine : noteLine;
@@ -449,7 +476,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
       return { ...prev, stage: "revision_needed" as PipelineStage, revised: false, notes };
     });
 
-    if (useSupabase) {
+    if (useSupabase && isValidUuid(cardId)) {
       markMutation(cardId);
       const card = cards.find((c) => c.id === cardId);
       const notes = card?.notes ? card.notes + "\n\n" + noteLine : noteLine;
@@ -469,7 +496,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
   const updateCard = useCallback((cardId: string, updates: Partial<ContentCard>) => {
     setCards((prev) => prev.map((c) => (c.id === cardId ? { ...c, ...updates } : c)));
     setSelectedCard((prev) => (prev?.id === cardId ? { ...prev, ...updates } : prev));
-    if (useSupabase) {
+    if (useSupabase && isValidUuid(cardId)) {
       markMutation(cardId);
       supabase.from("posts").update(cardToDb(updates)).eq("id", cardId).then(({ error }) => {
         if (error) console.error("[pipeline] updateCard sync failed:", error.message);
@@ -493,7 +520,9 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
       markMutation("create");
       const dbRow = cardToDb(newCard);
       dbRow.checklist = newCard.checklist;
-      supabase.from("posts").insert(dbRow).select().single().then(({ data, error }) => {
+      const insertRow: Record<string, unknown> = { ...dbRow };
+      if (workspaceIdRef.current) insertRow.workspace_id = workspaceIdRef.current;
+      supabase.from("posts").insert(insertRow).select().single().then(({ data, error }) => {
         if (error) {
           console.error("[pipeline] createCard sync failed:", error.message);
         } else if (data) {
@@ -510,7 +539,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
       if (selectedCard?.id === cardId) return false;
       return open;
     });
-    if (useSupabase) {
+    if (useSupabase && isValidUuid(cardId)) {
       markMutation(cardId);
       supabase.from("posts").delete().eq("id", cardId).then(({ error }) => {
         if (error) console.error("[pipeline] deleteCard sync failed:", error.message);
