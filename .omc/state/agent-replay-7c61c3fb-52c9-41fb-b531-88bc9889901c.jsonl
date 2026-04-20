@@ -20,3 +20,4 @@
 {"t":0,"agent":"system","event":"keyword_detected","keyword":"ultrathink"}
 {"t":0,"agent":"a443f8d","agent_type":"code-reviewer","event":"agent_start","parent_mode":"none"}
 {"t":0,"agent":"a443f8d","agent_type":"code-reviewer","event":"agent_stop","success":true,"duration_ms":156104}
+{"t":0,"agent":"ac8669d","agent_type":"unknown","event":"agent_stop","success":true}
