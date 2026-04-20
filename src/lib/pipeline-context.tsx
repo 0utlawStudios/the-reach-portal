@@ -270,7 +270,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
             postsSelect.current = POSTS_SELECT_BASIC;
             result = await supabase.from("posts").select(POSTS_SELECT_BASIC).order("created_at", { ascending: false });
           }
-          if (!result.error && result.data && result.data.length > 0) {
+          if (!result.error && result.data) {
             setCards(result.data.map(dbToCard));
           } else {
             setCards(loadState(STORAGE_KEY, PLACEHOLDER_CARDS));
@@ -542,7 +542,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
       const dbRow = cardToDb(newCard);
       dbRow.checklist = newCard.checklist;
       const insertRow: Record<string, unknown> = { ...dbRow };
-      if (workspaceIdRef.current) insertRow.workspace_id = workspaceIdRef.current;
+      insertRow.workspace_id = workspaceIdRef.current || "00000000-0000-0000-0000-000000000001";
       supabase.from("posts").insert(insertRow).select().single().then(({ data, error }) => {
         if (error) {
           console.error("[pipeline] createCard sync failed:", error.message);
