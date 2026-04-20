@@ -203,32 +203,32 @@
   "hotPaths": [
     {
       "path": "src/components/asset-review-drawer.tsx",
-      "accessCount": 97,
-      "lastAccessed": 1776699843393,
+      "accessCount": 98,
+      "lastAccessed": 1776702909572,
       "type": "file"
     },
     {
       "path": "",
-      "accessCount": 57,
-      "lastAccessed": 1776700182327,
-      "type": "directory"
-    },
-    {
-      "path": "src",
-      "accessCount": 47,
-      "lastAccessed": 1776700465144,
+      "accessCount": 59,
+      "lastAccessed": 1776702900598,
       "type": "directory"
     },
     {
       "path": "src/lib/pipeline-context.tsx",
-      "accessCount": 40,
-      "lastAccessed": 1776700254871,
+      "accessCount": 51,
+      "lastAccessed": 1776702866003,
       "type": "file"
     },
     {
+      "path": "src",
+      "accessCount": 49,
+      "lastAccessed": 1776702898720,
+      "type": "directory"
+    },
+    {
       "path": "src/components/pages/settings-page.tsx",
-      "accessCount": 34,
-      "lastAccessed": 1776699843628,
+      "accessCount": 35,
+      "lastAccessed": 1776702992508,
       "type": "file"
     },
     {
@@ -238,27 +238,33 @@
       "type": "file"
     },
     {
+      "path": "src/lib/team-context.tsx",
+      "accessCount": 19,
+      "lastAccessed": 1776702972490,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/notifications/revision/route.ts",
+      "accessCount": 19,
+      "lastAccessed": 1776702974995,
+      "type": "file"
+    },
+    {
       "path": "src/components/kanban-board.tsx",
       "accessCount": 18,
       "lastAccessed": 1776696997986,
       "type": "file"
     },
     {
-      "path": "src/lib/team-context.tsx",
-      "accessCount": 16,
-      "lastAccessed": 1776699820900,
-      "type": "file"
-    },
-    {
-      "path": "src/app/api/notifications/revision/route.ts",
-      "accessCount": 16,
-      "lastAccessed": 1776700454300,
-      "type": "file"
-    },
-    {
       "path": "src/app/api/notifications/mention/route.ts",
-      "accessCount": 13,
-      "lastAccessed": 1776699827781,
+      "accessCount": 16,
+      "lastAccessed": 1776703018435,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/team/invite/route.ts",
+      "accessCount": 14,
+      "lastAccessed": 1776702979938,
       "type": "file"
     },
     {
@@ -268,9 +274,9 @@
       "type": "file"
     },
     {
-      "path": "src/app/api/team/invite/route.ts",
-      "accessCount": 12,
-      "lastAccessed": 1776699828303,
+      "path": "src/app/api/team/approve-request/route.ts",
+      "accessCount": 11,
+      "lastAccessed": 1776702983858,
       "type": "file"
     },
     {
@@ -310,15 +316,15 @@
       "type": "file"
     },
     {
-      "path": "src/app/api/team/approve-request/route.ts",
-      "accessCount": 9,
-      "lastAccessed": 1776699833133,
-      "type": "file"
-    },
-    {
       "path": "src/app/api/team/request-access/route.ts",
       "accessCount": 9,
       "lastAccessed": 1776699854159,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/team/resend-invite/route.ts",
+      "accessCount": 9,
+      "lastAccessed": 1776702981309,
       "type": "file"
     },
     {
@@ -334,9 +340,9 @@
       "type": "directory"
     },
     {
-      "path": "src/app/api/team/resend-invite/route.ts",
+      "path": "src/app/api/team/remove-member/route.ts",
       "accessCount": 7,
-      "lastAccessed": 1776699834520,
+      "lastAccessed": 1776702977115,
       "type": "file"
     },
     {
@@ -385,12 +391,6 @@
       "path": "src/lib/supabaseClient.ts",
       "accessCount": 5,
       "lastAccessed": 1776697324193,
-      "type": "file"
-    },
-    {
-      "path": "src/app/api/team/remove-member/route.ts",
-      "accessCount": 5,
-      "lastAccessed": 1776699833957,
       "type": "file"
     },
     {

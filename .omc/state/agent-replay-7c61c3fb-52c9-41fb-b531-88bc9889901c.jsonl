@@ -21,3 +21,5 @@
 {"t":0,"agent":"a443f8d","agent_type":"code-reviewer","event":"agent_start","parent_mode":"none"}
 {"t":0,"agent":"a443f8d","agent_type":"code-reviewer","event":"agent_stop","success":true,"duration_ms":156104}
 {"t":0,"agent":"ac8669d","agent_type":"unknown","event":"agent_stop","success":true}
+{"t":0,"agent":"a392aaa","agent_type":"unknown","event":"agent_stop","success":true}
+{"t":0,"agent":"a5f91a2","agent_type":"unknown","event":"agent_stop","success":true}
