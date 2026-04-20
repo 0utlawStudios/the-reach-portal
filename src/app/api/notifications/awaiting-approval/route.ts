@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
     const { data: admins } = await admin
       .from("team_members")
       .select("email")
-      .in("role", ["superadmin", "admin", "creative_director", "approver"]);
+      .in("role", ["superadmin", "admin", "owner", "creative_director", "approver"]);
 
     const recipients: string[] = [];
     if (admins) {
