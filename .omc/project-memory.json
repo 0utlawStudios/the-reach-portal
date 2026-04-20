@@ -203,8 +203,8 @@
   "hotPaths": [
     {
       "path": "src/components/asset-review-drawer.tsx",
-      "accessCount": 95,
-      "lastAccessed": 1776620526526,
+      "accessCount": 96,
+      "lastAccessed": 1776696600791,
       "type": "file"
     },
     {
@@ -215,14 +215,20 @@
     },
     {
       "path": "src",
-      "accessCount": 38,
-      "lastAccessed": 1776678456047,
+      "accessCount": 39,
+      "lastAccessed": 1776697166226,
       "type": "directory"
     },
     {
       "path": "src/components/pages/settings-page.tsx",
       "accessCount": 33,
       "lastAccessed": 1775845381843,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/pipeline-context.tsx",
+      "accessCount": 29,
+      "lastAccessed": 1776697729665,
       "type": "file"
     },
     {
@@ -233,14 +239,8 @@
     },
     {
       "path": "src/components/kanban-board.tsx",
-      "accessCount": 17,
-      "lastAccessed": 1776619521181,
-      "type": "file"
-    },
-    {
-      "path": "src/lib/pipeline-context.tsx",
-      "accessCount": 17,
-      "lastAccessed": 1776678390309,
+      "accessCount": 18,
+      "lastAccessed": 1776696997986,
       "type": "file"
     },
     {
@@ -382,6 +382,12 @@
       "type": "file"
     },
     {
+      "path": "src/lib/supabaseClient.ts",
+      "accessCount": 5,
+      "lastAccessed": 1776697324193,
+      "type": "file"
+    },
+    {
       "path": "src/components",
       "accessCount": 4,
       "lastAccessed": 1775665269442,
@@ -421,12 +427,6 @@
       "path": "src/app/api/drive/finalize/route.ts",
       "accessCount": 3,
       "lastAccessed": 1775658256327,
-      "type": "file"
-    },
-    {
-      "path": "src/lib/supabaseClient.ts",
-      "accessCount": 3,
-      "lastAccessed": 1775845357974,
       "type": "file"
     },
     {
