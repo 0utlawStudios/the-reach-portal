@@ -487,6 +487,8 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     const now = new Date();
     const timestamp = now.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
     const author = currentUser.name;
+    // Capture card before state mutation so notification can read title + createdBy
+    const card = cards.find((c) => c.id === cardId);
     let noteLine = `${author} (${timestamp}): Revision requested — ${note}`;
     if (attachmentUrl) noteLine += `\n📎 ${attachmentUrl}`;
 
@@ -503,7 +505,6 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
 
     if (useSupabase && isValidUuid(cardId)) {
       markMutation(cardId);
-      const card = cards.find((c) => c.id === cardId);
       const notes = card?.notes ? card.notes + "\n\n" + noteLine : noteLine;
       supabase.from("posts").update({ stage: "revision_needed", notes }).eq("id", cardId).then(({ error }) => {
         if (error) console.error("[pipeline] kickback sync failed:", error.message);
@@ -512,7 +513,35 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
 
     setPendingKickback(null);
     logAudit(cardId, author, "revision_requested", `Kickback: ${note}`);
-  }, [useSupabase, cards, currentUser.name]);
+
+    // Notify creator + all approvers/creative directors
+    fetch("/api/notifications/revision", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        postId: cardId,
+        postTitle: card?.title ?? "",
+        revisionNote: note,
+        requestedBy: currentUser.email,
+        createdBy: card?.createdBy,
+      }),
+    }).catch(() => {});
+
+    // Fire @mention notifications if anyone was tagged
+    if (note.includes("@")) {
+      fetch("/api/notifications/mention", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          comment: note,
+          postTitle: card?.title ?? "",
+          postId: cardId,
+          authorName: currentUser.name,
+          authorEmail: currentUser.email,
+        }),
+      }).catch(() => {});
+    }
+  }, [useSupabase, cards, currentUser.name, currentUser.email]);
 
   const cancelKickback = useCallback(() => {
     setPendingKickback(null);

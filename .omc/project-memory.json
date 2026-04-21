@@ -219,8 +219,8 @@
   "hotPaths": [
     {
       "path": "src/components/asset-review-drawer.tsx",
-      "accessCount": 102,
-      "lastAccessed": 1776775451629,
+      "accessCount": 105,
+      "lastAccessed": 1776778680830,
       "type": "file"
     },
     {
@@ -231,20 +231,26 @@
     },
     {
       "path": "src",
-      "accessCount": 59,
-      "lastAccessed": 1776775513023,
+      "accessCount": 69,
+      "lastAccessed": 1776778566627,
       "type": "directory"
     },
     {
       "path": "src/lib/pipeline-context.tsx",
-      "accessCount": 51,
-      "lastAccessed": 1776702866003,
+      "accessCount": 57,
+      "lastAccessed": 1776779005596,
       "type": "file"
     },
     {
       "path": "src/components/pages/settings-page.tsx",
       "accessCount": 37,
       "lastAccessed": 1776775219128,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/notifications/revision/route.ts",
+      "accessCount": 24,
+      "lastAccessed": 1776778978850,
       "type": "file"
     },
     {
@@ -260,21 +266,15 @@
       "type": "file"
     },
     {
-      "path": "src/app/api/notifications/revision/route.ts",
-      "accessCount": 19,
-      "lastAccessed": 1776702974995,
-      "type": "file"
-    },
-    {
       "path": "src/components/kanban-board.tsx",
-      "accessCount": 18,
-      "lastAccessed": 1776696997986,
+      "accessCount": 19,
+      "lastAccessed": 1776778545845,
       "type": "file"
     },
     {
       "path": "src/app/api/notifications/mention/route.ts",
-      "accessCount": 16,
-      "lastAccessed": 1776703018435,
+      "accessCount": 18,
+      "lastAccessed": 1776778556445,
       "type": "file"
     },
     {
@@ -308,6 +308,18 @@
       "type": "file"
     },
     {
+      "path": "src/lib/types.ts",
+      "accessCount": 12,
+      "lastAccessed": 1776778587835,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/email-utils.ts",
+      "accessCount": 12,
+      "lastAccessed": 1776778964973,
+      "type": "file"
+    },
+    {
       "path": "src/app/api/team/approve-request/route.ts",
       "accessCount": 11,
       "lastAccessed": 1776702983858,
@@ -332,15 +344,15 @@
       "type": "file"
     },
     {
-      "path": "src/lib/types.ts",
-      "accessCount": 10,
-      "lastAccessed": 1776775199870,
-      "type": "file"
-    },
-    {
       "path": "src/app/api/drive/finalize/route.ts",
       "accessCount": 10,
       "lastAccessed": 1776775505876,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/audit.ts",
+      "accessCount": 10,
+      "lastAccessed": 1776778555122,
       "type": "file"
     },
     {
@@ -353,18 +365,6 @@
       "path": "src/lib/auth-context.tsx",
       "accessCount": 9,
       "lastAccessed": 1776529367717,
-      "type": "file"
-    },
-    {
-      "path": "src/lib/email-utils.ts",
-      "accessCount": 9,
-      "lastAccessed": 1776529378891,
-      "type": "file"
-    },
-    {
-      "path": "src/lib/audit.ts",
-      "accessCount": 9,
-      "lastAccessed": 1776699819916,
       "type": "file"
     },
     {
@@ -404,6 +404,12 @@
       "type": "file"
     },
     {
+      "path": "src/components/kickback-modal.tsx",
+      "accessCount": 7,
+      "lastAccessed": 1776779010065,
+      "type": "file"
+    },
+    {
       "path": "supabase-schema.sql",
       "accessCount": 6,
       "lastAccessed": 1775845357920,
@@ -428,6 +434,12 @@
       "type": "file"
     },
     {
+      "path": "src/components/app-shell.tsx",
+      "accessCount": 5,
+      "lastAccessed": 1776778586730,
+      "type": "file"
+    },
+    {
       "path": "src/components",
       "accessCount": 4,
       "lastAccessed": 1775665269442,
@@ -440,12 +452,6 @@
       "type": "file"
     },
     {
-      "path": "src/components/app-shell.tsx",
-      "accessCount": 4,
-      "lastAccessed": 1776617362833,
-      "type": "file"
-    },
-    {
       "path": ".vercel/project.json",
       "accessCount": 4,
       "lastAccessed": 1776775216875,
@@ -455,12 +461,6 @@
       "path": "src/components/rich-comment.tsx",
       "accessCount": 3,
       "lastAccessed": 1776276036535,
-      "type": "file"
-    },
-    {
-      "path": "src/components/kickback-modal.tsx",
-      "accessCount": 3,
-      "lastAccessed": 1776775200868,
       "type": "file"
     },
     {

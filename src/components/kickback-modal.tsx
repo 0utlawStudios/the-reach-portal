@@ -58,7 +58,7 @@ export function KickbackModal() {
     }
 
     submitKickback(pendingKickback.cardId, note.trim(), attachmentUrl);
-    addToast("Revision requested — card moved back for fixes.", "warning");
+    addToast("Revision requested — creator and approvers notified.", "warning");
     setNote("");
     removeFile();
     setUploading(false);

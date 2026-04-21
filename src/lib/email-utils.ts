@@ -128,6 +128,28 @@ export function buildPasswordResetEmailHtml(confirmUrl: string) {
 </div>`);
 }
 
+// ─── Template 4: Revision Requested Email ───
+
+export function buildRevisionEmailHtml(postTitle: string, revisionNote: string, requestedBy: string, siteUrl: string) {
+  const logoUrl = `${getSiteUrl()}/ten80ten-logo.png`;
+  return wrapEmail(`
+<div style="background:linear-gradient(135deg,#dc2626,#ea580c);padding:32px;text-align:center;">
+  <img src="${logoUrl}" alt="Ten80Ten" width="52" height="52" style="display:block;margin:0 auto 16px;border-radius:14px;background:rgba(255,255,255,0.2);padding:8px;" />
+  <h1 style="color:#fff;font-size:22px;font-weight:800;margin:0;">Revision Requested</h1>
+  <p style="color:rgba(255,255,255,0.8);font-size:13px;margin:8px 0 0;">Your post has been sent back for fixes</p>
+</div>
+<div style="background:#fff;padding:32px;">
+  <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 8px;"><strong>${esc(requestedBy)}</strong> has requested revisions on:</p>
+  <p style="color:#111;font-size:17px;font-weight:700;margin:0 0 20px;">${esc(postTitle)}</p>
+  <div style="background:#fff5f5;border-left:4px solid #dc2626;padding:14px 18px;border-radius:0 10px 10px 0;margin:0 0 24px;">
+    <p style="color:#6b7280;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 6px;">What needs to be fixed</p>
+    <p style="color:#374151;font-size:14px;line-height:1.6;margin:0;white-space:pre-wrap;">${esc(revisionNote)}</p>
+  </div>
+  <div style="text-align:center;margin:28px 0;">${ctaButton("View in Content Engine", siteUrl, "background:linear-gradient(135deg,#dc2626,#ea580c);")}</div>
+  <p style="color:#9ca3af;font-size:11px;text-align:center;margin:20px 0 0;">Log in to make your changes and resubmit for approval.</p>
+</div>`);
+}
+
 // ─── Admin Notification (New Access Request) ───
 
 export function buildAdminNotificationHtml(requester: { name: string; email: string; phone?: string | null; company?: string | null; reason?: string | null }) {
