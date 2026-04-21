@@ -15,6 +15,7 @@ interface UploadRequest {
   mimeType: string;
   folder: FolderName;
   cardId?: string;
+  fileSize?: number;
 }
 
 export async function POST(request: NextRequest) {
@@ -47,7 +48,8 @@ export async function POST(request: NextRequest) {
     const { uploadUri } = await createResumableUploadSession(
       driveFileName,
       body.mimeType,
-      parentId
+      parentId,
+      body.fileSize,
     );
 
     const isImage = body.mimeType.startsWith("image/");

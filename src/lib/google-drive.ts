@@ -118,17 +118,19 @@ export async function ensureSubfolder(name: string, parentId: string): Promise<s
 export async function createResumableUploadSession(
   fileName: string,
   mimeType: string,
-  parentFolderId: string
+  parentFolderId: string,
+  contentLength?: number
 ): Promise<{ uploadUri: string }> {
   // Standard Google resumable upload: single POST creates session + file in one call
   // The fileId is returned AFTER the client completes the PUT upload
   const res = await driveFetch(
-    `${DRIVE_UPLOAD}/files?uploadType=resumable`,
+    `${DRIVE_UPLOAD}/files?uploadType=resumable&supportsAllDrives=true`,
     {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "X-Upload-Content-Type": mimeType,
+        ...(contentLength !== undefined ? { "X-Upload-Content-Length": String(contentLength) } : {}),
       },
       body: JSON.stringify({
         name: fileName,
