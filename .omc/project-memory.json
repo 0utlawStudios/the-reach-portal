@@ -224,21 +224,21 @@
       "type": "file"
     },
     {
+      "path": "src",
+      "accessCount": 70,
+      "lastAccessed": 1776781906993,
+      "type": "directory"
+    },
+    {
       "path": "",
       "accessCount": 69,
       "lastAccessed": 1776775226612,
       "type": "directory"
     },
     {
-      "path": "src",
-      "accessCount": 69,
-      "lastAccessed": 1776778566627,
-      "type": "directory"
-    },
-    {
       "path": "src/lib/pipeline-context.tsx",
-      "accessCount": 57,
-      "lastAccessed": 1776779005596,
+      "accessCount": 58,
+      "lastAccessed": 1776782010500,
       "type": "file"
     },
     {
@@ -249,8 +249,8 @@
     },
     {
       "path": "src/app/api/notifications/revision/route.ts",
-      "accessCount": 24,
-      "lastAccessed": 1776778978850,
+      "accessCount": 25,
+      "lastAccessed": 1776782012666,
       "type": "file"
     },
     {
@@ -290,21 +290,27 @@
       "type": "file"
     },
     {
+      "path": "src/lib/google-drive.ts",
+      "accessCount": 15,
+      "lastAccessed": 1776782001931,
+      "type": "file"
+    },
+    {
       "path": "src/app/api/team/invite/route.ts",
       "accessCount": 14,
       "lastAccessed": 1776702979938,
       "type": "file"
     },
     {
-      "path": "src/lib/google-drive.ts",
-      "accessCount": 14,
-      "lastAccessed": 1776777661049,
+      "path": "src/app/api/drive/upload/route.ts",
+      "accessCount": 13,
+      "lastAccessed": 1776782002811,
       "type": "file"
     },
     {
-      "path": "src/app/api/drive/upload/route.ts",
-      "accessCount": 12,
-      "lastAccessed": 1776777670526,
+      "path": "src/lib/email-utils.ts",
+      "accessCount": 13,
+      "lastAccessed": 1776782011570,
       "type": "file"
     },
     {
@@ -314,9 +320,15 @@
       "type": "file"
     },
     {
-      "path": "src/lib/email-utils.ts",
+      "path": "next.config.ts",
       "accessCount": 12,
-      "lastAccessed": 1776778964973,
+      "lastAccessed": 1776781885666,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/drive-upload.ts",
+      "accessCount": 12,
+      "lastAccessed": 1776782000921,
       "type": "file"
     },
     {
@@ -332,21 +344,9 @@
       "type": "file"
     },
     {
-      "path": "next.config.ts",
-      "accessCount": 11,
-      "lastAccessed": 1776775463677,
-      "type": "file"
-    },
-    {
-      "path": "src/lib/drive-upload.ts",
-      "accessCount": 11,
-      "lastAccessed": 1776777704819,
-      "type": "file"
-    },
-    {
       "path": "src/app/api/drive/finalize/route.ts",
-      "accessCount": 10,
-      "lastAccessed": 1776775505876,
+      "accessCount": 11,
+      "lastAccessed": 1776782003749,
       "type": "file"
     },
     {
@@ -386,16 +386,22 @@
       "type": "file"
     },
     {
+      "path": "package.json",
+      "accessCount": 8,
+      "lastAccessed": 1776781884780,
+      "type": "directory"
+    },
+    {
       "path": "src/components/login-screen.tsx",
-      "accessCount": 7,
-      "lastAccessed": 1775710121884,
+      "accessCount": 8,
+      "lastAccessed": 1776781914780,
       "type": "file"
     },
     {
-      "path": "package.json",
-      "accessCount": 7,
-      "lastAccessed": 1776529477531,
-      "type": "directory"
+      "path": "src/components/kickback-modal.tsx",
+      "accessCount": 8,
+      "lastAccessed": 1776782013894,
+      "type": "file"
     },
     {
       "path": "src/app/api/team/remove-member/route.ts",
@@ -404,15 +410,15 @@
       "type": "file"
     },
     {
-      "path": "src/components/kickback-modal.tsx",
-      "accessCount": 7,
-      "lastAccessed": 1776779010065,
-      "type": "file"
-    },
-    {
       "path": "supabase-schema.sql",
       "accessCount": 6,
       "lastAccessed": 1775845357920,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/supabaseClient.ts",
+      "accessCount": 6,
+      "lastAccessed": 1776781908762,
       "type": "file"
     },
     {
@@ -425,12 +431,6 @@
       "path": "src/app/api/auth/forgot-password/route.ts",
       "accessCount": 5,
       "lastAccessed": 1776247279137,
-      "type": "file"
-    },
-    {
-      "path": "src/lib/supabaseClient.ts",
-      "accessCount": 5,
-      "lastAccessed": 1776697324193,
       "type": "file"
     },
     {
