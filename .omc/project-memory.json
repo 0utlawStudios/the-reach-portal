@@ -219,14 +219,14 @@
   "hotPaths": [
     {
       "path": "src/components/asset-review-drawer.tsx",
-      "accessCount": 120,
-      "lastAccessed": 1776838695531,
+      "accessCount": 121,
+      "lastAccessed": 1776839229524,
       "type": "file"
     },
     {
       "path": "src",
-      "accessCount": 79,
-      "lastAccessed": 1776838481670,
+      "accessCount": 82,
+      "lastAccessed": 1776839320039,
       "type": "directory"
     },
     {
@@ -237,8 +237,8 @@
     },
     {
       "path": "src/lib/pipeline-context.tsx",
-      "accessCount": 65,
-      "lastAccessed": 1776838656155,
+      "accessCount": 68,
+      "lastAccessed": 1776839344024,
       "type": "file"
     },
     {
@@ -260,33 +260,33 @@
       "type": "file"
     },
     {
+      "path": "src/lib/types.ts",
+      "accessCount": 21,
+      "lastAccessed": 1776839229397,
+      "type": "file"
+    },
+    {
+      "path": "src/components/kanban-board.tsx",
+      "accessCount": 21,
+      "lastAccessed": 1776839346209,
+      "type": "file"
+    },
+    {
       "path": "src/components/media-picker.tsx",
       "accessCount": 20,
       "lastAccessed": 1776838328829,
       "type": "file"
     },
     {
+      "path": "src/lib/team-context.tsx",
+      "accessCount": 20,
+      "lastAccessed": 1776839237925,
+      "type": "file"
+    },
+    {
       "path": "src/app/auth/setup/page.tsx",
       "accessCount": 19,
       "lastAccessed": 1776529372366,
-      "type": "file"
-    },
-    {
-      "path": "src/lib/team-context.tsx",
-      "accessCount": 19,
-      "lastAccessed": 1776702972490,
-      "type": "file"
-    },
-    {
-      "path": "src/components/kanban-board.tsx",
-      "accessCount": 19,
-      "lastAccessed": 1776778545845,
-      "type": "file"
-    },
-    {
-      "path": "src/lib/types.ts",
-      "accessCount": 19,
-      "lastAccessed": 1776838312346,
       "type": "file"
     },
     {
@@ -356,15 +356,15 @@
       "type": "file"
     },
     {
-      "path": "src/app/auth/confirm/route.ts",
-      "accessCount": 9,
-      "lastAccessed": 1775819304646,
+      "path": "src/lib/auth-context.tsx",
+      "accessCount": 10,
+      "lastAccessed": 1776839237772,
       "type": "file"
     },
     {
-      "path": "src/lib/auth-context.tsx",
+      "path": "src/app/auth/confirm/route.ts",
       "accessCount": 9,
-      "lastAccessed": 1776529367717,
+      "lastAccessed": 1775819304646,
       "type": "file"
     },
     {
@@ -386,6 +386,12 @@
       "type": "file"
     },
     {
+      "path": "src/components/kickback-modal.tsx",
+      "accessCount": 9,
+      "lastAccessed": 1776839228071,
+      "type": "file"
+    },
+    {
       "path": "package.json",
       "accessCount": 8,
       "lastAccessed": 1776781884780,
@@ -395,12 +401,6 @@
       "path": "src/components/login-screen.tsx",
       "accessCount": 8,
       "lastAccessed": 1776781914780,
-      "type": "file"
-    },
-    {
-      "path": "src/components/kickback-modal.tsx",
-      "accessCount": 8,
-      "lastAccessed": 1776782013894,
       "type": "file"
     },
     {

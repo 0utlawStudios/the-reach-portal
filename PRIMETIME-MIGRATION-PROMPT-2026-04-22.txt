@@ -1,692 +1,336 @@
+PRIMETIME SMM PORTAL — FULL MIGRATION PROMPT (2026-04-22)
+==========================================================
 
-================================================================================
+You are creating the Primetime SMM Portal — a fully branded, production-ready
+clone of the Ten80Ten Content Engine. The source codebase is at:
 
-You are working on the Primetime SMM Portal (Next.js + Supabase + Google Drive).
-Apply all three fixes below. Read each file before editing. Run `npm run build`
-after all changes to verify zero TypeScript errors.
+  /Users/ace/Documents/CURSOR MAIN/ten80ten-smm-portal
 
-================================================================================
-FIX 1 OF 3: Video/MP4 Upload Fails with 413 Error
-================================================================================
+The Primetime portal is an IDENTICAL functional clone with:
+- Primetime branding (logo, colors, company name)
+- All bugs from the Ten80Ten portal already fixed (listed below — apply every one)
+- Timezone: America/Chicago (CST)
+- No Ten80Ten references in any user-facing text
 
-WHY: Every file upload goes through a Next.js API route as FormData. Vercel's
-default serverless body limit is 4.5 MB. Any video file over 4.5 MB is rejected
-with HTTP 413 before the route handler runs. The 25 MB client-side limit in
-drive-upload.ts is irrelevant — Vercel rejects it first. Videos are broken.
+Read AGENTS.md in the source repo before touching any code. Every rule in it
+is non-negotiable and applies to the Primetime portal identically.
 
-THE FIX: Add a two-path system to `src/lib/drive-upload.ts`:
-- Files < 4 MB: existing proxy path (unchanged, works for thumbnails/images)
-- Files >= 4 MB: 3-step resumable path where the file goes browser-to-Google
-  directly, bypassing Vercel entirely. The /api/drive/upload route already
-  creates resumable sessions — it just has no callers.
+=======================================================
+SECTION 1: BRANDING CHANGES
+=======================================================
 
-Also fix two bugs in google-drive.ts:
-- Missing `supportsAllDrives=true` on the resumable session URL (causes 404 on Shared Drives)
-- Missing `contentLength` parameter (Google needs this to validate upload completeness)
+Replace all user-facing references:
+  "Ten80Ten Content Engine"            → "Primetime Content Engine"
+  "Ten80Ten Social Media Management"   → "Primetime Social Media Management"
+  "smm.ten80ten.com"                   → Primetime's domain (ask user if unknown)
+  Ten80Ten logo URL                    → Primetime logo URL (ask user)
+  "Ten80Ten" in email templates        → "Primetime"
+  Footer copyright                     → "Primetime Social Media Management Platform © {year}"
 
-And add `fileSize` to the /api/drive/upload route so it can set the content length.
+Do NOT change internal technical names: stage names, table names, API routes,
+type names, function names, or env variable names.
 
---- CHANGE 1A: src/lib/google-drive.ts ---
+=======================================================
+SECTION 2: BUG FIXES TO APPLY (already fixed in source)
+=======================================================
 
-Find the `createResumableUploadSession` function signature and update it to add
-the optional `contentLength` parameter:
+Apply every fix below. Each one caused real data loss or broken behavior.
+The source repo already has the fixes — read the fixed files and apply the
+same changes to the Primetime repo.
 
-FIND:
-  export async function createResumableUploadSession(
-    fileName: string,
-    mimeType: string,
-    parentFolderId: string
-  ): Promise<{ uploadUri: string }> {
+-------------------------------------------------------
+FIX 1: Posts vanishing on refresh (3 root causes)
+-------------------------------------------------------
 
-REPLACE WITH:
-  export async function createResumableUploadSession(
-    fileName: string,
-    mimeType: string,
-    parentFolderId: string,
-    contentLength?: number
-  ): Promise<{ uploadUri: string }> {
+File: src/lib/pipeline-context.tsx
 
-Then find the `driveFetch` call inside that function and update it to add
-`supportsAllDrives=true` to the URL and the `X-Upload-Content-Length` header:
+Root cause A — Workspace provisioning missing:
+  load() MUST call /api/workspace/provision BEFORE querying posts.
+  The provision endpoint (GET) uses service role to auto-insert missing
+  workspace_members rows. Without it, RLS blocks the SELECT.
 
-FIND:
-    `${DRIVE_UPLOAD}/files?uploadType=resumable`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Upload-Content-Type": mimeType,
-      },
+Root cause B — Wrong fallback condition causes empty board on refresh:
+  FORBIDDEN (causes posts to vanish when board is empty):
+    if (!error && data && data.length > 0) { setCards(data.map(dbToCard)); }
+    else { setCards(loadState(STORAGE_KEY, PLACEHOLDER_CARDS)); }
 
-REPLACE WITH:
-    `${DRIVE_UPLOAD}/files?uploadType=resumable&supportsAllDrives=true`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Upload-Content-Type": mimeType,
-        ...(contentLength !== undefined ? { "X-Upload-Content-Length": String(contentLength) } : {}),
-      },
+  CORRECT (empty array is valid state, not an error):
+    if (!error && data) { setCards(data.map(dbToCard)); }
+    else { setCards(loadState(STORAGE_KEY, PLACEHOLDER_CARDS)); }
 
---- CHANGE 1B: src/app/api/drive/upload/route.ts ---
+Root cause C — workspace_id missing from INSERT:
+  createCard() MUST always set workspace_id using the fallback pattern:
+    insertRow.workspace_id = workspaceIdRef.current || "00000000-0000-0000-0000-000000000001";
 
-Add `fileSize` to the UploadRequest interface and pass it through to
-`createResumableUploadSession`.
+  FORBIDDEN:
+    if (workspaceIdRef.current) insertRow.workspace_id = workspaceIdRef.current;
+    // ↑ omits workspace_id when ref is null → silent insert failure
 
-FIND:
-  interface UploadRequest {
-    fileName: string;
-    mimeType: string;
-    folder: FolderName;
-    cardId?: string;
-  }
+The same length > 0 bug exists in team-context.tsx — fix identically.
 
-REPLACE WITH:
-  interface UploadRequest {
-    fileName: string;
-    mimeType: string;
-    folder: FolderName;
-    cardId?: string;
-    fileSize?: number;
-  }
+-------------------------------------------------------
+FIX 2: Media Library empty after direct upload
+-------------------------------------------------------
 
-FIND:
-    const { uploadUri } = await createResumableUploadSession(
-      driveFileName,
-      body.mimeType,
-      parentId
-    );
+File: src/components/pages/media-page.tsx
 
-REPLACE WITH:
-    const { uploadUri } = await createResumableUploadSession(
-      driveFileName,
-      body.mimeType,
-      parentId,
-      body.fileSize,
-    );
+The media_assets INSERT was missing workspace_id (NOT NULL, no DEFAULT).
+Every upload silently failed the RLS insert policy.
 
---- CHANGE 1C: src/lib/drive-upload.ts ---
+Fix:
+  - Add workspaceId to usePipeline() destructure
+  - Add workspace_id: workspaceId to every media_assets INSERT
 
-Replace the entire file content with the following. This adds the resumable path
-for large files while keeping the existing proxy path for small files. The public
-`uploadToDrive` function signature is unchanged — all consumer components work
-without modification.
+-------------------------------------------------------
+FIX 3: Audit log always empty
+-------------------------------------------------------
 
-NEW CONTENT FOR src/lib/drive-upload.ts:
----
-/**
- * Client-side Google Drive upload — two paths based on file size.
- *
- * Small files (< 4 MB): proxy path
- *   Client → /api/drive/proxy-upload (FormData) → Google Drive → returns fileId + URL
- *   One round-trip, proven, fast for thumbnails and small images.
- *
- * Large files (>= 4 MB): resumable path (bypasses Vercel's 4.5 MB body limit)
- *   1. Client → /api/drive/upload (JSON metadata) → returns uploadUri
- *   2. Client → uploadUri (PUT file bytes directly to Google, CORS-safe)
- *   3. Client → /api/drive/finalize (JSON fileId) → sets permissions, returns URL
- *
- * The uploadUri is a pre-authenticated Google URL — the service account token
- * is baked in server-side. The browser PUTs directly without any auth header.
- * Google's resumable upload endpoints support CORS (Access-Control-Allow-Origin: *).
- *
- * Guarantees:
- * - Never returns a blob: URL
- * - 3-attempt exponential backoff on transient failures
- * - Throws on permanent failure (caller must handle)
- * - 413 is treated as permanent (not retried)
- */
+post_audit_logs has NO INSERT RLS policy for authenticated users (migration
+0007 intentional design). All writes to it are silently blocked.
 
-export interface DriveUploadResult {
-  fileId: string;
-  url: string;
-  mimeType?: string;
-  size?: number;
-}
+ALL audit writes MUST use record_audit_event() RPC → audit_log_v2:
 
-export type ProgressCallback = (percent: number) => void;
-
-const RETRY_DELAYS = [2000, 8000, 32000];
-
-// Files at or above this threshold use the resumable path to avoid Vercel's 4.5 MB body limit.
-const RESUMABLE_THRESHOLD = 4 * 1024 * 1024; // 4 MB
-
-// Instagram video limit (250 MB) — largest common platform constraint.
-const MAX_FILE_SIZE = 250 * 1024 * 1024; // 250 MB
-
-async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
-  let lastError: Error | null = null;
-  for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
-    try {
-      return await fn();
-    } catch (err) {
-      lastError = err instanceof Error ? err : new Error(String(err));
-      // Permanent failures — do not retry
-      if (
-        lastError.message.includes("400") ||
-        lastError.message.includes("401") ||
-        lastError.message.includes("403") ||
-        lastError.message.includes("404") ||
-        lastError.message.includes("413")
-      ) {
-        throw lastError;
-      }
-      if (attempt < RETRY_DELAYS.length) {
-        console.warn(`[drive-upload] ${label} attempt ${attempt + 1} failed, retrying in ${RETRY_DELAYS[attempt]}ms...`);
-        await new Promise((r) => setTimeout(r, RETRY_DELAYS[attempt]));
-      }
-    }
-  }
-  throw lastError || new Error(`${label} failed after ${RETRY_DELAYS.length + 1} attempts`);
-}
-
-// ─── Proxy path (< 4 MB) ───────────────────────────────────────────────────
-
-async function uploadViaProxy(
-  file: File,
-  folder: string,
-  cardId: string | undefined,
-  onProgress: ProgressCallback | undefined
-): Promise<DriveUploadResult> {
-  return withRetry(async () => {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("folder", folder);
-    formData.append("fileName", file.name);
-    formData.append("mimeType", file.type || "application/octet-stream");
-    if (cardId) formData.append("cardId", cardId);
-
-    return new Promise<DriveUploadResult>((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open("POST", "/api/drive/proxy-upload", true);
-
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) {
-          onProgress?.(Math.round((e.loaded / e.total) * 90));
-        }
-      };
-
-      xhr.onload = () => {
-        onProgress?.(95);
-        if (xhr.status >= 200 && xhr.status < 300) {
-          try {
-            const data = JSON.parse(xhr.responseText);
-            if (data.error) {
-              reject(new Error(data.error));
-            } else {
-              onProgress?.(100);
-              resolve({
-                fileId: data.fileId,
-                url: data.url,
-                mimeType: data.mimeType,
-                size: data.size,
-              });
-            }
-          } catch {
-            reject(new Error("Invalid response from upload server"));
-          }
-        } else {
-          try {
-            const data = JSON.parse(xhr.responseText);
-            reject(new Error(data.error || `Upload failed: ${xhr.status}`));
-          } catch {
-            reject(new Error(`Upload failed: ${xhr.status}`));
-          }
-        }
-      };
-
-      xhr.onerror = () => reject(new Error("Network error during upload"));
-      xhr.ontimeout = () => reject(new Error("Upload timed out"));
-      xhr.send(formData);
-    });
-  }, "Proxy upload");
-}
-
-// ─── Resumable path (>= 4 MB) ─────────────────────────────────────────────
-
-async function getUploadSession(
-  file: File,
-  folder: string,
-  cardId: string | undefined
-): Promise<string> {
-  const res = await fetch("/api/drive/upload", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      fileName: file.name,
-      mimeType: file.type || "application/octet-stream",
-      folder,
-      cardId,
-      fileSize: file.size,
-    }),
+  await supabase.rpc("record_audit_event", {
+    p_entity_type: "post",
+    p_action: actionType,
+    p_entity_id: isValidUuid(postId) ? postId : null,
+    p_metadata: { user_name: userName, details: details || null },
   });
 
-  if (!res.ok) {
-    let msg = `Session creation failed: ${res.status}`;
-    try {
-      const data = await res.json();
-      if (data.error) msg = data.error;
-    } catch { /* ignore */ }
-    throw new Error(msg);
-  }
-
-  const data = await res.json();
-  if (!data.uploadUri) throw new Error("No uploadUri returned from session endpoint");
-  return data.uploadUri;
-}
-
-async function putToGoogle(
-  file: File,
-  uploadUri: string,
-  onProgress: ProgressCallback | undefined
-): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("PUT", uploadUri, true);
-    xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
-
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) {
-        // Map to 5–90% of overall progress
-        onProgress?.(5 + Math.round((e.loaded / e.total) * 85));
-      }
-    };
-
-    xhr.onload = () => {
-      if (xhr.status === 200 || xhr.status === 201) {
-        try {
-          const data = JSON.parse(xhr.responseText);
-          if (!data.id) {
-            reject(new Error("Google did not return a file ID after upload"));
-          } else {
-            resolve(data.id as string);
-          }
-        } catch {
-          reject(new Error("Invalid response from Google after upload"));
-        }
-      } else {
-        reject(new Error(`Upload to Google failed: ${xhr.status}`));
-      }
-    };
-
-    xhr.onerror = () => reject(new Error("Network error during upload to Google"));
-    xhr.ontimeout = () => reject(new Error("Upload to Google timed out"));
-    xhr.send(file);
-  });
-}
-
-async function finalizeUpload(fileId: string): Promise<DriveUploadResult> {
-  const res = await fetch("/api/drive/finalize", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ fileId }),
-  });
-
-  if (!res.ok) {
-    let msg = `Finalize failed: ${res.status}`;
-    try {
-      const data = await res.json();
-      if (data.error) msg = data.error;
-    } catch { /* ignore */ }
-    throw new Error(msg);
-  }
-
-  const data = await res.json();
-  return {
-    fileId: data.fileId,
-    url: data.url,
-    mimeType: data.mimeType,
-    size: data.size,
-  };
-}
-
-async function uploadViaResumable(
-  file: File,
-  folder: string,
-  cardId: string | undefined,
-  onProgress: ProgressCallback | undefined
-): Promise<DriveUploadResult> {
-  onProgress?.(0);
-
-  // Step 1: create resumable session (returns uploadUri)
-  const uploadUri = await withRetry(
-    () => getUploadSession(file, folder, cardId),
-    "Session creation"
-  );
-  onProgress?.(5);
-
-  // Step 2: PUT file directly to Google (bypasses Vercel)
-  const fileId = await putToGoogle(file, uploadUri, onProgress);
-  onProgress?.(90);
-
-  // Step 3: set permissions and get serving URL
-  const result = await withRetry(
-    () => finalizeUpload(fileId),
-    "Finalize"
-  );
-  onProgress?.(100);
-
-  return result;
-}
-
-// ─── Public API ────────────────────────────────────────────────────────────
-
-export async function uploadToDrive(
-  file: File,
-  folder: "thumbnails" | "raw-files" | "media-library",
-  cardId?: string,
-  onProgress?: ProgressCallback
-): Promise<DriveUploadResult> {
-  if (file.size === 0) throw new Error("Cannot upload empty file");
-  if (file.size > MAX_FILE_SIZE) throw new Error(`File exceeds ${MAX_FILE_SIZE / (1024 * 1024)}MB limit.`);
-
-  onProgress?.(0);
-
-  if (file.size >= RESUMABLE_THRESHOLD) {
-    return uploadViaResumable(file, folder, cardId, onProgress);
-  }
-  return uploadViaProxy(file, folder, cardId, onProgress);
-}
----
-END OF FILE CONTENT FOR src/lib/drive-upload.ts
-
-
-================================================================================
-FIX 2 OF 3: Revision Email Not Sent When Dragging Card to "Revision Needed"
-================================================================================
-
-WHY: There are two ways to request a revision:
-  A) Drag a card to the "Revision Needed" column on the Kanban board — opens the
-     KickbackModal. The user fills in feedback and submits.
-  B) Click "Request Revision" in the asset review drawer.
-
-Path B calls /api/notifications/revision and sends email. Path A (the modal)
-calls `submitKickback()` in pipeline-context.tsx which only updates the card and
-writes an audit log. No email is sent. The post creator has no idea their work
-was sent back unless they check the board.
-
-Also: the KickbackModal uses MentionTextarea (supports @Name tags), but the @
-mentions are never turned into email notifications.
-
-THE FIX: Add notification calls to `submitKickback()` in pipeline-context.tsx.
-Also update the KickbackModal toast message to reflect that notifications are sent.
-
-NOTE ON USER EMAIL: This codebase uses `userName` (a name string prop) rather
-than a user email. The `requestedBy` field will contain the user's display name
-instead of their email. This means the "exclude requester" logic in the revision
-API won't exclude them from receiving the email (name != email address comparison).
-For a small team this is acceptable behavior — worst case the approver also gets
-the notification email they just sent.
-
---- CHANGE 2A: src/lib/pipeline-context.tsx ---
-
-Find the `submitKickback` function (around line 299). It currently ends with:
-
-    setPendingKickback(null);
-    logAudit(cardId, author, "revision_requested", `Kickback: ${note}`);
-  }, [useSupabase, cards, userName]);
-
-Replace the entire `submitKickback` function with the version below. The key
-changes are:
-1. Card is captured BEFORE setCards (so we have title + createdBy for the notification)
-2. Notification calls added after audit log
-3. `userName` added to dependency array (was already there, keeping it)
-
-FIND the entire submitKickback function:
-  const submitKickback = useCallback((cardId: string, note: string, attachmentUrl?: string) => {
-    const now = new Date();
-    const timestamp = now.toLocaleString("en-US", { timeZone: "America/Chicago", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-    const author = userName;
-    let noteLine = `${author} (${timestamp}): Revision requested — ${note}`;
-    if (attachmentUrl) noteLine += `\n📎 ${attachmentUrl}`;
-
-    setCards((prev) => prev.map((c) => {
-      if (c.id !== cardId) return c;
-      const notes = c.notes ? c.notes + "\n\n" + noteLine : noteLine;
-      return { ...c, stage: "revision_needed" as PipelineStage, revised: false, notes, updatedAt: now.toISOString() };
-    }));
-    setSelectedCard((prev) => {
-      if (prev?.id !== cardId) return prev;
-      const notes = prev.notes ? prev.notes + "\n\n" + noteLine : noteLine;
-      return { ...prev, stage: "revision_needed" as PipelineStage, revised: false, notes };
-    });
-
-    if (useSupabase) {
-      markMutation(cardId);
-      const card = cards.find((c) => c.id === cardId);
-      const notes = card?.notes ? card.notes + "\n\n" + noteLine : noteLine;
-      supabase.from("posts").update({ stage: "revision_needed", notes }).eq("id", cardId).then(() => {});
-    }
-
-    setPendingKickback(null);
-    logAudit(cardId, author, "revision_requested", `Kickback: ${note}`);
-  }, [useSupabase, cards, userName]);
-
-REPLACE WITH:
-  const submitKickback = useCallback((cardId: string, note: string, attachmentUrl?: string) => {
-    const now = new Date();
-    const timestamp = now.toLocaleString("en-US", { timeZone: "America/Chicago", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-    const author = userName;
-    // Capture card before state mutation so notification can read title + createdBy
-    const card = cards.find((c) => c.id === cardId);
-    let noteLine = `${author} (${timestamp}): Revision requested — ${note}`;
-    if (attachmentUrl) noteLine += `\n📎 ${attachmentUrl}`;
-
-    setCards((prev) => prev.map((c) => {
-      if (c.id !== cardId) return c;
-      const notes = c.notes ? c.notes + "\n\n" + noteLine : noteLine;
-      return { ...c, stage: "revision_needed" as PipelineStage, revised: false, notes, updatedAt: now.toISOString() };
-    }));
-    setSelectedCard((prev) => {
-      if (prev?.id !== cardId) return prev;
-      const notes = prev.notes ? prev.notes + "\n\n" + noteLine : noteLine;
-      return { ...prev, stage: "revision_needed" as PipelineStage, revised: false, notes };
-    });
-
-    if (useSupabase) {
-      markMutation(cardId);
-      const notes = card?.notes ? card.notes + "\n\n" + noteLine : noteLine;
-      supabase.from("posts").update({ stage: "revision_needed", notes }).eq("id", cardId).then(() => {});
-    }
-
-    setPendingKickback(null);
-    logAudit(cardId, author, "revision_requested", `Kickback: ${note}`);
-
-    // Notify creator + all Creative Directors
-    fetch("/api/notifications/revision", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        postId: cardId,
-        postTitle: card?.title ?? "",
-        revisionNote: note,
-        requestedBy: userName,
-        createdBy: card?.createdBy,
-      }),
-    }).catch(() => {});
-
-    // Fire @mention notifications if anyone was tagged
-    if (note.includes("@")) {
-      fetch("/api/notifications/mention", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          comment: note,
-          postTitle: card?.title ?? "",
-          postId: cardId,
-          authorName: userName,
-          authorEmail: userName,
-        }),
-      }).catch(() => {});
-    }
-  }, [useSupabase, cards, userName]);
-
---- CHANGE 2B: src/components/kickback-modal.tsx ---
-
-Update the toast message to reflect that the creator is now notified.
-
-FIND:
-    addToast("Revision requested — card moved back for fixes.", "warning");
-
-REPLACE WITH:
-    addToast("Revision requested — creator and Creative Director notified.", "warning");
-
-
-================================================================================
-FIX 3 OF 3: Revision Email Template Unbranded (Dark Theme, No Logo)
-================================================================================
-
-WHY: The revision email in /api/notifications/revision/route.ts uses inline HTML
-with a dark background (#0a0a0e), no logo, and is inconsistent with every other
-email in the system. All other emails use the `emailShell()` wrapper with the
-Prime Time logo, navy theme, and blue accents.
-
-Also: the email subject uses raw string interpolation (header injection risk).
-A `safeSubject()` utility needs to be added.
-
-THE FIX:
-1. Add `safeSubject()` export to email-utils.ts (strips CR/LF from subjects)
-2. Make the `esc()` function exported (currently private)
-3. Add `buildRevisionEmailHtml()` to email-utils.ts using the `emailShell()` pattern
-4. Update the revision route to use the new template and `safeSubject()`
-
---- CHANGE 3A: src/lib/email-utils.ts ---
-
-FIND the private `esc` function:
-  function esc(str: string): string {
-    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-  }
-
-REPLACE WITH (make it exported and handle null/undefined safely):
-  export function esc(value: unknown): string {
-    if (value == null) return "";
-    return String(value)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
-  }
-
-Then ADD the following two functions immediately after the `esc` function
-(before `getTransporter`):
-
-  /** Strip CR/LF from email subject lines to prevent header injection. */
-  export function safeSubject(value: unknown): string {
-    if (value == null) return "";
-    return String(value).replace(/[\r\n]+/g, " ").trim().slice(0, 200);
-  }
-
-Then ADD the following new template function at the END of the file (after the
-`buildApprovalEmailHtml` function):
-
-  // ─── Revision Requested Email ───
-
-  export function buildRevisionEmailHtml(postTitle: string, revisionNote: string, requestedBy: string, siteUrl: string): string {
-    return emailShell(
-      "#dc2626",
-      "Revision Requested",
-      "Your post has been sent back for fixes",
-      `
-      <p style="color:#374151; font-size:14px; line-height:1.7; margin:0 0 8px;">
-        <strong style="color:#111827;">${esc(requestedBy)}</strong> has requested revisions on:
-      </p>
-      <p style="color:#111827; font-size:17px; font-weight:700; margin:0 0 20px; line-height:1.3;">${esc(postTitle)}</p>
-      <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
-        <tr><td style="background:#fff5f5; border-left:4px solid #dc2626; border-radius:0 8px 8px 0; padding:14px 18px;">
-          <p style="color:#6b7280; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; margin:0 0 6px;">What needs to be fixed</p>
-          <p style="color:#374151; font-size:14px; line-height:1.6; margin:0; white-space:pre-wrap;">${esc(revisionNote)}</p>
-        </td></tr>
-      </table>
-      ${ctaButton(siteUrl, "View in Content Engine")}
-      <p style="color:#9ca3af; font-size:11px; text-align:center; margin:20px 0 0;">Log in to make your changes and resubmit for approval.</p>
-      `
-    );
-  }
-
---- CHANGE 3B: src/app/api/notifications/revision/route.ts ---
-
-Update the import line at the top to add `safeSubject` and `buildRevisionEmailHtml`:
-
-FIND:
-  import { getTransporter, getFromAddress } from "@/lib/email-utils";
-
-REPLACE WITH:
-  import { getTransporter, getFromAddress, safeSubject, buildRevisionEmailHtml } from "@/lib/email-utils";
-
-Then replace the entire inline HTML block with a single function call.
-
-FIND (the entire htmlEmail variable assignment — the dark-themed inline HTML):
-      const htmlEmail = `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 540px; margin: 0 auto; background: #0a0a0e; border-radius: 16px; overflow: hidden;">
-          <div style="padding: 32px 28px 24px; border-bottom: 1px solid rgba(255,255,255,0.06);">
-            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
-              <div style="width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, #0056b3, #1e40af); display: flex; align-items: center; justify-content: center;">
-                <span style="color: white; font-size: 18px; font-weight: 800;">!</span>
-              </div>
-              <div>
-                <p style="color: #0056b3; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; margin: 0;">Revision Requested</p>
-                <p style="color: #6b7280; font-size: 12px; margin: 2px 0 0;">by ${body.requestedBy}</p>
-              </div>
-            </div>
-            <h2 style="color: #ffffff; font-size: 20px; font-weight: 700; margin: 0 0 16px; letter-spacing: -0.02em;">${body.postTitle}</h2>
-            <div style="background: rgba(0,86,179,0.08); border-left: 3px solid #0056b3; padding: 14px 18px; border-radius: 0 10px 10px 0;">
-              <p style="color: #93c5fd; font-size: 13px; line-height: 1.6; margin: 0; white-space: pre-wrap;">${body.revisionNote}</p>
-            </div>
-          </div>
-          <div style="padding: 24px 28px;">
-            <a href="${siteUrl}" style="display: inline-block; background: #0056b3; color: white; text-decoration: none; padding: 12px 28px; border-radius: 10px; font-size: 13px; font-weight: 700; letter-spacing: 0.01em;">
-              View Revision in Portal
-            </a>
-            <p style="color: #374151; font-size: 11px; margin: 16px 0 0;">Prime Time Window Cleaning &mdash; Content Pipeline</p>
-          </div>
-        </div>
-      `;
-
-REPLACE WITH:
-      const htmlEmail = buildRevisionEmailHtml(body.postTitle, body.revisionNote, body.requestedBy, siteUrl);
-
-Also update the sendMail call to use `safeSubject()` for header injection safety.
-
-FIND:
-            subject: `Revision Requested: "${body.postTitle}"`,
-
-REPLACE WITH:
-            subject: safeSubject(`Revision Requested: "${body.postTitle}"`),
-
-
-================================================================================
-VERIFICATION
-================================================================================
-
-1. Run: npm run build
-   Expected: Clean compile, zero TypeScript errors, all routes listed.
-
-2. Start dev server: npm run dev
-
-3. TEST — Video upload (Fix 1):
-   - Open Create Post modal
-   - Attach a small image (< 4 MB) → should upload via proxy path, works as before
-   - Attach an MP4 video (> 4.5 MB) → should use resumable path, NO 413 error
-   - Check the Google Drive folder — file should appear with timestamp name
-
-4. TEST — Revision notification (Fix 2):
-   - Drag any card to the "Revision Needed" column
-   - KickbackModal opens — fill in at least 10 characters of feedback
-   - Click "Request Revision"
-   - Toast should say "Revision requested — creator and Creative Director notified."
-   - Card moves to Revision Needed column
-   - Post creator should receive a branded email notification
-
-5. TEST — Email branding (Fix 3):
-   - Trigger a revision from either path (drag or asset-review-drawer)
-   - Open the received email
-   - Should have: Prime Time logo, navy/blue theme, red accent bar for the
-     revision section, proper footer with "Prime Time Window Cleaning"
-   - Should NOT be the old dark (#0a0a0e) themed email
-
-6. Build check: npm run build (repeat after all changes to confirm no regressions)
-
-================================================================================
+Apply to:
+  - src/lib/audit.ts (complete rewrite to use RPC)
+  - /api/notifications/revision — mention_sent, revision_requested
+  - /api/notifications/mention — mention_sent
+  - /api/team/invite — invite_sent
+  - /api/team/resend-invite — invite_resent
+  - /api/team/approve-request — request_approved
+  - /api/team/remove-member — member_removed
+
+ALL audit reads must use audit_log_v2, not post_audit_logs.
+
+-------------------------------------------------------
+FIX 4: Video uploads failing with 413 error
+-------------------------------------------------------
+
+File: src/lib/drive-upload.ts
+
+Vercel serverless body limit is 4.5 MB. Any video over 4.5 MB is rejected
+before the route handler runs.
+
+Fix — size-based routing:
+  Files < 4 MB : existing proxy path through /api/drive/proxy-upload
+  Files >= 4 MB: 3-step resumable path:
+    1. POST metadata to /api/drive/upload → returns uploadUri
+    2. Browser PUTs file DIRECTLY to Google's uploadUri (bypasses Vercel)
+    3. POST fileId to /api/drive/finalize → sets permissions, returns URL
+
+Additional fixes:
+  - Client-side file size limit: raise from 25 MB to 250 MB
+  - 413 status: add to non-retryable error codes (no retry on 413)
+  - src/lib/google-drive.ts: add supportsAllDrives=true to resumable URL
+  - src/lib/google-drive.ts: add optional contentLength param
+  - src/app/api/drive/upload/route.ts: accept fileSize in request body
+
+-------------------------------------------------------
+FIX 5: KickbackModal not sending revision email notifications
+-------------------------------------------------------
+
+File: src/lib/pipeline-context.tsx (submitKickback function)
+
+Dragging a card to Revision Needed opens KickbackModal. submitKickback()
+updated the card and wrote an audit log, but NEVER called
+/api/notifications/revision. Post creator had no email notification.
+
+Fix: Add /api/notifications/revision call inside submitKickback() after
+     the audit log. Also add @mention check — if note contains "@", fire
+     /api/notifications/mention.
+
+File: src/components/kickback-modal.tsx
+  Update toast: "Revision requested — creator and approvers notified."
+
+-------------------------------------------------------
+FIX 6: Revision email template unbranded
+-------------------------------------------------------
+
+Files: src/lib/email-utils.ts, src/app/api/notifications/revision/route.ts
+
+The revision email used raw dark-themed inline HTML instead of the shared
+email template system.
+
+Fix:
+  - Export esc() from email-utils.ts (was private)
+  - Add safeSubject() export to email-utils.ts (strips CR/LF — header injection)
+  - Add buildRevisionEmailHtml() to email-utils.ts using wrapEmail() + ctaButton()
+  - Update revision route to call buildRevisionEmailHtml() instead of inline HTML
+  - Update subject line to use safeSubject()
+  - Template: Primetime logo, light theme, red/orange gradient header
+
+-------------------------------------------------------
+FIX 7: Pipeline post images not appearing in Media Library
+-------------------------------------------------------
+
+Problem: 3 code paths attach images to posts but only 1 ever wrote to media_assets.
+
+  Create Post Modal:     inserts to media_assets (was fire-and-forget → now awaited)
+  Asset Review Drawer:   handleAssetReplace + handleRawFileUpload → NEVER wrote
+  Repurpose Modal:       clones thumbnailUrl → NEVER wrote
+
+Fix: Create src/lib/media-assets.ts with ensureMediaAsset() helper:
+  - SELECT by url first (dedup — never create duplicate rows)
+  - If row exists and usedIn is valid UUID, append to used_in array
+  - If not exists, INSERT with all required fields including workspace_id
+  - isValidUuid() guard: skip used_in when post has temp timestamp ID
+
+Wire ensureMediaAsset() into:
+  - asset-review-drawer.tsx: both upload handlers (fire-and-catch so upload never blocks)
+  - create-post-modal.tsx: replace fire-and-forget .then() with awaited calls
+  - repurpose-modal.tsx: after createCard(), sync thumbnail + rawFiles
+
+Create: src/app/api/admin/backfill-media/route.ts
+  POST endpoint (service role) that scans all posts and inserts missing
+  media_assets rows for thumbnails and rawFiles.
+  Returns: { inserted, skipped, updated, total }
+
+-------------------------------------------------------
+FIX 8: Post auto-moves to Posted when approved + sticky cards + realtime + roles
+-------------------------------------------------------
+
+Root cause A — Wrong timezone fallback in create_publish_job_for_post:
+  Migration 0014 line 34:
+    coalesce(nullif(v_post.scheduled_timezone, ''), v_post.workspace_timezone, 'Asia/Dubai')
+
+  'Asia/Dubai' fallback causes "19:00 CST" to be stored as already-past UTC
+  time. n8n picks it up instantly → publishes → stage → posted.
+
+  Fix: Create supabase/migrations/0016_fix_timezone_defaults.sql:
+    - UPDATE workspaces SET timezone = 'America/Chicago'
+      WHERE timezone IS NULL OR timezone = '' OR timezone = 'Asia/Dubai';
+    - UPDATE posts SET scheduled_timezone = 'America/Chicago'
+      WHERE scheduled_timezone = 'Asia/Dubai';
+    - CREATE OR REPLACE FUNCTION create_publish_job_for_post with
+      fallback changed to 'America/Chicago' (full function replacement)
+
+  Fix toScheduledAt() in pipeline-context.tsx:
+    - Import APP_TIMEZONE from utils.ts (already = "America/Chicago")
+    - Convert date+time to UTC using the workspace timezone offset
+    - Use Intl.DateTimeFormat + getTimezoneOffset() helper for DST-correct conversion
+
+Root cause B — 'owner' role missing from isApprover (kanban-board.tsx):
+  Current: ["superadmin","admin","approver","creative_director"]
+  Fix:     ["superadmin","admin","owner","approver","creative_director"]
+  This unblocks owner-role users (like Carlo) from dragging to
+  approved_scheduled/posted. Fixes sticky cards AND role permissions together.
+
+Root cause C — Realtime subscription has no workspace_id filter:
+  The channel subscribes to ALL posts changes globally.
+  Fix:
+    - Add filter: `workspace_id=eq.${workspaceIdRef.current}` to all 3 event handlers
+    - Name channel posts-realtime-${workspaceId} (unique per workspace)
+    - UPDATE handler: use payload.new directly instead of re-fetching from DB
+      (eliminates extra round-trip, prevents state overwrite race)
+
+Root cause D — Settings timezone dropdown is non-functional:
+  File: src/components/pages/settings-page.tsx
+  Wire the dropdown to save workspaces.timezone via Supabase UPDATE.
+  Default selected value: "America/Chicago"
+
+=======================================================
+SECTION 3: ARCHITECTURE RULES (from AGENTS.md — mandatory)
+=======================================================
+
+1. POSTS MUST NEVER DISAPPEAR
+   Never write code that causes a post to vanish from the board on refresh,
+   a stage move, or any automated operation.
+
+2. workspace_id REQUIRED ON EVERY INSERT
+   posts, post_comments, media_assets, brand_playbook.
+   Always use fallback: workspaceIdRef.current || "00000000-0000-0000-0000-000000000001"
+
+3. ALL AUDIT WRITES use record_audit_event() RPC → audit_log_v2
+   Never write to post_audit_logs from client or server code.
+
+4. RLS GATE: provision before query
+   /api/workspace/provision must be called before any posts SELECT in load().
+
+5. isValidUuid() GUARD before all Supabase ops using card IDs
+   Post IDs start as temp timestamps. Guard every Supabase call:
+     if (useSupabase && isValidUuid(cardId)) { ... }
+
+6. load() MUST NOT fall back to localStorage on empty DB result
+   Empty array = empty board. Only fall back on result.error truthy.
+
+7. NEVER call setCards(PLACEHOLDER_CARDS) when Supabase is configured and user is authenticated.
+
+8. Branding: "Content Engine" not "Pipeline" in user-facing text.
+
+=======================================================
+SECTION 4: PENDING MIGRATIONS (run in this order in Supabase SQL editor)
+=======================================================
+
+  0010_publish_ledger.sql
+  0011_claim_publish_job.sql
+  0012_scheduled_at_tstz.sql
+  0013_column_drift.sql
+  0014_create_publish_job_for_post.sql
+  0015_post_safety.sql
+  0016_fix_timezone_defaults.sql  ← NEW (Fix 8 above)
+
+Until 0010-0014 are applied, POSTS_SELECT_FULL (joins publish_jobs) will fail.
+The code falls back to POSTS_SELECT_BASIC ("*") automatically. Do NOT remove
+this fallback.
+
+0015 triggers:
+  posts_audit_before_delete       — logs every DELETE to audit_log_v2 before removal
+  posts_protect_approved_and_posted — BLOCKS hard-delete of approved/posted posts
+  posts_audit_stage_change        — auto-logs stage changes to audit_log_v2
+
+=======================================================
+SECTION 5: POST-DEPLOY CHECKLIST
+=======================================================
+
+After deploying the Primetime portal:
+
+1. Run all migrations above in Supabase SQL editor (in order)
+2. Call POST /api/admin/backfill-media once to populate media_assets for existing posts
+3. Run npm run build → must be zero TypeScript errors
+4. Verify: Create post with image → image appears in Media Library
+5. Verify: Move card to Approved/Scheduled → stays there (does NOT jump to Posted)
+6. Verify: Drag card on one device → updates in real-time on another (no refresh needed)
+7. Verify: Owner-role users can drag cards to Approved/Scheduled
+8. Verify: Scheduled times respect CST (19:00 CST stored as 01:00 UTC next day)
+9. Verify: Revision drag → creator receives branded Primetime email
+10. Verify: MP4 video > 4.5 MB uploads successfully (no 413)
+11. Verify: Board does not show placeholder cards after first load
+
+=======================================================
+SECTION 6: KEY FILES REFERENCE
+=======================================================
+
+  src/lib/pipeline-context.tsx     — createCard, moveCard, submitKickback, load, Realtime
+  src/lib/media-assets.ts          — NEW: ensureMediaAsset() shared helper
+  src/lib/drive-upload.ts          — uploadToDrive (size-based routing)
+  src/lib/audit.ts                 — logAudit using record_audit_event() RPC
+  src/lib/email-utils.ts           — wrapEmail, ctaButton, buildRevisionEmailHtml
+  src/lib/utils.ts                 — APP_TIMEZONE = "America/Chicago"
+  src/components/kanban-board.tsx  — isApprover list, APPROVER_COLUMNS, drag RBAC
+  src/components/asset-review-drawer.tsx  — handleAssetReplace, handleRawFileUpload
+  src/components/create-post-modal.tsx    — media_assets insert loop
+  src/components/repurpose-modal.tsx      — createCard clone
+  src/components/pages/media-page.tsx     — media_assets upload insert
+  src/components/pages/settings-page.tsx  — timezone dropdown
+  src/app/api/workspace/provision/route.ts — self-healing workspace membership
+  src/app/api/publish-jobs/route.ts        — calls create_publish_job_for_post RPC
+  src/app/api/admin/backfill-media/route.ts — NEW: one-time media backfill
+  supabase/migrations/0016_fix_timezone_defaults.sql — NEW: CST fallback fix
+
+=======================================================
+BASELINE WORKSPACE UUID (single-tenant fallback)
+=======================================================
+
+  '00000000-0000-0000-0000-000000000001'
+
+Use everywhere workspace_id might be null/undefined as the INSERT fallback.
+
+=======================================================
 END OF MIGRATION PROMPT
-================================================================================
+=======================================================

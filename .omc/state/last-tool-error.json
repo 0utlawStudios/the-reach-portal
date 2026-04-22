@@ -1,0 +1,7 @@
+{
+  "tool_name": "Read",
+  "tool_input_preview": "{\"file_path\":\"/Users/ace/Documents/CURSOR\\\\ MAIN/ten80ten-smm-portal/src/components/asset-review-drawer.tsx\"}",
+  "error": "File does not exist. Note: your current working directory is /Users/ace/Documents/CURSOR MAIN/ten80ten-smm-portal.",
+  "timestamp": "2026-04-22T06:26:52.875Z",
+  "retry_count": 4
+}
