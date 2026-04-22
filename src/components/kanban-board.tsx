@@ -56,7 +56,7 @@ function sortForColumn(cards: ContentCardType[], stage: PipelineStage): ContentC
 const APPROVER_COLUMNS: PipelineStage[] = ["approved_scheduled", "posted"];
 
 function isApprover(role: string): boolean {
-  return ["superadmin", "admin", "approver", "creative_director"].includes(role);
+  return ["superadmin", "admin", "owner", "approver", "creative_director"].includes(role);
 }
 
 export function KanbanBoard() {

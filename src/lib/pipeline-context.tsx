@@ -7,6 +7,7 @@ import { loadState, saveState } from "./persistence";
 import { supabase } from "./supabaseClient";
 import { logAudit } from "./audit";
 import { useAuth } from "./auth-context";
+import { APP_TIMEZONE } from "./utils";
 
 const STORAGE_KEY = "pipeline_cards";
 const POSTS_SELECT_FULL = "*, publish_jobs(state, platform_publish_attempts(platform, state, external_post_id))";
@@ -94,13 +95,29 @@ function normalizePublishJob(raw: PostRow["publish_jobs"]): ContentCard["publish
   };
 }
 
+/** Convert a user-entered date+time (in APP_TIMEZONE) to a UTC ISO string. */
 function toScheduledAt(date?: string, time?: string): string | null | undefined {
   if (date === undefined && time === undefined) return undefined;
   if (!date || !time) return null;
 
-  const parsed = new Date(`${date}T${time}`);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return parsed.toISOString();
+  try {
+    // Build a reference Date in UTC (we'll correct for timezone offset below)
+    const naive = new Date(`${date}T${time}:00Z`);
+    if (Number.isNaN(naive.getTime())) return null;
+
+    // Calculate the UTC offset for APP_TIMEZONE at the naive date.
+    // toLocaleString gives us the wall-clock time in that timezone; the diff
+    // between the two wall-clock interpretations is the offset in ms.
+    const utcWall = new Date(naive.toLocaleString("en-US", { timeZone: "UTC" }));
+    const tzWall  = new Date(naive.toLocaleString("en-US", { timeZone: APP_TIMEZONE }));
+    const offsetMs = utcWall.getTime() - tzWall.getTime();
+
+    const corrected = new Date(naive.getTime() + offsetMs);
+    if (Number.isNaN(corrected.getTime())) return null;
+    return corrected.toISOString();
+  } catch {
+    return null;
+  }
 }
 
 function dbToCard(row: PostRow): ContentCard {
@@ -292,13 +309,14 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
 
   // ─── Realtime subscription ───
   useEffect(() => {
-    if (!useSupabase) return;
+    if (!useSupabase || !workspaceIdRef.current) return;
 
+    const wsId = workspaceIdRef.current;
     const channel = supabase
-      .channel("posts-realtime")
+      .channel(`posts-realtime-${wsId}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "posts" },
+        { event: "INSERT", schema: "public", table: "posts", filter: `workspace_id=eq.${wsId}` },
         (payload) => {
           const newCard = dbToCard(payload.new as PostRow);
           // Skip if this was our own insert (dedup)
@@ -311,22 +329,18 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
       )
       .on(
         "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "posts" },
+        { event: "UPDATE", schema: "public", table: "posts", filter: `workspace_id=eq.${wsId}` },
         (payload) => {
-          const fallback = dbToCard(payload.new as PostRow);
-          // Skip if this was our own update (dedup)
-          if (recentMutations.current.has(fallback.id)) return;
-          supabase.from("posts").select(postsSelect.current).eq("id", fallback.id).maybeSingle().then(({ data }) => {
-            const updated = dbToCard((data as PostRow | null) || (payload.new as PostRow));
-            setCards((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
-            // Also update selectedCard if it's the same post
-            setSelectedCard((prev) => (prev?.id === updated.id ? updated : prev));
-          });
+          const updated = dbToCard(payload.new as PostRow);
+          if (recentMutations.current.has(updated.id)) return;
+          setCards((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+          // Also update selectedCard if it's the same post
+          setSelectedCard((prev) => (prev?.id === updated.id ? updated : prev));
         }
       )
       .on(
         "postgres_changes",
-        { event: "DELETE", schema: "public", table: "posts" },
+        { event: "DELETE", schema: "public", table: "posts", filter: `workspace_id=eq.${wsId}` },
         (payload) => {
           const deletedId = (payload.old as Partial<PostRow>).id;
           if (!deletedId || recentMutations.current.has(deletedId)) return;
@@ -339,7 +353,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [useSupabase]);
+  }, [useSupabase, workspaceId]);
 
   // ─── Persist localStorage backup ───
   useEffect(() => {

@@ -242,6 +242,8 @@ export function SettingsPage() {
   const { members, removeMember, pendingRequests, refreshPendingRequests } = useTeam();
   const { currentUser } = useAuth();
   const { addToast } = useToast();
+  const { workspaceId } = usePipeline();
+  const [workspaceTz, setWorkspaceTz] = useState("America/Chicago");
   const currentMember = members.find((m) => m.email === currentUser.email);
   const isAdmin = currentMember?.role === "superadmin" || currentMember?.role === "admin";
   const isSuperadmin = currentMember?.role === "superadmin";
@@ -259,6 +261,13 @@ export function SettingsPage() {
   const [activeIntegration, setActiveIntegration] = useState<string | null>(null);
   const [approving, setApproving] = useState<string | null>(null);
   const [resendingInvite, setResendingInvite] = useState<string | null>(null);
+
+  // Load workspace timezone on mount
+  useEffect(() => {
+    if (!workspaceId) return;
+    supabase.from("workspaces").select("timezone").eq("id", workspaceId).maybeSingle()
+      .then(({ data }) => { if (data?.timezone) setWorkspaceTz(data.timezone); });
+  }, [workspaceId]);
 
   const activeMembers = useMemo(() => members.filter((m) => m.status === "active"), [members]);
   const pendingMembers = useMemo(() => members.filter((m) => m.status === "pending"), [members]);
@@ -392,8 +401,23 @@ export function SettingsPage() {
               </div>
             </SettingRow>
             <SettingRow icon={Clock} label="Timezone" desc="Scheduled posts use this timezone">
-              <select className="h-8 px-3 rounded-lg bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-[11px] text-gray-600 dark:text-gray-300 outline-none cursor-pointer">
-                <option>Pacific Time (PT)</option><option>Mountain Time (MT)</option><option>Central Time (CT)</option><option>Eastern Time (ET)</option><option>UTC</option>
+              <select
+                value={workspaceTz}
+                onChange={async (e) => {
+                  const newTz = e.target.value;
+                  setWorkspaceTz(newTz);
+                  if (workspaceId) {
+                    await supabase.from("workspaces").update({ timezone: newTz }).eq("id", workspaceId);
+                    addToast("Timezone updated", "success");
+                  }
+                }}
+                className="h-8 px-3 rounded-lg bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-[11px] text-gray-600 dark:text-gray-300 outline-none cursor-pointer"
+              >
+                <option value="America/Los_Angeles">Pacific Time (PT)</option>
+                <option value="America/Denver">Mountain Time (MT)</option>
+                <option value="America/Chicago">Central Time (CT)</option>
+                <option value="America/New_York">Eastern Time (ET)</option>
+                <option value="UTC">UTC</option>
               </select>
             </SettingRow>
             <SettingRow icon={Calendar} label="Week starts on" desc="First day of the week in calendar">
