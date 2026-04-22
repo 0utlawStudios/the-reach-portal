@@ -229,10 +229,59 @@ Root cause C — Realtime subscription has no workspace_id filter:
     - UPDATE handler: use payload.new directly instead of re-fetching from DB
       (eliminates extra round-trip, prevents state overwrite race)
 
+  RESULT: When any user drags a card on any device/browser, all other
+  logged-in users see the card move instantly with no page refresh.
+  This is the cross-device real-time board sync.
+
+  SUPABASE DASHBOARD REQUIREMENT: For this to work, the `posts` table
+  must have Realtime enabled in the Supabase dashboard:
+    Supabase → Database → Replication → Tables → enable `posts`
+  Without this toggle, the postgres_changes subscription fires nothing.
+
 Root cause D — Settings timezone dropdown is non-functional:
   File: src/components/pages/settings-page.tsx
   Wire the dropdown to save workspaces.timezone via Supabase UPDATE.
   Default selected value: "America/Chicago"
+
+-------------------------------------------------------
+FIX 9: Post approval email notification missing
+-------------------------------------------------------
+
+When an approver drags a card to Approved/Scheduled, the post creator
+received NO notification. They had no idea their post was approved,
+when it's scheduled, or what to do next.
+
+Files:
+  - src/lib/email-utils.ts
+  - src/app/api/notifications/approved/route.ts  ← NEW
+  - src/lib/pipeline-context.tsx (moveCard function)
+
+Fix — Add buildPostApprovedEmailHtml() to email-utils.ts:
+  - Green gradient header (#059669 → #22c55e) matching Approved/Scheduled column
+  - Shows: approver name, post title, platform badges, schedule in CST,
+    content type, caption preview (220 char limit)
+  - "What happens next?" section:
+      "Starting May 2026, approved posts will automatically publish to
+       your selected platforms at the scheduled time."
+      Until then: post manually, then move card to "Posted"
+
+Fix — New POST /api/notifications/approved:
+  Body: { postId, postTitle, approvedBy, createdBy }
+  1. Fetch post data (platforms, content_type, scheduled_date/time, caption)
+  2. Look up creator email from team_members by name match
+  3. Send branded approval email using buildPostApprovedEmailHtml()
+  4. Record audit event: p_action = "post_approved_notified"
+  Graceful: returns { sent: 0 } if creator name not found — no error thrown
+
+Fix — Wire into moveCard in pipeline-context.tsx:
+  After publish job creation, add fire-and-catch call to
+  /api/notifications/approved with { postId, postTitle, approvedBy,
+  createdBy: card?.createdBy } when newStage === "approved_scheduled"
+
+The approved notification is ALWAYS sent on any move to approved_scheduled
+(regardless of whether the card has a schedule date/time set).
+
+Email subject: Post Approved: "{postTitle}"
 
 =======================================================
 SECTION 3: ARCHITECTURE RULES (from AGENTS.md — mandatory)
@@ -295,12 +344,18 @@ After deploying the Primetime portal:
 3. Run npm run build → must be zero TypeScript errors
 4. Verify: Create post with image → image appears in Media Library
 5. Verify: Move card to Approved/Scheduled → stays there (does NOT jump to Posted)
-6. Verify: Drag card on one device → updates in real-time on another (no refresh needed)
+6. Verify: Drag card on one device → card moves on ALL other devices instantly,
+   no page refresh required (Supabase Realtime cross-device sync).
+   PREREQUISITE: In Supabase dashboard → Database → Replication → Tables →
+   enable Realtime on the "posts" table. Without this toggle the sync is silent.
 7. Verify: Owner-role users can drag cards to Approved/Scheduled
 8. Verify: Scheduled times respect CST (19:00 CST stored as 01:00 UTC next day)
 9. Verify: Revision drag → creator receives branded Primetime email
 10. Verify: MP4 video > 4.5 MB uploads successfully (no 413)
 11. Verify: Board does not show placeholder cards after first load
+12. Verify: Approving a post (drag to Approved/Scheduled) → creator receives
+    green branded approval email showing schedule, platforms, caption preview,
+    and the May 2026 auto-publish notice
 
 =======================================================
 SECTION 6: KEY FILES REFERENCE
@@ -321,6 +376,7 @@ SECTION 6: KEY FILES REFERENCE
   src/app/api/workspace/provision/route.ts — self-healing workspace membership
   src/app/api/publish-jobs/route.ts        — calls create_publish_job_for_post RPC
   src/app/api/admin/backfill-media/route.ts — NEW: one-time media backfill
+  src/app/api/notifications/approved/route.ts — NEW: post approval email to creator
   supabase/migrations/0016_fix_timezone_defaults.sql — NEW: CST fallback fix
 
 =======================================================
