@@ -1,7 +1,7 @@
 {
   "tool_name": "Read",
-  "tool_input_preview": "{\"file_path\":\"/Users/ace/Documents/CURSOR MAIN/ten80ten-smm-portal/src/components/pipeline-context.tsx\"}",
+  "tool_input_preview": "{\"file_path\":\"/Users/ace/Documents/CURSOR\\\\ MAIN/ten80ten-smm-portal/src/lib/auth-context.tsx\"}",
   "error": "File does not exist. Note: your current working directory is /Users/ace/Documents/CURSOR MAIN/ten80ten-smm-portal.",
-  "timestamp": "2026-04-22T19:02:07.444Z",
-  "retry_count": 1
+  "timestamp": "2026-04-22T20:21:39.606Z",
+  "retry_count": 5
 }
