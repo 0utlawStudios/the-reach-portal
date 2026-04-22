@@ -225,8 +225,8 @@
     },
     {
       "path": "src",
-      "accessCount": 82,
-      "lastAccessed": 1776839320039,
+      "accessCount": 83,
+      "lastAccessed": 1776839855143,
       "type": "directory"
     },
     {
@@ -237,14 +237,14 @@
     },
     {
       "path": "src/lib/pipeline-context.tsx",
-      "accessCount": 68,
-      "lastAccessed": 1776839344024,
+      "accessCount": 72,
+      "lastAccessed": 1776839929091,
       "type": "file"
     },
     {
       "path": "src/components/pages/settings-page.tsx",
-      "accessCount": 39,
-      "lastAccessed": 1776838335341,
+      "accessCount": 43,
+      "lastAccessed": 1776839963238,
       "type": "file"
     },
     {
@@ -260,15 +260,15 @@
       "type": "file"
     },
     {
-      "path": "src/lib/types.ts",
-      "accessCount": 21,
-      "lastAccessed": 1776839229397,
+      "path": "src/components/kanban-board.tsx",
+      "accessCount": 23,
+      "lastAccessed": 1776839913048,
       "type": "file"
     },
     {
-      "path": "src/components/kanban-board.tsx",
+      "path": "src/lib/types.ts",
       "accessCount": 21,
-      "lastAccessed": 1776839346209,
+      "lastAccessed": 1776839229397,
       "type": "file"
     },
     {
