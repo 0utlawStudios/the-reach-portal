@@ -414,6 +414,23 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
             await createPublishJob(cardId);
           }
 
+          if (newStage === "approved_scheduled") {
+            supabase.auth.getSession().then(({ data: { session } }) => {
+              const headers: HeadersInit = { "Content-Type": "application/json" };
+              if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+              fetch("/api/notifications/approved", {
+                method: "POST",
+                headers,
+                body: JSON.stringify({
+                  postId: cardId,
+                  postTitle: card?.title || "",
+                  approvedBy: currentUser.name,
+                  createdBy: card?.createdBy || "",
+                }),
+              }).catch((e) => console.error("[pipeline] approved notify failed:", e));
+            }).catch(() => {});
+          }
+
           if (newStage === "awaiting_approval") {
             supabase.auth.getSession().then(({ data: { session } }) => {
               const headers: HeadersInit = { "Content-Type": "application/json" };

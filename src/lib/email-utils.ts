@@ -150,6 +150,89 @@ export function buildRevisionEmailHtml(postTitle: string, revisionNote: string, 
 </div>`);
 }
 
+// ─── Template 6: Post Approved Email ───
+
+export function buildPostApprovedEmailHtml(params: {
+  creatorName: string;
+  approverName: string;
+  postTitle: string;
+  platforms: string[];
+  scheduled: string | null;
+  contentType: string;
+  captionPreview: string | null;
+  siteUrl: string;
+}): string {
+  const { creatorName, approverName, postTitle, platforms, scheduled, contentType, captionPreview, siteUrl } = params;
+  const logoUrl = `${getSiteUrl()}/ten80ten-logo.png`;
+
+  const PLATFORM_COLORS: Record<string, { label: string; color: string }> = {
+    facebook:  { label: "Facebook",  color: "#1877f2" },
+    instagram: { label: "Instagram", color: "#e1306c" },
+    linkedin:  { label: "LinkedIn",  color: "#0a66c2" },
+    youtube:   { label: "YouTube",   color: "#ff0000" },
+    tiktok:    { label: "TikTok",    color: "#010101" },
+  };
+
+  const platformBadges = platforms?.length
+    ? platforms.map((p) => {
+        const m = PLATFORM_COLORS[p] || { label: p, color: "#6b7280" };
+        return `<span style="display:inline-block;background:${m.color};color:#fff;font-size:11px;font-weight:700;padding:4px 14px;border-radius:100px;margin:0 6px 6px 0;letter-spacing:0.02em;">${esc(m.label)}</span>`;
+      }).join("")
+    : '<span style="color:#9ca3af;font-size:13px;">No platforms set</span>';
+
+  const metaRow = (contentType || scheduled)
+    ? `<div style="background:#f9fafb;border-radius:8px;padding:16px 20px;margin:0 0 20px;">
+         <table cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+           <tr>
+             ${contentType ? `<td style="padding-right:40px;vertical-align:top;">
+               <p style="color:#9ca3af;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 4px;">Content Type</p>
+               <p style="color:#111827;font-size:14px;font-weight:700;margin:0;">${esc(contentType)}</p>
+             </td>` : ""}
+             ${scheduled ? `<td style="vertical-align:top;">
+               <p style="color:#9ca3af;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 4px;">Scheduled</p>
+               <p style="color:#111827;font-size:14px;font-weight:700;margin:0;">${esc(scheduled)} <span style="font-size:11px;color:#6b7280;font-weight:500;">CST</span></p>
+             </td>` : ""}
+           </tr>
+         </table>
+       </div>`
+    : "";
+
+  const captionBlock = captionPreview
+    ? `<div style="border-left:3px solid #059669;padding:12px 16px;background:#f0fdf4;border-radius:0 8px 8px 0;margin-bottom:24px;">
+         <p style="color:#9ca3af;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 6px;">Caption</p>
+         <p style="color:#374151;font-size:13px;line-height:1.65;margin:0;white-space:pre-wrap;">${esc(captionPreview)}</p>
+       </div>`
+    : "";
+
+  return wrapEmail(`
+<div style="background:linear-gradient(135deg,#059669,#22c55e);padding:32px;text-align:center;">
+  <img src="${logoUrl}" alt="Ten80Ten" width="52" height="52" style="display:block;margin:0 auto 16px;border-radius:14px;background:rgba(255,255,255,0.2);padding:8px;" />
+  <h1 style="color:#fff;font-size:22px;font-weight:800;margin:0;">Post Approved</h1>
+  <p style="color:rgba(255,255,255,0.85);font-size:13px;margin:8px 0 0;">Your content has been approved</p>
+</div>
+<div style="background:#fff;padding:32px;">
+  <p style="color:#111;font-size:15px;line-height:1.6;margin:0 0 6px;">Hi <strong>${esc(creatorName)}</strong>,</p>
+  <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 20px;"><strong>${esc(approverName)}</strong> has reviewed and approved your post:</p>
+  <p style="color:#111827;font-size:17px;font-weight:700;margin:0 0 18px;line-height:1.3;">${esc(postTitle)}</p>
+  <div style="margin-bottom:20px;">
+    <p style="color:#9ca3af;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 10px;">Posting to</p>
+    <div>${platformBadges}</div>
+  </div>
+  ${metaRow}
+  ${captionBlock}
+  <div style="border-top:1px solid #f3f4f6;padding-top:24px;">
+    <p style="color:#111827;font-size:14px;font-weight:700;margin:0 0 10px;">What happens next?</p>
+    <p style="color:#374151;font-size:13px;line-height:1.65;margin:0 0 14px;">Starting <strong>May 2026</strong>, approved posts will automatically publish to your selected platforms at the scheduled time. No manual action needed.</p>
+    <p style="color:#374151;font-size:13px;font-weight:600;margin:0 0 8px;">Until auto-publishing is active:</p>
+    <ol style="color:#374151;font-size:13px;line-height:1.8;margin:0 0 24px;padding-left:20px;">
+      <li>Post this content manually on the platforms above at the scheduled time</li>
+      <li>Move the card to <strong>&ldquo;Posted&rdquo;</strong> in the Content Engine to confirm it&rsquo;s live</li>
+    </ol>
+  </div>
+  <div style="text-align:center;margin:4px 0 8px;">${ctaButton("View in Content Engine", siteUrl, "background:linear-gradient(135deg,#059669,#22c55e);")}</div>
+</div>`);
+}
+
 // ─── Admin Notification (New Access Request) ───
 
 export function buildAdminNotificationHtml(requester: { name: string; email: string; phone?: string | null; company?: string | null; reason?: string | null }) {
