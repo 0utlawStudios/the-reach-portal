@@ -25,11 +25,12 @@ import { ValidationErrorModal } from "./validation-error-modal";
 import { useAuth } from "@/lib/auth-context";
 import { useTeam } from "@/lib/team-context";
 import { useToast } from "@/lib/toast-context";
+import { ensureMediaAsset } from "@/lib/media-assets";
 
 type DrawerTab = "content" | "vault" | "audit";
 
 export function AssetReviewDrawer() {
-  const { selectedCard, isDrawerOpen, isEditingOnOpen, closeDrawer, moveCard, requestReapproval, updateCard, deleteCard } = usePipeline();
+  const { selectedCard, isDrawerOpen, isEditingOnOpen, closeDrawer, moveCard, requestReapproval, updateCard, deleteCard, workspaceId } = usePipeline();
   const { addToast } = useToast();
   const { currentUser } = useAuth();
   const { members } = useTeam();
@@ -251,6 +252,16 @@ export function AssetReviewDrawer() {
       const result = await uploadToDrive(file, "thumbnails", selectedCard.id, setUploadProgress);
       URL.revokeObjectURL(blobUrl);
       updateCard(selectedCard.id, { thumbnailUrl: result.url });
+      // Sync to Media Library — fire and catch so primary op is never blocked
+      ensureMediaAsset({
+        name: file.name,
+        url: result.url,
+        fileType: file.type.startsWith("video") ? "video" : "image",
+        folder: "Pipeline Uploads",
+        addedBy: currentUser.name,
+        workspaceId,
+        usedIn: selectedCard.id,
+      }).catch((err) => console.error("[drawer] media_assets sync failed:", err));
       addToast("Cover image uploaded to Drive", "success");
     } catch (err) {
       // REVERT — never persist blob URL
@@ -299,6 +310,16 @@ export function AssetReviewDrawer() {
       };
       const rawFiles = [...existingFiles, newFile];
       updateCard(selectedCard.id, { sourceVault: { ...(selectedCard.sourceVault || {}), rawFiles } });
+      // Sync to Media Library
+      ensureMediaAsset({
+        name: file.name,
+        url: result.url,
+        fileType: (result.mimeType || file.type).startsWith("video") ? "video" : "image",
+        folder: "Pipeline Uploads",
+        addedBy: currentUser.name,
+        workspaceId,
+        usedIn: selectedCard.id,
+      }).catch((err) => console.error("[drawer] media_assets sync failed:", err));
       logAudit(selectedCard.id, currentUser.name, "raw_file_uploaded", `Uploaded ${file.name} (${newFile.usageType})`);
       addToast(`${file.name} uploaded to Drive`, "success");
     } catch (err) {

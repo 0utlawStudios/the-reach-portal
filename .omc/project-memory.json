@@ -219,38 +219,50 @@
   "hotPaths": [
     {
       "path": "src/components/asset-review-drawer.tsx",
-      "accessCount": 105,
-      "lastAccessed": 1776778680830,
+      "accessCount": 120,
+      "lastAccessed": 1776838695531,
       "type": "file"
     },
     {
       "path": "src",
-      "accessCount": 70,
-      "lastAccessed": 1776781906993,
+      "accessCount": 79,
+      "lastAccessed": 1776838481670,
       "type": "directory"
     },
     {
       "path": "",
-      "accessCount": 69,
-      "lastAccessed": 1776775226612,
+      "accessCount": 74,
+      "lastAccessed": 1776838651108,
       "type": "directory"
     },
     {
       "path": "src/lib/pipeline-context.tsx",
-      "accessCount": 58,
-      "lastAccessed": 1776782010500,
+      "accessCount": 65,
+      "lastAccessed": 1776838656155,
       "type": "file"
     },
     {
       "path": "src/components/pages/settings-page.tsx",
-      "accessCount": 37,
-      "lastAccessed": 1776775219128,
+      "accessCount": 39,
+      "lastAccessed": 1776838335341,
+      "type": "file"
+    },
+    {
+      "path": "src/components/pages/media-page.tsx",
+      "accessCount": 27,
+      "lastAccessed": 1776838756142,
       "type": "file"
     },
     {
       "path": "src/app/api/notifications/revision/route.ts",
       "accessCount": 25,
       "lastAccessed": 1776782012666,
+      "type": "file"
+    },
+    {
+      "path": "src/components/media-picker.tsx",
+      "accessCount": 20,
+      "lastAccessed": 1776838328829,
       "type": "file"
     },
     {
@@ -272,27 +284,33 @@
       "type": "file"
     },
     {
+      "path": "src/lib/types.ts",
+      "accessCount": 19,
+      "lastAccessed": 1776838312346,
+      "type": "file"
+    },
+    {
       "path": "src/app/api/notifications/mention/route.ts",
       "accessCount": 18,
       "lastAccessed": 1776778556445,
       "type": "file"
     },
     {
-      "path": "src/components/pages/media-page.tsx",
-      "accessCount": 16,
-      "lastAccessed": 1776775452304,
-      "type": "file"
-    },
-    {
-      "path": "src/components/media-picker.tsx",
-      "accessCount": 15,
-      "lastAccessed": 1776775499707,
-      "type": "file"
-    },
-    {
       "path": "src/lib/google-drive.ts",
+      "accessCount": 17,
+      "lastAccessed": 1776838050989,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/drive/upload/route.ts",
       "accessCount": 15,
-      "lastAccessed": 1776782001931,
+      "lastAccessed": 1776838048485,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/drive-upload.ts",
+      "accessCount": 15,
+      "lastAccessed": 1776838312954,
       "type": "file"
     },
     {
@@ -302,21 +320,21 @@
       "type": "file"
     },
     {
-      "path": "src/app/api/drive/upload/route.ts",
-      "accessCount": 13,
-      "lastAccessed": 1776782002811,
-      "type": "file"
-    },
-    {
       "path": "src/lib/email-utils.ts",
       "accessCount": 13,
       "lastAccessed": 1776782011570,
       "type": "file"
     },
     {
-      "path": "src/lib/types.ts",
-      "accessCount": 12,
-      "lastAccessed": 1776778587835,
+      "path": "src/app/api/drive/finalize/route.ts",
+      "accessCount": 13,
+      "lastAccessed": 1776838048970,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/drive/proxy-upload/route.ts",
+      "accessCount": 13,
+      "lastAccessed": 1776838050395,
       "type": "file"
     },
     {
@@ -326,27 +344,9 @@
       "type": "file"
     },
     {
-      "path": "src/lib/drive-upload.ts",
-      "accessCount": 12,
-      "lastAccessed": 1776782000921,
-      "type": "file"
-    },
-    {
       "path": "src/app/api/team/approve-request/route.ts",
       "accessCount": 11,
       "lastAccessed": 1776702983858,
-      "type": "file"
-    },
-    {
-      "path": "src/app/api/drive/proxy-upload/route.ts",
-      "accessCount": 11,
-      "lastAccessed": 1776775437600,
-      "type": "file"
-    },
-    {
-      "path": "src/app/api/drive/finalize/route.ts",
-      "accessCount": 11,
-      "lastAccessed": 1776782003749,
       "type": "file"
     },
     {
@@ -381,8 +381,8 @@
     },
     {
       "path": "src/app/api/drive/stream/route.ts",
-      "accessCount": 8,
-      "lastAccessed": 1776775459802,
+      "accessCount": 9,
+      "lastAccessed": 1776838050103,
       "type": "file"
     },
     {
@@ -437,6 +437,12 @@
       "path": "src/components/app-shell.tsx",
       "accessCount": 5,
       "lastAccessed": 1776778586730,
+      "type": "file"
+    },
+    {
+      "path": "migration/migrate.mjs",
+      "accessCount": 5,
+      "lastAccessed": 1776838078740,
       "type": "file"
     },
     {
@@ -503,12 +509,6 @@
       "path": "migration/package.json",
       "accessCount": 1,
       "lastAccessed": 1775603446536,
-      "type": "file"
-    },
-    {
-      "path": "migration/migrate.mjs",
-      "accessCount": 1,
-      "lastAccessed": 1775603571618,
       "type": "file"
     },
     {

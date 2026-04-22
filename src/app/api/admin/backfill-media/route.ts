@@ -1,0 +1,115 @@
+import { createClient } from "@supabase/supabase-js";
+import { NextResponse } from "next/server";
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isValidUuid(v: string): boolean {
+  return UUID_REGEX.test(v);
+}
+
+export async function POST() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceKey) {
+    return NextResponse.json({ error: "Missing Supabase credentials" }, { status: 500 });
+  }
+
+  const admin = createClient(supabaseUrl, serviceKey);
+
+  // Fetch all posts
+  const { data: posts, error: postsErr } = await admin
+    .from("posts")
+    .select("id, title, thumbnail_url, source_vault, content_type, created_by, workspace_id");
+
+  if (postsErr) {
+    return NextResponse.json({ error: postsErr.message }, { status: 500 });
+  }
+
+  // Fetch all existing media_assets URLs to skip duplicates
+  const { data: existingAssets } = await admin.from("media_assets").select("id, url, used_in");
+  const existingByUrl = new Map<string, { id: string; used_in: string[] }>(
+    (existingAssets || []).map((a: { id: string; url: string; used_in: string[] }) => [
+      a.url,
+      { id: a.id, used_in: a.used_in || [] },
+    ])
+  );
+
+  let inserted = 0;
+  let skipped = 0;
+  let updated = 0;
+
+  for (const post of posts || []) {
+    const wsId = post.workspace_id || "00000000-0000-0000-0000-000000000001";
+    const isVideo = post.content_type === "video" || post.content_type === "reel";
+
+    // Collect all image/video URLs for this post
+    const entries: { name: string; url: string; fileType: "image" | "video" }[] = [];
+
+    if (post.thumbnail_url && !post.thumbnail_url.startsWith("blob:")) {
+      entries.push({
+        name: post.title || "Post thumbnail",
+        url: post.thumbnail_url,
+        fileType: isVideo ? "video" : "image",
+      });
+    }
+
+    const rawFiles: { name?: string; url?: string; mimeType?: string }[] =
+      post.source_vault?.rawFiles || [];
+    for (const rf of rawFiles) {
+      if (rf.url && !rf.url.startsWith("blob:")) {
+        entries.push({
+          name: rf.name || "Raw file",
+          url: rf.url,
+          fileType: rf.mimeType?.startsWith("video") ? "video" : "image",
+        });
+      }
+    }
+
+    for (const entry of entries) {
+      const existing = existingByUrl.get(entry.url);
+
+      if (existing) {
+        // Row already exists — update used_in if this post isn't already in it
+        skipped++;
+        if (isValidUuid(post.id) && !existing.used_in.includes(post.id)) {
+          const newUsedIn = [...existing.used_in, post.id];
+          await admin
+            .from("media_assets")
+            .update({ used_in: newUsedIn })
+            .eq("id", existing.id);
+          existingByUrl.set(entry.url, { id: existing.id, used_in: newUsedIn });
+          updated++;
+        }
+        continue;
+      }
+
+      // Insert new row
+      const usedInArray = isValidUuid(post.id) ? [post.id] : [];
+      const { error } = await admin.from("media_assets").insert({
+        name: entry.name,
+        url: entry.url,
+        file_type: entry.fileType,
+        folder: "Pipeline Uploads",
+        added_by: post.created_by || "System Backfill",
+        workspace_id: wsId,
+        used_in: usedInArray,
+      });
+
+      if (!error) {
+        inserted++;
+        existingByUrl.set(entry.url, { id: "backfilled", used_in: usedInArray });
+      } else {
+        console.error("[backfill] insert failed for url", entry.url, error.message);
+      }
+    }
+  }
+
+  return NextResponse.json({
+    inserted,
+    skipped,
+    updated,
+    total: (posts || []).length,
+    message: `Backfill complete. ${inserted} new, ${skipped} already existed (${updated} had used_in updated), ${(posts || []).length} posts scanned.`,
+  });
+}

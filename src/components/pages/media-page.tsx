@@ -45,7 +45,7 @@ function dbToAsset(row: MediaAssetRow): MediaAsset {
 }
 
 export function MediaPage() {
-  const { cards } = usePipeline();
+  const { cards, workspaceId } = usePipeline();
   const { currentUser } = useAuth();
   const { addToast } = useToast();
   const [media, setMedia] = useState<MediaAsset[]>([]);
@@ -117,6 +117,7 @@ export function MediaPage() {
               file_type: asset.type,
               folder: asset.folder,
               added_by: asset.addedBy,
+              workspace_id: workspaceId,
             })
             .select("id")
             .single();

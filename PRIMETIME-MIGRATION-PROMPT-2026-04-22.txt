@@ -1,8 +1,4 @@
-PRIMETIME SMM PORTAL — MIGRATION PROMPT
-Generated: 2026-04-22
-Apply these three bug fixes that were resolved in the source codebase today.
-This is a self-contained prompt. Paste it into your Primetime Claude session.
-Working directory: /Users/ace/Documents/CURSOR MAIN/PRIMETIME SMM PORTAL
+
 ================================================================================
 
 You are working on the Primetime SMM Portal (Next.js + Supabase + Google Drive).

@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { X, RotateCcw, Sparkles, Copy, Calendar, ArrowRight, CheckCircle } from "lucide-react";
+import { ensureMediaAsset } from "@/lib/media-assets";
+import { useAuth } from "@/lib/auth-context";
 
 type RepurposeMode = "select" | "repost" | "rewrite" | "seasonal";
 
@@ -19,8 +21,9 @@ interface Props {
 }
 
 export function RepurposeModal({ card, onClose }: Props) {
-  const { createCard } = usePipeline();
+  const { createCard, workspaceId } = usePipeline();
   const { addToast } = useToast();
+  const { currentUser } = useAuth();
   const [mode, setMode] = useState<RepurposeMode>("select");
   const [title, setTitle] = useState(card.title);
   const [caption, setCaption] = useState(card.caption || "");
@@ -47,6 +50,29 @@ export function RepurposeModal({ card, onClose }: Props) {
       scheduledDate,
       scheduledTime,
     });
+    // Sync thumbnail and rawFiles to Media Library (dedup-safe)
+    if (card.thumbnailUrl) {
+      ensureMediaAsset({
+        name: card.title || "Repurposed asset",
+        url: card.thumbnailUrl,
+        fileType: card.contentType === "video" || card.contentType === "reel" ? "video" : "image",
+        folder: "Pipeline Uploads",
+        addedBy: currentUser.name,
+        workspaceId,
+      }).catch((err) => console.error("[repurpose] media_assets sync failed:", err));
+    }
+    if (card.sourceVault?.rawFiles) {
+      for (const rf of card.sourceVault.rawFiles) {
+        ensureMediaAsset({
+          name: rf.name,
+          url: rf.url,
+          fileType: rf.mimeType?.startsWith("video") ? "video" : "image",
+          folder: "Pipeline Uploads",
+          addedBy: currentUser.name,
+          workspaceId,
+        }).catch((err) => console.error("[repurpose] media_assets sync failed:", err));
+      }
+    }
     addToast(`Content repurposed and added to Ideas pipeline.`, "success");
     onClose();
   };

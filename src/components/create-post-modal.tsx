@@ -9,7 +9,7 @@ import { X, Image as ImageIcon, Film, Layers, PlayCircle, Upload, FileVideo, Plu
 import { PlatformIcon } from "./platform-icons";
 import { useToast } from "@/lib/toast-context";
 import { useAuth } from "@/lib/auth-context";
-import { supabase } from "@/lib/supabaseClient";
+import { ensureMediaAsset } from "@/lib/media-assets";
 import { MentionTextarea } from "./mention-textarea";
 import { MediaPicker } from "./media-picker";
 import { ValidationErrorModal } from "./validation-error-modal";
@@ -226,17 +226,20 @@ export function CreatePostModal({ open, onClose }: Props) {
     });
 
     // Insert uploaded files into media_assets so they appear in Media Library
+    // Note: usedIn omitted — post ID is still a temp timestamp at this point
     for (const rf of rawFiles) {
-      supabase.from("media_assets").insert({
-        name: rf.name,
-        url: rf.url,
-        file_type: rf.mimeType?.startsWith("video") ? "video" : "image",
-        folder: "Pipeline Uploads",
-        added_by: currentUser.name,
-        workspace_id: workspaceId,
-      }).then(({ error }) => {
-        if (error) console.error("[create-post] media_assets insert failed:", error.message);
-      });
+      try {
+        await ensureMediaAsset({
+          name: rf.name,
+          url: rf.url,
+          fileType: rf.mimeType?.startsWith("video") ? "video" : "image",
+          folder: "Pipeline Uploads",
+          addedBy: currentUser.name,
+          workspaceId,
+        });
+      } catch (err) {
+        console.error("[create-post] media_assets insert failed:", err);
+      }
     }
 
     rawFilesRef.current.clear();
