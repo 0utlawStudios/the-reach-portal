@@ -15,6 +15,8 @@ interface UserProfile {
 interface AuthContextType {
   isAuthenticated: boolean;
   currentUser: UserProfile;
+  accessToken: string | null;
+  provisionResult: { workspaceId: string } | null;
   updateCurrentUserAvatar: (avatar: string | undefined) => void;
   login: (email: string, password: string) => Promise<string | null>;
   logout: () => void;
@@ -87,6 +89,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [currentUser, setCurrentUser] = useState<UserProfile>(DEFAULT_USER);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [provisionResult, setProvisionResult] = useState<{ workspaceId: string } | null>(null);
 
   // Check for existing Supabase session on mount
   useEffect(() => {
@@ -94,12 +98,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
+          const token = session.access_token;
           const email = session.user.email || "";
           const meta = session.user.user_metadata || {};
-          let profile = buildProfile(email, meta);
-          profile = await enrichFromTeamMembers(email, profile);
-          setCurrentUser(profile);
+          const profile = buildProfile(email, meta);
+          // Fire provision and team enrich in parallel — provision completes
+          // before PipelineProvider ever mounts, eliminating the waterfall.
+          const [enriched, provisioned] = await Promise.all([
+            enrichFromTeamMembers(email, profile),
+            fetch("/api/workspace/provision", {
+              headers: { Authorization: `Bearer ${token}` },
+            }).then((r) => r.ok ? r.json() : null).catch(() => null),
+          ]);
+          setCurrentUser(enriched);
           setIsAuthenticated(true);
+          setAccessToken(token);
+          if (provisioned?.workspaceId) setProvisionResult(provisioned);
         }
       } catch (err) {
         console.error("[auth] init failed:", err);
@@ -159,8 +173,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ isAuthenticated, currentUser, updateCurrentUserAvatar, login, logout }),
-    [isAuthenticated, currentUser, updateCurrentUserAvatar, login, logout]
+    () => ({ isAuthenticated, currentUser, accessToken, provisionResult, updateCurrentUserAvatar, login, logout }),
+    [isAuthenticated, currentUser, accessToken, provisionResult, updateCurrentUserAvatar, login, logout]
   );
 
   if (!hydrated) return null;

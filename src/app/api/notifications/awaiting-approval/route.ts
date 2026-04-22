@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getTransporter, getFromAddress, esc, safeSubject } from "@/lib/email-utils";
+import { APP_TIMEZONE } from "@/lib/utils";
 import { consume, getClientIp } from "@/lib/rate-limit";
 
 export const maxDuration = 10;
@@ -43,8 +44,8 @@ function formatScheduled(date?: string | null, time?: string | null): string | n
   if (!date) return null;
   try {
     const d = new Date(`${date}T${time || "00:00"}`);
-    const dateStr = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
-    const timeStr = time ? d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }) : null;
+    const dateStr = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: APP_TIMEZONE });
+    const timeStr = time ? d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: APP_TIMEZONE }) + " CT" : null;
     return timeStr ? `${dateStr} at ${timeStr}` : dateStr;
   } catch { return date; }
 }

@@ -7,6 +7,7 @@ import {
   safeSubject,
   buildPostApprovedEmailHtml,
 } from "@/lib/email-utils";
+import { APP_TIMEZONE } from "@/lib/utils";
 import { consume, getClientIp } from "@/lib/rate-limit";
 
 export const maxDuration = 10;
@@ -35,9 +36,10 @@ function formatScheduled(date?: string | null, time?: string | null): string | n
       month: "short",
       day: "numeric",
       year: "numeric",
+      timeZone: APP_TIMEZONE,
     });
     const timeStr = time
-      ? d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
+      ? d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: APP_TIMEZONE }) + " CT"
       : null;
     return timeStr ? `${dateStr} at ${timeStr}` : dateStr;
   } catch {

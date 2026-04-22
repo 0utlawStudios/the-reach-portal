@@ -11,6 +11,7 @@ import { useToast } from "@/lib/toast-context";
 import { useAuth } from "@/lib/auth-context";
 import { ensureMediaAsset } from "@/lib/media-assets";
 import { MentionTextarea } from "./mention-textarea";
+import { formatDateTimeCompact } from "@/lib/utils";
 import { MediaPicker } from "./media-picker";
 import { ValidationErrorModal } from "./validation-error-modal";
 
@@ -217,7 +218,7 @@ export function CreatePostModal({ open, onClose }: Props) {
       assetSource: assetSource || undefined,
       checklist,
       licenseFileId: licenseFileId || undefined,
-      notes: notes.trim() ? `${currentUser.name} (${new Date().toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}): ${notes.trim()}` : undefined,
+      notes: notes.trim() ? `${currentUser.name} (${formatDateTimeCompact(new Date())}): ${notes.trim()}` : undefined,
       sourceVault: (designLink || driveFolder || rawFiles.length > 0) ? {
         designLink: designLink || undefined,
         driveFolder: driveFolder || undefined,

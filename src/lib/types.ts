@@ -72,7 +72,6 @@ export interface MediaAsset {
   type: "image" | "video";
   folder: string;
   uploadedAt: string;
-  uploadedTime?: string;
   addedBy?: string;
   usedIn?: string[];
   scheduledFor?: string;

@@ -4,6 +4,8 @@ import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { ContentCard as ContentCardType, PipelineColumn as PipelineColumnType } from "@/lib/types";
 import { ContentCard } from "./content-card";
+import { SkeletonCard } from "./skeleton-card";
+import { usePipeline } from "@/lib/pipeline-context";
 
 interface Props {
   column: PipelineColumnType;
@@ -12,6 +14,7 @@ interface Props {
 
 export function PipelineColumn({ column, cards }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
+  const { isLoading } = usePipeline();
 
   return (
     <div className="flex flex-col flex-1 min-w-[240px] sm:min-w-[190px] snap-start">
@@ -34,7 +37,13 @@ export function PipelineColumn({ column, cards }: Props) {
         <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
           <div className="space-y-2.5 p-0.5">
             {cards.map((card) => <ContentCard key={card.id} card={card} stageColor={column.color} />)}
-            {cards.length === 0 && (
+            {isLoading && cards.length === 0 && (
+              <div className="space-y-2.5">
+                <SkeletonCard />
+                <SkeletonCard />
+              </div>
+            )}
+            {!isLoading && cards.length === 0 && (
               <div className="py-10 text-center">
                 <div className="w-8 h-8 rounded-full mx-auto mb-2 flex items-center justify-center" style={{ backgroundColor: `${column.color}10` }}>
                   <div className="w-2 h-2 rounded-full" style={{ backgroundColor: `${column.color}40` }} />

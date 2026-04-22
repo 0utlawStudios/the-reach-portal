@@ -13,6 +13,7 @@ import { usePipeline } from "@/lib/pipeline-context";
 import { ThemeSelector } from "@/components/theme-selector";
 import { logAudit, fetchAllAuditLogs, AuditEntry } from "@/lib/audit";
 import { History, ArrowUpRight, Search, FileText as FileTextIcon, Shield as ShieldIcon, AtSign, ArrowUpDown, Filter, ChevronRight, CheckCircle, Activity, Clock as ClockIcon } from "lucide-react";
+import { formatDateTime, formatDateShort, formatDateTimeCompact } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -523,7 +524,7 @@ export function SettingsPage() {
                         <p className="text-[11px] text-gray-400 mt-0.5">{req.email}{req.phone ? ` · ${req.phone}` : ""}</p>
                         {req.company && <p className="text-[10px] text-gray-400 mt-0.5">{req.company}</p>}
                         {req.reason && <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1 italic">&ldquo;{req.reason}&rdquo;</p>}
-                        <p className="text-[9px] text-gray-300 dark:text-gray-600 mt-1">{new Date(req.created_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</p>
+                        <p className="text-[9px] text-gray-300 dark:text-gray-600 mt-1">{formatDateTimeCompact(req.created_at)}</p>
                       </div>
                       {/* Only superadmin sees approve/reject buttons */}
                       {isSuperadmin && (
@@ -576,7 +577,7 @@ export function SettingsPage() {
                           {member.updatedAt && (
                             <span className="text-[9px] text-gray-300 dark:text-gray-600 flex items-center gap-1">
                               <Clock className="w-2.5 h-2.5" />
-                              Signed up {new Date(member.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} at {new Date(member.updatedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                              Signed up {formatDateTime(member.updatedAt)}
                             </span>
                           )}
                         </div>
@@ -886,7 +887,7 @@ function timeAgo(dateStr: string): string {
   if (hrs < 24) return `${hrs}h ago`;
   const days = Math.floor(hrs / 24);
   if (days < 7) return `${days}d ago`;
-  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return formatDateShort(dateStr);
 }
 
 const CONTENT_ACTIONS = ["stage_change", "revision_submitted", "revision_requested", "content_edited", "asset_replaced", "card_viewed", "comment_added", "vault_updated", "raw_file_uploaded", "title_edited", "license_uploaded"];
@@ -1034,7 +1035,7 @@ function AuditLogTab({ auditLogs, auditLoading, setAuditLogs, setAuditLoading }:
         {filteredLogs.map((entry, i) => {
           const meta = actionMeta[entry.action_type] || { label: entry.action_type, color: "bg-gray-400", icon: "content" as const };
           const ago = timeAgo(entry.created_at);
-          const fullDate = new Date(entry.created_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+          const fullDate = formatDateTime(entry.created_at);
 
           // Category icon styling
           const iconBg = meta.icon === "system"

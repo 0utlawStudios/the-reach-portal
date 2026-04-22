@@ -26,6 +26,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useTeam } from "@/lib/team-context";
 import { useToast } from "@/lib/toast-context";
 import { ensureMediaAsset } from "@/lib/media-assets";
+import { formatDate, formatDateTime, formatDateShort, formatDateTimeCompact } from "@/lib/utils";
 
 type DrawerTab = "content" | "vault" | "audit";
 
@@ -208,7 +209,7 @@ export function AssetReviewDrawer() {
   const addComment = () => {
     if (!newComment.trim()) return;
     const trimmed = newComment.trim();
-    const timestamp = new Date().toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+    const timestamp = formatDateTimeCompact(new Date());
     const comment = `${currentUser.name} (${timestamp}): ${trimmed}`;
     const existing = selectedCard.notes ? selectedCard.notes + "\n\n" : "";
     updateCard(selectedCard.id, { notes: existing + comment });
@@ -383,7 +384,7 @@ export function AssetReviewDrawer() {
                   </span>
                 );
               })()}
-              <span>{selectedCard.createdAt ? new Date(selectedCard.createdAt).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : ""}</span>
+              <span>{selectedCard.createdAt ? formatDateTime(selectedCard.createdAt) : ""}</span>
             </div>
 
             {/* Platforms — editable */}
@@ -429,7 +430,7 @@ export function AssetReviewDrawer() {
                     {selectedCard.scheduledDate ? (
                       <div className="flex items-center gap-2">
                         <span className="text-[13px] font-medium text-slate-800 dark:text-gray-200">
-                          {new Date(selectedCard.scheduledDate).toLocaleDateString("en-US", { weekday: "short", month: "long", day: "numeric", year: "numeric" })}
+                          {formatDate(selectedCard.scheduledDate, { weekday: "short", month: "long", day: "numeric", year: "numeric" })}
                         </span>
                         {selectedCard.scheduledTime && (
                           <span className="text-[12px] text-gray-500 dark:text-gray-400 flex items-center gap-1 border-l border-gray-200 dark:border-white/[0.08] pl-2">
@@ -548,7 +549,7 @@ export function AssetReviewDrawer() {
                       )}
                       <div className="flex-1 min-w-0">
                         <p className="text-[11px] font-medium text-gray-700 dark:text-gray-300 truncate">{file.name}</p>
-                        <p className="text-[9px] text-gray-400">{new Date(file.uploadedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</p>
+                        <p className="text-[9px] text-gray-400">{formatDateShort(file.uploadedAt)}</p>
                       </div>
                       <a href={file.url} target="_blank" rel="noopener noreferrer" className="p-1 rounded hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-300 hover:text-blue-500 transition-colors cursor-pointer" title="Open file">
                         <ExternalLink className="w-3 h-3" />
@@ -815,7 +816,7 @@ export function AssetReviewDrawer() {
                           <FileText className="w-4 h-4 text-violet-500 shrink-0" />
                           <div className="flex-1 min-w-0">
                             <p className="text-[12px] font-medium text-gray-700 dark:text-gray-300 truncate">{file.name}</p>
-                            <p className="text-[9px] text-gray-400">{new Date(file.uploadedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</p>
+                            <p className="text-[9px] text-gray-400">{formatDateTimeCompact(file.uploadedAt)}</p>
                           </div>
                           <a href={file.url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-500/10 text-gray-400 hover:text-blue-500 transition-colors"><ExternalLink className="w-3.5 h-3.5" /></a>
                         </div>
@@ -846,7 +847,7 @@ export function AssetReviewDrawer() {
                     <div className="space-y-0">
                       {auditLogs.map((entry) => {
                         const date = new Date(entry.created_at);
-                        const timeStr = date.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+                        const timeStr = formatDateTimeCompact(date);
                         const actionColors: Record<string, string> = {
                           stage_change: "bg-blue-500",
                           revision_submitted: "bg-violet-500",
@@ -906,7 +907,7 @@ export function AssetReviewDrawer() {
                 <Button variant="outline" size="sm" onClick={() => { setRevisionMode(false); setRevisionFeedback(""); }} className="flex-1 h-9 rounded-lg text-[12px]">Cancel</Button>
                 <Button size="sm" disabled={!revisionFeedback.trim()} onClick={() => {
                   const feedback = revisionFeedback.trim();
-                  const ts = new Date().toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+                  const ts = formatDateTimeCompact(new Date());
                   const note = `${currentUser.name} (${ts}): ${feedback}`;
                   updateCard(selectedCard.id, { notes: (selectedCard.notes ? selectedCard.notes + "\n\n" : "") + note });
                   moveCard(selectedCard.id, "revision_needed");

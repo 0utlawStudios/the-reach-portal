@@ -7,24 +7,12 @@ import { ContentCard as ContentCardType, Platform, isPlatform } from "@/lib/type
 import { usePipeline } from "@/lib/pipeline-context";
 import { PlatformIcon } from "./platform-icons";
 import { Calendar, AlertCircle, Bot } from "lucide-react";
+import { isUrgent, isOverdue, formatDateShort } from "@/lib/utils";
 
 interface Props {
   card: ContentCardType;
   isDragOverlay?: boolean;
   stageColor?: string;
-}
-
-function isUrgent(dateStr?: string): boolean {
-  if (!dateStr) return false;
-  const diff = (new Date(dateStr).getTime() - Date.now()) / (1000 * 60 * 60 * 24);
-  return diff <= 2 && diff >= 0;
-}
-
-function isOverdue(dateStr?: string): boolean {
-  if (!dateStr) return false;
-  const now = new Date();
-  const scheduled = new Date(dateStr);
-  return scheduled < now;
 }
 
 export function ContentCard({ card, isDragOverlay, stageColor }: Props) {
@@ -109,7 +97,7 @@ export function ContentCard({ card, isDragOverlay, stageColor }: Props) {
             <Calendar className="w-2.5 h-2.5" />
             {card.scheduledDate ? (
               <>
-                {new Date(card.scheduledDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                {formatDateShort(card.scheduledDate)}
                 {card.scheduledTime && <span className="text-gray-400 dark:text-gray-500">{card.scheduledTime}</span>}
                 {overdue && <span className="text-[8px] bg-red-200 dark:bg-red-500/20 text-red-600 dark:text-red-400 px-1 rounded font-bold">OVERDUE</span>}
                 {urgent && !overdue && <span className="text-[8px] bg-red-200 dark:bg-red-500/20 text-red-600 dark:text-red-400 px-1 rounded font-bold">SOON</span>}

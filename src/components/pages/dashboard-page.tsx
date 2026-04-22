@@ -9,6 +9,7 @@ import { PlatformIcon } from "@/components/platform-icons";
 import { AnimatedCounter, AnimatedBar } from "@/components/animated";
 import { Lightbulb, Clock, RotateCcw, CalendarCheck, Rocket, ArrowRight, Zap, Eye, TrendingUp, BarChart3, Target, AlertCircle, Calendar, CheckCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { formatDate } from "@/lib/utils";
 
 const stageIcons = [Lightbulb, Clock, RotateCcw, CalendarCheck, Rocket];
 
@@ -312,7 +313,7 @@ function MiniCalendar({ cards, navigate }: { cards: ContentCard[]; navigate: (pa
         <h2 className="text-[11px] font-bold text-gray-500 dark:text-gray-400 flex items-center gap-2 uppercase tracking-[0.08em]"><Calendar className="w-4 h-4 text-blue-500" />Calendar</h2>
         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
           <button onClick={(e) => { e.stopPropagation(); setCalDate(new Date(year, month - 1, 1)); }} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-400 cursor-pointer transition-colors"><ChevronLeft className="w-3.5 h-3.5" /></button>
-          <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 w-16 text-center font-mono">{calDate.toLocaleDateString("en-US", { month: "short", year: "numeric" })}</span>
+          <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 w-16 text-center font-mono">{formatDate(calDate, { month: "short", year: "numeric" })}</span>
           <button onClick={(e) => { e.stopPropagation(); setCalDate(new Date(year, month + 1, 1)); }} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-400 cursor-pointer transition-colors"><ChevronRight className="w-3.5 h-3.5" /></button>
         </div>
       </div>

@@ -219,38 +219,50 @@
   "hotPaths": [
     {
       "path": "src/components/asset-review-drawer.tsx",
-      "accessCount": 121,
-      "lastAccessed": 1776839229524,
+      "accessCount": 137,
+      "lastAccessed": 1776888832113,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/pipeline-context.tsx",
+      "accessCount": 113,
+      "lastAccessed": 1776889130275,
       "type": "file"
     },
     {
       "path": "src",
-      "accessCount": 83,
-      "lastAccessed": 1776839855143,
+      "accessCount": 112,
+      "lastAccessed": 1776884839740,
       "type": "directory"
     },
     {
       "path": "",
-      "accessCount": 80,
-      "lastAccessed": 1776882559117,
+      "accessCount": 106,
+      "lastAccessed": 1776884820153,
       "type": "directory"
     },
     {
-      "path": "src/lib/pipeline-context.tsx",
-      "accessCount": 77,
-      "lastAccessed": 1776841184352,
-      "type": "file"
-    },
-    {
       "path": "src/components/pages/settings-page.tsx",
-      "accessCount": 43,
-      "lastAccessed": 1776839963238,
+      "accessCount": 56,
+      "lastAccessed": 1776888798882,
       "type": "file"
     },
     {
       "path": "src/components/pages/media-page.tsx",
+      "accessCount": 42,
+      "lastAccessed": 1776889174661,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/types.ts",
+      "accessCount": 30,
+      "lastAccessed": 1776888960955,
+      "type": "file"
+    },
+    {
+      "path": "src/components/kanban-board.tsx",
       "accessCount": 27,
-      "lastAccessed": 1776838756142,
+      "lastAccessed": 1776884780989,
       "type": "file"
     },
     {
@@ -260,27 +272,15 @@
       "type": "file"
     },
     {
-      "path": "src/components/kanban-board.tsx",
-      "accessCount": 24,
-      "lastAccessed": 1776840434446,
-      "type": "file"
-    },
-    {
-      "path": "src/lib/types.ts",
+      "path": "src/lib/team-context.tsx",
       "accessCount": 22,
-      "lastAccessed": 1776840447298,
+      "lastAccessed": 1776884593714,
       "type": "file"
     },
     {
       "path": "src/components/media-picker.tsx",
-      "accessCount": 20,
-      "lastAccessed": 1776838328829,
-      "type": "file"
-    },
-    {
-      "path": "src/lib/team-context.tsx",
-      "accessCount": 20,
-      "lastAccessed": 1776839237925,
+      "accessCount": 21,
+      "lastAccessed": 1776884559024,
       "type": "file"
     },
     {
@@ -297,8 +297,14 @@
     },
     {
       "path": "src/lib/google-drive.ts",
-      "accessCount": 17,
-      "lastAccessed": 1776838050989,
+      "accessCount": 18,
+      "lastAccessed": 1776884560289,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/auth-context.tsx",
+      "accessCount": 18,
+      "lastAccessed": 1776889114285,
       "type": "file"
     },
     {
@@ -308,15 +314,15 @@
       "type": "file"
     },
     {
-      "path": "src/app/api/drive/upload/route.ts",
-      "accessCount": 15,
-      "lastAccessed": 1776838048485,
+      "path": "src/lib/drive-upload.ts",
+      "accessCount": 16,
+      "lastAccessed": 1776884559962,
       "type": "file"
     },
     {
-      "path": "src/lib/drive-upload.ts",
+      "path": "src/app/api/drive/upload/route.ts",
       "accessCount": 15,
-      "lastAccessed": 1776838312954,
+      "lastAccessed": 1776838048485,
       "type": "file"
     },
     {
@@ -351,14 +357,8 @@
     },
     {
       "path": "src/lib/audit.ts",
-      "accessCount": 10,
-      "lastAccessed": 1776778555122,
-      "type": "file"
-    },
-    {
-      "path": "src/lib/auth-context.tsx",
-      "accessCount": 10,
-      "lastAccessed": 1776839237772,
+      "accessCount": 11,
+      "lastAccessed": 1776884554163,
       "type": "file"
     },
     {
@@ -404,6 +404,18 @@
       "type": "file"
     },
     {
+      "path": "src/components/app-shell.tsx",
+      "accessCount": 8,
+      "lastAccessed": 1776884769197,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/supabaseClient.ts",
+      "accessCount": 8,
+      "lastAccessed": 1776884771832,
+      "type": "file"
+    },
+    {
       "path": "src/app/api/team/remove-member/route.ts",
       "accessCount": 7,
       "lastAccessed": 1776702977115,
@@ -416,10 +428,10 @@
       "type": "file"
     },
     {
-      "path": "src/lib/supabaseClient.ts",
+      "path": "src/components",
       "accessCount": 6,
-      "lastAccessed": 1776781908762,
-      "type": "file"
+      "lastAccessed": 1776884821016,
+      "type": "directory"
     },
     {
       "path": "supabase-setup-all.sql",
@@ -434,22 +446,10 @@
       "type": "file"
     },
     {
-      "path": "src/components/app-shell.tsx",
-      "accessCount": 5,
-      "lastAccessed": 1776778586730,
-      "type": "file"
-    },
-    {
       "path": "migration/migrate.mjs",
       "accessCount": 5,
       "lastAccessed": 1776838078740,
       "type": "file"
-    },
-    {
-      "path": "src/components",
-      "accessCount": 4,
-      "lastAccessed": 1775665269442,
-      "type": "directory"
     },
     {
       "path": "supabase-audit-source-vault.sql",
@@ -467,6 +467,12 @@
       "path": "src/components/rich-comment.tsx",
       "accessCount": 3,
       "lastAccessed": 1776276036535,
+      "type": "file"
+    },
+    {
+      "path": "src/components/pages/post-preview-page.tsx",
+      "accessCount": 3,
+      "lastAccessed": 1776884764136,
       "type": "file"
     },
     {
@@ -509,12 +515,6 @@
       "path": "migration/package.json",
       "accessCount": 1,
       "lastAccessed": 1775603446536,
-      "type": "file"
-    },
-    {
-      "path": "src/components/pages/post-preview-page.tsx",
-      "accessCount": 1,
-      "lastAccessed": 1775606717668,
       "type": "file"
     }
   ],

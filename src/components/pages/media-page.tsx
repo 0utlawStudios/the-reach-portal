@@ -7,6 +7,7 @@ import { usePipeline } from "@/lib/pipeline-context";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
 import { supabase } from "@/lib/supabaseClient";
+import { formatDateShort, formatDateTimeCompact } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
@@ -38,7 +39,7 @@ function dbToAsset(row: MediaAssetRow): MediaAsset {
     url: row.url || "",
     type: row.file_type || "image",
     folder: row.folder || "Uploads",
-    uploadedAt: row.uploaded_at?.split("T")[0] || new Date().toISOString().split("T")[0],
+    uploadedAt: row.uploaded_at || new Date().toISOString(),
     addedBy: row.added_by || undefined,
     usedIn: row.used_in || undefined,
   };
@@ -75,6 +76,48 @@ export function MediaPage() {
       });
   }, [useDb]);
 
+  // Realtime subscription — keeps media library in sync with DB inserts/updates/deletes
+  useEffect(() => {
+    if (!useDb) return;
+
+    const channel = supabase
+      .channel("media-assets-realtime")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "media_assets" },
+        (payload) => {
+          const newAsset = dbToAsset(payload.new as MediaAssetRow);
+          setMedia((prev) => {
+            if (prev.some((m) => m.id === newAsset.id)) return prev;
+            return [newAsset, ...prev];
+          });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "media_assets" },
+        (payload) => {
+          const updated = dbToAsset(payload.new as MediaAssetRow);
+          setMedia((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "media_assets" },
+        (payload) => {
+          const deletedId = (payload.old as Partial<MediaAssetRow>).id;
+          if (deletedId) {
+            setMedia((prev) => prev.filter((m) => m.id !== deletedId));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [useDb]);
+
   const folders = useMemo(() => Array.from(new Set(media.map((m) => m.folder))).sort(), [media]);
 
   const filteredMedia = useMemo(() => {
@@ -103,7 +146,7 @@ export function MediaPage() {
           url: result.url,
           type: file.type.startsWith("video") ? "video" : "image",
           folder: "Uploads",
-          uploadedAt: new Date().toISOString().split("T")[0],
+          uploadedAt: new Date().toISOString(),
           addedBy: currentUser.name,
         };
 
@@ -162,12 +205,6 @@ export function MediaPage() {
     const siteUrl = typeof window !== "undefined" ? window.location.origin : "";
     const url = asset.url.startsWith("/") ? `${siteUrl}${asset.url}` : asset.url;
     window.open(url, "_blank");
-  };
-
-  const formatDate = (date: string, time?: string) => {
-    const d = new Date(date + "T12:00:00");
-    const formatted = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-    return time ? `${formatted} · ${time}` : formatted;
   };
 
   // ─── Lightbox navigation ───
@@ -328,7 +365,7 @@ export function MediaPage() {
                             {asset.addedBy && <span className="w-4 h-4 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-[6px] font-bold text-white">{asset.addedBy[0]}</span>}
                             {asset.addedBy}
                           </span>
-                          <span className="text-[9px] text-gray-400">{asset.uploadedAt.slice(5)}</span>
+                          <span className="text-[9px] text-gray-400">{formatDateShort(asset.uploadedAt)}</span>
                         </div>
                       </div>
                     </div>
@@ -378,7 +415,7 @@ export function MediaPage() {
                             </>
                           )}
                         </div>
-                        <div className="flex items-center text-[10px] text-gray-400 tabular-nums">{formatDate(asset.uploadedAt, asset.uploadedTime)}</div>
+                        <div className="flex items-center text-[10px] text-gray-400 tabular-nums">{formatDateTimeCompact(asset.uploadedAt)}</div>
                       </div>
                     );
                   })}
@@ -404,7 +441,7 @@ export function MediaPage() {
               <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-white/[0.06]">
                 <div>
                   <p className="text-[13px] font-medium text-gray-800 dark:text-gray-200">{lightboxAsset.name}</p>
-                  <p className="text-[10px] text-gray-400">{lightboxAsset.folder} · {formatDate(lightboxAsset.uploadedAt, lightboxAsset.uploadedTime)}{lightboxAsset.addedBy ? ` · by ${lightboxAsset.addedBy}` : ""}</p>
+                  <p className="text-[10px] text-gray-400">{lightboxAsset.folder} · {formatDateTimeCompact(lightboxAsset.uploadedAt)}{lightboxAsset.addedBy ? ` · by ${lightboxAsset.addedBy}` : ""}</p>
                   {filteredMedia.length > 1 && <p className="text-[9px] text-gray-400 tabular-nums mt-0.5">{lightboxIndex + 1} of {filteredMedia.length}</p>}
                 </div>
                 <div className="flex items-center gap-1">

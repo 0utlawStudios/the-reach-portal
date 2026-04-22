@@ -7,7 +7,7 @@ import { loadState, saveState } from "./persistence";
 import { supabase } from "./supabaseClient";
 import { logAudit } from "./audit";
 import { useAuth } from "./auth-context";
-import { APP_TIMEZONE } from "./utils";
+import { APP_TIMEZONE, formatDateTimeCompact } from "./utils";
 
 const STORAGE_KEY = "pipeline_cards";
 const POSTS_SELECT_FULL = "*, publish_jobs(state, platform_publish_attempts(platform, state, external_post_id))";
@@ -219,6 +219,7 @@ interface PendingKickback {
 
 interface PipelineContextType {
   cards: ContentCard[];
+  isLoading: boolean;
   selectedCard: ContentCard | null;
   isDrawerOpen: boolean;
   isEditingOnOpen: boolean;
@@ -243,8 +244,9 @@ interface PipelineContextType {
 const PipelineContext = createContext<PipelineContextType | null>(null);
 
 export function PipelineProvider({ children }: { children: ReactNode }) {
-  const { currentUser } = useAuth();
+  const { currentUser, accessToken, provisionResult } = useAuth();
   const [cards, setCards] = useState<ContentCard[]>(PLACEHOLDER_CARDS);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedCard, setSelectedCard] = useState<ContentCard | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isEditingOnOpen, setIsEditingOnOpen] = useState(false);
@@ -268,18 +270,26 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     async function load() {
       if (useSupabase) {
         try {
-          // Resolve workspace + auto-provision membership if missing (breaks RLS chicken-and-egg)
+          // Resolve workspace + auto-provision membership if missing (breaks RLS chicken-and-egg).
+          // provisionResult is pre-fetched by AuthProvider during init (runs in parallel with
+          // enrichFromTeamMembers), so by the time we get here it's already available.
           try {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session?.access_token) {
-              const res = await fetch("/api/workspace/provision", {
-                headers: { Authorization: `Bearer ${session.access_token}` },
-              });
-              if (res.ok) {
-                const json = await res.json();
-                if (json.workspaceId) {
-                  workspaceIdRef.current = json.workspaceId;
-                  setWorkspaceId(json.workspaceId);
+            if (provisionResult?.workspaceId) {
+              workspaceIdRef.current = provisionResult.workspaceId;
+              setWorkspaceId(provisionResult.workspaceId);
+            } else {
+              // Fallback: provision wasn't pre-fetched (e.g. first login), fetch now
+              const token = accessToken || (await supabase.auth.getSession()).data.session?.access_token;
+              if (token) {
+                const res = await fetch("/api/workspace/provision", {
+                  headers: { Authorization: `Bearer ${token}` },
+                });
+                if (res.ok) {
+                  const json = await res.json();
+                  if (json.workspaceId) {
+                    workspaceIdRef.current = json.workspaceId;
+                    setWorkspaceId(json.workspaceId);
+                  }
                 }
               }
             }
@@ -303,6 +313,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
         setCards(loadState(STORAGE_KEY, PLACEHOLDER_CARDS));
       }
       hydrated.current = true;
+      setIsLoading(false);
     }
     load();
   }, [useSupabase]);
@@ -463,7 +474,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
 
   const submitReapproval = useCallback((cardId: string, note: string) => {
     const now = new Date();
-    const timestamp = now.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+    const timestamp = formatDateTimeCompact(now);
     const author = currentUser.name;
     const historyEntry = { note, by: author, at: now.toISOString() };
     const noteLine = `${author} (${timestamp}): Fix submitted — ${note}`;
@@ -516,7 +527,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
 
   const submitKickback = useCallback((cardId: string, note: string, attachmentUrl?: string) => {
     const now = new Date();
-    const timestamp = now.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+    const timestamp = formatDateTimeCompact(now);
     const author = currentUser.name;
     // Capture card before state mutation so notification can read title + createdBy
     const card = cards.find((c) => c.id === cardId);
@@ -633,8 +644,8 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
   }, [selectedCard, useSupabase]);
 
   const value = useMemo(
-    () => ({ cards, selectedCard, isDrawerOpen, isEditingOnOpen, pendingReapproval, pendingKickback, workspaceId, selectCard, selectCardForEditing, closeDrawer, moveCard, requestReapproval, submitReapproval, cancelReapproval, requestKickback, submitKickback, cancelKickback, updateCard, createCard, deleteCard }),
-    [cards, selectedCard, isDrawerOpen, isEditingOnOpen, pendingReapproval, pendingKickback, workspaceId, selectCard, selectCardForEditing, closeDrawer, moveCard, requestReapproval, submitReapproval, cancelReapproval, requestKickback, submitKickback, cancelKickback, updateCard, createCard, deleteCard]
+    () => ({ cards, isLoading, selectedCard, isDrawerOpen, isEditingOnOpen, pendingReapproval, pendingKickback, workspaceId, selectCard, selectCardForEditing, closeDrawer, moveCard, requestReapproval, submitReapproval, cancelReapproval, requestKickback, submitKickback, cancelKickback, updateCard, createCard, deleteCard }),
+    [cards, isLoading, selectedCard, isDrawerOpen, isEditingOnOpen, pendingReapproval, pendingKickback, workspaceId, selectCard, selectCardForEditing, closeDrawer, moveCard, requestReapproval, submitReapproval, cancelReapproval, requestKickback, submitKickback, cancelKickback, updateCard, createCard, deleteCard]
   );
 
   return <PipelineContext.Provider value={value}>{children}</PipelineContext.Provider>;
