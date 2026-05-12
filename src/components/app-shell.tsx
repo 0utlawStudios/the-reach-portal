@@ -57,28 +57,33 @@ function DashboardLayout() {
 
   return (
     <NavigationProvider>
-      <PipelineProvider>
-        <TeamProvider>
-          <ToastProvider>
-          <AvatarSync />
-          <div className="h-screen flex bg-[#fafbfc] dark:bg-[#0a0a0a] overflow-hidden">
-            <Sidebar onCreatePost={() => setCreateOpen(true)} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
-            <main className="flex-1 flex flex-col min-w-0">
-              <TopBar onMenuClick={() => setMobileOpen(true)} />
-              <PageContent />
-              <div className="h-8 flex items-center justify-center border-t border-gray-100 dark:border-white/[0.04] bg-white dark:bg-[#111] shrink-0">
-                <p className="text-[10px] text-gray-300 dark:text-gray-600">Ten80Ten Social Media Management Platform &copy; 2026</p>
-              </div>
-            </main>
-            <AssetReviewDrawer />
-            <CreatePostModal open={createOpen} onClose={() => setCreateOpen(false)} />
-            <RevisionModal />
-            <KickbackModal />
-            <ToastContainer />
-          </div>
-          </ToastProvider>
-        </TeamProvider>
-      </PipelineProvider>
+      {/* ToastProvider must wrap PipelineProvider — pipeline-context calls
+          useToast() to surface DB rollback errors. If ToastProvider sat
+          inside PipelineProvider the useToast() hook would throw, which
+          was the root cause of the cf20bbd "This page couldn't load"
+          incident on 2026-05-13. */}
+      <ToastProvider>
+        <PipelineProvider>
+          <TeamProvider>
+            <AvatarSync />
+            <div className="h-screen flex bg-[#fafbfc] dark:bg-[#0a0a0a] overflow-hidden">
+              <Sidebar onCreatePost={() => setCreateOpen(true)} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
+              <main className="flex-1 flex flex-col min-w-0">
+                <TopBar onMenuClick={() => setMobileOpen(true)} />
+                <PageContent />
+                <div className="h-8 flex items-center justify-center border-t border-gray-100 dark:border-white/[0.04] bg-white dark:bg-[#111] shrink-0">
+                  <p className="text-[10px] text-gray-300 dark:text-gray-600">Ten80Ten Social Media Management Platform &copy; 2026</p>
+                </div>
+              </main>
+              <AssetReviewDrawer />
+              <CreatePostModal open={createOpen} onClose={() => setCreateOpen(false)} />
+              <RevisionModal />
+              <KickbackModal />
+              <ToastContainer />
+            </div>
+          </TeamProvider>
+        </PipelineProvider>
+      </ToastProvider>
     </NavigationProvider>
   );
 }
