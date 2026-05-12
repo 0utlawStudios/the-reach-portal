@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1776882157039,
+  "lastScanned": 1778613729621,
   "projectRoot": "/Users/ace/Documents/CURSOR MAIN/ten80ten-smm-portal",
   "techStack": {
     "languages": [
@@ -81,14 +81,14 @@
       "path": "MAIN",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1776882157024,
+      "lastAccessed": 1778613729597,
       "keyFiles": []
     },
     "SANITY": {
       "path": "SANITY",
       "purpose": null,
       "fileCount": 8,
-      "lastAccessed": 1776882157025,
+      "lastAccessed": 1778613729597,
       "keyFiles": [
         "04152026231041@2x.png",
         "04152026231115@2x.png",
@@ -101,7 +101,7 @@
       "path": "docs",
       "purpose": "Documentation",
       "fileCount": 1,
-      "lastAccessed": 1776882157027,
+      "lastAccessed": 1778613729606,
       "keyFiles": [
         "TEN80TEN-SMM-MANUAL.html"
       ]
@@ -110,7 +110,7 @@
       "path": "migration",
       "purpose": null,
       "fileCount": 4,
-      "lastAccessed": 1776882157027,
+      "lastAccessed": 1778613729606,
       "keyFiles": [
         "migrate.mjs",
         "package-lock.json",
@@ -121,7 +121,7 @@
       "path": "n8n",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1776882157027,
+      "lastAccessed": 1778613729611,
       "keyFiles": [
         "ten80ten-auto-publisher.json"
       ]
@@ -130,7 +130,7 @@
       "path": "public",
       "purpose": "Public files",
       "fileCount": 11,
-      "lastAccessed": 1776882157027,
+      "lastAccessed": 1778613729611,
       "keyFiles": [
         "file.svg",
         "globe.svg",
@@ -143,7 +143,7 @@
       "path": "scripts",
       "purpose": "Build/utility scripts",
       "fileCount": 1,
-      "lastAccessed": 1776882157028,
+      "lastAccessed": 1778613729612,
       "keyFiles": [
         "db-types-check.ts"
       ]
@@ -152,14 +152,14 @@
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1776882157028,
+      "lastAccessed": 1778613729613,
       "keyFiles": []
     },
     "supabase": {
       "path": "supabase",
       "purpose": null,
       "fileCount": 3,
-      "lastAccessed": 1776882157028,
+      "lastAccessed": 1778613729613,
       "keyFiles": [
         "config.toml"
       ]
@@ -168,14 +168,14 @@
       "path": "migration/node_modules",
       "purpose": "Dependencies",
       "fileCount": 1,
-      "lastAccessed": 1776882157029,
+      "lastAccessed": 1778613729615,
       "keyFiles": []
     },
     "src/app": {
       "path": "src/app",
       "purpose": "Application code",
       "fileCount": 5,
-      "lastAccessed": 1776882157029,
+      "lastAccessed": 1778613729616,
       "keyFiles": [
         "favicon.ico",
         "globals.css",
@@ -185,8 +185,8 @@
     "src/components": {
       "path": "src/components",
       "purpose": "UI components",
-      "fileCount": 24,
-      "lastAccessed": 1776882157030,
+      "fileCount": 25,
+      "lastAccessed": 1778613729617,
       "keyFiles": [
         "animated.tsx",
         "app-shell.tsx",
@@ -197,7 +197,7 @@
       "path": "src/lib",
       "purpose": "Library code",
       "fileCount": 24,
-      "lastAccessed": 1776882157030,
+      "lastAccessed": 1778613729617,
       "keyFiles": [
         "audit.ts",
         "auth-context.tsx",
@@ -207,8 +207,8 @@
     "supabase/migrations": {
       "path": "supabase/migrations",
       "purpose": "Database migrations",
-      "fileCount": 17,
-      "lastAccessed": 1776882157030,
+      "fileCount": 18,
+      "lastAccessed": 1778613729618,
       "keyFiles": [
         "0000_baseline.sql",
         "0001_feature_flags.sql",
@@ -218,303 +218,303 @@
   },
   "hotPaths": [
     {
-      "path": "src/components/asset-review-drawer.tsx",
-      "accessCount": 137,
-      "lastAccessed": 1776888832113,
-      "type": "file"
-    },
-    {
       "path": "src/lib/pipeline-context.tsx",
-      "accessCount": 113,
-      "lastAccessed": 1776889130275,
-      "type": "file"
-    },
-    {
-      "path": "src",
-      "accessCount": 112,
-      "lastAccessed": 1776884839740,
-      "type": "directory"
-    },
-    {
-      "path": "",
-      "accessCount": 106,
-      "lastAccessed": 1776884820153,
-      "type": "directory"
-    },
-    {
-      "path": "src/components/pages/settings-page.tsx",
-      "accessCount": 56,
-      "lastAccessed": 1776888798882,
-      "type": "file"
-    },
-    {
-      "path": "src/components/pages/media-page.tsx",
-      "accessCount": 42,
-      "lastAccessed": 1776889174661,
-      "type": "file"
-    },
-    {
-      "path": "src/lib/types.ts",
-      "accessCount": 30,
-      "lastAccessed": 1776888960955,
-      "type": "file"
-    },
-    {
-      "path": "src/components/kanban-board.tsx",
-      "accessCount": 27,
-      "lastAccessed": 1776884780989,
-      "type": "file"
-    },
-    {
-      "path": "src/app/api/notifications/revision/route.ts",
-      "accessCount": 26,
-      "lastAccessed": 1776840441100,
-      "type": "file"
-    },
-    {
-      "path": "src/lib/team-context.tsx",
-      "accessCount": 22,
-      "lastAccessed": 1776884593714,
-      "type": "file"
-    },
-    {
-      "path": "src/components/media-picker.tsx",
-      "accessCount": 21,
-      "lastAccessed": 1776884559024,
-      "type": "file"
-    },
-    {
-      "path": "src/app/auth/setup/page.tsx",
-      "accessCount": 19,
-      "lastAccessed": 1776529372366,
-      "type": "file"
-    },
-    {
-      "path": "src/app/api/notifications/mention/route.ts",
-      "accessCount": 19,
-      "lastAccessed": 1776840441557,
-      "type": "file"
-    },
-    {
-      "path": "src/lib/google-drive.ts",
-      "accessCount": 18,
-      "lastAccessed": 1776884560289,
-      "type": "file"
-    },
-    {
-      "path": "src/lib/auth-context.tsx",
-      "accessCount": 18,
-      "lastAccessed": 1776889114285,
-      "type": "file"
-    },
-    {
-      "path": "src/lib/email-utils.ts",
-      "accessCount": 16,
-      "lastAccessed": 1776840918895,
-      "type": "file"
-    },
-    {
-      "path": "src/lib/drive-upload.ts",
-      "accessCount": 16,
-      "lastAccessed": 1776884559962,
-      "type": "file"
-    },
-    {
-      "path": "src/app/api/drive/upload/route.ts",
-      "accessCount": 15,
-      "lastAccessed": 1776838048485,
-      "type": "file"
-    },
-    {
-      "path": "src/app/api/team/invite/route.ts",
-      "accessCount": 14,
-      "lastAccessed": 1776702979938,
-      "type": "file"
-    },
-    {
-      "path": "src/app/api/drive/finalize/route.ts",
-      "accessCount": 13,
-      "lastAccessed": 1776838048970,
-      "type": "file"
-    },
-    {
-      "path": "src/app/api/drive/proxy-upload/route.ts",
-      "accessCount": 13,
-      "lastAccessed": 1776838050395,
-      "type": "file"
-    },
-    {
-      "path": "next.config.ts",
-      "accessCount": 12,
-      "lastAccessed": 1776781885666,
-      "type": "file"
-    },
-    {
-      "path": "src/app/api/team/approve-request/route.ts",
-      "accessCount": 11,
-      "lastAccessed": 1776702983858,
-      "type": "file"
-    },
-    {
-      "path": "src/lib/audit.ts",
-      "accessCount": 11,
-      "lastAccessed": 1776884554163,
-      "type": "file"
-    },
-    {
-      "path": "src/app/auth/confirm/route.ts",
       "accessCount": 9,
-      "lastAccessed": 1775819304646,
-      "type": "file"
-    },
-    {
-      "path": "src/app/api/team/request-access/route.ts",
-      "accessCount": 9,
-      "lastAccessed": 1776699854159,
-      "type": "file"
-    },
-    {
-      "path": "src/app/api/team/resend-invite/route.ts",
-      "accessCount": 9,
-      "lastAccessed": 1776702981309,
+      "lastAccessed": 1778614550903,
       "type": "file"
     },
     {
       "path": "src/app/api/drive/stream/route.ts",
-      "accessCount": 9,
-      "lastAccessed": 1776838050103,
+      "accessCount": 7,
+      "lastAccessed": 1778614462104,
       "type": "file"
     },
     {
-      "path": "src/components/kickback-modal.tsx",
-      "accessCount": 9,
-      "lastAccessed": 1776839228071,
+      "path": "AGENTS.md",
+      "accessCount": 6,
+      "lastAccessed": 1778613974559,
       "type": "file"
     },
     {
-      "path": "package.json",
-      "accessCount": 8,
-      "lastAccessed": 1776781884780,
-      "type": "directory"
-    },
-    {
-      "path": "src/components/login-screen.tsx",
-      "accessCount": 8,
-      "lastAccessed": 1776781914780,
-      "type": "file"
-    },
-    {
-      "path": "src/components/app-shell.tsx",
-      "accessCount": 8,
-      "lastAccessed": 1776884769197,
-      "type": "file"
-    },
-    {
-      "path": "src/lib/supabaseClient.ts",
-      "accessCount": 8,
-      "lastAccessed": 1776884771832,
+      "path": "src/app/api/team/invite/route.ts",
+      "accessCount": 6,
+      "lastAccessed": 1778614328769,
       "type": "file"
     },
     {
       "path": "src/app/api/team/remove-member/route.ts",
-      "accessCount": 7,
-      "lastAccessed": 1776702977115,
+      "accessCount": 6,
+      "lastAccessed": 1778614341925,
       "type": "file"
     },
     {
-      "path": "supabase-schema.sql",
+      "path": "src/app/api/team/resend-invite/route.ts",
       "accessCount": 6,
-      "lastAccessed": 1775845357920,
+      "lastAccessed": 1778614350302,
       "type": "file"
     },
     {
-      "path": "src/components",
+      "path": "src/app/api/team/approve-request/route.ts",
       "accessCount": 6,
-      "lastAccessed": 1776884821016,
-      "type": "directory"
+      "lastAccessed": 1778614358037,
+      "type": "file"
     },
     {
-      "path": "supabase-setup-all.sql",
-      "accessCount": 5,
-      "lastAccessed": 1775819598474,
+      "path": "src/lib/auth/require.ts",
+      "accessCount": 4,
+      "lastAccessed": 1778614310706,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/auth-context.tsx",
+      "accessCount": 4,
+      "lastAccessed": 1778614399145,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/team/request-access/route.ts",
+      "accessCount": 4,
+      "lastAccessed": 1778614484558,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/publish-jobs/route.ts",
+      "accessCount": 4,
+      "lastAccessed": 1778614624180,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/drive/upload/route.ts",
+      "accessCount": 4,
+      "lastAccessed": 1778614633304,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/workspace/provision/route.ts",
+      "accessCount": 3,
+      "lastAccessed": 1778614061875,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/admin/backfill-media/route.ts",
+      "accessCount": 3,
+      "lastAccessed": 1778614288159,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/team-context.tsx",
+      "accessCount": 3,
+      "lastAccessed": 1778614366114,
+      "type": "file"
+    },
+    {
+      "path": "src/app/auth/confirm/route.ts",
+      "accessCount": 2,
+      "lastAccessed": 1778613950254,
       "type": "file"
     },
     {
       "path": "src/app/api/auth/forgot-password/route.ts",
-      "accessCount": 5,
-      "lastAccessed": 1776247279137,
-      "type": "file"
-    },
-    {
-      "path": "migration/migrate.mjs",
-      "accessCount": 5,
-      "lastAccessed": 1776838078740,
-      "type": "file"
-    },
-    {
-      "path": "supabase-audit-source-vault.sql",
-      "accessCount": 4,
-      "lastAccessed": 1775845380414,
-      "type": "file"
-    },
-    {
-      "path": ".vercel/project.json",
-      "accessCount": 4,
-      "lastAccessed": 1776775216875,
-      "type": "file"
-    },
-    {
-      "path": "src/components/rich-comment.tsx",
-      "accessCount": 3,
-      "lastAccessed": 1776276036535,
-      "type": "file"
-    },
-    {
-      "path": "src/components/pages/post-preview-page.tsx",
-      "accessCount": 3,
-      "lastAccessed": 1776884764136,
-      "type": "file"
-    },
-    {
-      "path": "supabase-seed.sql",
       "accessCount": 2,
-      "lastAccessed": 1775605948062,
+      "lastAccessed": 1778613960907,
       "type": "file"
     },
     {
-      "path": "src/app/request-access/page.tsx",
+      "path": "src/lib/supabaseClient.ts",
       "accessCount": 2,
-      "lastAccessed": 1775709589655,
+      "lastAccessed": 1778613971794,
       "type": "file"
     },
     {
-      "path": "src/app",
+      "path": "package.json",
       "accessCount": 2,
-      "lastAccessed": 1776775212707,
-      "type": "directory"
-    },
-    {
-      "path": "supabase-avatar-storage.sql",
-      "accessCount": 1,
-      "lastAccessed": 1775601476528,
+      "lastAccessed": 1778613973397,
       "type": "file"
     },
     {
-      "path": "src/components/avatar-crop-modal.tsx",
-      "accessCount": 1,
-      "lastAccessed": 1775601476613,
+      "path": "src/components/kanban-board.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1778614060032,
       "type": "file"
     },
     {
-      "path": "src/components/ui/avatar.tsx",
-      "accessCount": 1,
-      "lastAccessed": 1775601480630,
+      "path": "supabase/migrations/0000_baseline.sql",
+      "accessCount": 2,
+      "lastAccessed": 1778614063790,
       "type": "file"
     },
     {
-      "path": "migration/package.json",
+      "path": "supabase/migrations/0007_rls_v2.sql",
+      "accessCount": 2,
+      "lastAccessed": 1778614063935,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/supabase/server.ts",
+      "accessCount": 2,
+      "lastAccessed": 1778614232259,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/auth/logout/route.ts",
       "accessCount": 1,
-      "lastAccessed": 1775603446536,
+      "lastAccessed": 1778613930718,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/drive/finalize/route.ts",
+      "accessCount": 1,
+      "lastAccessed": 1778613930918,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/drive/proxy-upload/route.ts",
+      "accessCount": 1,
+      "lastAccessed": 1778613931095,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/health/integrations/route.ts",
+      "accessCount": 1,
+      "lastAccessed": 1778613934591,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/health/deep-check/route.ts",
+      "accessCount": 1,
+      "lastAccessed": 1778613934698,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/notifications/approved/route.ts",
+      "accessCount": 1,
+      "lastAccessed": 1778613934769,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/notifications/awaiting-approval/route.ts",
+      "accessCount": 1,
+      "lastAccessed": 1778613935203,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/notifications/mention/route.ts",
+      "accessCount": 1,
+      "lastAccessed": 1778613935254,
+      "type": "file"
+    },
+    {
+      "path": "supabase/migrations/0004_workspace_id_columns.sql",
+      "accessCount": 1,
+      "lastAccessed": 1778613937625,
+      "type": "file"
+    },
+    {
+      "path": "supabase/migrations/0009_audit_log_v2.sql",
+      "accessCount": 1,
+      "lastAccessed": 1778613938249,
+      "type": "file"
+    },
+    {
+      "path": "supabase/migrations/0015_post_safety.sql",
+      "accessCount": 1,
+      "lastAccessed": 1778613938459,
+      "type": "file"
+    },
+    {
+      "path": "supabase/migrations/0012_scheduled_at_tstz.sql",
+      "accessCount": 1,
+      "lastAccessed": 1778613938703,
+      "type": "file"
+    },
+    {
+      "path": "supabase/migrations/0013_column_drift.sql",
+      "accessCount": 1,
+      "lastAccessed": 1778613938844,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/notifications/revision/route.ts",
+      "accessCount": 1,
+      "lastAccessed": 1778613939911,
+      "type": "file"
+    },
+    {
+      "path": "supabase/migrations/0008_abuse_events.sql",
+      "accessCount": 1,
+      "lastAccessed": 1778613941603,
+      "type": "file"
+    },
+    {
+      "path": "supabase/migrations/0006_rate_limit.sql",
+      "accessCount": 1,
+      "lastAccessed": 1778613942021,
+      "type": "file"
+    },
+    {
+      "path": "supabase/migrations/0010_publish_ledger.sql",
+      "accessCount": 1,
+      "lastAccessed": 1778613942229,
+      "type": "file"
+    },
+    {
+      "path": "supabase/migrations/0016_fix_timezone_defaults.sql",
+      "accessCount": 1,
+      "lastAccessed": 1778613942653,
+      "type": "file"
+    },
+    {
+      "path": "supabase/migrations/0002_tenant_model.sql",
+      "accessCount": 1,
+      "lastAccessed": 1778613942889,
+      "type": "file"
+    },
+    {
+      "path": "supabase/migrations/0011_claim_publish_job.sql",
+      "accessCount": 1,
+      "lastAccessed": 1778613946893,
+      "type": "file"
+    },
+    {
+      "path": "supabase/migrations/0014_create_publish_job_for_post.sql",
+      "accessCount": 1,
+      "lastAccessed": 1778613947231,
+      "type": "file"
+    },
+    {
+      "path": "supabase/migrations/0001_feature_flags.sql",
+      "accessCount": 1,
+      "lastAccessed": 1778613947449,
+      "type": "file"
+    },
+    {
+      "path": "supabase/migrations/0017_media_assets_realtime.sql",
+      "accessCount": 1,
+      "lastAccessed": 1778613947677,
+      "type": "file"
+    },
+    {
+      "path": "src/app/auth/setup/page.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1778613950500,
+      "type": "file"
+    },
+    {
+      "path": "src/app/auth/forgot-password/page.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1778613950922,
+      "type": "file"
+    },
+    {
+      "path": "src/app/auth/reset-password/page.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1778613950966,
+      "type": "file"
+    },
+    {
+      "path": "src/components/pipeline-column.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1778613956901,
       "type": "file"
     }
   ],

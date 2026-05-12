@@ -7,7 +7,12 @@ import { loadState, saveState } from "./persistence";
 import { supabase } from "./supabaseClient";
 import { logAudit } from "./audit";
 import { useAuth } from "./auth-context";
+import { useToast } from "./toast-context";
 import { APP_TIMEZONE, formatDateTimeCompact } from "./utils";
+
+// Real @mention pattern — @username form, not any "@" character. Avoids
+// false-positive mention notifications on pasted emails or URLs containing "@".
+const MENTION_RE = /@[a-zA-Z][\w.-]*/;
 
 const STORAGE_KEY = "pipeline_cards";
 const POSTS_SELECT_FULL = "*, publish_jobs(state, platform_publish_attempts(platform, state, external_post_id))";
@@ -245,6 +250,7 @@ const PipelineContext = createContext<PipelineContextType | null>(null);
 
 export function PipelineProvider({ children }: { children: ReactNode }) {
   const { currentUser, accessToken, provisionResult } = useAuth();
+  const { addToast } = useToast();
   const [cards, setCards] = useState<ContentCard[]>(PLACEHOLDER_CARDS);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCard, setSelectedCard] = useState<ContentCard | null>(null);
@@ -457,15 +463,28 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
           const message = error instanceof Error ? error.message : String(error);
           console.error("[pipeline] stage_change failed:", message);
           rollback();
+          addToast(`Move failed: ${message}. Card restored to "${fromLabel}".`, "error");
           if (stageUpdated) {
             markMutation(cardId);
-            await supabase.from("posts").update({ stage: fromStage }).eq("id", cardId);
+            try {
+              const { error: rbErr } = await supabase
+                .from("posts")
+                .update({ stage: fromStage })
+                .eq("id", cardId);
+              if (rbErr) {
+                console.error("[pipeline] CRITICAL: rollback also failed:", rbErr.message);
+                addToast("Critical: card state may diverge between server and UI. Refresh recommended.", "error");
+              }
+            } catch (rbErr) {
+              console.error("[pipeline] CRITICAL: rollback exception:", rbErr);
+              addToast("Critical: card state may diverge between server and UI. Refresh recommended.", "error");
+            }
           }
         }
       })();
     }
     logAudit(cardId, currentUser.name, "stage_change", `Moved from ${fromLabel} to ${toLabel}`);
-  }, [useSupabase, cards, currentUser.name]);
+  }, [useSupabase, cards, currentUser.name, addToast]);
 
   const requestReapproval = useCallback((cardId: string) => {
     const card = cards.find((c) => c.id === cardId);
@@ -569,8 +588,9 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
       }),
     }).catch(() => {});
 
-    // Fire @mention notifications if anyone was tagged
-    if (note.includes("@")) {
+    // Fire @mention notifications if anyone was tagged. Strict regex so we
+    // don't trigger on every "@" in arbitrary text (e.g. pasted emails or URLs).
+    if (MENTION_RE.test(note)) {
       fetch("/api/notifications/mention", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -613,7 +633,11 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     setCards((prev) => [newCard, ...prev]);
 
     if (useSupabase) {
-      markMutation("create");
+      // Mark by tempId so we can match the real insert when it echoes back via
+      // realtime. The previous literal "create" key collided across concurrent
+      // creators — two simultaneous inserts would each suppress the other's
+      // echo until the 2s dedup window expired.
+      markMutation(tempId);
       const dbRow = cardToDb(newCard);
       dbRow.checklist = newCard.checklist;
       const insertRow: Record<string, unknown> = { ...dbRow };
@@ -621,14 +645,27 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
       supabase.from("posts").insert(insertRow).select().single().then(({ data, error }) => {
         if (error) {
           console.error("[pipeline] createCard sync failed:", error.message);
+          // Rollback: the row was never persisted, so remove the local tempId
+          // card to keep UI honest. Surface the failure to the user.
+          setCards((prev) => prev.filter((c) => c.id !== tempId));
+          addToast(`Save failed: ${error.message}. Card was not created.`, "error");
         } else if (data) {
           setCards((prev) => prev.map((c) => c.id === tempId ? { ...c, id: data.id } : c));
+          // Also mark the real id so the realtime INSERT echo (which will
+          // arrive with the real UUID) is suppressed.
+          markMutation(data.id);
         }
       });
     }
-  }, [useSupabase]);
+  }, [useSupabase, addToast]);
 
   const deleteCard = useCallback((cardId: string) => {
+    // Snapshot the card BEFORE removing it so we can restore on DB failure.
+    // Iron law spirit: a post must never appear to vanish, then quietly come
+    // back on refresh. If the 0015 trigger blocks the delete (approved_scheduled
+    // / posted), we surface the error and re-insert the card locally.
+    const previousCard = cards.find((c) => c.id === cardId);
+    const previousSelected = selectedCard;
     setCards((prev) => prev.filter((c) => c.id !== cardId));
     setSelectedCard((prev) => (prev?.id === cardId ? null : prev));
     setIsDrawerOpen((open) => {
@@ -638,10 +675,26 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     if (useSupabase && isValidUuid(cardId)) {
       markMutation(cardId);
       supabase.from("posts").delete().eq("id", cardId).then(({ error }) => {
-        if (error) console.error("[pipeline] deleteCard sync failed:", error.message);
+        if (error) {
+          console.error("[pipeline] deleteCard sync failed:", error.message);
+          // Restore the card — DB rejected the delete (RLS or protect-trigger).
+          if (previousCard) {
+            setCards((prev) => prev.some((c) => c.id === cardId) ? prev : [previousCard, ...prev]);
+            setSelectedCard(previousSelected);
+            const isProtected = /protected|approved|posted|cannot.*delete/i.test(error.message);
+            addToast(
+              isProtected
+                ? "This post is locked because it has been approved or posted. Move it back to Revision Needed first."
+                : `Delete failed: ${error.message}. Card restored.`,
+              "error",
+            );
+          } else {
+            addToast(`Delete failed: ${error.message}.`, "error");
+          }
+        }
       });
     }
-  }, [selectedCard, useSupabase]);
+  }, [cards, selectedCard, useSupabase, addToast]);
 
   const value = useMemo(
     () => ({ cards, isLoading, selectedCard, isDrawerOpen, isEditingOnOpen, pendingReapproval, pendingKickback, workspaceId, selectCard, selectCardForEditing, closeDrawer, moveCard, requestReapproval, submitReapproval, cancelReapproval, requestKickback, submitKickback, cancelKickback, updateCard, createCard, deleteCard }),

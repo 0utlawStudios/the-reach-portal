@@ -45,48 +45,53 @@ export async function POST(request: NextRequest) {
 
     const admin = getAdminClient();
 
-    // Check if already a team member
-    const { data: existing } = await admin
+    // Anti-enumeration: always respond with success. Internally we still skip
+    // the insert (and the admin notification) if the email already maps to a
+    // team member or a pending request, so we don't spam admins or pile up
+    // duplicates — but the response shape is identical for unknown emails.
+    const { data: existingMember } = await admin
       .from("team_members")
       .select("id")
       .eq("email", email)
       .maybeSingle();
-    if (existing) {
-      return NextResponse.json({ error: "This email is already registered. Try signing in." }, { status: 409 });
-    }
 
-    // Check for duplicate pending request
     const { data: pendingReq } = await admin
       .from("signup_requests")
       .select("id")
       .eq("email", email)
       .eq("status", "pending")
       .maybeSingle();
-    if (pendingReq) {
-      return NextResponse.json({ error: "A request for this email is already pending review." }, { status: 409 });
+
+    const alreadyKnown = !!existingMember || !!pendingReq;
+
+    let insertErr: { message: string } | null = null;
+    if (!alreadyKnown) {
+      // Insert the request
+      const res = await admin
+        .from("signup_requests")
+        .insert({
+          name: body.name.trim(),
+          email,
+          phone: body.phone || null,
+          company: body.company || null,
+          reason: body.reason || null,
+          status: "pending",
+        });
+      insertErr = res.error;
+
+      if (insertErr) {
+        console.error("[request-access] Insert failed:", insertErr.message);
+        // Still respond 200 to preserve anti-enumeration. Caller can retry; we
+        // surface the failure only in server logs.
+      }
+    } else {
+      console.log(`[request-access] Skipped duplicate request for ${email}`);
     }
 
-    // Insert the request
-    const { error: insertErr } = await admin
-      .from("signup_requests")
-      .insert({
-        name: body.name.trim(),
-        email,
-        phone: body.phone || null,
-        company: body.company || null,
-        reason: body.reason || null,
-        status: "pending",
-      });
-
-    if (insertErr) {
-      console.error("[request-access] Insert failed:", insertErr.message);
-      return NextResponse.json({ error: "Failed to submit request" }, { status: 500 });
-    }
-
-    // ─── Email admins about the new request ───
+    // ─── Email admins about the new request (only for genuinely new emails) ───
     const smtpUser = process.env.SMTP_USER;
     const smtpPass = process.env.SMTP_PASS;
-    if (smtpUser && smtpPass) {
+    if (smtpUser && smtpPass && !alreadyKnown && !insertErr) {
       try {
         const transporter = getTransporter();
 

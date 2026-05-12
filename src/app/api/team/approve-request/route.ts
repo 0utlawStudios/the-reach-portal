@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getTransporter, getFromAddress, getSiteUrl, buildApprovalEmailHtml } from "@/lib/email-utils";
+import { requireBearerTeamRole } from "@/lib/auth/require";
 
 export const maxDuration = 10;
 
@@ -15,29 +16,24 @@ interface ApproveBody {
   requestId: string;
   action: "approve" | "reject";
   role?: string;
-  reviewedBy: string;
+  // reviewedBy is derived from the Bearer token; client value is ignored.
+  reviewedBy?: string;
 }
 
 export async function POST(request: NextRequest) {
   try {
+    // ─── Auth: superadmin-only via verified Bearer token ───
+    const ctx = await requireBearerTeamRole(request, ["superadmin"]);
+    if (ctx instanceof NextResponse) return ctx;
+    const reviewerEmail = ctx.email;
+
     const body: ApproveBody = await request.json();
 
-    if (!body.requestId || !body.action || !body.reviewedBy) {
+    if (!body.requestId || !body.action) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
     const admin = getAdminClient();
-
-    // ─── RBAC: Only superadmin can approve/reject ───
-    const { data: reviewer } = await admin
-      .from("team_members")
-      .select("role")
-      .eq("email", body.reviewedBy)
-      .single();
-
-    if (!reviewer || reviewer.role !== "superadmin") {
-      return NextResponse.json({ error: "Only superadmins can approve or reject requests" }, { status: 403 });
-    }
 
     // Get the request
     const { data: req, error: fetchErr } = await admin
@@ -57,7 +53,7 @@ export async function POST(request: NextRequest) {
     if (body.action === "reject") {
       await admin
         .from("signup_requests")
-        .update({ status: "rejected", reviewed_by: body.reviewedBy, reviewed_at: new Date().toISOString() })
+        .update({ status: "rejected", reviewed_by: reviewerEmail, reviewed_at: new Date().toISOString() })
         .eq("id", body.requestId);
 
       return NextResponse.json({ success: true, action: "rejected" });
@@ -148,7 +144,7 @@ export async function POST(request: NextRequest) {
     // Update request status
     await admin
       .from("signup_requests")
-      .update({ status: "approved", reviewed_by: body.reviewedBy, reviewed_at: new Date().toISOString() })
+      .update({ status: "approved", reviewed_by: reviewerEmail, reviewed_at: new Date().toISOString() })
       .eq("id", body.requestId);
 
     // Audit log
@@ -158,7 +154,7 @@ export async function POST(request: NextRequest) {
         p_action: "request_approved",
         p_entity_id: null,
         p_metadata: {
-          user_name: body.reviewedBy,
+          user_name: reviewerEmail,
           details: emailSent
             ? `Approved ${req.name} (${req.email}) as ${role} — email sent`
             : `Approved ${req.name} (${req.email}) as ${role} — email failed, invite link generated`,

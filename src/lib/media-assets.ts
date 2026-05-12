@@ -25,11 +25,15 @@ export async function ensureMediaAsset(params: EnsureMediaAssetParams): Promise<
   const { name, url, fileType, folder, addedBy, workspaceId, usedIn } = params;
   const wsId = workspaceId || "00000000-0000-0000-0000-000000000001";
 
-  // 1. Check if a row with this URL already exists
+  // 1. Check if a row with this URL already exists IN THIS WORKSPACE.
+  // RLS already gates this at the DB level, but the explicit workspace_id
+  // filter is belt-and-suspenders against a future code path that mistakenly
+  // uses the admin client here.
   const { data: existing } = await supabase
     .from("media_assets")
     .select("id, used_in")
     .eq("url", url)
+    .eq("workspace_id", wsId)
     .maybeSingle();
 
   if (existing) {
@@ -40,7 +44,8 @@ export async function ensureMediaAsset(params: EnsureMediaAssetParams): Promise<
         await supabase
           .from("media_assets")
           .update({ used_in: [...currentUsedIn, usedIn] })
-          .eq("id", existing.id);
+          .eq("id", existing.id)
+          .eq("workspace_id", wsId);
       }
     }
     return;
