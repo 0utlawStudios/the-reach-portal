@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import type { User } from "@supabase/supabase-js";
+import { createClient, type User } from "@supabase/supabase-js";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 // Server-side actor verification helpers. Route handlers call requireUser or
@@ -100,6 +100,83 @@ export async function requireRole(
       workspaceId: data.workspace_id as string,
       role,
     };
+  } catch {
+    return forbidden("Role check failed");
+  }
+}
+
+// ─── Bearer-token variants (for client-side fetch calls with Authorization headers) ───
+
+const TEAM_ADMIN_ROLES = new Set([
+  "superadmin",
+  "admin",
+  "owner",
+]);
+
+/**
+ * Verify Bearer token from Authorization header. Returns the authenticated User
+ * or a NextResponse (401). Uses the service-role client purely to validate the
+ * token — never returns it to the caller.
+ */
+export async function requireBearerUser(
+  req: NextRequest,
+): Promise<{ user: User } | NextResponse> {
+  const token = req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
+  if (!token) return unauthorized();
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceKey) return unauthorized("Auth not configured");
+  try {
+    const admin = createClient(url, serviceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { data, error } = await admin.auth.getUser(token);
+    if (error || !data.user) return unauthorized();
+    return { user: data.user };
+  } catch {
+    return unauthorized();
+  }
+}
+
+/**
+ * Verify Bearer token + look up the caller in team_members. Returns the User
+ * along with their email and role (lowercased role string for portable
+ * comparison). Returns 401/403 NextResponse on failure.
+ *
+ * If allowedRoles is provided, the caller must have one of those roles.
+ * Defaults to the team-admin set: superadmin, admin, owner.
+ */
+export async function requireBearerTeamRole(
+  req: NextRequest,
+  allowedRoles?: ReadonlyArray<string>,
+): Promise<{ user: User; email: string; role: string } | NextResponse> {
+  const result = await requireBearerUser(req);
+  if (result instanceof NextResponse) return result;
+  const { user } = result;
+  const email = (user.email || "").toLowerCase();
+  if (!email) return forbidden("No email on user");
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceKey) return forbidden("Auth not configured");
+
+  try {
+    const admin = createClient(url, serviceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { data } = await admin
+      .from("team_members")
+      .select("role")
+      .ilike("email", email)
+      .maybeSingle();
+    const role = (data?.role as string) || "";
+    const allowed = allowedRoles
+      ? new Set(allowedRoles.map((r) => r.toLowerCase()))
+      : TEAM_ADMIN_ROLES;
+    if (!role || !allowed.has(role.toLowerCase())) {
+      return forbidden(`Role '${role || "none"}' not allowed`);
+    }
+    return { user, email, role };
   } catch {
     return forbidden("Role check failed");
   }

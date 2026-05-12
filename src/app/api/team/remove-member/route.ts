@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { requireBearerTeamRole } from "@/lib/auth/require";
 
 export const maxDuration = 10;
 
@@ -13,29 +14,29 @@ function getAdminClient() {
 interface RemoveBody {
   memberId: string;
   memberEmail: string;
-  requestedBy: string;
+  // requestedBy is no longer trusted; we derive the actor from the Bearer token.
+  requestedBy?: string;
 }
 
 export async function POST(request: NextRequest) {
   try {
+    // ─── Auth: verified session ───
+    const ctx = await requireBearerTeamRole(request, ["superadmin", "admin", "owner"]);
+    if (ctx instanceof NextResponse) return ctx;
+    const actorEmail = ctx.email;
+
     const body: RemoveBody = await request.json();
 
-    if (!body.memberId || !body.memberEmail || !body.requestedBy) {
+    if (!body.memberId || !body.memberEmail) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const admin = getAdminClient();
-
-    // ─── RBAC: Only superadmin, developer, admin can remove ───
-    const { data: requester } = await admin
-      .from("team_members")
-      .select("role")
-      .eq("email", body.requestedBy)
-      .single();
-
-    if (!requester || !["superadmin", "admin"].includes(requester.role)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    // ─── Guard against self-removal (no one can lock themselves out) ───
+    if (body.memberEmail.toLowerCase() === actorEmail) {
+      return NextResponse.json({ error: "You cannot remove yourself" }, { status: 400 });
     }
+
+    const admin = getAdminClient();
 
     // ─── Delete from team_members ───
     await admin.from("team_members").delete().eq("id", body.memberId);
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest) {
         p_entity_type: "team",
         p_action: "member_removed",
         p_entity_id: null,
-        p_metadata: { user_name: body.requestedBy, details: `Removed ${body.memberEmail} from team and auth` },
+        p_metadata: { user_name: actorEmail, details: `Removed ${body.memberEmail} from team and auth` },
       });
     } catch { /* best-effort */ }
 
