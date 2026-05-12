@@ -129,14 +129,25 @@ async function uploadViaProxy(
 
 // ─── Resumable path (≥ 4 MB) ──────────────────────────────────────────────
 
+async function getAuthHeaders(): Promise<HeadersInit> {
+  const { supabase } = await import("@/lib/supabaseClient");
+  const { data } = await supabase.auth.getSession();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (data.session?.access_token) {
+    headers.Authorization = `Bearer ${data.session.access_token}`;
+  }
+  return headers;
+}
+
 async function getUploadSession(
   file: File,
   folder: string,
   cardId: string | undefined
 ): Promise<string> {
+  const headers = await getAuthHeaders();
   const res = await fetch("/api/drive/upload", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({
       fileName: file.name,
       mimeType: file.type || "application/octet-stream",
