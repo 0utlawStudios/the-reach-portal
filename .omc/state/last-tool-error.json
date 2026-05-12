@@ -1,7 +1,0 @@
-{
-  "tool_name": "Read",
-  "tool_input_preview": "{\"file_path\":\"/Users/ace/Documents/CURSOR MAIN/ten80ten-smm-portal/src/components/asset-review-drawer.tsx\"}",
-  "error": "File content (28329 tokens) exceeds maximum allowed tokens (25000). Use offset and limit parameters to read specific portions of the file, or search for specific content instead of reading the whole file.",
-  "timestamp": "2026-05-12T19:25:57.888Z",
-  "retry_count": 2
-}
