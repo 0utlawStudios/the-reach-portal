@@ -25,31 +25,23 @@ export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
   return (
     <header className="h-12 flex items-center gap-2 px-4 border-b border-gray-100 bg-white dark:bg-[#111] dark:border-white/[0.06] shrink-0">
       {/* Mobile / tablet hamburger */}
-      <button
-        onClick={onMenuClick}
-        aria-label="Open navigation menu"
-        className="md:hidden p-2 -ml-1 rounded-lg text-gray-500 hover:bg-gray-50 dark:hover:bg-white/[0.06] cursor-pointer transition-colors"
-      >
-        <Menu className="w-5 h-5" aria-hidden="true" />
+      <button onClick={onMenuClick} className="md:hidden p-2 -ml-1 rounded-lg text-gray-500 hover:bg-gray-50 dark:hover:bg-white/[0.06] cursor-pointer transition-colors">
+        <Menu className="w-5 h-5" />
       </button>
       <div className="flex-1" />
       {/* Theme toggle */}
       <button
         onClick={toggleTheme}
-        aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
         className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50 dark:hover:bg-white/[0.06] dark:hover:text-gray-300 transition-colors cursor-pointer"
         title={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
       >
-        {theme === "light" ? <Moon className="w-4 h-4" aria-hidden="true" /> : <Sun className="w-4 h-4" aria-hidden="true" />}
+        {theme === "light" ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
       </button>
 
       {/* User menu */}
       <div ref={menuRef} className="relative">
         <button
           onClick={() => setMenuOpen(!menuOpen)}
-          aria-label="Open user menu"
-          aria-haspopup="menu"
-          aria-expanded={menuOpen}
           className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
         >
           {currentUser.avatar ? (

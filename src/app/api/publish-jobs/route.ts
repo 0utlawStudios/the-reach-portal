@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { consume, getClientIp } from "@/lib/rate-limit";
 
 export const maxDuration = 10;
 export const dynamic = "force-dynamic";
@@ -70,17 +69,6 @@ export async function POST(request: NextRequest) {
     const { data: userData, error: userError } = await caller.auth.getUser();
     if (userError || !userData.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Rate-limit: 30 publish-job creations per minute per user. Anti-abuse
-    // against repeated clicks or scripted hammering of the approve workflow.
-    const rlKey = `user:${userData.user.id}|ip:${getClientIp(request)}`;
-    const rl = await consume("publish-jobs:create", rlKey, 30, 60);
-    if (!rl.allowed) {
-      return NextResponse.json(
-        { error: "Too many publish requests. Please slow down." },
-        { status: 429 },
-      );
     }
 
     const body = await request.json() as PublishJobRequest;

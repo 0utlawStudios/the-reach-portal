@@ -40,37 +40,6 @@ export function safeSubject(value: unknown): string {
   return String(value).replace(/[\r\n]+/g, " ").trim().slice(0, 200);
 }
 
-/**
- * Validate a single email address against a strict shape and reject anything
- * that smuggles in CR/LF, commas, or other RFC-5322 separators.
- * Use before passing user-derived addresses to nodemailer's `to` / `cc` / `bcc`
- * fields to close header-injection vectors.
- */
-const EMAIL_RE = /^[^\s@,;<>"\r\n]+@[^\s@,;<>"\r\n]+\.[^\s@,;<>"\r\n]+$/;
-export function isValidEmail(value: unknown): boolean {
-  if (typeof value !== "string") return false;
-  const trimmed = value.trim();
-  if (!trimmed || trimmed.length > 320) return false;
-  return EMAIL_RE.test(trimmed);
-}
-
-/**
- * Filter a list of candidate emails down to those that pass `isValidEmail`.
- * Returns a deduplicated, lowercased list ready for `to:` / `cc:` / `bcc:`.
- */
-export function safeRecipients(values: ReadonlyArray<unknown>): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const v of values) {
-    if (!isValidEmail(v)) continue;
-    const norm = String(v).trim().toLowerCase();
-    if (seen.has(norm)) continue;
-    seen.add(norm);
-    out.push(norm);
-  }
-  return out;
-}
-
 // ─── Shared HTML Wrapper ───
 
 function wrapEmail(content: string) {

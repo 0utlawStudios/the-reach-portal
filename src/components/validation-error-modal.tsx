@@ -1,7 +1,6 @@
 "use client";
 
 import { X, AlertTriangle } from "lucide-react";
-import { useEffect, useRef } from "react";
 
 const FIELD_GUIDANCE: Record<string, string> = {
   "title": "Enter a descriptive title at the top of the form.",
@@ -30,24 +29,6 @@ interface Props {
 }
 
 export function ValidationErrorModal({ errors, onClose }: Props) {
-  const dismissRef = useRef<HTMLButtonElement | null>(null);
-  const titleId = "validation-error-modal-title";
-  const descId = "validation-error-modal-desc";
-
-  // Focus the primary dismiss button on open + close on Escape.
-  useEffect(() => {
-    if (errors.length === 0) return;
-    const t = setTimeout(() => dismissRef.current?.focus(), 0);
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => {
-      clearTimeout(t);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [errors.length, onClose]);
-
   if (errors.length === 0) return null;
 
   return (
@@ -55,10 +36,6 @@ export function ValidationErrorModal({ errors, onClose }: Props) {
       <div onClick={onClose} className="fixed inset-0 bg-black/40 dark:bg-black/60 z-[100] backdrop-blur-sm" />
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6" onClick={onClose}>
         <div
-          role="alertdialog"
-          aria-modal="true"
-          aria-labelledby={titleId}
-          aria-describedby={descId}
           className="w-full max-w-sm sm:max-w-md max-h-[75vh] sm:max-h-[80vh] flex flex-col rounded-2xl overflow-hidden
             bg-white/80 dark:bg-[#18181b]/85
             backdrop-blur-2xl
@@ -69,18 +46,14 @@ export function ValidationErrorModal({ errors, onClose }: Props) {
           {/* Header */}
           <div className="flex items-center gap-3 px-4 sm:px-5 py-3.5 sm:py-4 border-b border-gray-200/40 dark:border-white/[0.08] shrink-0">
             <div className="w-9 h-9 rounded-xl bg-red-500/10 dark:bg-red-500/15 flex items-center justify-center shrink-0">
-              <AlertTriangle className="w-5 h-5 text-red-500" aria-hidden="true" />
+              <AlertTriangle className="w-5 h-5 text-red-500" />
             </div>
             <div className="flex-1 min-w-0">
-              <h3 id={titleId} className="text-[14px] sm:text-[15px] font-bold text-gray-900 dark:text-white">Missing Required Fields</h3>
-              <p id={descId} className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">Complete these before continuing</p>
+              <h3 className="text-[14px] sm:text-[15px] font-bold text-gray-900 dark:text-white">Missing Required Fields</h3>
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">Complete these before continuing</p>
             </div>
-            <button
-              onClick={onClose}
-              aria-label="Close validation error dialog"
-              className="p-1.5 rounded-lg hover:bg-gray-100/80 dark:hover:bg-white/[0.06] text-gray-400 cursor-pointer transition-colors"
-            >
-              <X className="w-4 h-4" aria-hidden="true" />
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100/80 dark:hover:bg-white/[0.06] text-gray-400 cursor-pointer transition-colors">
+              <X className="w-4 h-4" />
             </button>
           </div>
 
@@ -101,11 +74,8 @@ export function ValidationErrorModal({ errors, onClose }: Props) {
 
           {/* Footer */}
           <div className="px-4 sm:px-5 py-3 sm:py-4 border-t border-gray-200/40 dark:border-white/[0.08] shrink-0">
-            <button
-              ref={dismissRef}
-              onClick={onClose}
-              className="w-full h-10 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-[13px] font-semibold cursor-pointer hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors shadow-sm"
-            >
+            <button onClick={onClose}
+              className="w-full h-10 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-[13px] font-semibold cursor-pointer hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors shadow-sm">
               Got it
             </button>
           </div>

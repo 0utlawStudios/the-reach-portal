@@ -14,15 +14,10 @@ export interface UserPresence {
 const useSupabase = !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   && process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://placeholder.supabase.co");
 
-export function usePresence(userEmail: string, workspaceId?: string) {
+export function usePresence(userEmail: string) {
   const [presenceMap, setPresenceMap] = useState<Record<string, UserPresence>>({});
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const statusRef = useRef<PresenceStatus>("online");
-
-  // Default to the baseline workspace so the channel name is stable for the
-  // current single-tenant deployment. Anyone in a different workspace will
-  // join a different channel and not see this workspace's presence.
-  const wsId = workspaceId || "00000000-0000-0000-0000-000000000001";
 
   const broadcastStatus = useCallback((status: PresenceStatus) => {
     if (!channelRef.current) return;
@@ -37,9 +32,7 @@ export function usePresence(userEmail: string, workspaceId?: string) {
   useEffect(() => {
     if (!useSupabase || !userEmail) return;
 
-    // Scope channel name per workspace — previously a single global
-    // "presence-room" leaked identities across tenants.
-    const channel = supabase.channel(`presence-${wsId}`, {
+    const channel = supabase.channel("presence-room", {
       config: { presence: { key: userEmail } },
     });
 
@@ -82,7 +75,7 @@ export function usePresence(userEmail: string, workspaceId?: string) {
       channel.unsubscribe();
       channelRef.current = null;
     };
-  }, [userEmail, wsId, broadcastStatus]);
+  }, [userEmail, broadcastStatus]);
 
   const getStatus = useCallback((email: string): PresenceStatus => {
     return presenceMap[email]?.status || "offline";

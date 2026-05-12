@@ -218,7 +218,6 @@ export function RepurposeModal({ card, onClose }: Props) {
                 <Input type="date" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} className="h-9 flex-1 bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[12px] text-gray-800 dark:text-gray-200" />
                 <Input type="time" value={scheduledTime} onChange={(e) => setScheduledTime(e.target.value)} className="h-9 w-28 bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[12px] text-gray-800 dark:text-gray-200" />
               </div>
-              <p className="text-[10px] text-gray-400">All times shown in Central Time (CST).</p>
               {(!scheduledDate || !scheduledTime) && <p className="text-[10px] text-amber-500">Select when this should be published</p>}
             </div>
           </div>

@@ -249,7 +249,7 @@ export function SettingsPage() {
   const isAdmin = currentMember?.role === "superadmin" || currentMember?.role === "admin";
   const isSuperadmin = currentMember?.role === "superadmin";
   const canViewAudit = isAdmin || currentMember?.role === "approver" || currentMember?.role === "creative_director";
-  const { getStatus } = usePresence(currentUser.email, workspaceId);
+  const { getStatus } = usePresence(currentUser.email);
   const [activeTab, setActiveTab] = useState<"general" | "team" | "audit" | "themes">("general");
   const [auditLogs, setAuditLogs] = useState<AuditEntry[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
@@ -276,12 +276,9 @@ export function SettingsPage() {
   const handleApprove = async (reqId: string, action: "approve" | "reject", role = "social_media_specialist") => {
     setApproving(reqId);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
       const res = await fetch("/api/team/approve-request", {
         method: "POST",
-        headers,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ requestId: reqId, action, role, reviewedBy: currentUser.email }),
       });
       const data = await res.json();
@@ -305,12 +302,9 @@ export function SettingsPage() {
     if (!inviteEmail.trim() || !inviteName.trim() || inviting) return;
     setInviting(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
       const res = await fetch("/api/team/invite", {
         method: "POST",
-        headers,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: inviteEmail.trim(),
           name: inviteName.trim(),
@@ -344,12 +338,9 @@ export function SettingsPage() {
   const handleResendInvite = async (member: TeamMember) => {
     setResendingInvite(member.id);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
       const res = await fetch("/api/team/resend-invite", {
         method: "POST",
-        headers,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: member.email, name: member.name, role: member.role, requestedBy: currentUser.email }),
       });
       const data = await res.json();

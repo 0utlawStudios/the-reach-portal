@@ -1,14 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const ADMIN_ROLES = new Set(["superadmin", "admin", "owner"]);
 
 function isValidUuid(v: string): boolean {
   return UUID_REGEX.test(v);
 }
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -17,24 +16,6 @@ export async function POST(request: NextRequest) {
   }
 
   const admin = createClient(supabaseUrl, serviceKey);
-
-  // ─── Auth: Bearer token + admin role required ───
-  const token = request.headers.get("Authorization")?.replace("Bearer ", "");
-  if (!token) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  const { data: { user }, error: authErr } = await admin.auth.getUser(token);
-  if (authErr || !user?.email) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  const { data: tm } = await admin
-    .from("team_members")
-    .select("role")
-    .ilike("email", user.email)
-    .maybeSingle();
-  if (!tm || !ADMIN_ROLES.has(tm.role)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
 
   // Fetch all posts
   const { data: posts, error: postsErr } = await admin

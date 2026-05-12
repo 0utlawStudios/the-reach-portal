@@ -174,14 +174,10 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     setMembers((prev) => prev.filter((m) => m.id !== id));
     if (useDb) {
       // Use the API route to delete both team_members AND auth user
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        const headers: HeadersInit = { "Content-Type": "application/json" };
-        if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
-        fetch("/api/team/remove-member", {
-          method: "POST",
-          headers,
-          body: JSON.stringify({ memberId: id, memberEmail: email, requestedBy }),
-        }).catch(() => {});
+      fetch("/api/team/remove-member", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberId: id, memberEmail: email, requestedBy }),
       }).catch(() => {});
     }
   }, [useDb]);

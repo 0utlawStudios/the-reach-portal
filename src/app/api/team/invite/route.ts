@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getTransporter, getFromAddress, getSiteUrl, buildInviteEmailHtml } from "@/lib/email-utils";
-import { requireBearerTeamRole } from "@/lib/auth/require";
 
 export const maxDuration = 10;
 
@@ -34,27 +33,20 @@ interface InviteRequest {
   email: string;
   name: string;
   role: ValidRole;
-  // requestedBy is no longer trusted; we derive the actor from the Bearer token
-  // and only use this field as a hint for audit logging when present.
-  requestedBy?: string;
+  requestedBy: string;
 }
 
 export async function POST(request: NextRequest) {
   try {
-    // ─── Auth: verified session, not client-supplied requestedBy ───
-    const ctx = await requireBearerTeamRole(request, ["superadmin", "admin", "owner"]);
-    if (ctx instanceof NextResponse) return ctx;
-    const actorEmail = ctx.email;
-
     const body: InviteRequest = await request.json();
 
     // ─── Input validation ───
-    if (!body.email || !body.name || !body.role) {
-      return NextResponse.json({ error: "Missing required fields: email, name, role" }, { status: 400 });
+    if (!body.email || !body.name || !body.role || !body.requestedBy) {
+      return NextResponse.json({ error: "Missing required fields: email, name, role, requestedBy" }, { status: 400 });
     }
 
     const email = body.email.trim().toLowerCase();
-    if (!/^[^\s@\r\n]+@[^\s@\r\n]+\.[^\s@\r\n]+$/.test(email)) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return NextResponse.json({ error: "Invalid email address" }, { status: 400 });
     }
 
@@ -63,6 +55,21 @@ export async function POST(request: NextRequest) {
     }
 
     const admin = getAdminClient();
+
+    // ─── RBAC: Verify requester is superadmin, developer, or admin ───
+    const { data: requester, error: requesterErr } = await admin
+      .from("team_members")
+      .select("role")
+      .eq("email", body.requestedBy)
+      .single();
+
+    if (requesterErr || !requester) {
+      return NextResponse.json({ error: "Unauthorized — requester not found in team" }, { status: 403 });
+    }
+
+    if (!["superadmin", "admin"].includes(requester.role)) {
+      return NextResponse.json({ error: "Unauthorized — only superadmins and admins can invite members" }, { status: 403 });
+    }
 
     // ─── Check if email already exists in team ───
     const { data: existing } = await admin
@@ -164,7 +171,7 @@ export async function POST(request: NextRequest) {
         p_action: "invite_sent",
         p_entity_id: null,
         p_metadata: {
-          user_name: actorEmail,
+          user_name: body.requestedBy,
           details: emailSent
             ? `Invited ${body.name} (${email}) as ${body.role} — email sent`
             : `Invited ${body.name} (${email}) as ${body.role} — email FAILED: ${emailError}. Invite link generated.`,

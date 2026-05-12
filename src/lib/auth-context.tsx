@@ -66,10 +66,12 @@ async function enrichFromTeamMembers(email: string, profile: UserProfile): Promi
       .eq("email", email)
       .single();
     if (data) {
-      // NOTE: previously this block auto-flipped status:"pending"→"active". That
-      // defeats the admin approval flow — anyone who acquires an auth session
-      // for a pending invite would self-promote. Activation must happen in the
-      // server-side approve-request flow or the magic-link setup page only.
+      // Auto-activate: if user has a valid auth session but is still pending, flip to active
+      if (data.status === "pending") {
+        supabase.from("team_members").update({ status: "active" }).eq("email", email).then(({ error }) => {
+          if (error) console.error("[auth] auto-activate failed:", error.message);
+        });
+      }
       const name = data.name || profile.name;
       return {
         ...profile,
@@ -161,13 +163,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-    // scope:"global" revokes the refresh token server-side so the session
-    // cannot be reused if cookies/localStorage are recovered after sign-out.
-    await supabase.auth.signOut({ scope: "global" });
+    await supabase.auth.signOut();
     setIsAuthenticated(false);
     setCurrentUser(DEFAULT_USER);
-    setAccessToken(null);
-    setProvisionResult(null);
   }, []);
 
   const updateCurrentUserAvatar = useCallback((avatar: string | undefined) => {

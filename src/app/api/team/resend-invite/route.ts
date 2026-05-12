@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getTransporter, getFromAddress, getSiteUrl, buildInviteEmailHtml } from "@/lib/email-utils";
-import { requireBearerTeamRole } from "@/lib/auth/require";
 
 export const maxDuration = 10;
 
@@ -28,22 +27,25 @@ async function findAuthUserByEmail(admin: ReturnType<typeof getAdminClient>, ema
 
 export async function POST(request: NextRequest) {
   try {
-    // ─── Auth: verified session, not client-supplied requestedBy ───
-    const ctx = await requireBearerTeamRole(request, ["superadmin", "admin", "owner"]);
-    if (ctx instanceof NextResponse) return ctx;
-    const actorEmail = ctx.email;
-
     const body = await request.json();
-    const { email, name, role } = body;
+    const { email, name, role, requestedBy } = body;
 
-    if (!email || !name || !role) {
+    if (!email || !name || !role || !requestedBy) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-    }
-    if (!/^[^\s@\r\n]+@[^\s@\r\n]+\.[^\s@\r\n]+$/.test(email)) {
-      return NextResponse.json({ error: "Invalid email address" }, { status: 400 });
     }
 
     const admin = getAdminClient();
+
+    // RBAC: only superadmin/admin can resend
+    const { data: requester } = await admin
+      .from("team_members")
+      .select("role")
+      .eq("email", requestedBy)
+      .single();
+
+    if (!requester || !["superadmin", "admin"].includes(requester.role)) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    }
 
     // Verify member exists and is pending
     const { data: member } = await admin
@@ -120,7 +122,7 @@ export async function POST(request: NextRequest) {
         p_entity_type: "team",
         p_action: "invite_resent",
         p_entity_id: null,
-        p_metadata: { user_name: actorEmail, details: `Resent invite to ${name} (${email})` },
+        p_metadata: { user_name: requestedBy, details: `Resent invite to ${name} (${email})` },
       });
     } catch { /* best-effort */ }
 
