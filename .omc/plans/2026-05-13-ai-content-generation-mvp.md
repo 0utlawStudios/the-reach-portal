@@ -494,14 +494,32 @@ OPENAI_PROMPT_VERSION=2026-05-13.v1
 
 ---
 
-## 14. Open questions / decisions to confirm
+## 14. Decisions locked in 2026-05-13
 
-1. **Default model.** Plan suggests `gpt-5-mini` for cost. Alternatives: `gpt-4o-mini`, `gpt-5`, `o3-mini`. Decision: ship with `gpt-5-mini`, env-configurable.
-2. **Who can generate?** Plan gates by writer roles (excludes viewer). Confirm.
-3. **Calendar generation in MVP or phase 2?** Plan defers to phase 2 unless you say otherwise.
-4. **Brand rules in DB vs code?** Plan splits: brand_playbook in DB (data), code constants for "do/avoid" (behavior). Confirm or move all to DB.
+1. **Model.** `OPENAI_MODEL=gpt-5-mini` (env-configurable; admin can swap without redeploy).
+2. **Allowed roles for AI generation:** `superadmin`, `admin`, `owner`, `creative_director`. Writer roles below creative_director (editor, social_media_specialist, video_editor, graphic_designer, specialist) are excluded — they can still manually create posts but cannot trigger the AI endpoints.
+3. **Calendar generation:** **Phase 2.** MVP ships single-draft + revise only. Calendar after we have real token-cost data.
+4. **Brand rules location:** **All in DB.** `brand_playbook.data` gains two new JSON arrays:
+   - `doFocus` — content topics to focus on (10 entries: Business systems, Workflow cleanup, Automation, AI tools, Virtual assistants, Delegation, Operations support, Founder and operator pain points, Before-and-after process improvements, Practical business education).
+   - `doAvoid` — patterns to refuse (8 entries: Generic motivational quotes, Pushy sales language, Fake case studies, Fake testimonials, Too many hashtags, Buzzword-heavy captions, Repetitive hooks, Overpromising).
 
-Anything you mark as "decided" I'll bake into the implementation. Otherwise I default per the plan.
+   No code-side `brand-rules.ts` file. The system prompt builder reads `data.doFocus` and `data.doAvoid` from the singleton row at request time. Admins can edit them through the existing Brand Kit page once the Settings UI is extended (out of MVP scope; can be done in a follow-up).
+
+## 14b. Required role-check change
+
+The role gate is narrower than the original draft. Update `requireBearerTeamRole(req, [...])` call in every `/api/ai/*` route to:
+
+```ts
+const ctx = await requireBearerTeamRole(req, [
+  "superadmin", "admin", "owner", "creative_director",
+]);
+```
+
+Document in `src/lib/ai/persist.ts` that anyone outside this set gets a 403 from these endpoints (manual post creation through `/api/team/*` and the pipeline-context flow remains open to all writers).
+
+## 14c. Schema update applied 2026-05-13
+
+Migration 0020 already applied to production Supabase (project `lczmgquuzuqhalasjnip`) via the Management API on 2026-05-13. Verified via `information_schema.columns` query: 16 new columns present with the expected types and nullability. `brand_playbook.data` seeded with `doFocus` + `doAvoid` arrays on the singleton row. The .sql file lives at `supabase/migrations/0020_ai_content_fields.sql` for repo history; it is NOT yet committed.
 
 ---
 
