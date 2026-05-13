@@ -66,6 +66,9 @@ export interface ContentCard {
     state: string;
     platformAttempts: { platform: string; state: string; externalPostId: string | null }[];
   };
+  // Set by the n8n auto-publisher when the post goes live.
+  postedAt?: string;
+  postedUrls?: Record<string, string>;
   // ─── Creator Studio AI fields (all optional; only present on AI-originated posts) ───
   feel?: string;
   visualStyle?: string;

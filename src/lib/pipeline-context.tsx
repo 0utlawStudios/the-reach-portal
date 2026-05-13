@@ -57,6 +57,8 @@ type PostRow = {
   created_at?: string | null;
   updated_at?: string | null;
   publish_jobs?: PublishJobRow[] | PublishJobRow | null;
+  posted_at?: string | null;
+  posted_urls?: Record<string, string> | null;
   // ─── Creator Studio AI fields ───
   feel?: string | null;
   visual_style?: string | null;
@@ -180,6 +182,8 @@ function dbToCard(row: PostRow): ContentCard {
     licenseFileId: row.license_file_id || undefined,
     createdBy: row.created_by || undefined,
     publishJob: normalizePublishJob(row.publish_jobs),
+    postedAt: row.posted_at || undefined,
+    postedUrls: row.posted_urls || undefined,
     feel: row.feel || undefined,
     visualStyle: row.visual_style || undefined,
     stylePrompt: row.style_prompt || undefined,

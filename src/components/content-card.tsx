@@ -62,17 +62,36 @@ export function ContentCard({ card, isDragOverlay, stageColor }: Props) {
         {overdue && <div className="absolute bottom-1.5 left-1.5 px-2 py-[3px] rounded-full bg-red-600 text-[8px] font-bold text-white uppercase tracking-wider shadow-md shadow-red-500/30 flex items-center gap-1 animate-pulse"><span className="w-1.5 h-1.5 rounded-full bg-white" />Action Needed</div>}
         {card.revised && !overdue && <div className="absolute bottom-1.5 left-1.5 px-2 py-[3px] rounded-full bg-violet-600 text-[8px] font-bold text-white uppercase tracking-wider shadow-md shadow-violet-500/30 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-white/80 animate-pulse" />Revised</div>}
         {showAutoPostedBadge && (
-          <div className={`absolute bottom-1.5 left-1.5 px-2 py-[3px] rounded-full text-[8px] font-bold text-white uppercase tracking-wider shadow-md flex items-center gap-1 ${
-            publishState === "partial"
-              ? "bg-amber-500 shadow-amber-500/30"
-              : "bg-emerald-600 shadow-emerald-500/30"
-          }`}>
+          <div
+            title={card.postedAt ? `Live since ${new Date(card.postedAt).toLocaleString()}` : undefined}
+            className={`absolute bottom-1.5 left-1.5 px-2 py-[3px] rounded-full text-[8px] font-bold text-white uppercase tracking-wider shadow-md flex items-center gap-1 ${
+              publishState === "partial"
+                ? "bg-amber-500 shadow-amber-500/30"
+                : "bg-emerald-600 shadow-emerald-500/30"
+            }`}
+          >
             <Bot className="w-2.5 h-2.5" />
-            <span>{publishState === "partial" ? "Partial" : "Auto-posted"}</span>
+            <span>{publishState === "partial" ? "Partial" : "Live"}</span>
             <span className="flex items-center gap-0.5 pl-0.5">
-              {verifiedPlatforms.map((platform) => (
-                <PlatformIcon key={platform} platform={platform} className="w-2.5 h-2.5" />
-              ))}
+              {verifiedPlatforms.map((platform) => {
+                const liveUrl = card.postedUrls?.[platform];
+                const icon = <PlatformIcon platform={platform} className="w-2.5 h-2.5" />;
+                return liveUrl ? (
+                  <a
+                    key={platform}
+                    href={liveUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    title={`Open live post on ${platform}`}
+                    className="hover:opacity-75 transition-opacity"
+                  >
+                    {icon}
+                  </a>
+                ) : (
+                  <span key={platform}>{icon}</span>
+                );
+              })}
             </span>
           </div>
         )}
