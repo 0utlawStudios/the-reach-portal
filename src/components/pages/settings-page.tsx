@@ -482,6 +482,12 @@ export function SettingsPage() {
           )}
 
           {isAdmin && (
+            <Section title="Publishing Queue" icon={<Send className="w-3.5 h-3.5 text-blue-500" />}>
+              <PublishQueuePanel addToast={addToast} />
+            </Section>
+          )}
+
+          {isAdmin && (
             <Section title="Data" icon={<Shield className="w-3.5 h-3.5 text-rose-500" />}>
               <SettingRow icon={Download} label="Export data" desc="Download posts, media, analytics as CSV"><Button size="sm" variant="outline" onClick={() => addToast("Data export coming soon", "info")} className="h-7 text-[10px] rounded-lg px-3 cursor-pointer">Export</Button></SettingRow>
             </Section>
@@ -1106,6 +1112,166 @@ function AuditLogTab({ auditLogs, auditLoading, setAuditLogs, setAuditLoading }:
 }
 
 // ─── Creator Studio access panel ───
+// ─── Publishing Queue Panel ───
+//
+// Admin-only view of v_publish_queue (migration 0026). Surfaces every job
+// worth watching: pending (waiting for scheduled_at), claimed (in-flight),
+// partial (some platforms succeeded), failed (all-platform failure / DLQ).
+// Force Retry resets the row to clean pending so the next n8n claim picks
+// it up.
+interface PublishQueueRow {
+  job_id: string;
+  state: string;
+  scheduled_at: string;
+  next_retry_at: string | null;
+  attempts: number;
+  last_error: string | null;
+  worker_id: string | null;
+  claim_expires_at: string | null;
+  post_id: string;
+  title: string | null;
+  stage: string;
+  platforms: string[] | null;
+  scheduled_timezone: string | null;
+  posted_at: string | null;
+  posted_urls: Record<string, string> | null;
+  overdue_by: string | null;
+  claim_stuck: boolean;
+}
+
+function publishQueueStateBadge(state: string): { label: string; cls: string } {
+  switch (state) {
+    case "pending":  return { label: "Pending",  cls: "bg-gray-100 text-gray-600 dark:bg-white/[0.06] dark:text-gray-300" };
+    case "claimed":  return { label: "In Flight", cls: "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300" };
+    case "running":  return { label: "Running",  cls: "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300" };
+    case "partial":  return { label: "Partial",  cls: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300" };
+    case "failed":   return { label: "Failed",   cls: "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300" };
+    default:         return { label: state,      cls: "bg-gray-100 text-gray-600 dark:bg-white/[0.06] dark:text-gray-300" };
+  }
+}
+
+function PublishQueuePanel({ addToast }: { addToast: (msg: string, kind?: "info" | "success" | "error" | "warning") => void }) {
+  const [rows, setRows] = useState<PublishQueueRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [retrying, setRetrying] = useState<string | null>(null);
+
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setRefreshing(true);
+    try {
+      const { data, error } = await supabase
+        .from("v_publish_queue")
+        .select("*")
+        .limit(50);
+      if (error) throw error;
+      setRows((data || []) as PublishQueueRow[]);
+    } catch (err) {
+      if (!silent) addToast(`Couldn't load queue: ${err instanceof Error ? err.message : String(err)}`, "error");
+    } finally {
+      if (!silent) setRefreshing(false);
+      setLoading(false);
+    }
+  }, [addToast]);
+
+  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const id = setInterval(() => { void load(true); }, 30_000);
+    return () => clearInterval(id);
+  }, [load]);
+
+  const retry = useCallback(async (jobId: string) => {
+    setRetrying(jobId);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+      const res = await fetch(`/api/admin/publish-jobs/${jobId}/retry`, { method: "POST", headers });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+      addToast("Job reset to pending. n8n will pick it up on the next tick.", "success");
+      await load(true);
+    } catch (err) {
+      addToast(`Retry failed: ${err instanceof Error ? err.message : String(err)}`, "error");
+    } finally {
+      setRetrying(null);
+    }
+  }, [addToast, load]);
+
+  if (loading) {
+    return <div className="px-4 py-4 flex items-center gap-2 text-[12px] text-gray-400"><Loader2 className="w-3 h-3 animate-spin" /> Loading queue…</div>;
+  }
+
+  if (rows.length === 0) {
+    return (
+      <div className="px-4 py-4 text-[12px] text-gray-500 dark:text-gray-400 flex items-center gap-2">
+        <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+        Queue is empty. All approved posts are published or scheduled.
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-4 py-3 space-y-2.5">
+      <div className="flex items-center justify-between">
+        <p className="text-[11px] text-gray-500 dark:text-gray-400">{rows.length} job{rows.length === 1 ? "" : "s"} in flight or scheduled.</p>
+        <button onClick={() => void load(false)} disabled={refreshing} className="text-[10px] text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 inline-flex items-center gap-1 disabled:opacity-40">
+          {refreshing ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+          Refresh
+        </button>
+      </div>
+
+      <div className="space-y-2">
+        {rows.map((row) => {
+          const badge = publishQueueStateBadge(row.state);
+          const scheduledStr = new Date(row.scheduled_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+          const overdueMs = (() => {
+            const t = new Date(row.scheduled_at).getTime();
+            return Date.now() - t;
+          })();
+          const overdue = row.state === "pending" && overdueMs > 5 * 60_000;
+          const canRetry = row.state === "failed" || row.state === "partial" || row.claim_stuck;
+
+          return (
+            <div key={row.job_id} className="px-3 py-2.5 rounded-lg border border-gray-100 dark:border-white/[0.06] bg-white dark:bg-[#0c0d11]">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-semibold uppercase tracking-wider ${badge.cls}`}>{badge.label}</span>
+                    {row.claim_stuck && <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold uppercase tracking-wider bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">Stuck</span>}
+                    {overdue && <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold uppercase tracking-wider bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">Overdue</span>}
+                    <span className="text-[10px] text-gray-400 ml-0.5">Attempt {row.attempts}/3</span>
+                  </div>
+                  <p className="text-[12px] font-medium text-gray-800 dark:text-gray-200 mt-1 line-clamp-1">{row.title || row.post_id}</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">
+                    <Clock className="w-2.5 h-2.5 inline -mt-0.5 mr-1" />
+                    {scheduledStr}
+                    {row.scheduled_timezone && <span className="text-gray-300 dark:text-gray-600 ml-1">({row.scheduled_timezone})</span>}
+                  </p>
+                  {row.last_error && (
+                    <p className="text-[10px] text-rose-600 dark:text-rose-400 mt-1 font-mono line-clamp-2 break-all">{row.last_error}</p>
+                  )}
+                </div>
+                {canRetry && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void retry(row.job_id)}
+                    disabled={retrying === row.job_id}
+                    className="h-7 text-[10px] px-2.5 cursor-pointer shrink-0"
+                  >
+                    {retrying === row.job_id ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3 mr-1" />}
+                    Force retry
+                  </Button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // Admins use this to restrict who can see/use the Creator Studio. Reads from
 // brand_playbook.data.studioAllowedEmails. Empty allowlist = role-based default
 // (every Studio-writer role gets access). Non-empty = strict allowlist.
