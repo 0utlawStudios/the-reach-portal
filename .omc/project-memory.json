@@ -290,6 +290,12 @@
       "type": "file"
     },
     {
+      "path": "package.json",
+      "accessCount": 4,
+      "lastAccessed": 1778654339159,
+      "type": "file"
+    },
+    {
       "path": "src/app/api/workspace/provision/route.ts",
       "accessCount": 3,
       "lastAccessed": 1778614061875,
@@ -329,12 +335,6 @@
       "path": "src/lib/supabaseClient.ts",
       "accessCount": 2,
       "lastAccessed": 1778613971794,
-      "type": "file"
-    },
-    {
-      "path": "package.json",
-      "accessCount": 2,
-      "lastAccessed": 1778613973397,
       "type": "file"
     },
     {
