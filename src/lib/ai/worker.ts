@@ -287,6 +287,27 @@ export async function runGenerateJob(jobId: string): Promise<void> {
     if (!job.plan_row_id) throw new Error("generate job missing plan_row_id");
     await enforceDailyCap(job.workspace_id);
 
+    // Idempotency guard — if a concurrent job already produced a post for
+    // this plan row, abort cleanly. Belt-and-suspenders for the API-side
+    // "no in-flight" check, which has a race window of a few ms between
+    // the SELECT and the INSERT of the duplicate job.
+    const { data: planCheck } = await sb
+      .from("content_plan_rows")
+      .select("generated_post_id, status")
+      .eq("id", job.plan_row_id)
+      .maybeSingle();
+    if (planCheck?.generated_post_id) {
+      await sb.from("ai_generation_jobs")
+        .update({
+          status: "cancelled",
+          completed_at: new Date().toISOString(),
+          error: "duplicate_job: plan row already has a generated post",
+          result: { duplicate_of: planCheck.generated_post_id },
+        })
+        .eq("id", jobId);
+      return;
+    }
+
     const { plan, brand, recent } = await loadGenerateContext(sb, job.plan_row_id);
     const resolved = resolveAspect({
       mediaType: (plan.media_type || "image") as never,
@@ -518,6 +539,27 @@ export async function runReviseJob(jobId: string): Promise<void> {
       workspaceId: job.workspace_id,
       tally,
     });
+
+    // Operator-moved-the-card guard. If the post is no longer in
+    // revision_needed (operator dragged it back to Ideas / approved it
+    // manually / etc.) we MUST NOT write back — that would silently
+    // override their decision. Abort and log.
+    const { data: latest } = await sb
+      .from("posts")
+      .select("stage")
+      .eq("id", sourcePost.id)
+      .maybeSingle();
+    if (latest?.stage && latest.stage !== "revision_needed") {
+      await sb.from("ai_generation_jobs")
+        .update({
+          status: "cancelled",
+          completed_at: new Date().toISOString(),
+          error: `aborted: post left revision_needed (now ${latest.stage}) before revise completed`,
+        })
+        .eq("id", jobId);
+      return;
+    }
+
     const assets = await uploadAssets({
       workspaceId: plan.workspace_id,
       postId: sourcePost.id,

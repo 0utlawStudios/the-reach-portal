@@ -150,12 +150,37 @@ export function StudioPage() {
     return () => { cancelled = true; };
   }, [addToast, accessState]);
 
+  // Track tmp→real id swaps so the realtime echo doesn't duplicate the row.
+  // When a POST /rows succeeds, the new server row may also arrive via
+  // realtime. Without dedup we'd end up with both the tmp row (locally
+  // optimistic) and the freshly inserted server row.
+  const recentlyCreatedRef = useRef<Set<string>>(new Set());
+  const markRecentlyCreated = (id: string) => {
+    recentlyCreatedRef.current.add(id);
+    setTimeout(() => recentlyCreatedRef.current.delete(id), 4000);
+  };
+
   useEffect(() => {
     if (!isAllowedRole) return;
     const ch = supabase
       .channel("studio-plan-rows")
       .on("postgres_changes", { event: "*", schema: "public", table: "content_plan_rows" }, (payload) => {
-        if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
+        if (payload.eventType === "INSERT") {
+          const next = payload.new as PlanRow;
+          // Skip if our local POST already added this row (dedup).
+          if (recentlyCreatedRef.current.has(next.id)) return;
+          setRows((prev) => {
+            if (prev.some((r) => r.id === next.id)) return prev;
+            // Replace a matching tmp row (same row_index + same created_by) if it exists.
+            const tmpIdx = prev.findIndex((r) => r.id.startsWith("tmp-") && r.row_index === next.row_index && r.created_by === next.created_by);
+            if (tmpIdx >= 0) {
+              const out = [...prev];
+              out[tmpIdx] = next;
+              return out;
+            }
+            return [...prev, next];
+          });
+        } else if (payload.eventType === "UPDATE") {
           const next = payload.new as PlanRow;
           setRows((prev) => {
             const idx = prev.findIndex((r) => r.id === next.id);
@@ -164,7 +189,7 @@ export function StudioPage() {
               out[idx] = { ...prev[idx], ...next };
               return out;
             }
-            return [...prev, next];
+            return prev; // ignore updates for rows we don't know about
           });
         } else if (payload.eventType === "DELETE") {
           const oldId = (payload.old as { id?: string }).id;
@@ -231,6 +256,10 @@ export function StudioPage() {
     };
   }
 
+  // Tracks tmp rows that failed to save so we don't spam the user with the
+  // same toast on every keystroke; we retry on the next debounce instead.
+  const failedTmpRows = useRef<Set<string>>(new Set());
+
   const persistRowChange = useCallback(async (row: PlanRow, patch: Partial<PlanRow>) => {
     const isTmp = row.id.startsWith("tmp-");
     if (isTmp) {
@@ -242,9 +271,16 @@ export function StudioPage() {
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
         const saved = json.data?.row as PlanRow;
+        markRecentlyCreated(saved.id);
         setRows((prev) => prev.map((r) => (r.id === row.id ? saved : r)));
+        failedTmpRows.current.delete(row.id);
       } catch (err) {
-        addToast(`Failed to save row: ${err instanceof Error ? err.message : String(err)}`, "error");
+        // Only toast once per tmp row failure to avoid noise — the next
+        // keystroke will retry automatically via the debounce.
+        if (!failedTmpRows.current.has(row.id)) {
+          failedTmpRows.current.add(row.id);
+          addToast(`Couldn't save the row: ${err instanceof Error ? err.message : String(err)}. We'll retry as you keep typing.`, "error");
+        }
       }
       return;
     }
