@@ -1,8 +1,9 @@
 "use client";
 
 import { RawImage } from "@/components/raw-image";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { supabase } from "@/lib/supabaseClient";
 import { NavigationProvider, useNavigation } from "@/lib/navigation-context";
 import { PipelineProvider } from "@/lib/pipeline-context";
 import { TeamProvider, useTeam } from "@/lib/team-context";
@@ -101,7 +102,40 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
   const { currentPage, navigate, sidebarCollapsed, sidebarPinned, setSidebarCollapsed, togglePin } = useNavigation();
   const { currentUser } = useAuth();
   const studioRoles = ["superadmin", "admin", "owner", "creative_director", "social_media_specialist"];
-  const canAccessStudio = studioRoles.includes((currentUser.role || "").toLowerCase());
+  const inStudioRole = studioRoles.includes((currentUser.role || "").toLowerCase());
+
+  // Email allowlist gate. Studio access is a two-layer check: role AND (allowlist absent OR email in list).
+  // We fetch the live allowlist from /api/ai/studio/access so admins can adjust who sees the link
+  // without redeploying. Hidden until we've confirmed — fail-closed prevents flashing the link
+  // for users who don't have access.
+  const [studioAccessConfirmed, setStudioAccessConfirmed] = useState(false);
+  const [studioAccessAllowed, setStudioAccessAllowed] = useState(false);
+  useEffect(() => {
+    if (!inStudioRole) {
+      setStudioAccessConfirmed(true);
+      setStudioAccessAllowed(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        if (!token) return;
+        const res = await fetch("/api/ai/studio/access", { headers: { Authorization: `Bearer ${token}` } });
+        const json = await res.json();
+        if (cancelled) return;
+        setStudioAccessAllowed(Boolean(json.data?.allowed));
+      } catch {
+        if (!cancelled) setStudioAccessAllowed(false);
+      } finally {
+        if (!cancelled) setStudioAccessConfirmed(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [inStudioRole]);
+
+  const canAccessStudio = inStudioRole && studioAccessConfirmed && studioAccessAllowed;
   const autoCollapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hoverExpandRef = useRef(false);
   // Auto-collapse after 6s on desktop (not mobile, not pinned)

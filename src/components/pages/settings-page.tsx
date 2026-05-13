@@ -24,7 +24,7 @@ import {
   Shield, Download, Sun, Moon, Mail,
   Smartphone, Calendar, BarChart3, Zap, Link2, Webhook, FileText,
   UserPlus, ShieldCheck, Pencil, Eye, Crown, X, Send, Megaphone, Users, Settings as SettingsIcon,
-  Camera, Save, Upload, Trash2, RefreshCw,
+  Camera, Save, Upload, Trash2, RefreshCw, Sparkles, Loader2, Lock, Unlock,
 } from "lucide-react";
 
 const roleConfig: Record<UserRole, { label: string; icon: React.ReactNode; color: string }> = {
@@ -475,6 +475,12 @@ export function SettingsPage() {
                   <ChevronRight className="w-3.5 h-3.5 text-gray-200 dark:text-gray-700 group-hover:text-orange-400 transition-colors shrink-0" />
                 </button>
               ))}
+            </Section>
+          )}
+
+          {isAdmin && (
+            <Section title="Creator Studio Access" icon={<Sparkles className="w-3.5 h-3.5 text-violet-500" />}>
+              <StudioAccessPanel addToast={addToast} />
             </Section>
           )}
 
@@ -1094,6 +1100,178 @@ function AuditLogTab({ auditLogs, auditLoading, setAuditLogs, setAuditLoading }:
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ─── Creator Studio access panel ───
+// Admins use this to restrict who can see/use the Creator Studio. Reads from
+// brand_playbook.data.studioAllowedEmails. Empty allowlist = role-based default
+// (every Studio-writer role gets access). Non-empty = strict allowlist.
+function StudioAccessPanel({ addToast }: { addToast: (msg: string, kind?: "info" | "success" | "error" | "warning") => void }) {
+  const { members } = useTeam();
+  const [loading, setLoading] = useState(true);
+  const [emails, setEmails] = useState<string[]>([]);
+  const [configured, setConfigured] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
+  const [saving, setSaving] = useState(false);
+  const STUDIO_ROLES = useMemo(() => new Set(["superadmin", "admin", "owner", "creative_director", "social_media_specialist"]), []);
+
+  const reload = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {};
+      if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+      const res = await fetch("/api/ai/studio/access", { headers });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+      setEmails(Array.isArray(json.data?.allowlist) ? json.data.allowlist : []);
+      setConfigured(Boolean(json.data?.allowlistConfigured));
+    } catch (err) {
+      addToast(`Couldn't load Studio access: ${err instanceof Error ? err.message : String(err)}`, "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => { reload(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+
+  const save = async (next: string[], mode: "set" | "clear") => {
+    setSaving(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+      const res = await fetch("/api/ai/studio/access", {
+        method: "PUT",
+        headers,
+        body: JSON.stringify(mode === "set" ? { mode: "set", emails: next } : { mode: "clear" }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+      setEmails(Array.isArray(json.data?.allowlist) ? json.data.allowlist : []);
+      setConfigured(Boolean(json.data?.allowlistConfigured));
+      addToast(mode === "set" ? "Studio access updated" : "Studio opened to all writers", "success");
+    } catch (err) {
+      addToast(`Save failed: ${err instanceof Error ? err.message : String(err)}`, "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addOne = async () => {
+    const e = newEmail.trim().toLowerCase();
+    if (!e) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
+      addToast("Enter a valid email address.", "error");
+      return;
+    }
+    if (emails.includes(e)) {
+      addToast("Already on the allowlist.", "info");
+      setNewEmail("");
+      return;
+    }
+    await save([...emails, e], "set");
+    setNewEmail("");
+  };
+
+  const removeOne = async (e: string) => {
+    await save(emails.filter((x) => x !== e), "set");
+  };
+
+  const openToAll = async () => {
+    if (!confirm("Open Studio to every writer role (admin, owner, creative_director, social_media_specialist)? You can re-lock anytime.")) return;
+    await save([], "clear");
+  };
+
+  if (loading) {
+    return <div className="px-4 py-4 flex items-center gap-2 text-[12px] text-gray-400"><Loader2 className="w-3 h-3 animate-spin" /> Loading…</div>;
+  }
+
+  const teamWriters = members.filter((m) => STUDIO_ROLES.has(m.role.toLowerCase()) && m.status === "active");
+
+  return (
+    <div className="px-4 py-3 space-y-3">
+      <div className="flex items-start gap-2 p-2.5 rounded-lg bg-violet-50/60 dark:bg-violet-500/[0.06] border border-violet-100 dark:border-violet-500/15">
+        {configured ? (
+          <Lock className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400 shrink-0 mt-0.5" />
+        ) : (
+          <Unlock className="w-3.5 h-3.5 text-gray-400 shrink-0 mt-0.5" />
+        )}
+        <div className="flex-1">
+          <p className="text-[11.5px] font-semibold text-gray-700 dark:text-gray-200">
+            {configured
+              ? `Locked — ${emails.length} ${emails.length === 1 ? "person has" : "people have"} access`
+              : "Open to all Studio writer roles"}
+          </p>
+          <p className="text-[10.5px] text-gray-500 dark:text-gray-400 mt-0.5 leading-snug">
+            {configured
+              ? "Only the emails below see Creator Studio in their sidebar and can generate. Everyone else gets a 403."
+              : "Anyone with a Studio writer role (admin, owner, creative_director, social_media_specialist) can use Creator Studio."}
+          </p>
+        </div>
+      </div>
+
+      {emails.length > 0 && (
+        <div className="space-y-1.5">
+          {emails.map((email) => (
+            <div key={email} className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/[0.05]">
+              <Sparkles className="w-3 h-3 text-violet-500 shrink-0" />
+              <span className="text-[12px] text-gray-700 dark:text-gray-200 flex-1 truncate">{email}</span>
+              <button
+                disabled={saving}
+                onClick={() => removeOne(email)}
+                className="text-gray-400 hover:text-red-500 transition-colors p-0.5 disabled:opacity-40"
+                title="Remove from allowlist"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex items-stretch gap-2">
+        <Input
+          type="email"
+          value={newEmail}
+          onChange={(e) => setNewEmail(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void addOne(); } }}
+          placeholder="name@ten80ten.com"
+          disabled={saving}
+          className="flex-1 h-8 text-[12px]"
+        />
+        <Button size="sm" onClick={addOne} disabled={saving || !newEmail.trim()} className="h-8 text-[11px] px-3">
+          {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : "Add"}
+        </Button>
+      </div>
+
+      {teamWriters.length > 0 && (
+        <div>
+          <p className="text-[9px] uppercase tracking-wider font-bold text-gray-400 mb-1.5">Suggested from your team</p>
+          <div className="flex flex-wrap gap-1.5">
+            {teamWriters.filter((m) => !emails.includes(m.email.toLowerCase())).slice(0, 8).map((m) => (
+              <button
+                key={m.id}
+                disabled={saving}
+                onClick={() => save([...emails, m.email.toLowerCase()], "set")}
+                className="px-2 py-1 rounded-md text-[10.5px] bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.06] text-gray-600 dark:text-gray-300 hover:border-violet-300 dark:hover:border-violet-500/30 hover:text-violet-600 transition-colors disabled:opacity-40"
+              >
+                + {m.email}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {configured && (
+        <button
+          disabled={saving}
+          onClick={openToAll}
+          className="text-[10.5px] text-gray-500 hover:text-violet-600 dark:hover:text-violet-400 underline disabled:opacity-40"
+        >
+          Open Studio to all writer roles
+        </button>
+      )}
     </div>
   );
 }
