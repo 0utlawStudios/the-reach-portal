@@ -6,7 +6,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { ContentCard as ContentCardType, Platform, isPlatform } from "@/lib/types";
 import { usePipeline } from "@/lib/pipeline-context";
 import { PlatformIcon } from "./platform-icons";
-import { Calendar, AlertCircle, Bot } from "lucide-react";
+import { Calendar, AlertCircle, Bot, Sparkles } from "lucide-react";
 import { isUrgent, isOverdue, formatDateShort } from "@/lib/utils";
 
 interface Props {
@@ -77,6 +77,13 @@ export function ContentCard({ card, isDragOverlay, stageColor }: Props) {
           </div>
         )}
         {card.notes && !card.revised && <div className="absolute top-1.5 left-1.5 w-4 h-4 rounded-full bg-amber-500 flex items-center justify-center" title="Has revision notes"><AlertCircle className="w-2.5 h-2.5 text-white" /></div>}
+        {card.generatedByModel && (
+          <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded bg-violet-600/85 backdrop-blur-sm text-white text-[8.5px] font-bold uppercase tracking-wider flex items-center gap-0.5 shadow-md shadow-violet-500/30" title={`AI generated · ${card.generatedByModel}${card.revisionCount ? ` · v${card.revisionCount + 1}` : ""}`}>
+            <Sparkles className="w-2.5 h-2.5" />
+            AI
+            {card.aspectRatio && <span className="ml-1 font-mono font-medium opacity-90 normal-case tracking-normal">{card.aspectRatio}</span>}
+          </div>
+        )}
       </div>
       <div className="px-2.5 pt-2 pb-1.5 space-y-1">
         <h3 className="text-[11px] font-semibold text-gray-800 dark:text-gray-200 leading-tight line-clamp-2">{card.title}</h3>

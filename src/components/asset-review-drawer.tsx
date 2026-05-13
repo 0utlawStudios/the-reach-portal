@@ -14,8 +14,9 @@ import {
   X, Calendar, Clock, ChevronRight, CheckCircle2, MessageSquare,
   ArrowRightLeft, Pencil, Save, ExternalLink, Type, Trash2, Send,
   Upload, FolderOpen, Link2, FileText, History, Image as ImageIcon,
-  FileVideo, Paperclip, AlertCircle, Maximize2,
+  FileVideo, Paperclip, AlertCircle, Maximize2, Sparkles, Star,
 } from "lucide-react";
+import { useNavigation } from "@/lib/navigation-context";
 import { PlatformIcon } from "./platform-icons";
 import { MentionTextarea } from "./mention-textarea";
 import { RichComment } from "./rich-comment";
@@ -32,6 +33,7 @@ type DrawerTab = "content" | "vault" | "audit";
 
 export function AssetReviewDrawer() {
   const { selectedCard, isDrawerOpen, isEditingOnOpen, closeDrawer, moveCard, requestReapproval, updateCard, deleteCard, workspaceId } = usePipeline();
+  const { navigate } = useNavigation();
   const { addToast } = useToast();
   const { currentUser } = useAuth();
   const { members } = useTeam();
@@ -504,7 +506,24 @@ export function AssetReviewDrawer() {
               </div>
             </div>
 
-            {selectedCard.contentType === "carousel" && (
+            {/* AI carousel/storyboard slide strip — only when the card has multiple AI assets. */}
+            {(selectedCard.assetUrls && selectedCard.assetUrls.length > 1) ? (
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {selectedCard.assetUrls.map((url, idx) => {
+                  const scene = selectedCard.carouselOutline?.[idx];
+                  return (
+                    <div key={`${idx}-${url}`} className="shrink-0 w-24" title={scene?.shot || `Slide ${idx + 1}`}>
+                      <div className={`w-24 ${selectedCard.aspectRatio === "9:16" ? "aspect-[9/16]" : "aspect-[4/5]"} rounded-lg overflow-hidden border-2 ${idx === 0 ? "border-violet-500" : "border-gray-200 dark:border-white/[0.06]"}`}>
+                        <RawImage src={url} alt={`Slide ${idx + 1}`} className="w-full h-full object-cover" />
+                      </div>
+                      <p className="mt-1 text-[9px] text-gray-500 dark:text-gray-400 line-clamp-2">
+                        <span className="font-semibold text-gray-600 dark:text-gray-300">{idx + 1}.</span> {scene?.on_screen_text || scene?.shot || `Slide ${idx + 1}`}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : selectedCard.contentType === "carousel" ? (
               <div className="flex gap-2 overflow-x-auto pb-1">
                 <div className="w-16 h-16 rounded-lg overflow-hidden border-2 border-orange-500 shrink-0"><RawImage src={selectedCard.thumbnailUrl} alt="Slide 1" className="w-full h-full object-cover" /></div>
                 {[2, 3, 4].map((n) => (
@@ -512,6 +531,75 @@ export function AssetReviewDrawer() {
                     <span className="text-[9px] font-medium">Slide {n}</span>
                   </div>
                 ))}
+              </div>
+            ) : null}
+
+            {/* AI generation panel — shown only for AI-originated cards. */}
+            {selectedCard.generatedByModel && (
+              <div className="rounded-xl border border-violet-200/60 dark:border-violet-500/20 bg-violet-50/40 dark:bg-violet-500/[0.05] p-3 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
+                    <span className="text-[11px] font-semibold text-violet-700 dark:text-violet-300">AI Generated</span>
+                    {selectedCard.aspectRatio && (
+                      <span className="px-1.5 py-0.5 rounded font-mono text-[10px] bg-white/70 dark:bg-white/[0.04] text-gray-600 dark:text-gray-300">
+                        {selectedCard.aspectRatio}
+                      </span>
+                    )}
+                    {typeof selectedCard.revisionCount === "number" && selectedCard.revisionCount > 0 && (
+                      <span className="px-1.5 py-0.5 rounded text-[10px] bg-violet-100 dark:bg-violet-500/15 text-violet-700 dark:text-violet-300">
+                        v{selectedCard.revisionCount + 1}
+                      </span>
+                    )}
+                  </div>
+                  {selectedCard.planRowId && (
+                    <button
+                      onClick={() => navigate("studio")}
+                      className="text-[10px] text-violet-600 dark:text-violet-400 hover:underline inline-flex items-center gap-1"
+                    >
+                      View plan row <ExternalLink className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+                {typeof selectedCard.qualityScore === "number" && (
+                  <div className="flex items-center gap-1.5 text-[10.5px] text-gray-700 dark:text-gray-300">
+                    <Star className="w-3 h-3 text-amber-500" />
+                    <span><span className="font-semibold">AI self-quality:</span> {selectedCard.qualityScore}/10</span>
+                    <span className="text-gray-400 dark:text-gray-500">·</span>
+                    <span className="text-gray-500 dark:text-gray-400">Model: {selectedCard.generatedByModel}</span>
+                  </div>
+                )}
+                {selectedCard.approvalNotes && (
+                  <div className="text-[11px] text-gray-700 dark:text-gray-300 leading-relaxed bg-white/60 dark:bg-white/[0.04] rounded-lg p-2.5 border border-violet-100 dark:border-violet-500/15">
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-violet-500 mb-1">Reviewer note from AI</p>
+                    {selectedCard.approvalNotes}
+                  </div>
+                )}
+                {selectedCard.visualBrief && (
+                  <div className="text-[10.5px] text-gray-600 dark:text-gray-400 leading-snug">
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">Visual brief</p>
+                    {selectedCard.visualBrief}
+                  </div>
+                )}
+                {selectedCard.hashtags && selectedCard.hashtags.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {selectedCard.hashtags.map((tag) => (
+                      <span key={tag} className="px-1.5 py-0.5 rounded bg-white dark:bg-white/[0.06] border border-gray-200/70 dark:border-white/[0.05] text-[10px] text-gray-600 dark:text-gray-300">
+                        #{tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {selectedCard.cta && (
+                  <div className="text-[10.5px] text-gray-600 dark:text-gray-400">
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-gray-400">CTA</span> · {selectedCard.cta}
+                  </div>
+                )}
+                {selectedCard.stage === "revision_needed" && (
+                  <div className="text-[10.5px] text-gray-500 dark:text-gray-400 italic pt-1 border-t border-violet-100 dark:border-violet-500/15">
+                    Save reviewer notes below. The AI will pick this up automatically and revise the draft in ~30 seconds.
+                  </div>
+                )}
               </div>
             )}
 

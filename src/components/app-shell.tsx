@@ -20,6 +20,7 @@ import { CalendarPage } from "./pages/calendar-page";
 import { MediaPage } from "./pages/media-page";
 import { SettingsPage } from "./pages/settings-page";
 import { BrandKitPage } from "./pages/brand-kit-page";
+import { StudioPage } from "./pages/studio-page";
 import { RevisionModal } from "./revision-modal";
 import { KickbackModal } from "./kickback-modal";
 import {
@@ -34,6 +35,7 @@ import {
   PinOff,
   Plus,
   Settings,
+  Sparkles,
 } from "lucide-react";
 
 function PageContent() {
@@ -42,6 +44,7 @@ function PageContent() {
     <div className="flex-1 min-h-0 overflow-y-auto">
       {currentPage === "dashboard" && <DashboardPage />}
       {currentPage === "pipeline" && <KanbanBoard />}
+      {currentPage === "studio" && <StudioPage />}
       {currentPage === "calendar" && <CalendarPage />}
       {currentPage === "preview" && <PostPreviewPage />}
       {currentPage === "media" && <MediaPage />}
@@ -96,6 +99,9 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
   setMobileOpen: (v: boolean) => void;
 }) {
   const { currentPage, navigate, sidebarCollapsed, sidebarPinned, setSidebarCollapsed, togglePin } = useNavigation();
+  const { currentUser } = useAuth();
+  const studioRoles = ["superadmin", "admin", "owner", "creative_director", "social_media_specialist"];
+  const canAccessStudio = studioRoles.includes((currentUser.role || "").toLowerCase());
   const autoCollapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hoverExpandRef = useRef(false);
   // Auto-collapse after 6s on desktop (not mobile, not pinned)
@@ -127,6 +133,9 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
   const NAV_ITEMS = [
     { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" />, section: "plan" },
     { id: "pipeline", label: "Content Engine", icon: <Kanban className="w-4 h-4" />, section: "plan" },
+    ...(canAccessStudio
+      ? [{ id: "studio", label: "Creator Studio", icon: <Sparkles className="w-4 h-4" />, section: "plan" }]
+      : []),
     { id: "calendar", label: "Content Calendar", icon: <CalendarDays className="w-4 h-4" />, section: "plan" },
     { id: "preview", label: "Post Preview", icon: <Eye className="w-4 h-4" />, section: "publish" },
     { id: "media", label: "Media Library", icon: <FolderOpen className="w-4 h-4" />, section: "publish" },
