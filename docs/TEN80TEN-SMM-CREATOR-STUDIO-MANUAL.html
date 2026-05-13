@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ten80Ten Content Engine — Creator Studio Operator Manual</title>
+<link rel="icon" type="image/png" href="https://smm.ten80ten.com/ten80ten-logo.png" />
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #fafbfc;
+    --surface: #ffffff;
+    --surface-2: #f4f5f7;
+    --border: #e5e7eb;
+    --border-strong: #d1d5db;
+    --ink: #111827;
+    --ink-soft: #374151;
+    --ink-mute: #6b7280;
+    --ink-dim: #9ca3af;
+    --brand: #f97316;
+    --brand-strong: #ea580c;
+    --brand-deep: #c2410c;
+    --brand-tint: #fff7ed;
+    --brand-ring: #fed7aa;
+    --green: #16a34a;
+    --green-tint: #f0fdf4;
+    --amber: #d97706;
+    --amber-tint: #fffbeb;
+    --red: #dc2626;
+    --red-tint: #fef2f2;
+    --violet: #7c3aed;
+    --violet-tint: #f5f3ff;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.06);
+    --shadow-lg: 0 18px 48px rgba(0,0,0,0.08);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0a0a0a;
+      --surface: #111113;
+      --surface-2: #18181b;
+      --border: #27272a;
+      --border-strong: #3f3f46;
+      --ink: #f4f4f5;
+      --ink-soft: #d4d4d8;
+      --ink-mute: #9ca3af;
+      --ink-dim: #71717a;
+      --brand: #fb923c;
+      --brand-strong: #f97316;
+      --brand-deep: #ea580c;
+      --brand-tint: rgba(249,115,22,0.10);
+      --brand-ring: rgba(249,115,22,0.30);
+      --green: #4ade80;
+      --green-tint: rgba(34,197,94,0.10);
+      --amber: #fbbf24;
+      --amber-tint: rgba(217,119,6,0.12);
+      --red: #f87171;
+      --red-tint: rgba(220,38,38,0.10);
+      --violet: #a78bfa;
+      --violet-tint: rgba(139,92,246,0.10);
+      --shadow-md: 0 4px 18px rgba(0,0,0,0.4);
+      --shadow-lg: 0 24px 60px rgba(0,0,0,0.5);
+    }
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.65;
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection { background: var(--brand); color: white; }
+  a { color: var(--brand-strong); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code, pre, kbd { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.86em; }
+  code { background: var(--surface-2); padding: 0.12em 0.42em; border-radius: 4px; border: 1px solid var(--border); color: var(--brand-deep); }
+  pre { background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; overflow-x: auto; margin: 12px 0 22px; line-height: 1.55; }
+  pre code { background: transparent; border: 0; padding: 0; color: var(--ink-soft); }
+  kbd { display: inline-block; padding: 1px 6px; border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 4px; background: var(--surface); color: var(--ink); font-size: 11px; font-weight: 500; }
+
+  /* ─── LAYOUT ─── */
+  .page { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
+  @media (max-width: 960px) { .page { grid-template-columns: 1fr; } .sidebar { display: none; } }
+
+  .sidebar {
+    position: sticky; top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 22px 18px 30px;
+  }
+  .brand-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 0 6px 18px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+  .brand-row .logo {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: white;
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+  }
+  .brand-row .logo img { width: 26px; height: 26px; object-fit: contain; }
+  .brand-row .name { font-size: 13px; font-weight: 800; letter-spacing: -0.01em; line-height: 1.1; }
+  .brand-row .name span { display: block; font-weight: 500; color: var(--ink-mute); font-size: 11px; margin-top: 1px; }
+  .sidebar-h {
+    text-transform: uppercase; letter-spacing: 0.08em;
+    font-size: 10px; font-weight: 700; color: var(--ink-dim);
+    padding: 18px 8px 6px;
+  }
+  .sidebar a.toc-link {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 10px; border-radius: 8px;
+    font-size: 13px; color: var(--ink-soft); font-weight: 500;
+    text-decoration: none;
+  }
+  .sidebar a.toc-link:hover { background: var(--surface-2); color: var(--brand-strong); }
+  .sidebar a.toc-link .num { color: var(--ink-dim); font-variant-numeric: tabular-nums; font-size: 11px; min-width: 18px; }
+
+  /* ─── MAIN ─── */
+  .main { max-width: 900px; margin: 0 auto; padding: 56px 48px 80px; }
+  @media (max-width: 720px) { .main { padding: 32px 22px 60px; } }
+
+  /* ─── HERO ─── */
+  .hero {
+    background: linear-gradient(135deg, var(--brand-deep) 0%, var(--brand-strong) 50%, var(--brand) 100%);
+    color: white;
+    border-radius: 22px;
+    padding: 40px 36px 36px;
+    margin-bottom: 36px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+  }
+  .hero::before {
+    content: "";
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(circle at 90% 10%, rgba(255,255,255,0.25), transparent 40%),
+      radial-gradient(circle at 10% 110%, rgba(0,0,0,0.20), transparent 50%);
+    pointer-events: none;
+  }
+  .hero-eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 6px 10px; border-radius: 999px;
+    background: rgba(255,255,255,0.18);
+    backdrop-filter: blur(4px);
+  }
+  .hero-eyebrow .pulse {
+    width: 6px; height: 6px; border-radius: 50%; background: #fff;
+    box-shadow: 0 0 0 0 rgba(255,255,255,0.7);
+    animation: pulse 2.2s ease-out infinite;
+  }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255,255,255,0.7); } 100% { box-shadow: 0 0 0 12px rgba(255,255,255,0); } }
+  .hero h1 {
+    font-size: 36px; font-weight: 800; letter-spacing: -0.025em;
+    line-height: 1.1; margin-top: 16px;
+  }
+  .hero h1 small { display: block; font-size: 16px; font-weight: 500; letter-spacing: 0; opacity: 0.92; margin-top: 8px; }
+  .hero-meta {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px;
+    margin-top: 26px;
+  }
+  .hero-meta .item {
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 12px;
+    padding: 10px 14px;
+    backdrop-filter: blur(4px);
+  }
+  .hero-meta .item .k { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.8; font-weight: 600; }
+  .hero-meta .item .v { font-size: 14px; font-weight: 600; margin-top: 4px; font-family: 'JetBrains Mono', monospace; }
+
+  /* ─── HEADINGS ─── */
+  h2 {
+    font-size: 24px; font-weight: 800; letter-spacing: -0.015em;
+    margin: 56px 0 14px;
+    padding-bottom: 10px; border-bottom: 2px solid var(--border);
+    display: flex; align-items: center; gap: 12px;
+  }
+  h2 .num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 30px; height: 30px; border-radius: 8px;
+    background: var(--brand-tint); color: var(--brand-deep);
+    font-size: 13px; font-weight: 800;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  h3 { font-size: 18px; font-weight: 700; margin: 28px 0 10px; letter-spacing: -0.01em; color: var(--ink); }
+  h4 { font-size: 14px; font-weight: 700; margin: 16px 0 6px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.06em; }
+  p { margin: 0 0 14px; color: var(--ink-soft); }
+  p strong, li strong { color: var(--ink); font-weight: 600; }
+
+  ul, ol { margin: 0 0 16px 22px; }
+  li { margin-bottom: 6px; color: var(--ink-soft); }
+  li::marker { color: var(--brand-strong); }
+
+  /* ─── CALLOUTS ─── */
+  .callout {
+    display: flex; gap: 14px;
+    padding: 14px 16px 14px 14px;
+    border: 1px solid var(--border);
+    border-left-width: 4px;
+    border-radius: 10px;
+    background: var(--surface);
+    margin: 18px 0;
+  }
+  .callout.brand { border-left-color: var(--brand-strong); background: var(--brand-tint); }
+  .callout.green { border-left-color: var(--green); background: var(--green-tint); }
+  .callout.amber { border-left-color: var(--amber); background: var(--amber-tint); }
+  .callout.red { border-left-color: var(--red); background: var(--red-tint); }
+  .callout.violet { border-left-color: var(--violet); background: var(--violet-tint); }
+  .callout .icon { font-size: 18px; line-height: 1.4; flex-shrink: 0; }
+  .callout .body { flex: 1; }
+  .callout .body p:last-child { margin-bottom: 0; }
+  .callout strong { font-weight: 700; color: var(--ink); }
+
+  /* ─── CARDS / KEY-VALUE ─── */
+  .kv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 14px 0 22px; }
+  .kv { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .kv .k { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; color: var(--ink-mute); }
+  .kv .v { font-size: 15px; font-weight: 600; margin-top: 4px; color: var(--ink); font-family: 'JetBrains Mono', monospace; }
+
+  /* ─── TABLES ─── */
+  table {
+    width: 100%; border-collapse: separate; border-spacing: 0;
+    margin: 16px 0 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    font-size: 13.5px;
+  }
+  th {
+    text-align: left; font-weight: 700; padding: 12px 14px;
+    background: var(--surface-2); border-bottom: 1px solid var(--border);
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-mute);
+  }
+  td { padding: 11px 14px; border-bottom: 1px solid var(--border); color: var(--ink-soft); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  tr:hover td { background: var(--surface-2); }
+  td code { font-size: 12px; }
+
+  /* ─── STEPS ─── */
+  .steps { counter-reset: step; list-style: none; margin: 12px 0 22px 0; padding: 0; }
+  .steps li {
+    position: relative;
+    padding: 14px 16px 14px 56px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 10px;
+    counter-increment: step;
+  }
+  .steps li::before {
+    content: counter(step);
+    position: absolute; left: 12px; top: 12px;
+    width: 30px; height: 30px;
+    border-radius: 8px;
+    background: var(--brand-strong); color: white;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 13px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .steps li strong { display: block; color: var(--ink); margin-bottom: 4px; font-size: 14.5px; font-weight: 700; }
+  .steps li p:last-child { margin-bottom: 0; }
+
+  /* ─── PILLS / BADGES ─── */
+  .pills { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 18px; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 999px;
+    font-size: 11.5px; font-weight: 600;
+    background: var(--surface-2); border: 1px solid var(--border); color: var(--ink-soft);
+  }
+  .pill.brand { background: var(--brand-tint); border-color: var(--brand-ring); color: var(--brand-deep); }
+  .pill.green { background: var(--green-tint); border-color: var(--green); color: var(--green); }
+  .pill.amber { background: var(--amber-tint); border-color: var(--amber); color: var(--amber); }
+  .pill.red { background: var(--red-tint); border-color: var(--red); color: var(--red); }
+  .pill.violet { background: var(--violet-tint); border-color: var(--violet); color: var(--violet); }
+
+  /* ─── DIAGRAM ─── */
+  .flow {
+    display: flex; align-items: stretch; gap: 0;
+    margin: 18px 0 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+    overflow-x: auto;
+  }
+  .flow .node {
+    flex: 1; min-width: 110px;
+    padding: 14px 12px; border-radius: 10px;
+    background: var(--surface-2); border: 1px solid var(--border);
+    text-align: center;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+  }
+  .flow .node.brand { background: var(--brand-tint); border-color: var(--brand-ring); color: var(--brand-deep); }
+  .flow .node.violet { background: var(--violet-tint); border-color: var(--violet); color: var(--violet); }
+  .flow .node.green { background: var(--green-tint); border-color: var(--green); color: var(--green); }
+  .flow .node .l { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; opacity: 0.7; }
+  .flow .node .t { font-weight: 600; font-size: 13px; }
+  .flow .arrow {
+    align-self: center; padding: 0 6px;
+    color: var(--ink-dim); font-size: 18px;
+  }
+
+  /* ─── FOOTER ─── */
+  footer {
+    margin-top: 72px; padding-top: 22px;
+    border-top: 1px solid var(--border);
+    text-align: center;
+    font-size: 12px;
+    color: var(--ink-dim);
+  }
+  footer strong { color: var(--brand-strong); }
+
+  /* ─── PRINT ─── */
+  @media print {
+    .sidebar { display: none; }
+    .page { grid-template-columns: 1fr; }
+    .main { padding: 20px 30px; max-width: 100%; }
+    .hero, .callout, .steps li, .kv, table, pre { box-shadow: none; break-inside: avoid; }
+    body { background: white; color: black; font-size: 11pt; line-height: 1.45; }
+    a { color: black; text-decoration: underline; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ─── SIDEBAR ─── -->
+  <aside class="sidebar">
+    <div class="brand-row">
+      <div class="logo"><img src="https://smm.ten80ten.com/ten80ten-logo.png" alt="Ten80Ten" /></div>
+      <div class="name">Ten80Ten<span>Creator Studio Manual</span></div>
+    </div>
+    <div class="sidebar-h">Contents</div>
+    <a class="toc-link" href="#what"><span class="num">01</span>What it is</a>
+    <a class="toc-link" href="#flow"><span class="num">02</span>The 90-second flow</a>
+    <a class="toc-link" href="#setup"><span class="num">03</span>One-time setup</a>
+    <a class="toc-link" href="#sheet"><span class="num">04</span>The Studio sheet</a>
+    <a class="toc-link" href="#aspect"><span class="num">05</span>Aspect ratios</a>
+    <a class="toc-link" href="#revise"><span class="num">06</span>Auto-revise</a>
+    <a class="toc-link" href="#review"><span class="num">07</span>The AI review panel</a>
+    <a class="toc-link" href="#guardrails"><span class="num">08</span>Hallucination guardrails</a>
+    <a class="toc-link" href="#cost"><span class="num">09</span>Cost &amp; limits</a>
+    <a class="toc-link" href="#roles"><span class="num">10</span>Who can use it</a>
+    <a class="toc-link" href="#trouble"><span class="num">11</span>Troubleshooting</a>
+    <a class="toc-link" href="#worked"><span class="num">12</span>Worked example</a>
+    <div class="sidebar-h">Reference</div>
+    <a class="toc-link" href="#models">Models &amp; env vars</a>
+    <a class="toc-link" href="#paths">Code paths</a>
+  </aside>
+
+  <!-- ─── MAIN ─── -->
+  <main class="main">
+
+    <!-- HERO -->
+    <section class="hero">
+      <span class="hero-eyebrow"><span class="pulse"></span>Shipped v1.0 · 2026-05-13</span>
+      <h1>Creator Studio
+        <small>Plan a row. Click generate. Review the draft. Approve when ready.</small>
+      </h1>
+      <div class="hero-meta">
+        <div class="item"><div class="k">App</div><div class="v">smm.ten80ten.com</div></div>
+        <div class="item"><div class="k">Image model</div><div class="v">gpt-image-2</div></div>
+        <div class="item"><div class="k">Text model</div><div class="v">gpt-4o-mini</div></div>
+        <div class="item"><div class="k">Daily cap</div><div class="v">$10 / workspace</div></div>
+      </div>
+    </section>
+
+    <!-- ─── 01 WHAT IT IS ─── -->
+    <h2 id="what"><span class="num">01</span>What Creator Studio is, in one paragraph</h2>
+    <p>
+      <strong>Creator Studio</strong> is a spreadsheet inside your Ten80Ten Content Engine where you describe one post per row — date, platform, format, mood, visual style, topic — and click <strong>Generate</strong>. The AI writes the caption and renders the images (single, carousel, story, or video storyboard), then drops the finished draft directly into the <strong>Awaiting Approval</strong> column of your kanban. A human reviews and approves. The AI never publishes, schedules, approves, or deletes anything — that's the iron law of this product and Creator Studio respects it absolutely.
+    </p>
+
+    <div class="callout brand">
+      <div class="icon">🎯</div>
+      <div class="body">
+        <p><strong>The big idea:</strong> you describe the intent in plain language, the AI does the typing and the image rendering, and a human still owns every approve/publish decision. You stay in control. The AI gives you a faster first draft, not a finished post.</p>
+      </div>
+    </div>
+
+    <!-- ─── 02 FLOW ─── -->
+    <h2 id="flow"><span class="num">02</span>The 90-second flow</h2>
+    <div class="flow">
+      <div class="node brand"><div class="l">step 1</div><div class="t">Fill a row</div></div>
+      <div class="arrow">→</div>
+      <div class="node"><div class="l">step 2</div><div class="t">Click Generate</div></div>
+      <div class="arrow">→</div>
+      <div class="node violet"><div class="l">step 3</div><div class="t">AI draft lands in Awaiting Approval</div></div>
+      <div class="arrow">→</div>
+      <div class="node"><div class="l">step 4</div><div class="t">You review &amp; approve</div></div>
+      <div class="arrow">→</div>
+      <div class="node green"><div class="l">step 5</div><div class="t">n8n publishes on schedule</div></div>
+    </div>
+    <p>
+      A single-image post takes about <strong>20 seconds</strong> from click to card. A 5-slide carousel takes about <strong>60 seconds</strong>. The card appears in your kanban via realtime — no refresh needed, and every open tab updates at the same time.
+    </p>
+
+    <!-- ─── 03 SETUP ─── -->
+    <h2 id="setup"><span class="num">03</span>One-time setup (≈5 minutes)</h2>
+
+    <h3>3.1 Vercel environment variables</h3>
+    <p>Open <code>vercel.com → ten80ten-smm-portal → Settings → Environment Variables</code> and add these three with <strong>Production</strong> scope:</p>
+    <table>
+      <thead><tr><th>Name</th><th>Value</th><th>How to generate</th></tr></thead>
+      <tbody>
+        <tr><td><code>OPENAI_API_KEY</code></td><td>sk-…</td><td>platform.openai.com → API keys</td></tr>
+        <tr><td><code>SUPABASE_WEBHOOK_SECRET</code></td><td>random 32-byte hex</td><td><code>openssl rand -hex 32</code></td></tr>
+        <tr><td><code>CRON_SECRET</code></td><td>random 32-byte hex</td><td><code>openssl rand -hex 32</code></td></tr>
+      </tbody>
+    </table>
+    <p>The model names, prompt version, and $10 cap all have working defaults baked into the code — only add them if you want to override.</p>
+
+    <h3>3.2 Supabase Database Webhook (this is what makes auto-revise work)</h3>
+    <p><code>supabase.com → project lczmgquuzuqhalasjnip → Database → Webhooks → Create a new hook</code> with these settings:</p>
+    <table>
+      <tbody>
+        <tr><td>Name</td><td><code>auto-revise-ai-posts</code></td></tr>
+        <tr><td>Table</td><td><code>public.posts</code></td></tr>
+        <tr><td>Events</td><td><strong>UPDATE only</strong> (uncheck Insert / Delete)</td></tr>
+        <tr><td>Method</td><td>POST</td></tr>
+        <tr><td>URL</td><td><code>https://smm.ten80ten.com/api/ai/auto-revise/webhook</code></td></tr>
+        <tr><td>Header</td><td><code>Authorization: Bearer &lt;same SUPABASE_WEBHOOK_SECRET hex&gt;</code></td></tr>
+        <tr><td>Timeout</td><td>5000 ms</td></tr>
+      </tbody>
+    </table>
+
+    <h3>3.3 Push and deploy</h3>
+    <p>Vercel auto-deploys on push to <code>main</code>. After deploy, you should see <strong>Creator Studio</strong> with a Sparkles icon in your sidebar.</p>
+
+    <div class="callout green">
+      <div class="icon">✅</div>
+      <div class="body"><p>That's the entire setup. The migrations (0021, 0022, 0023) and the <code>ai-assets</code> Supabase Storage bucket are already live in production — they were applied on 2026-05-13 when the feature shipped.</p></div>
+    </div>
+
+    <!-- ─── 04 SHEET ─── -->
+    <h2 id="sheet"><span class="num">04</span>The Studio sheet, column by column</h2>
+    <p>When you open Creator Studio, you see a spreadsheet of 14 rows (the next two weeks). Every keystroke autosaves after 600 ms — you can close the tab and your work persists.</p>
+
+    <h3>4.1 Top bar</h3>
+    <div class="pills">
+      <span class="pill brand">$X.XX / $10.00 today — live spend</span>
+      <span class="pill">Add Row — append blank row</span>
+      <span class="pill">Bulk Generate Ready — fire every Ready row serially</span>
+    </div>
+
+    <h3>4.2 The columns</h3>
+    <table>
+      <thead><tr><th>#</th><th>Column</th><th>What goes in it</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td><strong>#</strong></td><td>Row number, read-only.</td></tr>
+        <tr><td>2</td><td><strong>Date</strong></td><td>When the post should go out. Required.</td></tr>
+        <tr><td>3</td><td><strong>Time</strong></td><td>Optional. Pre-fills the schedule once approved.</td></tr>
+        <tr><td>4</td><td><strong>Platforms</strong></td><td>Click chips to toggle. Multi-platform expands to IG + Facebook + LinkedIn on the produced post.</td></tr>
+        <tr><td>5</td><td><strong>Media</strong></td><td>Image or Video (Portrait).</td></tr>
+        <tr><td>6</td><td><strong>Format</strong></td><td>Single / Carousel / Story (Image) or Reel / Storyboard (Video).</td></tr>
+        <tr><td>7</td><td><strong>Slides</strong></td><td>2–10 when Format is Carousel.</td></tr>
+        <tr><td>8</td><td><strong>Aspect</strong></td><td><strong>Auto-derived from Media + Format + Platforms.</strong> See §05.</td></tr>
+        <tr><td>9</td><td><strong>Feel</strong></td><td>The mood: Educational, Story, Founder POV, Before/After, Contrarian, Hype, Behind-the-Scenes, Testimonial-Style, Announcement, How-To.</td></tr>
+        <tr><td>10</td><td><strong>Visual Style</strong></td><td>Photography (Realistic), Illustration (Flat), Infographic, Screenshot Mockup, 3D Render, Mixed Media, Editorial Photo, Studio Photo.</td></tr>
+        <tr><td>11</td><td><strong>Style Prompt</strong></td><td>Free text. Your visual steer. Example: <em>"clean white background, single orange #FF6A00 accent, bold sans-serif, no people."</em></td></tr>
+        <tr><td>12</td><td><strong>Topic</strong></td><td>What the post is about, in your words.</td></tr>
+        <tr><td>13</td><td><strong>Notes</strong></td><td>Constraints, CTA hint, audience pointers, exact stats you want included.</td></tr>
+        <tr><td>14</td><td><strong>Status</strong></td><td>Empty → Ready → Generating → Generated (or Failed / Revising).</td></tr>
+        <tr><td>15</td><td><strong>Card</strong></td><td>Once generated, an <strong>Open</strong> link that deep-links into Awaiting Approval.</td></tr>
+        <tr><td>16</td><td><strong>Action</strong></td><td>Generate button. Disabled until the minimum fields are filled.</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout amber">
+      <div class="icon">🔒</div>
+      <div class="body"><p><strong>Once a row enters Generating or Revising, the columns lock.</strong> Once it reaches Generated, it locks permanently — re-editing the row wouldn't affect the produced post. To make a new version, copy the inputs into a fresh row.</p></div>
+    </div>
+
+    <!-- ─── 05 ASPECT ─── -->
+    <h2 id="aspect"><span class="num">05</span>Aspect ratios — decided for you</h2>
+    <p>The aspect ratio chip in column 8 is computed deterministically from Media + Format + Platforms. It is not a creative AI choice — it is a fact about each platform's feed. The server re-computes it on every Generate request, so the client can't override it.</p>
+    <table>
+      <thead><tr><th>Media</th><th>Format</th><th>Platforms</th><th>Aspect</th><th>Pixels</th></tr></thead>
+      <tbody>
+        <tr><td>Image</td><td>Single</td><td>Instagram / LinkedIn / Facebook only</td><td><strong>4:5</strong></td><td>1080×1350</td></tr>
+        <tr><td>Image</td><td>Single</td><td>TikTok / YouTube only</td><td><strong>9:16</strong></td><td>1080×1920</td></tr>
+        <tr><td>Image</td><td>Single</td><td>Multi-platform OR mixed</td><td><strong>4:5</strong></td><td>1080×1350</td></tr>
+        <tr><td>Image</td><td>Carousel</td><td>any</td><td><strong>4:5</strong></td><td>1080×1350 per slide</td></tr>
+        <tr><td>Image</td><td>Story</td><td>any</td><td><strong>9:16</strong></td><td>1080×1920</td></tr>
+        <tr><td>Video</td><td>Reel / Storyboard</td><td>any</td><td><strong>9:16</strong></td><td>1080×1920 keyframes</td></tr>
+      </tbody>
+    </table>
+    <p>If you want a 9:16 single image, set Platforms to TikTok-only (or YouTube-only). That's the only way to get a 9:16 single — multi-platform always falls back to 4:5 because it's the universal feed-safe ratio.</p>
+
+    <!-- ─── 06 AUTO-REVISE ─── -->
+    <h2 id="revise"><span class="num">06</span>The auto-revise loop</h2>
+    <p>This is the most powerful feature, and the one most likely to feel like magic. Workflow:</p>
+    <ol class="steps">
+      <li>
+        <strong>Open an AI-generated card and decide what's wrong.</strong>
+        <p>Maybe slide 3 is too text-heavy, the hook is generic, or the CTA missed the brief.</p>
+      </li>
+      <li>
+        <strong>Drag the card to "Revision Needed".</strong>
+        <p>This works for AI posts and manual posts. For manual posts, your existing kickback flow runs. For AI posts, Creator Studio kicks in.</p>
+      </li>
+      <li>
+        <strong>Write reviewer notes (≥10 characters).</strong>
+        <p>Be specific. <em>"Slide 3 has too much copy — cut to one bold sentence. Hook should lead with a time-cost, not a generic question."</em></p>
+      </li>
+      <li>
+        <strong>Save.</strong>
+        <p>Don't click anything else. The Supabase Database Webhook fires, the worker enqueues a revise job, and within about <strong>30 seconds</strong> the card moves itself back to Awaiting Approval with the revised content. The revision counter shows <code>v2</code>, then <code>v3</code>, etc.</p>
+      </li>
+    </ol>
+
+    <div class="callout violet">
+      <div class="icon">🔁</div>
+      <div class="body"><p><strong>Why it works without clicks:</strong> Supabase's database webhook fires on every <code>posts UPDATE</code>. Our handler filters for the exact transition — AI post, stage flipping to <code>revision_needed</code>, notes ≥10 chars — and enqueues a revise job. Anything that doesn't match returns 204 and nothing happens.</p></div>
+    </div>
+
+    <!-- ─── 07 REVIEW PANEL ─── -->
+    <h2 id="review"><span class="num">07</span>The AI review panel</h2>
+    <p>Open any AI-generated card and you'll see a purple panel with the new context. Every field is read-only — the AI's job is to surface its reasoning to you, the human approver.</p>
+    <table>
+      <tbody>
+        <tr><td><strong>AI badge + aspect chip</strong></td><td>Top-right of the card thumbnail. Shows model id on hover.</td></tr>
+        <tr><td><strong>Revision counter</strong></td><td><code>v2</code>, <code>v3</code>… visible if the card has been auto-revised.</td></tr>
+        <tr><td><strong>Quality score</strong></td><td>1–10, the AI's own self-assessment. Take with a grain of salt — your eyes are the real check.</td></tr>
+        <tr><td><strong>Reviewer note from AI</strong></td><td>1–2 sentences telling you the <em>intent</em> of the post and what to verify.</td></tr>
+        <tr><td><strong>Visual brief</strong></td><td>2–4 sentences describing the visual treatment.</td></tr>
+        <tr><td><strong>Hashtags</strong></td><td>Auto-mixed brand core + topical tags.</td></tr>
+        <tr><td><strong>CTA</strong></td><td>One clear next step, matched to the Notes hint if you gave one.</td></tr>
+        <tr><td><strong>Carousel / storyboard strip</strong></td><td>Every slide rendered in correct aspect, with the on-screen text under each thumbnail.</td></tr>
+        <tr><td><strong>"View plan row" deep-link</strong></td><td>Jumps back to the Studio row that produced this post.</td></tr>
+      </tbody>
+    </table>
+
+    <!-- ─── 08 GUARDRAILS ─── -->
+    <h2 id="guardrails"><span class="num">08</span>Hallucination guardrails — what the AI cannot do</h2>
+    <p>This is a creator tool for a real business. Fabricated facts in your captions would be costly. Every draft passes a <strong>three-stage gate</strong> before it's allowed into Awaiting Approval. If the gate fails, the AI regenerates once with the violations pinned in the prompt. If the second attempt also fails, the job ends as Failed with a clear reason — <strong>no half-baked post is ever inserted.</strong></p>
+
+    <h3>Stage 1 — Regex sweep</h3>
+    <p>The following are automatic kills <strong>unless your input row literally contained that exact text</strong>:</p>
+    <ul>
+      <li>Any percentage: <code>73%</code>, <code>45.5 %</code></li>
+      <li>Any dollar amount: <code>$10K</code>, <code>$1,200</code>, <code>$5M</code></li>
+      <li>Phrases: <em>"studies show", "research proves", "data shows", "experts agree", "according to a study", "X out of Y"</em></li>
+      <li>Year strings outside the current year ±1</li>
+    </ul>
+
+    <h3>Stage 2 — Trusted-corpus cross-reference</h3>
+    <p>The gate builds a corpus from your row inputs <strong>plus</strong> the brand_playbook (tagline, voice, hashtags, hooks, CTAs, content pillars, focus list, avoid list). Anything specific in the caption that doesn't appear in the corpus is flagged.</p>
+
+    <h3>Stage 3 — Second-LLM verifier</h3>
+    <p>If the regex sweep is clean, a fast pass through <code>gpt-4o-mini</code> asks: <em>"list any specific claims here that are not in the input corpus."</em> Empty list passes. Anything else fails.</p>
+
+    <div class="callout brand">
+      <div class="icon">💡</div>
+      <div class="body"><p><strong>If the gate trips on a legitimate fact</strong> (e.g. you really do have a $10K MRR client and want to mention it), put the fact in the <strong>Notes</strong> column of the plan row. The gate sees it in the corpus and lets it through.</p></div>
+    </div>
+
+    <!-- ─── 09 COST ─── -->
+    <h2 id="cost"><span class="num">09</span>Cost &amp; limits</h2>
+    <div class="kv-grid">
+      <div class="kv"><div class="k">Daily cap</div><div class="v">$10 / workspace</div></div>
+      <div class="kv"><div class="k">Per-user rate</div><div class="v">30 / hour</div></div>
+      <div class="kv"><div class="k">Single image</div><div class="v">≈ $0.50</div></div>
+      <div class="kv"><div class="k">5-slide carousel</div><div class="v">≈ $2.50</div></div>
+      <div class="kv"><div class="k">Storyboard (4 frames)</div><div class="v">≈ $2.00</div></div>
+      <div class="kv"><div class="k">Job polling</div><div class="v">3 s</div></div>
+    </div>
+    <p>The spend chip in the Studio top-right shows live <code>$X.XX / $10.00 today</code>. Green up to 60%, amber 60–90%, red above 90%. When the cap is hit, the API returns 429 with the message <code>Daily AI spend cap reached: $X.XX / $10.00</code> — both at the API entry point and inside the worker as a defence in depth.</p>
+    <p>$10 cap maps to roughly <strong>20 single images, OR 4 carousels, OR 5 storyboards</strong> per workspace per day. Bump <code>OPENAI_DAILY_CAP_USD</code> in Vercel env vars to raise it.</p>
+
+    <!-- ─── 10 ROLES ─── -->
+    <h2 id="roles"><span class="num">10</span>Who can use Creator Studio</h2>
+    <table>
+      <thead><tr><th>Role</th><th>Sidebar link?</th><th>Can generate?</th></tr></thead>
+      <tbody>
+        <tr><td><code>superadmin</code></td><td>✓</td><td>✓</td></tr>
+        <tr><td><code>admin</code></td><td>✓</td><td>✓</td></tr>
+        <tr><td><code>owner</code></td><td>✓</td><td>✓</td></tr>
+        <tr><td><code>creative_director</code></td><td>✓</td><td>✓</td></tr>
+        <tr><td><code>social_media_specialist</code></td><td>✓</td><td>✓</td></tr>
+        <tr><td><code>approver / editor / viewer</code></td><td>✗ (hidden)</td><td>✗ (403)</td></tr>
+      </tbody>
+    </table>
+    <p>The sidebar link hides for non-writer roles. If anyone navigates manually, they see <em>"Studio is restricted."</em> and the API returns 403.</p>
+
+    <!-- ─── 11 TROUBLESHOOTING ─── -->
+    <h2 id="trouble"><span class="num">11</span>Troubleshooting</h2>
+
+    <div class="callout amber">
+      <div class="icon">⚠️</div>
+      <div class="body">
+        <p><strong>"Fill in the Brand Kit before generating AI drafts."</strong></p>
+        <p>Open Brand Kit from the sidebar. Fill at minimum: tagline, brand voice, content pillars, hashtag core, hooks (3–5), CTAs (3–5). Save. The placeholder detector trips on <code>Sample hook 1</code>, <code>Define your brand voice</code>, or the literal word <code>placeholder</code> — replace those and the gate passes.</p>
+      </div>
+    </div>
+
+    <div class="callout amber">
+      <div class="icon">⏱️</div>
+      <div class="body">
+        <p><strong>Row stuck on "Generating…" for more than 5 minutes.</strong></p>
+        <p>The cron worker reclaims jobs stuck in <code>running</code> for &gt;5 minutes. Wait one cron cycle and the job auto-retries. If it stays stuck, click Cancel — the row flips back to Ready and you can re-Generate.</p>
+      </div>
+    </div>
+
+    <div class="callout red">
+      <div class="icon">🛑</div>
+      <div class="body">
+        <p><strong>Job ended with <code>hallucination_gate_failed</code>.</strong></p>
+        <p>Read the violation list in <code>Last Error</code>. Common causes: you mentioned a stat in <strong>Topic</strong> but not in <strong>Notes</strong>, or the model invented a customer name. Add the legit fact to Notes, or tighten Style Prompt with <em>"do not name specific customers."</em></p>
+      </div>
+    </div>
+
+    <div class="callout amber">
+      <div class="icon">💰</div>
+      <div class="body">
+        <p><strong>Daily cap hit before noon.</strong></p>
+        <p>Bump <code>OPENAI_DAILY_CAP_USD</code> in Vercel env vars (Production scope) and redeploy. Or reduce slides per carousel — the image bill scales linearly.</p>
+      </div>
+    </div>
+
+    <div class="callout red">
+      <div class="icon">🔌</div>
+      <div class="body">
+        <p><strong>Auto-revise didn't fire when I dragged a card to Revision Needed.</strong></p>
+        <p>Check three things:</p>
+        <ol>
+          <li><code>SUPABASE_WEBHOOK_SECRET</code> in Vercel matches the one in the Supabase Database Webhook header byte-for-byte.</li>
+          <li>The card has <code>generated_by_model</code> set (i.e. it was AI-generated, not manual).</li>
+          <li>Reviewer notes are at least 10 characters. Shorter notes are filtered as accidental drag.</li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- ─── 12 WORKED EXAMPLE ─── -->
+    <h2 id="worked"><span class="num">12</span>A full worked example</h2>
+    <p><strong>Goal:</strong> A LinkedIn carousel about <em>"Why founders should automate hiring intake."</em></p>
+    <ol class="steps">
+      <li>
+        <strong>Open Creator Studio</strong>
+        <p>Sidebar → Sparkles icon.</p>
+      </li>
+      <li>
+        <strong>Fill row 1</strong>
+        <p><strong>Date</strong> 2026-05-15 · <strong>Time</strong> 09:00 · <strong>Platforms</strong> LinkedIn · <strong>Media</strong> Image · <strong>Format</strong> Carousel · <strong>Slides</strong> 5 · <strong>Feel</strong> Educational · <strong>Visual Style</strong> Infographic · <strong>Style Prompt</strong> <em>"clean white background, single orange #FF6A00 accent, bold sans-serif, no people, slide number top-right"</em> · <strong>Topic</strong> <em>"Why founders should automate their hiring intake process"</em> · <strong>Notes</strong> <em>"Address the founder pain of repetitive interviews. End with CTA: book a 15-min systems audit."</em></p>
+        <p>Aspect chip auto-updates to <code>4:5 · 1080×1350</code>. Status flips from Empty to Ready. Generate button enables.</p>
+      </li>
+      <li>
+        <strong>Click Generate</strong>
+        <p>Status → Generating. Toast: <em>"AI generation started — back in about 20 seconds."</em></p>
+      </li>
+      <li>
+        <strong>Wait ≈60 seconds</strong>
+        <p>Carousels take longer than single images because each slide is a separate image call. Status → Generated. Toast: <em>"AI draft ready — check Awaiting Approval."</em></p>
+      </li>
+      <li>
+        <strong>Open the card</strong>
+        <p>5 carousel images in correct 4:5 dimensions, a hook-led caption, hashtags mixing your brand core with topical tags, the purple AI panel with quality score (e.g. 7/10) and the AI's approval note explaining intent.</p>
+      </li>
+      <li>
+        <strong>Reviewer pass</strong>
+        <p>You decide slide 3 is too text-heavy. Drag to <strong>Revision Needed</strong>. Note: <em>"Slide 3 — cut to one bold sentence. Hook is weak, lead with a specific time-cost."</em> Save.</p>
+      </li>
+      <li>
+        <strong>Wait ≈30 seconds</strong>
+        <p>Card animates back to Awaiting Approval. Slide 3 is now one bold line. Hook references the time-cost. Revision counter: <code>v2</code>.</p>
+      </li>
+      <li>
+        <strong>Approve manually</strong>
+        <p>Drag to <strong>Approved / Scheduled</strong>. Confirm date/time. n8n picks it up for publishing on the scheduled timestamp.</p>
+      </li>
+    </ol>
+    <p><strong>Total cost</strong> ≈ $2.50 generation + $2.00 revision = $4.50 from your $10 daily cap.</p>
+
+    <!-- ─── REFERENCE ─── -->
+    <h2 id="models"><span class="num">★</span>Reference — models &amp; environment variables</h2>
+    <table>
+      <thead><tr><th>Variable</th><th>Default</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>OPENAI_API_KEY</code></td><td>—</td><td>Your OpenAI key. Required.</td></tr>
+        <tr><td><code>OPENAI_TEXT_MODEL</code></td><td><code>gpt-4o-mini</code></td><td>Writes the caption, hook, hashtags.</td></tr>
+        <tr><td><code>OPENAI_IMAGE_MODEL</code></td><td><code>gpt-image-2</code></td><td>Renders each slide.</td></tr>
+        <tr><td><code>OPENAI_VERIFIER_MODEL</code></td><td><code>gpt-4o-mini</code></td><td>Hallucination gate second pass.</td></tr>
+        <tr><td><code>OPENAI_PROMPT_VERSION</code></td><td><code>2026-05-13.v1</code></td><td>Stamped onto each post for forensic drift detection.</td></tr>
+        <tr><td><code>OPENAI_DAILY_CAP_USD</code></td><td><code>10</code></td><td>Hard daily spend cap per workspace.</td></tr>
+        <tr><td><code>OPENAI_PRICE_IMAGE</code></td><td><code>0.50</code></td><td>Per-image cost estimate for the cap calculator.</td></tr>
+        <tr><td><code>SUPABASE_WEBHOOK_SECRET</code></td><td>—</td><td>Bearer secret for the Supabase Database Webhook → /api/ai/auto-revise/webhook. Required.</td></tr>
+        <tr><td><code>CRON_SECRET</code></td><td>—</td><td>Shared secret for the worker route. Required.</td></tr>
+        <tr><td><code>OPENAI_VIDEO_ENABLED</code></td><td><code>false</code></td><td>Gate for full-render video. Off until budget-approved.</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="paths"><span class="num">★</span>Reference — code paths</h2>
+    <table>
+      <thead><tr><th>Layer</th><th>Path</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td>DB</td><td><code>supabase/migrations/0021_studio_posts_fields.sql</code></td><td>11 new posts columns.</td></tr>
+        <tr><td>DB</td><td><code>supabase/migrations/0022_content_plan_rows.sql</code></td><td>Studio sheet state.</td></tr>
+        <tr><td>DB</td><td><code>supabase/migrations/0023_ai_generation_jobs.sql</code></td><td>Durable job queue.</td></tr>
+        <tr><td>Storage</td><td>bucket <code>ai-assets</code></td><td>Private, 10 MB, PNG/JPG/WEBP. Path <code>{workspace_id}/{post_id}/slide-{n}.{ext}</code>.</td></tr>
+        <tr><td>Server</td><td><code>src/lib/ai/aspect-resolver.ts</code></td><td>Pure deterministic aspect resolver. Unit-tested.</td></tr>
+        <tr><td>Server</td><td><code>src/lib/ai/hallucination-gate.ts</code></td><td>3-stage validation.</td></tr>
+        <tr><td>Server</td><td><code>src/lib/ai/worker.ts</code></td><td>End-to-end generate &amp; revise pipeline.</td></tr>
+        <tr><td>API</td><td><code>src/app/api/ai/studio/*</code></td><td>Rows CRUD, generate, jobs, cancel.</td></tr>
+        <tr><td>API</td><td><code>src/app/api/ai/auto-revise/webhook</code></td><td>Supabase DB webhook target.</td></tr>
+        <tr><td>API</td><td><code>src/app/api/ai/auto-revise/process</code></td><td>Worker cron / on-demand trigger.</td></tr>
+        <tr><td>UI</td><td><code>src/components/pages/studio-page.tsx</code></td><td>The Studio sheet.</td></tr>
+        <tr><td>UI</td><td><code>src/components/content-card.tsx</code></td><td>AI badge + aspect chip on kanban cards.</td></tr>
+        <tr><td>UI</td><td><code>src/components/asset-review-drawer.tsx</code></td><td>AI review panel + carousel viewer.</td></tr>
+      </tbody>
+    </table>
+
+    <footer>
+      <p><strong>Ten80Ten Content Engine</strong> — Creator Studio Operator Manual · v1.0 · 2026-05-13</p>
+      <p>Companion to the markdown manual at <code>docs/TEN80TEN-SMM-CREATOR-STUDIO-OPERATOR-MANUAL.md</code>.</p>
+    </footer>
+  </main>
+</div>
+</body>
+</html>
