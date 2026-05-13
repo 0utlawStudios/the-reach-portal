@@ -219,8 +219,8 @@
   "hotPaths": [
     {
       "path": "src/lib/pipeline-context.tsx",
-      "accessCount": 9,
-      "lastAccessed": 1778614550903,
+      "accessCount": 14,
+      "lastAccessed": 1778635271291,
       "type": "file"
     },
     {
@@ -261,14 +261,14 @@
     },
     {
       "path": "src/lib/auth/require.ts",
-      "accessCount": 4,
-      "lastAccessed": 1778614310706,
+      "accessCount": 5,
+      "lastAccessed": 1778634628350,
       "type": "file"
     },
     {
       "path": "src/lib/auth-context.tsx",
-      "accessCount": 4,
-      "lastAccessed": 1778614399145,
+      "accessCount": 5,
+      "lastAccessed": 1778634644811,
       "type": "file"
     },
     {
@@ -305,6 +305,12 @@
       "path": "src/lib/team-context.tsx",
       "accessCount": 3,
       "lastAccessed": 1778614366114,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/supabase/server.ts",
+      "accessCount": 3,
+      "lastAccessed": 1778634633839,
       "type": "file"
     },
     {
@@ -347,12 +353,6 @@
       "path": "supabase/migrations/0007_rls_v2.sql",
       "accessCount": 2,
       "lastAccessed": 1778614063935,
-      "type": "file"
-    },
-    {
-      "path": "src/lib/supabase/server.ts",
-      "accessCount": 2,
-      "lastAccessed": 1778614232259,
       "type": "file"
     },
     {
