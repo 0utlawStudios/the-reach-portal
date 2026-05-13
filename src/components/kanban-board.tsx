@@ -162,8 +162,17 @@ export function KanbanBoard() {
 
     if (!targetStage || sourceCard.stage === targetStage) return;
 
-    // ── Completeness gate: required fields must be filled before entering Awaiting Approval, Approved, or Posted ──
-    if (sourceCard.stage === "ideas" || targetStage === "awaiting_approval" || targetStage === "approved_scheduled" || targetStage === "posted") {
+    // ── Posted lockdown: humans never drag here. n8n owns this transition. ──
+    if (targetStage === "posted") {
+      addToast(
+        "Only the auto-publisher moves cards to Posted. The card will move automatically once n8n confirms the post is live.",
+        "warning",
+      );
+      return;
+    }
+
+    // ── Completeness gate: required fields must be filled before entering Awaiting Approval or Approved ──
+    if (sourceCard.stage === "ideas" || targetStage === "awaiting_approval" || targetStage === "approved_scheduled") {
       const missing: string[] = [];
       if (!sourceCard.scheduledDate) missing.push("scheduled date");
       if (!sourceCard.scheduledTime) missing.push("scheduled time");

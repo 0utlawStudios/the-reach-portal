@@ -441,6 +441,18 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const moveCard = useCallback((cardId: string, newStage: PipelineStage) => {
+    // POSTED LOCKDOWN: only the n8n auto-publisher (service-role) writes
+    // stage='posted'. The DB has a BEFORE UPDATE trigger that rejects this
+    // path; we short-circuit here so the user sees a useful toast instead
+    // of a confusing 400 error.
+    if (newStage === "posted") {
+      addToast(
+        "Only the auto-publisher moves cards to Posted. The card will move automatically once n8n confirms the post is live.",
+        "warning",
+      );
+      return;
+    }
+
     // INTERCEPT: revision_needed → awaiting_approval requires a note
     const card = cards.find((c) => c.id === cardId);
     if (card?.stage === "revision_needed" && newStage === "awaiting_approval") {

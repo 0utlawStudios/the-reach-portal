@@ -1089,14 +1089,14 @@ export function AssetReviewDrawer() {
                   <ArrowRightLeft className="w-3.5 h-3.5 mr-1.5" />Revision
                 </Button>
               )}
-              {nextStage && nextColumn && selectedCard.stage !== "posted" && (
+              {nextStage && nextColumn && selectedCard.stage !== "posted" && nextStage !== "posted" && (
                 (["approved_scheduled", "posted"] as PipelineStage[]).includes(nextStage) && !userIsApprover ? (
                   <div className="flex-1 text-center py-1">
                     <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">Approver permission required</p>
                   </div>
                 ) : (
                   <Button size="sm" onClick={() => {
-                    if (selectedCard.stage === "ideas" || nextStage === "awaiting_approval" || nextStage === "approved_scheduled" || nextStage === "posted") {
+                    if (selectedCard.stage === "ideas" || nextStage === "awaiting_approval" || nextStage === "approved_scheduled") {
                       const missing: string[] = [];
                       if (!selectedCard.scheduledDate) missing.push("scheduled date");
                       if (!selectedCard.scheduledTime) missing.push("scheduled time");
