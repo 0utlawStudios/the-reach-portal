@@ -1,7 +1,7 @@
 "use client";
 
 import { RawImage } from "@/components/raw-image";
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { AvatarCropModal } from "@/components/avatar-crop-modal";
 import { useTheme } from "@/lib/theme-context";
@@ -475,6 +475,12 @@ export function SettingsPage() {
                   <ChevronRight className="w-3.5 h-3.5 text-gray-200 dark:text-gray-700 group-hover:text-orange-400 transition-colors shrink-0" />
                 </button>
               ))}
+            </Section>
+          )}
+
+          {isAdmin && (
+            <Section title="Creator Studio Health" icon={<Activity className="w-3.5 h-3.5 text-emerald-500" />}>
+              <StudioHealthPanel addToast={addToast} />
             </Section>
           )}
 
@@ -1272,6 +1278,130 @@ function StudioAccessPanel({ addToast }: { addToast: (msg: string, kind?: "info"
           Open Studio to all writer roles
         </button>
       )}
+    </div>
+  );
+}
+
+// ─── Creator Studio health panel ───
+// Pulls /api/ai/health (admin-only) and renders the operational gauges
+// you want at a glance: spend vs cap, queued/running/stuck jobs, gate
+// failures, cap hits, last successful generation. Refresh every 30s.
+interface StudioHealthSnapshot {
+  studio_enabled: boolean;
+  daily_cap_usd: number;
+  per_row_cap_usd: number;
+  spend_today_usd: number;
+  spend_today_pct: number;
+  spend_24h_usd: number;
+  jobs: {
+    queued: number;
+    running: number;
+    stuck: number;
+    stuck_ids: string[];
+    failed_24h: number;
+    completed_24h: number;
+  };
+  quality: {
+    cap_hits_7d: number;
+    gate_failures_7d: number;
+    avg_latency_ms_24h: number;
+  };
+  last_success: { at: string | null; post_id: string | null; kind: string | null } | null;
+  timestamp: string;
+}
+
+function StudioHealthPanel({ addToast }: { addToast: (msg: string, kind?: "info" | "success" | "error" | "warning") => void }) {
+  const [snap, setSnap] = useState<StudioHealthSnapshot | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setRefreshing(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {};
+      if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+      const res = await fetch("/api/ai/health", { headers });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+      setSnap(json.data as StudioHealthSnapshot);
+    } catch (err) {
+      if (!silent) addToast(`Couldn't load Studio health: ${err instanceof Error ? err.message : String(err)}`, "error");
+    } finally {
+      if (!silent) setRefreshing(false);
+      setLoading(false);
+    }
+  }, [addToast]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  // Auto-refresh every 30s while the section is mounted.
+  useEffect(() => {
+    const id = setInterval(() => { void load(true); }, 30_000);
+    return () => clearInterval(id);
+  }, [load]);
+
+  if (loading || !snap) {
+    return <div className="px-4 py-4 flex items-center gap-2 text-[12px] text-gray-400"><Loader2 className="w-3 h-3 animate-spin" /> Loading health…</div>;
+  }
+
+  const spendTone = snap.spend_today_pct >= 90 ? "rose" : snap.spend_today_pct >= 60 ? "amber" : "emerald";
+  const jobsTone = snap.jobs.stuck > 0 ? "rose" : snap.jobs.queued + snap.jobs.running > 5 ? "amber" : "emerald";
+  const qualityTone = snap.quality.cap_hits_7d > 0 || snap.quality.gate_failures_7d > 3 ? "amber" : "emerald";
+
+  return (
+    <div className="px-4 py-3 space-y-3">
+      {/* Top status bar */}
+      <div className={`flex items-center justify-between px-3 py-2 rounded-lg border ${snap.studio_enabled ? "bg-emerald-50/60 dark:bg-emerald-500/[0.06] border-emerald-100 dark:border-emerald-500/15" : "bg-amber-50/60 dark:bg-amber-500/[0.06] border-amber-100 dark:border-amber-500/15"}`}>
+        <div className="flex items-center gap-2">
+          <span className={`w-2 h-2 rounded-full ${snap.studio_enabled ? "bg-emerald-500" : "bg-amber-500"}`} />
+          <span className="text-[12px] font-semibold text-gray-700 dark:text-gray-200">
+            {snap.studio_enabled ? "Studio is live" : "Studio is paused (STUDIO_ENABLED=false)"}
+          </span>
+        </div>
+        <button onClick={() => void load(false)} disabled={refreshing} className="text-[10px] text-gray-500 hover:text-violet-600 dark:hover:text-violet-400 inline-flex items-center gap-1 disabled:opacity-40">
+          {refreshing ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+          Refresh
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <HealthCard label="Spend today" tone={spendTone} value={`$${snap.spend_today_usd.toFixed(2)}`} hint={`/ $${snap.daily_cap_usd.toFixed(2)} (${snap.spend_today_pct}%)`} />
+        <HealthCard label="Spend 24h" tone="default" value={`$${snap.spend_24h_usd.toFixed(2)}`} hint={`Per-row cap $${snap.per_row_cap_usd.toFixed(2)}`} />
+        <HealthCard label="Queued" tone={jobsTone} value={String(snap.jobs.queued)} hint={`${snap.jobs.running} running`} />
+        <HealthCard label="Stuck >5m" tone={snap.jobs.stuck > 0 ? "rose" : "emerald"} value={String(snap.jobs.stuck)} hint={snap.jobs.stuck > 0 ? "Cron will reclaim" : "All clear"} />
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <HealthCard label="Completed 24h" tone="emerald" value={String(snap.jobs.completed_24h)} />
+        <HealthCard label="Failed 24h" tone={snap.jobs.failed_24h > 0 ? "amber" : "default"} value={String(snap.jobs.failed_24h)} />
+        <HealthCard label="Gate failures 7d" tone={qualityTone} value={String(snap.quality.gate_failures_7d)} hint="Hallucination-blocked" />
+        <HealthCard label="Cap hits 7d" tone={snap.quality.cap_hits_7d > 0 ? "amber" : "default"} value={String(snap.quality.cap_hits_7d)} hint="Spend-aborted" />
+      </div>
+
+      <div className="flex items-center justify-between text-[10px] text-gray-400 pt-1">
+        <span>Avg latency 24h: {snap.quality.avg_latency_ms_24h > 0 ? `${(snap.quality.avg_latency_ms_24h / 1000).toFixed(1)}s` : "—"}</span>
+        <span>
+          Last success: {snap.last_success?.at ? new Date(snap.last_success.at).toLocaleString() : "never"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function HealthCard({ label, value, hint, tone }: { label: string; value: string; hint?: string; tone?: "default" | "emerald" | "amber" | "rose" }) {
+  const toneClass = tone === "emerald"
+    ? "border-emerald-200/60 dark:border-emerald-500/20"
+    : tone === "amber"
+    ? "border-amber-200/60 dark:border-amber-500/20"
+    : tone === "rose"
+    ? "border-rose-200/60 dark:border-rose-500/20"
+    : "border-gray-100 dark:border-white/[0.05]";
+  return (
+    <div className={`p-2.5 rounded-lg border bg-white dark:bg-white/[0.02] ${toneClass}`}>
+      <p className="text-[9px] uppercase tracking-wider font-bold text-gray-400">{label}</p>
+      <p className="text-[16px] font-bold text-gray-800 dark:text-gray-100 tabular-nums mt-0.5">{value}</p>
+      {hint && <p className="text-[9.5px] text-gray-400 mt-0.5">{hint}</p>}
     </div>
   );
 }
