@@ -219,14 +219,20 @@
   "hotPaths": [
     {
       "path": "src/lib/pipeline-context.tsx",
-      "accessCount": 14,
-      "lastAccessed": 1778635271291,
+      "accessCount": 20,
+      "lastAccessed": 1778679091812,
       "type": "file"
     },
     {
       "path": "src/app/api/drive/stream/route.ts",
       "accessCount": 7,
       "lastAccessed": 1778614462104,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/team/remove-member/route.ts",
+      "accessCount": 7,
+      "lastAccessed": 1778679166953,
       "type": "file"
     },
     {
@@ -239,12 +245,6 @@
       "path": "src/app/api/team/invite/route.ts",
       "accessCount": 6,
       "lastAccessed": 1778614328769,
-      "type": "file"
-    },
-    {
-      "path": "src/app/api/team/remove-member/route.ts",
-      "accessCount": 6,
-      "lastAccessed": 1778614341925,
       "type": "file"
     },
     {
@@ -269,6 +269,12 @@
       "path": "src/lib/auth/require.ts",
       "accessCount": 5,
       "lastAccessed": 1778634628350,
+      "type": "file"
+    },
+    {
+      "path": "src/components/kanban-board.tsx",
+      "accessCount": 5,
+      "lastAccessed": 1778679004823,
       "type": "file"
     },
     {
@@ -341,12 +347,6 @@
       "path": "src/app/api/auth/forgot-password/route.ts",
       "accessCount": 2,
       "lastAccessed": 1778613960907,
-      "type": "file"
-    },
-    {
-      "path": "src/components/kanban-board.tsx",
-      "accessCount": 2,
-      "lastAccessed": 1778614060032,
       "type": "file"
     },
     {
