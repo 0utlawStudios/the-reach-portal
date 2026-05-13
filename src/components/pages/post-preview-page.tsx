@@ -12,7 +12,9 @@ function InstagramPreview({ card }: { card: ContentCard }) {
   return (
     <div className="w-[340px] bg-white rounded-xl overflow-hidden border border-gray-200 shadow-lg">
       <div className="flex items-center gap-2.5 px-3 py-2.5">
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-[9px] font-bold text-white">10</div>
+        <div className="w-8 h-8 rounded-full bg-white ring-1 ring-gray-200 overflow-hidden flex items-center justify-center shrink-0">
+          <RawImage src="/ten80ten-logo.png" alt="Ten80Ten" className="w-[80%] h-[80%] object-contain" />
+        </div>
         <div className="flex-1"><p className="text-[11px] font-semibold text-gray-900" style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}>ten80ten</p><p className="text-[10px] text-gray-400">Sponsored</p></div>
         <MoreHorizontal className="w-4 h-4 text-gray-400" />
       </div>
@@ -35,7 +37,9 @@ function FacebookPreview({ card }: { card: ContentCard }) {
   return (
     <div className="w-[400px] bg-white rounded-xl overflow-hidden border border-gray-200 shadow-lg">
       <div className="p-3 flex items-center gap-2.5">
-        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-[10px] font-bold text-white">10</div>
+        <div className="w-10 h-10 rounded-full bg-white ring-1 ring-gray-200 overflow-hidden flex items-center justify-center shrink-0">
+          <RawImage src="/ten80ten-logo.png" alt="Ten80Ten" className="w-[80%] h-[80%] object-contain" />
+        </div>
         <div><p className="text-[13px] font-semibold text-gray-900">Ten80Ten</p><p className="text-[11px] text-gray-500">Just now · 🌍</p></div>
       </div>
       <p className="px-3 pb-2 text-[13px] text-gray-800 leading-relaxed">{card.caption || "No caption..."}</p>
@@ -62,7 +66,9 @@ function YouTubePreview({ card }: { card: ContentCard }) {
         <div className="absolute bottom-2 right-2 bg-black/80 text-white text-[10px] px-1.5 py-0.5 rounded font-medium">3:42</div>
       </div>
       <div className="p-3 flex gap-3">
-        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-[9px] font-bold text-white shrink-0">10</div>
+        <div className="w-9 h-9 rounded-full bg-white ring-1 ring-gray-200 overflow-hidden flex items-center justify-center shrink-0">
+          <RawImage src="/ten80ten-logo.png" alt="Ten80Ten" className="w-[80%] h-[80%] object-contain" />
+        </div>
         <div><p className="text-[13px] font-medium text-gray-900 line-clamp-2 leading-tight">{card.title}</p><p className="text-[11px] text-gray-500 mt-1">Ten80Ten · 1.2K views · 2 hours ago</p></div>
       </div>
     </div>
@@ -73,7 +79,9 @@ function LinkedInPreview({ card }: { card: ContentCard }) {
   return (
     <div className="w-[420px] bg-white rounded-xl overflow-hidden border border-gray-200 shadow-lg">
       <div className="p-3 flex items-center gap-3">
-        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center text-[12px] font-bold text-white">10</div>
+        <div className="w-12 h-12 rounded-full bg-white ring-1 ring-gray-200 overflow-hidden flex items-center justify-center shrink-0">
+          <RawImage src="/ten80ten-logo.png" alt="Ten80Ten" className="w-[80%] h-[80%] object-contain" />
+        </div>
         <div><p className="text-[13px] font-semibold text-gray-900">Ten80Ten</p><p className="text-[11px] text-gray-500">2,400 followers · 2h</p></div>
       </div>
       <p className="px-3 pb-2 text-[13px] text-gray-800 leading-relaxed">{card.caption || "No caption..."}</p>
