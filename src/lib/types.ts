@@ -37,6 +37,9 @@ export interface SourceVault {
   rawFiles?: RawFile[];
 }
 
+export type MediaType = "image" | "video";
+export type AspectRatio = "1:1" | "4:5" | "9:16" | "1.91:1";
+
 export interface ContentCard {
   id: string;
   title: string;
@@ -63,6 +66,28 @@ export interface ContentCard {
     state: string;
     platformAttempts: { platform: string; state: string; externalPostId: string | null }[];
   };
+  // ─── Creator Studio AI fields (all optional; only present on AI-originated posts) ───
+  feel?: string;
+  visualStyle?: string;
+  stylePrompt?: string;
+  slidesCount?: number;
+  mediaType?: MediaType;
+  aspectRatio?: AspectRatio;
+  assetWidth?: number;
+  assetHeight?: number;
+  assetUrls?: string[];
+  assetStorageKeys?: string[];
+  hashtags?: string[];
+  cta?: string;
+  visualBrief?: string;
+  carouselOutline?: Array<{ index: number; shot: string; on_screen_text: string; voiceover?: string }>;
+  sourceNotes?: string[];
+  qualityScore?: number;
+  approvalNotes?: string;
+  generatedByModel?: string;
+  promptVersion?: string;
+  revisionCount?: number;
+  planRowId?: string;
 }
 
 export interface MediaAsset {

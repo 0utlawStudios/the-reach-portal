@@ -57,6 +57,28 @@ type PostRow = {
   created_at?: string | null;
   updated_at?: string | null;
   publish_jobs?: PublishJobRow[] | PublishJobRow | null;
+  // ─── Creator Studio AI fields ───
+  feel?: string | null;
+  visual_style?: string | null;
+  style_prompt?: string | null;
+  slides_count?: number | null;
+  media_type?: ContentCard["mediaType"] | null;
+  aspect_ratio?: ContentCard["aspectRatio"] | null;
+  asset_width?: number | null;
+  asset_height?: number | null;
+  asset_urls?: string[] | null;
+  asset_storage_keys?: string[] | null;
+  hashtags?: string[] | null;
+  cta?: string | null;
+  visual_brief?: string | null;
+  carousel_outline?: ContentCard["carouselOutline"] | null;
+  source_notes?: string[] | null;
+  quality_score?: number | null;
+  approval_notes?: string | null;
+  generated_by_model?: string | null;
+  prompt_version?: string | null;
+  revision_count?: number | null;
+  plan_row_id?: string | null;
 };
 
 type PostUpdate = {
@@ -158,6 +180,27 @@ function dbToCard(row: PostRow): ContentCard {
     licenseFileId: row.license_file_id || undefined,
     createdBy: row.created_by || undefined,
     publishJob: normalizePublishJob(row.publish_jobs),
+    feel: row.feel || undefined,
+    visualStyle: row.visual_style || undefined,
+    stylePrompt: row.style_prompt || undefined,
+    slidesCount: row.slides_count ?? undefined,
+    mediaType: row.media_type || undefined,
+    aspectRatio: row.aspect_ratio || undefined,
+    assetWidth: row.asset_width ?? undefined,
+    assetHeight: row.asset_height ?? undefined,
+    assetUrls: row.asset_urls && row.asset_urls.length > 0 ? row.asset_urls : undefined,
+    assetStorageKeys: row.asset_storage_keys && row.asset_storage_keys.length > 0 ? row.asset_storage_keys : undefined,
+    hashtags: row.hashtags && row.hashtags.length > 0 ? row.hashtags : undefined,
+    cta: row.cta || undefined,
+    visualBrief: row.visual_brief || undefined,
+    carouselOutline: row.carousel_outline || undefined,
+    sourceNotes: row.source_notes && row.source_notes.length > 0 ? row.source_notes : undefined,
+    qualityScore: row.quality_score ?? undefined,
+    approvalNotes: row.approval_notes || undefined,
+    generatedByModel: row.generated_by_model || undefined,
+    promptVersion: row.prompt_version || undefined,
+    revisionCount: row.revision_count ?? undefined,
+    planRowId: row.plan_row_id || undefined,
     createdAt: row.created_at?.split("T")[0] || new Date().toISOString().split("T")[0],
     updatedAt: row.updated_at?.split("T")[0] || new Date().toISOString().split("T")[0],
   };

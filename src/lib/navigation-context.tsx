@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef, ReactNode } from "react";
 import { loadState, saveState } from "./persistence";
 
-export type Page = "dashboard" | "pipeline" | "calendar" | "preview" | "team" | "media" | "settings" | "brandkit";
+export type Page = "dashboard" | "pipeline" | "calendar" | "preview" | "team" | "media" | "settings" | "brandkit" | "studio";
 
 interface NavigationContextType {
   currentPage: Page;
