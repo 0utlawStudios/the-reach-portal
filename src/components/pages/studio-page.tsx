@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Sparkles, Plus, Loader2, X, ExternalLink, ChevronDown, Check, Calendar, Clock } from "lucide-react";
+import { Sparkles, Plus, Loader2, X, ExternalLink, ChevronDown, Check, Calendar, Clock, Lock as LockIcon } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
 import { usePipeline } from "@/lib/pipeline-context";
@@ -398,14 +398,14 @@ export function StudioPage() {
     );
   }
 
-  if (accessState === "denied") {
-    return (
-      <div className="p-6 sm:p-8 max-w-2xl mx-auto">
-        <h1 className="text-base font-semibold mb-2">Studio is restricted</h1>
-        <p className="text-[12px] text-gray-500">Your role or email isn&apos;t on the Studio access list. Ask an admin in Settings if you need it.</p>
-      </div>
-    );
-  }
+  const readOnly = accessState === "denied";
+  // For non-allowlisted users we still render the full page so they can see
+  // what Studio looks like — but every control is disabled and a banner
+  // tells them how to request access. Placeholder rows are seeded below so
+  // the page isn't empty.
+  const displayRows = readOnly && rows.length === 0
+    ? Array.from({ length: 3 }, (_, i) => makeBlankRow(i))
+    : rows;
 
   const readyCount = rows.filter((r) => r.status === "ready").length;
 
@@ -421,20 +421,33 @@ export function StudioPage() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <SpendChip spent={spendUsd} cap={dailyCap} />
-          <Button variant="outline" size="sm" onClick={addRow} className="h-7 text-[11px] px-2.5 cursor-pointer"><Plus className="w-3 h-3 mr-1" />Add Row</Button>
-          <Button size="sm" onClick={generateBatch} disabled={readyCount === 0} className="h-7 text-[11px] px-2.5 cursor-pointer">
-            Bulk Generate {readyCount > 0 ? `(${readyCount})` : ""}
+          <Button variant="outline" size="sm" onClick={addRow} disabled={readOnly} className="h-7 text-[11px] px-2.5 cursor-pointer"><Plus className="w-3 h-3 mr-1" />Add Row</Button>
+          <Button size="sm" onClick={generateBatch} disabled={readOnly || readyCount === 0} className="h-7 text-[11px] px-2.5 cursor-pointer">
+            Bulk Generate {!readOnly && readyCount > 0 ? `(${readyCount})` : ""}
           </Button>
         </div>
       </div>
 
-      {loading ? (
+      {readOnly && (
+        <div className="mb-4 rounded-xl border border-violet-200 dark:border-violet-500/20 bg-violet-50/60 dark:bg-violet-500/[0.06] p-4 flex items-start gap-3">
+          <LockIcon className="w-4 h-4 mt-0.5 text-violet-600 dark:text-violet-300 shrink-0" />
+          <div className="text-[12px] text-violet-900 dark:text-violet-200 leading-relaxed">
+            <p className="font-semibold mb-0.5">Read-only preview</p>
+            <p>You&apos;re seeing what Creator Studio looks like, but you can&apos;t edit or generate. Ask an admin (Aldridge or Carlo) to add your email in <span className="font-medium">Settings → General → Creator Studio Access</span>.</p>
+          </div>
+        </div>
+      )}
+
+      {loading && !readOnly ? (
         <div className="py-12 text-center text-gray-400 text-[12px] flex items-center justify-center gap-2">
           <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading rows…
         </div>
       ) : (
-        <div className="space-y-3">
-          {rows.map((row, idx) => (
+        <fieldset
+          disabled={readOnly}
+          className={`space-y-3 border-0 p-0 m-0 min-w-0 ${readOnly ? "opacity-60 pointer-events-none select-none" : ""}`}
+        >
+          {displayRows.map((row, idx) => (
             <StudioCard
               key={row.id}
               row={row}
@@ -447,7 +460,7 @@ export function StudioPage() {
               hasCard={Boolean(row.generated_post_id && cards.some((c) => c.id === row.generated_post_id))}
             />
           ))}
-        </div>
+        </fieldset>
       )}
     </div>
   );

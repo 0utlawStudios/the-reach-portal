@@ -28,31 +28,48 @@ export interface AuditEntry {
   created_at: string;
 }
 
+// Audit reads go through v_audit_log_with_actor (migration 0025) which
+// resolves actor_name via the fallback chain: metadata.user_name >
+// metadata.movedBy > metadata.approvedBy > metadata.changedBy >
+// team_members.name (via auth.users.email) > actor_role. Reading from this
+// view means the UI gets a real name in nearly every case — "Unknown" only
+// fires when literally every signal is missing.
 type AuditLogV2Row = {
   id: string;
   entity_id: string | null;
   action: string;
-  metadata: { user_name?: string; details?: string | null } | null;
+  metadata: { user_name?: string; details?: string | null; movedBy?: string; approvedBy?: string; changedBy?: string } | null;
   actor_role: string | null;
+  actor_name: string | null;
   created_at: string;
 };
 
 function toAuditEntry(row: AuditLogV2Row): AuditEntry {
+  const m = row.metadata || {};
+  const name = row.actor_name
+    || m.user_name
+    || m.movedBy
+    || m.approvedBy
+    || m.changedBy
+    || row.actor_role
+    || "Unknown";
   return {
     id: row.id,
     post_id: row.entity_id || "",
-    user_name: row.metadata?.user_name || row.actor_role || "Unknown",
+    user_name: name,
     action_type: row.action,
-    details: row.metadata?.details || null,
+    details: m.details || null,
     created_at: row.created_at,
   };
 }
 
+const AUDIT_SELECT = "id, entity_id, action, metadata, actor_role, actor_name, created_at";
+
 export async function fetchAuditLogs(postId: string): Promise<AuditEntry[]> {
   if (!isConfigured || !isValidUuid(postId)) return [];
   const { data, error } = await supabase
-    .from("audit_log_v2")
-    .select("id, entity_id, action, metadata, actor_role, created_at")
+    .from("v_audit_log_with_actor")
+    .select(AUDIT_SELECT)
     .eq("entity_id", postId)
     .eq("entity_type", "post")
     .order("created_at", { ascending: false });
@@ -63,8 +80,8 @@ export async function fetchAuditLogs(postId: string): Promise<AuditEntry[]> {
 export async function fetchAllAuditLogs(limit = 100): Promise<AuditEntry[]> {
   if (!isConfigured) return [];
   const { data, error } = await supabase
-    .from("audit_log_v2")
-    .select("id, entity_id, action, metadata, actor_role, created_at")
+    .from("v_audit_log_with_actor")
+    .select(AUDIT_SELECT)
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error || !data) return [];

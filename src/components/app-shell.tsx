@@ -164,12 +164,14 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
     closeMobile();
   };
 
+  // Studio is shown to ALL signed-in users; the page itself renders a
+  // greyed-out read-only preview with an "ask admin for access" banner when
+  // canAccessStudio is false. See studio-page.tsx denied state for details.
+  void canAccessStudio;
   const NAV_ITEMS = [
     { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" />, section: "plan" },
     { id: "pipeline", label: "Content Engine", icon: <Kanban className="w-4 h-4" />, section: "plan" },
-    ...(canAccessStudio
-      ? [{ id: "studio", label: "Creator Studio", icon: <Sparkles className="w-4 h-4" />, section: "plan" }]
-      : []),
+    { id: "studio", label: "Creator Studio", icon: <Sparkles className="w-4 h-4" />, section: "plan" },
     { id: "calendar", label: "Content Calendar", icon: <CalendarDays className="w-4 h-4" />, section: "plan" },
     { id: "preview", label: "Post Preview", icon: <Eye className="w-4 h-4" />, section: "publish" },
     { id: "media", label: "Media Library", icon: <FolderOpen className="w-4 h-4" />, section: "publish" },
