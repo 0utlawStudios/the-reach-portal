@@ -10,8 +10,15 @@ import type { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { requireStudioWriter, errorResponse, okResponse } from "@/lib/ai/auth-helpers";
 import { consume, getClientIp } from "@/lib/rate-limit";
-import { enforceDailyCap, DailyCapExceeded } from "@/lib/ai/cost";
-import { resolveAspect } from "@/lib/ai/aspect-resolver";
+import {
+  enforceDailyCap,
+  DailyCapExceeded,
+  assertEstimateWithinPerRowCap,
+  PerRowCapExceeded,
+  estimateJobCostUsd,
+  perRowCapUsd,
+} from "@/lib/ai/cost";
+import { resolveAspect, imageCountForPlan } from "@/lib/ai/aspect-resolver";
 
 function adminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -71,6 +78,23 @@ export async function POST(req: NextRequest, ctxParams: { params: Promise<{ id: 
     format: row.format,
     platforms: row.platforms,
   });
+
+  // Pre-flight per-row cap check. Refuse rows whose expected cost exceeds
+  // the per-row ceiling (default \$3) so the operator gets a clear error
+  // instead of burning real OpenAI cost on partial output.
+  const expectedImages = imageCountForPlan(row.format, row.media_type, row.slides_count);
+  const estimate = estimateJobCostUsd({ imageCount: expectedImages });
+  try {
+    assertEstimateWithinPerRowCap(estimate);
+  } catch (err) {
+    if (err instanceof PerRowCapExceeded) {
+      return errorResponse(
+        400,
+        `This row's expected cost (~$${estimate.toFixed(2)}) exceeds the per-row cap ($${perRowCapUsd().toFixed(2)}). Lower the slide count or ask an admin to raise OPENAI_PER_ROW_CAP_USD.`,
+      );
+    }
+    throw err;
+  }
 
   // Refuse to generate if the brand_playbook is still placeholder.
   const { data: brand } = await sb

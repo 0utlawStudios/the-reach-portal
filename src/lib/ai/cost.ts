@@ -137,6 +137,23 @@ export function enforcePerRowCap(spentOnRow: number): void {
 }
 
 /**
+ * Pre-flight check before enqueueing a job. Refuses ANY job whose
+ * estimated cost exceeds the per-row cap, so the operator gets an
+ * immediate clear error (e.g. on a 10-slide carousel at default
+ * \$3 cap) rather than burning \$2.50 on partial slides before the
+ * mid-flight cap fires.
+ *
+ * The mid-flight check still runs as a defense-in-depth in case the
+ * model surprises us with token usage above the estimate.
+ */
+export function assertEstimateWithinPerRowCap(estimateUsd: number): void {
+  const cap = perRowCapUsd();
+  if (estimateUsd >= cap) {
+    throw new PerRowCapExceeded(estimateUsd, cap);
+  }
+}
+
+/**
  * Write an estimated cost to the job row so the daily-cap aggregator sees
  * this job's committed spend immediately (instead of only after the job
  * completes). Without this, 5 concurrent batch generates could all pass
