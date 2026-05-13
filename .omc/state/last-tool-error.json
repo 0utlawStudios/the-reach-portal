@@ -1,7 +1,7 @@
 {
-  "tool_name": "WebFetch",
-  "tool_input_preview": "{\"url\":\"https://platform.openai.com/docs/models\",\"prompt\":\"Find all OpenAI image generation model IDs available in the API today. Specifically: is there a gpt-image-2, gpt-image-1.5, gpt-image-1-mini,...",
-  "error": "Request failed with status code 403",
-  "timestamp": "2026-05-13T05:40:40.632Z",
-  "retry_count": 2
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"wc -l /Users/ace/Documents/CURSOR\\\\ MAIN/ten80ten-smm-portal/n8n/ten80ten-auto-publisher.json; jq '.nodes | length, [.nodes[].type] | unique' /Users/ace/Documents/CURSOR\\\\ MAIN/ten80ten-sm...",
+  "error": "Exit code 5\n     297 /Users/ace/Documents/CURSOR MAIN/ten80ten-smm-portal/n8n/ten80ten-auto-publisher.json",
+  "timestamp": "2026-05-13T13:11:49.500Z",
+  "retry_count": 1
 }
