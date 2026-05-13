@@ -17,6 +17,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { studioEnabled } from "@/lib/ai/feature-flag";
 
 function adminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -63,6 +64,11 @@ export async function POST(req: NextRequest) {
   const provided = authHeader.replace(/^Bearer\s+/i, "");
   if (!secret || provided !== secret) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  // Feature kill switch — silently drop webhooks when disabled so Supabase
+  // doesn't enter a retry storm if we flip the flag mid-incident.
+  if (!studioEnabled()) {
+    return new NextResponse(null, { status: 204 });
   }
 
   let payload: PostsWebhookPayload;

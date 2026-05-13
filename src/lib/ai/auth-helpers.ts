@@ -15,6 +15,7 @@ import { NextResponse } from "next/server";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { requireBearerTeamRole } from "@/lib/auth/require";
 import { AI_WRITER_ROLES } from "@/lib/ai/types";
+import { studioEnabled, STUDIO_DISABLED_MESSAGE } from "@/lib/ai/feature-flag";
 
 const BASELINE_WORKSPACE = "00000000-0000-0000-0000-000000000001";
 
@@ -66,6 +67,15 @@ export function isEmailAllowed(email: string, allowlist: string[] | null): boole
  * Returns the AiAuthCtx on success, or a 401/403 NextResponse on failure.
  */
 export async function requireStudioWriter(req: NextRequest): Promise<AiAuthCtx | NextResponse> {
+  // Feature kill switch — must come BEFORE any expensive lookup so a
+  // disabled feature returns 503 in microseconds.
+  if (!studioEnabled()) {
+    return NextResponse.json(
+      { error: STUDIO_DISABLED_MESSAGE, code: "feature_disabled" },
+      { status: 503 },
+    );
+  }
+
   const team = await requireBearerTeamRole(req, [...AI_WRITER_ROLES]);
   if (team instanceof NextResponse) return team;
 

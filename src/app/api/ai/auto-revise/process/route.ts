@@ -12,6 +12,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { runGenerateJob, runReviseJob } from "@/lib/ai/worker";
+import { studioEnabled } from "@/lib/ai/feature-flag";
 
 function adminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -35,6 +36,11 @@ function isAuthorized(req: NextRequest): boolean {
 export async function POST(req: NextRequest) {
   if (!isAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  // Feature kill switch — when off, the worker drains nothing. Queued
+  // jobs stay queued so a flip back to enabled doesn't lose work.
+  if (!studioEnabled()) {
+    return NextResponse.json({ ok: true, processed: 0, reason: "feature_disabled" });
   }
 
   const sb = adminClient();

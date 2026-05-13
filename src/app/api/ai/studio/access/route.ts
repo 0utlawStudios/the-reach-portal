@@ -9,6 +9,7 @@ import { NextResponse } from "next/server";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { requireBearerTeamRole } from "@/lib/auth/require";
 import { loadStudioAllowlist, isEmailAllowed, errorResponse, okResponse } from "@/lib/ai/auth-helpers";
+import { studioEnabled } from "@/lib/ai/feature-flag";
 
 const BASELINE_WORKSPACE = "00000000-0000-0000-0000-000000000001";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -50,6 +51,18 @@ export async function GET(req: NextRequest) {
   ]);
   if (team instanceof NextResponse) return team;
 
+  // If the feature is disabled, return a clean "not allowed + reason" so
+  // the sidebar can render the disabled state instead of leaking errors.
+  if (!studioEnabled()) {
+    return okResponse({
+      allowed: false,
+      isAdmin: ADMIN_ROLES.includes(team.role.toLowerCase()),
+      allowlist: null,
+      allowlistConfigured: false,
+      reason: "feature_disabled",
+    });
+  }
+
   const sb = adminClient();
   const workspaceId = await resolveWorkspace(sb, team.user.id);
   const allowlist = await loadStudioAllowlist(sb, workspaceId);
@@ -69,6 +82,9 @@ export async function PUT(req: NextRequest) {
   // Only superadmin / admin / owner can edit the allowlist.
   const team = await requireBearerTeamRole(req, ADMIN_ROLES);
   if (team instanceof NextResponse) return team;
+  // Allow allowlist edits even when the feature is disabled — admins should
+  // be able to prep access for re-enable. The feature flag gates GENERATION,
+  // not configuration.
 
   let body: { emails?: unknown; mode?: unknown } = {};
   try { body = (await req.json()) as typeof body; } catch { return errorResponse(400, "Invalid JSON"); }

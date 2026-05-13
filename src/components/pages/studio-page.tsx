@@ -94,11 +94,37 @@ export function StudioPage() {
   const [jobIdByRow, setJobIdByRow] = useState<Record<string, string>>({});
   const [spendUsd, setSpendUsd] = useState<number>(0);
   const [dailyCap, setDailyCap] = useState<number>(DAILY_CAP_DEFAULT);
+  const [accessState, setAccessState] = useState<"unknown" | "ok" | "disabled" | "denied">("unknown");
   const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const isAllowedRole = useMemo(() => {
     const role = (currentUser.role || "").toLowerCase();
     return ["superadmin", "admin", "owner", "creative_director", "social_media_specialist"].includes(role);
   }, [currentUser.role]);
+
+  // Feature flag + allowlist check. Runs before fetching rows so we render
+  // a clean disabled state if the kill switch is flipped (rather than a
+  // sea of error toasts from the rows endpoint 503-ing).
+  useEffect(() => {
+    if (!isAllowedRole) {
+      setAccessState("denied");
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await authedFetch("/api/ai/studio/access");
+        const json = await res.json();
+        if (cancelled) return;
+        const data = json.data || {};
+        if (data.reason === "feature_disabled") setAccessState("disabled");
+        else if (data.allowed) setAccessState("ok");
+        else setAccessState("denied");
+      } catch {
+        if (!cancelled) setAccessState("denied");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isAllowedRole]);
 
   useEffect(() => {
     let cancelled = false;
@@ -119,10 +145,10 @@ export function StudioPage() {
         if (!cancelled) setLoading(false);
       }
     }
-    if (isAllowedRole) load();
+    if (accessState === "ok") load();
     else setLoading(false);
     return () => { cancelled = true; };
-  }, [addToast, isAllowedRole]);
+  }, [addToast, accessState]);
 
   useEffect(() => {
     if (!isAllowedRole) return;
@@ -313,11 +339,34 @@ export function StudioPage() {
     navigateToPost(row.generated_post_id);
   }, [navigateToPost]);
 
-  if (!isAllowedRole) {
+  if (accessState === "unknown") {
+    return (
+      <div className="p-8 flex items-center justify-center gap-2 text-[12px] text-gray-400">
+        <Loader2 className="w-3.5 h-3.5 animate-spin" /> Checking access…
+      </div>
+    );
+  }
+
+  if (accessState === "disabled") {
+    return (
+      <div className="p-6 sm:p-8 max-w-2xl mx-auto">
+        <div className="rounded-xl border border-amber-200 dark:border-amber-500/20 bg-amber-50/60 dark:bg-amber-500/[0.06] p-5">
+          <h1 className="text-base font-semibold text-amber-900 dark:text-amber-300 mb-1.5 flex items-center gap-2">
+            <Sparkles className="w-4 h-4" />Creator Studio is paused
+          </h1>
+          <p className="text-[12px] text-amber-800/80 dark:text-amber-300/80 leading-relaxed">
+            Studio has been temporarily disabled by an admin. Drafts you already generated are unaffected — they stay in Awaiting Approval and can be reviewed and published normally. The Studio sheet itself will come back when the flag is flipped.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (accessState === "denied") {
     return (
       <div className="p-6 sm:p-8 max-w-2xl mx-auto">
         <h1 className="text-base font-semibold mb-2">Studio is restricted</h1>
-        <p className="text-[12px] text-gray-500">Your role doesn&apos;t have access to AI generation. Ask an admin if you need it.</p>
+        <p className="text-[12px] text-gray-500">Your role or email isn&apos;t on the Studio access list. Ask an admin in Settings if you need it.</p>
       </div>
     );
   }
