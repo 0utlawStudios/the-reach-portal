@@ -8,7 +8,9 @@ import { useTheme } from "@/lib/theme-context";
 import { useTeam, UserRole, TeamMember } from "@/lib/team-context";
 import { useToast } from "@/lib/toast-context";
 import { useAuth } from "@/lib/auth-context";
-import { usePresence, PresenceStatus } from "@/lib/use-presence";
+import { usePresence } from "@/lib/use-presence";
+import { PresenceDot } from "@/components/presence-dot";
+import { PresenceLabel } from "@/components/presence-label";
 import { usePipeline } from "@/lib/pipeline-context";
 import { ThemeSelector } from "@/components/theme-selector";
 import { logAudit, fetchAllAuditLogs, AuditEntry } from "@/lib/audit";
@@ -207,17 +209,6 @@ function EditProfileModal({ member, onClose, onDelete, canDelete }: { member: Te
         />
       )}
     </>
-  );
-}
-
-function PresenceDot({ status }: { status: PresenceStatus }) {
-  const colors: Record<PresenceStatus, string> = {
-    online: "bg-emerald-500 shadow-emerald-500/40",
-    idle: "bg-amber-400 shadow-amber-400/40",
-    offline: "bg-gray-300 dark:bg-gray-600",
-  };
-  return (
-    <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white dark:border-[#151518] ${colors[status]} ${status === "online" ? "shadow-sm" : ""}`} title={status} />
   );
 }
 
@@ -602,6 +593,10 @@ export function SettingsPage() {
                             </span>
                           )}
                         </div>
+                        <PresenceLabel
+                          email={member.email}
+                          className="block mt-1 text-[10px] leading-tight"
+                        />
                       </div>
                     </button>
                   );

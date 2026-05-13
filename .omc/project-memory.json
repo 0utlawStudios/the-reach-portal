@@ -260,15 +260,15 @@
       "type": "file"
     },
     {
-      "path": "src/lib/auth/require.ts",
-      "accessCount": 5,
-      "lastAccessed": 1778634628350,
+      "path": "src/lib/auth-context.tsx",
+      "accessCount": 6,
+      "lastAccessed": 1778669110133,
       "type": "file"
     },
     {
-      "path": "src/lib/auth-context.tsx",
+      "path": "src/lib/auth/require.ts",
       "accessCount": 5,
-      "lastAccessed": 1778634644811,
+      "lastAccessed": 1778634628350,
       "type": "file"
     },
     {
@@ -296,6 +296,12 @@
       "type": "file"
     },
     {
+      "path": "src/lib/supabase/server.ts",
+      "accessCount": 4,
+      "lastAccessed": 1778669245792,
+      "type": "file"
+    },
+    {
       "path": "src/app/api/workspace/provision/route.ts",
       "accessCount": 3,
       "lastAccessed": 1778614061875,
@@ -314,9 +320,9 @@
       "type": "file"
     },
     {
-      "path": "src/lib/supabase/server.ts",
+      "path": "src/lib/supabaseClient.ts",
       "accessCount": 3,
-      "lastAccessed": 1778634633839,
+      "lastAccessed": 1778669093343,
       "type": "file"
     },
     {
@@ -329,12 +335,6 @@
       "path": "src/app/api/auth/forgot-password/route.ts",
       "accessCount": 2,
       "lastAccessed": 1778613960907,
-      "type": "file"
-    },
-    {
-      "path": "src/lib/supabaseClient.ts",
-      "accessCount": 2,
-      "lastAccessed": 1778613971794,
       "type": "file"
     },
     {
@@ -365,6 +365,12 @@
       "path": "supabase/migrations/0016_fix_timezone_defaults.sql",
       "accessCount": 2,
       "lastAccessed": 1778615717063,
+      "type": "file"
+    },
+    {
+      "path": "supabase/migrations/0009_audit_log_v2.sql",
+      "accessCount": 2,
+      "lastAccessed": 1778669045584,
       "type": "file"
     },
     {
@@ -419,12 +425,6 @@
       "path": "supabase/migrations/0004_workspace_id_columns.sql",
       "accessCount": 1,
       "lastAccessed": 1778613937625,
-      "type": "file"
-    },
-    {
-      "path": "supabase/migrations/0009_audit_log_v2.sql",
-      "accessCount": 1,
-      "lastAccessed": 1778613938249,
       "type": "file"
     },
     {
