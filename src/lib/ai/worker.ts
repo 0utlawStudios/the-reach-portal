@@ -32,7 +32,15 @@ import {
   insertGeneratedPost,
   updateRevisedPost,
 } from "./persist";
-import { computeCostUsd, enforceDailyCap, DailyCapExceeded } from "./cost";
+import {
+  computeCostUsd,
+  enforceDailyCap,
+  enforceMidFlightCap,
+  estimateJobCostUsd,
+  writeJobPrecharge,
+  DailyCapExceeded,
+  PerRowCapExceeded,
+} from "./cost";
 
 function adminClient(): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -204,6 +212,37 @@ async function generateImagesForCaption(
   return out;
 }
 
+/**
+ * Same as generateImagesForCaption but with cap enforcement between each
+ * image. If a mid-job cap is hit, throws immediately so the worker fails
+ * the job cleanly rather than continuing to spend.
+ */
+async function generateImagesForCaptionWithCapChecks(args: {
+  ctx: BuildPromptContext;
+  caption: GeneratedCaption;
+  resolved: ResolvedAspect;
+  jobId: string;
+  workspaceId: string;
+  tally: { textIn: number; textOut: number; verifierIn: number; verifierOut: number; images: number };
+}): Promise<Array<{ bytes: Buffer; mime: "image/png" }>> {
+  const prompts = buildImagePrompts(args.ctx, args.caption.scene_outline);
+  const out: Array<{ bytes: Buffer; mime: "image/png" }> = [];
+  for (const prompt of prompts) {
+    // Cap check BEFORE the call — once we've authorized a $0.50 image we
+    // commit to paying for it.
+    await enforceMidFlightCap({
+      workspaceId: args.workspaceId,
+      jobId: args.jobId,
+      spentOnThisJob: computeCostUsd(args.tally),
+    });
+    const img = await callImage({ model: imageModel(), prompt, size: args.resolved.openaiSize, quality: "high" });
+    const processed = await processImage(img.base64, args.resolved);
+    out.push({ bytes: processed.bytes, mime: "image/png" });
+    args.tally.images += 1;
+  }
+  return out;
+}
+
 async function claimJob(sb: SupabaseClient, jobId: string): Promise<AiJobRow | null> {
   const { data, error } = await sb
     .from("ai_generation_jobs")
@@ -255,23 +294,59 @@ export async function runGenerateJob(jobId: string): Promise<void> {
       platforms: plan.platforms || [],
     });
 
+    // Pre-charge: write the estimated cost to the job row NOW so concurrent
+    // batches see this job's committed spend in the daily-cap aggregator.
+    // Will be replaced with the actual cost on completion.
+    const expectedImages = imageCountForPlan(
+      (plan.format || "single") as never,
+      (plan.media_type || "image") as never,
+      plan.slides_count ?? null,
+    );
+    const estimate = estimateJobCostUsd({ imageCount: expectedImages });
+    await writeJobPrecharge(jobId, estimate);
+
     const promptCtx: BuildPromptContext = { brand, recentPosts: recent, plan, resolved };
+
+    // Tally accumulates across the job. Used for mid-flight cap checks and
+    // for the per-row hard ceiling. Updated after each expensive call.
+    const tally = { textIn: 0, textOut: 0, verifierIn: 0, verifierOut: 0, images: 0 };
 
     // First text attempt.
     let textResult = await runTextGeneration(promptCtx, null);
-    // Hallucination gate.
+    tally.textIn += textResult.tokensIn; tally.textOut += textResult.tokensOut;
+
+    // Hallucination gate (first pass).
     let gate = await runHallucinationGate({ caption: textResult.caption, plan, brand: brand?.data || null });
+    tally.verifierIn += gate.verifierTokensIn; tally.verifierOut += gate.verifierTokensOut;
     if (!gate.ok) {
       const retry = gate.violations.join("; ");
       textResult = await runTextGeneration(promptCtx, retry);
+      tally.textIn += textResult.tokensIn; tally.textOut += textResult.tokensOut;
       gate = await runHallucinationGate({ caption: textResult.caption, plan, brand: brand?.data || null });
+      tally.verifierIn += gate.verifierTokensIn; tally.verifierOut += gate.verifierTokensOut;
       if (!gate.ok) {
         throw new Error(`hallucination_gate_failed: ${gate.violations.slice(0, 3).join("; ")}`);
       }
     }
 
-    // Images.
-    const processed = await generateImagesForCaption(promptCtx, textResult.caption, resolved);
+    // Mid-flight cap check before the (expensive) image phase. Catches the
+    // case where the text + verifier alone already pushed us over.
+    await enforceMidFlightCap({
+      workspaceId: job.workspace_id,
+      jobId,
+      spentOnThisJob: computeCostUsd(tally),
+    });
+
+    // Images, with cap check between each generation. If a 5-slide carousel
+    // would push us over, we stop after the slides we've already paid for.
+    const processed = await generateImagesForCaptionWithCapChecks({
+      ctx: promptCtx,
+      caption: textResult.caption,
+      resolved,
+      jobId,
+      workspaceId: job.workspace_id,
+      tally,
+    });
 
     // Build placeholder post id so storage path is stable BEFORE insert.
     const provisionalId = crypto.randomUUID();
@@ -317,13 +392,9 @@ export async function runGenerateJob(jobId: string): Promise<void> {
       console.error("[ai-worker] asset rename failed (non-fatal)", err);
     }
 
-    const usage = {
-      textIn: textResult.tokensIn,
-      textOut: textResult.tokensOut,
-      verifierIn: gate.verifierTokensIn,
-      verifierOut: gate.verifierTokensOut,
-      images: processed.length,
-    };
+    // Reconcile pre-charge with actual cost. tally was kept up to date
+    // through the run; this is the canonical end-of-job number.
+    const usage = { ...tally };
     const costUsd = computeCostUsd(usage);
     const latencyMs = Date.now() - t0;
 
@@ -343,7 +414,11 @@ export async function runGenerateJob(jobId: string): Promise<void> {
       tokens_out: usage.textOut + usage.verifierOut,
       images_generated: usage.images,
       cost_usd: costUsd,
-      result: { caption_summary: textResult.caption.title, quality_score: textResult.caption.quality_score },
+      result: {
+        caption_summary: textResult.caption.title,
+        quality_score: textResult.caption.quality_score,
+        precharge_estimate: estimate,
+      },
     }).eq("id", jobId);
 
     await recordAudit(sb, "ai_post_generated", inserted.id, {
@@ -356,13 +431,15 @@ export async function runGenerateJob(jobId: string): Promise<void> {
       tokens_out: usage.textOut + usage.verifierOut,
       images_generated: usage.images,
       cost_usd: costUsd,
+      precharge_estimate: estimate,
       latency_ms: latencyMs,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    const detailed = err instanceof DailyCapExceeded ? msg : msg;
+    const capHit = err instanceof DailyCapExceeded || err instanceof PerRowCapExceeded;
+    const detailed = capHit ? msg : msg;
     await failJob(sb, jobId, detailed);
-    await recordAudit(sb, "ai_post_generate_failed", null, { job_id: jobId, error: detailed });
+    await recordAudit(sb, "ai_post_generate_failed", null, { job_id: jobId, error: detailed, cap_hit: capHit });
   }
 }
 
@@ -384,6 +461,15 @@ export async function runReviseJob(jobId: string): Promise<void> {
       platforms: plan.platforms || [],
     });
 
+    // Pre-charge for the revise job (same logic as generate).
+    const expectedImages = imageCountForPlan(
+      (plan.format || "single") as never,
+      (plan.media_type || "image") as never,
+      plan.slides_count ?? null,
+    );
+    const estimate = estimateJobCostUsd({ imageCount: expectedImages });
+    await writeJobPrecharge(jobId, estimate);
+
     const promptCtx: BuildPromptContext = {
       brand,
       recentPosts: recent,
@@ -401,18 +487,37 @@ export async function runReviseJob(jobId: string): Promise<void> {
       reviewerNotes,
     };
 
+    const tally = { textIn: 0, textOut: 0, verifierIn: 0, verifierOut: 0, images: 0 };
+
     let textResult = await runTextGeneration(promptCtx, null);
+    tally.textIn += textResult.tokensIn; tally.textOut += textResult.tokensOut;
     let gate = await runHallucinationGate({ caption: textResult.caption, plan, brand: brand?.data || null, reviewerNotes });
+    tally.verifierIn += gate.verifierTokensIn; tally.verifierOut += gate.verifierTokensOut;
     if (!gate.ok) {
       const retry = gate.violations.join("; ");
       textResult = await runTextGeneration(promptCtx, retry);
+      tally.textIn += textResult.tokensIn; tally.textOut += textResult.tokensOut;
       gate = await runHallucinationGate({ caption: textResult.caption, plan, brand: brand?.data || null, reviewerNotes });
+      tally.verifierIn += gate.verifierTokensIn; tally.verifierOut += gate.verifierTokensOut;
       if (!gate.ok) {
         throw new Error(`hallucination_gate_failed: ${gate.violations.slice(0, 3).join("; ")}`);
       }
     }
 
-    const processed = await generateImagesForCaption(promptCtx, textResult.caption, resolved);
+    await enforceMidFlightCap({
+      workspaceId: job.workspace_id,
+      jobId,
+      spentOnThisJob: computeCostUsd(tally),
+    });
+
+    const processed = await generateImagesForCaptionWithCapChecks({
+      ctx: promptCtx,
+      caption: textResult.caption,
+      resolved,
+      jobId,
+      workspaceId: job.workspace_id,
+      tally,
+    });
     const assets = await uploadAssets({
       workspaceId: plan.workspace_id,
       postId: sourcePost.id,
@@ -430,13 +535,7 @@ export async function runReviseJob(jobId: string): Promise<void> {
       promptVersion: PROMPT_VERSION,
     });
 
-    const usage = {
-      textIn: textResult.tokensIn,
-      textOut: textResult.tokensOut,
-      verifierIn: gate.verifierTokensIn,
-      verifierOut: gate.verifierTokensOut,
-      images: processed.length,
-    };
+    const usage = { ...tally };
     const costUsd = computeCostUsd(usage);
     const latencyMs = Date.now() - t0;
 
@@ -467,12 +566,14 @@ export async function runReviseJob(jobId: string): Promise<void> {
       images_generated: usage.images,
       cost_usd: costUsd,
       latency_ms: latencyMs,
+      precharge_estimate: estimate,
       reviewer_notes_excerpt: reviewerNotes.slice(0, 200),
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    const capHit = err instanceof DailyCapExceeded || err instanceof PerRowCapExceeded;
     await failJob(sb, jobId, msg);
-    await recordAudit(sb, "ai_post_revise_failed", job.post_id || null, { job_id: jobId, error: msg });
+    await recordAudit(sb, "ai_post_revise_failed", job.post_id || null, { job_id: jobId, error: msg, cap_hit: capHit });
   }
 }
 
