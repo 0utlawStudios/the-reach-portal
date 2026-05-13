@@ -48,7 +48,8 @@ export async function uploadAssets(args: {
 
 /**
  * Re-sign storage keys. Used by the post-fetch path when an existing signed
- * URL is within 24h of expiry.
+ * URL is within 24h of expiry, AND by the worker after a storage re-key
+ * (so the signed URLs match the new keys).
  */
 export async function resignAssets(
   storageKeys: ReadonlyArray<string>,
@@ -61,6 +62,43 @@ export async function resignAssets(
       throw new Error(`Re-sign failed for ${key}: ${error?.message || "unknown"}`);
     }
     out.push(data.signedUrl);
+  }
+  return out;
+}
+
+/**
+ * Move existing storage objects to a new prefix (e.g. provisional id → real
+ * post.id), re-sign URLs against the new keys, and return the updated tuples.
+ *
+ * Why: Supabase Storage signed URLs are bound to the original path. If you
+ * move the object and forget to re-sign, the old signed URL 404s.
+ */
+export async function rekeyAndResignAssets(args: {
+  oldPrefix: string;     // e.g. "{workspace_id}/{provisional_id}/"
+  newPrefix: string;     // e.g. "{workspace_id}/{post_id}/"
+  assets: ReadonlyArray<UploadedAsset>;
+}): Promise<UploadedAsset[]> {
+  const sb = adminClient();
+  const out: UploadedAsset[] = [];
+  for (const a of args.assets) {
+    const newKey = a.storageKey.startsWith(args.oldPrefix)
+      ? args.newPrefix + a.storageKey.slice(args.oldPrefix.length)
+      : a.storageKey;
+    if (newKey !== a.storageKey) {
+      const { error: moveErr } = await sb.storage.from(BUCKET).move(a.storageKey, newKey);
+      if (moveErr) {
+        // Couldn't move — keep the old key + URL so the post stays usable.
+        out.push(a);
+        continue;
+      }
+    }
+    const { data, error: signErr } = await sb.storage.from(BUCKET).createSignedUrl(newKey, SIGNED_URL_TTL_SECONDS);
+    if (signErr || !data?.signedUrl) {
+      // Move succeeded but re-sign failed — fall back to the old (now stale) URL.
+      out.push({ storageKey: newKey, signedUrl: a.signedUrl });
+      continue;
+    }
+    out.push({ storageKey: newKey, signedUrl: data.signedUrl });
   }
   return out;
 }

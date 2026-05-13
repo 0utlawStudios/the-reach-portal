@@ -24,6 +24,25 @@ function adminClient() {
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
+/**
+ * Pull the latest reviewer kickback note from the accumulated posts.notes
+ * field. The existing kickback flow appends entries like:
+ *   "<author> (<timestamp>): Fix submitted — <note>"
+ * separated by blank lines. We want the trailing block.
+ */
+function extractLatestReviewerNote(rawNotes: string): string {
+  if (!rawNotes) return "";
+  const blocks = rawNotes.split(/\n{2,}/).map((b) => b.trim()).filter(Boolean);
+  if (blocks.length === 0) return "";
+  const last = blocks[blocks.length - 1];
+  // [\s\S]+ matches any char including newlines without needing the /s flag
+  // (which requires ES2018+ — tsconfig targets ES2017 here).
+  const fixMatch = last.match(/Fix submitted\s+—\s+([\s\S]+)$/);
+  if (fixMatch && fixMatch[1]) return fixMatch[1].trim();
+  // Legacy / direct-typed note: return the last block as-is.
+  return last;
+}
+
 type PostsWebhookPayload = {
   type: "UPDATE" | "INSERT" | "DELETE";
   table: "posts";
@@ -65,7 +84,12 @@ export async function POST(req: NextRequest) {
   if (!postId || !workspaceId) return new NextResponse(null, { status: 204 });
   if (oldStage === newStage || newStage !== "revision_needed") return new NextResponse(null, { status: 204 });
   if (!generatedByModel) return new NextResponse(null, { status: 204 });
-  if (notes.trim().length < 10) return new NextResponse(null, { status: 204 });
+
+  // posts.notes is an append-only comment thread (see pipeline-context.tsx
+  // submitKickback). Extract just the most recent "Fix submitted —" entry
+  // so the AI gets the reviewer's CURRENT note, not the full history.
+  const recentNote = extractLatestReviewerNote(notes);
+  if (recentNote.trim().length < 10) return new NextResponse(null, { status: 204 });
 
   const sb = adminClient();
 
@@ -85,7 +109,7 @@ export async function POST(req: NextRequest) {
     status: "queued",
     post_id: postId,
     requested_by: "webhook:auto-revise",
-    payload: { reviewer_notes: notes.slice(0, 4000) },
+    payload: { reviewer_notes: recentNote.slice(0, 4000) },
   });
 
   // Kick the worker so the user sees the revision within ~30s instead of waiting for cron.

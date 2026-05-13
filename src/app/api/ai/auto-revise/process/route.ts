@@ -1,8 +1,8 @@
 // POST /api/ai/auto-revise/process
 //
 // Worker route invoked by:
-//  1. Vercel cron (every 1 min) — header x-vercel-cron-signature
-//  2. The /api/ai/studio/generate-row endpoint — header x-trigger-secret
+//  1. Vercel cron — Vercel sends `Authorization: Bearer <CRON_SECRET>`.
+//  2. The /api/ai/studio/generate-row endpoint — header x-trigger-secret.
 //
 // Both paths are verified by shared secret. Pulls up to 3 queued jobs,
 // runs them serially (one OpenAI image call at a time keeps us under rate
@@ -20,11 +20,14 @@ function adminClient() {
 }
 
 function isAuthorized(req: NextRequest): boolean {
-  const cronSig = req.headers.get("x-vercel-cron-signature") || "";
-  const trigger = req.headers.get("x-trigger-secret") || "";
-  const cronSecret = process.env.CRON_SECRET || "";
-  const triggerSecret = process.env.AI_WORKER_TRIGGER_SECRET || cronSecret;
-  if (cronSig && cronSecret && cronSig === cronSecret) return true;
+  const auth = (req.headers.get("authorization") || req.headers.get("Authorization") || "").trim();
+  const bearer = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+  const trigger = (req.headers.get("x-trigger-secret") || "").trim();
+  const cronSecret = (process.env.CRON_SECRET || "").trim();
+  const triggerSecret = (process.env.AI_WORKER_TRIGGER_SECRET || cronSecret).trim();
+  // Vercel cron sends Authorization: Bearer <CRON_SECRET>.
+  if (bearer && cronSecret && bearer === cronSecret) return true;
+  // Internal trigger from generate-row / webhook routes.
   if (trigger && triggerSecret && trigger === triggerSecret) return true;
   return false;
 }

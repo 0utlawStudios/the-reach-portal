@@ -17,7 +17,7 @@ import { resolveAspect, imageCountForPlan } from "./aspect-resolver";
 import { callTextJson } from "./openai-text";
 import { callImage } from "./openai-image";
 import { processImage } from "./image-postprocess";
-import { uploadAssets } from "./upload";
+import { uploadAssets, rekeyAndResignAssets } from "./upload";
 import {
   buildTextSystem,
   buildTextUser,
@@ -91,8 +91,25 @@ async function loadReviseContext(sb: SupabaseClient, postId: string, workspaceId
     .select("*")
     .eq("id", postId)
     .eq("workspace_id", workspaceId)
-    .single();
+    .maybeSingle();
   if (error || !post) throw new Error(`Post not found for revise: ${error?.message || "missing"}`);
+
+  // Preserve the *original* operator intent by looking up the source plan row.
+  // Without this the revise pipeline used post.title (a short internal name)
+  // as the topic, which drifted away from the operator's original instructions.
+  let originalTopic: string | null = null;
+  let originalNotes: string | null = null;
+  if (post.plan_row_id) {
+    const { data: planRow } = await sb
+      .from("content_plan_rows")
+      .select("topic, notes")
+      .eq("id", post.plan_row_id)
+      .maybeSingle();
+    if (planRow) {
+      originalTopic = (planRow.topic as string | null) ?? null;
+      originalNotes = (planRow.notes as string | null) ?? null;
+    }
+  }
 
   // Build a synthetic PlanRow from the post so the rest of the pipeline is symmetrical.
   const plan: PlanRow = {
@@ -110,8 +127,9 @@ async function loadReviseContext(sb: SupabaseClient, postId: string, workspaceId
     feel: post.feel || null,
     visual_style: post.visual_style || null,
     style_prompt: post.style_prompt || null,
-    topic: post.title || null,
-    notes: reviewerNotes,
+    // Prefer the operator's original topic, fall back to the AI-generated title.
+    topic: originalTopic || post.title || null,
+    notes: [originalNotes, reviewerNotes].filter(Boolean).join("\n\n"),
     status: "revising",
     generated_post_id: post.id,
     last_error: null,
@@ -276,21 +294,25 @@ export async function runGenerateJob(jobId: string): Promise<void> {
       promptVersion: PROMPT_VERSION,
     });
 
-    // Re-key the assets to the real post id so the bucket layout is correct
-    // long-term. (Move object → server-side rename.) Failure here is non-fatal.
+    // Re-key the assets to the real post id so the bucket layout is
+    // canonical, AND re-sign URLs because Supabase signed URLs are bound
+    // to the original storage path — moving an object invalidates the URL.
+    // Failure here is non-fatal (the post will keep working with the
+    // provisional path), but logged.
     try {
-      for (let i = 0; i < assets.length; i++) {
-        const oldKey = assets[i].storageKey;
-        const newKey = oldKey.replace(`${plan.workspace_id}/${provisionalId}/`, `${plan.workspace_id}/${inserted.id}/`);
-        if (oldKey !== newKey) {
-          const { error } = await sb.storage.from("ai-assets").move(oldKey, newKey);
-          if (!error) {
-            assets[i] = { storageKey: newKey, signedUrl: assets[i].signedUrl };
-          }
-        }
-      }
-      const finalKeys = assets.map((a) => a.storageKey);
-      await sb.from("posts").update({ asset_storage_keys: finalKeys }).eq("id", inserted.id);
+      const reSigned = await rekeyAndResignAssets({
+        oldPrefix: `${plan.workspace_id}/${provisionalId}/`,
+        newPrefix: `${plan.workspace_id}/${inserted.id}/`,
+        assets,
+      });
+      await sb
+        .from("posts")
+        .update({
+          asset_storage_keys: reSigned.map((a) => a.storageKey),
+          asset_urls: reSigned.map((a) => a.signedUrl),
+          thumbnail_url: reSigned[0]?.signedUrl || null,
+        })
+        .eq("id", inserted.id);
     } catch (err) {
       console.error("[ai-worker] asset rename failed (non-fatal)", err);
     }

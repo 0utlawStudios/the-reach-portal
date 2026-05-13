@@ -29,6 +29,13 @@ export interface GateResult {
   verifierTokensOut: number;
 }
 
+// Normalize a string for corpus comparison: lowercase + collapse whitespace.
+// Without this, `"73%"` in input vs `"73 %"` in output would false-positive
+// trigger the gate even though they're the same fact.
+function normalizeForMatch(s: string): string {
+  return s.toLowerCase().replace(/\s+/g, "");
+}
+
 // Build a corpus of "trusted strings" the model is allowed to echo.
 function trustedCorpus(input: GateInput): string {
   const bits: string[] = [];
@@ -51,7 +58,7 @@ function trustedCorpus(input: GateInput): string {
       if (Array.isArray(arr)) bits.push(...arr.map(String));
     }
   }
-  return bits.join(" \n ").toLowerCase();
+  return normalizeForMatch(bits.join(" \n "));
 }
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -79,7 +86,7 @@ function regexSweep(c: GeneratedCaption, corpus: string): string[] {
   // Percentages — any digit followed by %
   const pctMatches = text.match(/\b\d+(?:\.\d+)?\s?%/g) || [];
   for (const m of pctMatches) {
-    if (!corpus.includes(m.toLowerCase())) {
+    if (!corpus.includes(normalizeForMatch(m))) {
       violations.push(`Fabricated percentage: "${m}". Input did not include this number.`);
     }
   }
@@ -87,7 +94,7 @@ function regexSweep(c: GeneratedCaption, corpus: string): string[] {
   // Dollar amounts — $X[k|m|K|M] or $X,XXX
   const dollarMatches = text.match(/\$\s?\d[\d,\.]*(?:\s?[kKmMbB])?/g) || [];
   for (const m of dollarMatches) {
-    if (!corpus.includes(m.toLowerCase().replace(/\s/g, ""))) {
+    if (!corpus.includes(normalizeForMatch(m))) {
       violations.push(`Fabricated dollar amount: "${m}". Input did not include this figure.`);
     }
   }
@@ -96,7 +103,7 @@ function regexSweep(c: GeneratedCaption, corpus: string): string[] {
   const yearMatches = text.match(/\b(19|20)\d{2}\b/g) || [];
   for (const m of yearMatches) {
     const y = Number(m);
-    if (!ALLOWED_YEARS.has(y) && !corpus.includes(m)) {
+    if (!ALLOWED_YEARS.has(y) && !corpus.includes(normalizeForMatch(m))) {
       violations.push(`Fabricated year: "${m}". Input did not include this year.`);
     }
   }
