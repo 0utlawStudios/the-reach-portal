@@ -7,13 +7,14 @@
 
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
-const DEFAULT_DAILY_CAP_USD = 25;
+const DEFAULT_DAILY_CAP_USD = 10;
 
 // Per-1k-token costs in USD. Bias high so the cap fires before the bill does.
 const TEXT_INPUT_PER_1K = Number(process.env.OPENAI_PRICE_TEXT_IN) || 0.0025;
 const TEXT_OUTPUT_PER_1K = Number(process.env.OPENAI_PRICE_TEXT_OUT) || 0.01;
-// gpt-image-1 high quality 1024x1536 image cost
-const IMAGE_PER_GENERATION = Number(process.env.OPENAI_PRICE_IMAGE) || 0.19;
+// gpt-image-2 at $30/M output tokens, typical 1024×1536 image ~15-30k tokens.
+// Conservative estimate of $0.50 per image so the cap fires before the bill does.
+const IMAGE_PER_GENERATION = Number(process.env.OPENAI_PRICE_IMAGE) || 0.50;
 // Verifier (gpt-4o-mini) — cheaper than the main text model
 const VERIFIER_INPUT_PER_1K = Number(process.env.OPENAI_PRICE_VERIFIER_IN) || 0.00015;
 const VERIFIER_OUTPUT_PER_1K = Number(process.env.OPENAI_PRICE_VERIFIER_OUT) || 0.0006;

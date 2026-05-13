@@ -42,7 +42,7 @@ function adminClient(): SupabaseClient {
 }
 
 const TEXT_MODEL_DEFAULT = "gpt-4o-mini";
-const IMAGE_MODEL_DEFAULT = "gpt-image-1";
+const IMAGE_MODEL_DEFAULT = "gpt-image-2";
 
 function textModel() {
   return process.env.OPENAI_TEXT_MODEL || TEXT_MODEL_DEFAULT;
