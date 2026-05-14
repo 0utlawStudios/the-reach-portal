@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1778613729621,
+  "lastScanned": 1778748108680,
   "projectRoot": "/Users/ace/Documents/CURSOR MAIN/ten80ten-smm-portal",
   "techStack": {
     "languages": [
@@ -53,6 +53,7 @@
       "lint": "eslint",
       "typecheck": "tsc --noEmit",
       "preflight": "npm ci && npm run lint && npm run typecheck && npm run build",
+      "studio:smoke": "node scripts/studio-smoke.mjs",
       "db:diff": "supabase db diff --schema public",
       "db:types": "supabase gen types typescript --project-id \"$SUPABASE_PROJECT_ID\" --schema public > src/lib/database.types.ts",
       "db:types:check": "tsx scripts/db-types-check.ts"
@@ -81,14 +82,14 @@
       "path": "MAIN",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1778613729597,
+      "lastAccessed": 1778748108671,
       "keyFiles": []
     },
     "SANITY": {
       "path": "SANITY",
       "purpose": null,
       "fileCount": 8,
-      "lastAccessed": 1778613729597,
+      "lastAccessed": 1778748108671,
       "keyFiles": [
         "04152026231041@2x.png",
         "04152026231115@2x.png",
@@ -100,9 +101,11 @@
     "docs": {
       "path": "docs",
       "purpose": "Documentation",
-      "fileCount": 1,
-      "lastAccessed": 1778613729606,
+      "fileCount": 3,
+      "lastAccessed": 1778748108671,
       "keyFiles": [
+        "TEN80TEN-SMM-CREATOR-STUDIO-MANUAL.html",
+        "TEN80TEN-SMM-CREATOR-STUDIO-OPERATOR-MANUAL.md",
         "TEN80TEN-SMM-MANUAL.html"
       ]
     },
@@ -110,7 +113,7 @@
       "path": "migration",
       "purpose": null,
       "fileCount": 4,
-      "lastAccessed": 1778613729606,
+      "lastAccessed": 1778748108673,
       "keyFiles": [
         "migrate.mjs",
         "package-lock.json",
@@ -120,9 +123,10 @@
     "n8n": {
       "path": "n8n",
       "purpose": null,
-      "fileCount": 1,
-      "lastAccessed": 1778613729611,
+      "fileCount": 2,
+      "lastAccessed": 1778748108673,
       "keyFiles": [
+        "ten80ten-auto-publisher-v4.json",
         "ten80ten-auto-publisher.json"
       ]
     },
@@ -130,7 +134,7 @@
       "path": "public",
       "purpose": "Public files",
       "fileCount": 11,
-      "lastAccessed": 1778613729611,
+      "lastAccessed": 1778748108673,
       "keyFiles": [
         "file.svg",
         "globe.svg",
@@ -142,24 +146,25 @@
     "scripts": {
       "path": "scripts",
       "purpose": "Build/utility scripts",
-      "fileCount": 1,
-      "lastAccessed": 1778613729612,
+      "fileCount": 2,
+      "lastAccessed": 1778748108673,
       "keyFiles": [
-        "db-types-check.ts"
+        "db-types-check.ts",
+        "studio-smoke.mjs"
       ]
     },
     "src": {
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1778613729613,
+      "lastAccessed": 1778748108673,
       "keyFiles": []
     },
     "supabase": {
       "path": "supabase",
       "purpose": null,
       "fileCount": 3,
-      "lastAccessed": 1778613729613,
+      "lastAccessed": 1778748108673,
       "keyFiles": [
         "config.toml"
       ]
@@ -168,14 +173,14 @@
       "path": "migration/node_modules",
       "purpose": "Dependencies",
       "fileCount": 1,
-      "lastAccessed": 1778613729615,
+      "lastAccessed": 1778748108673,
       "keyFiles": []
     },
     "src/app": {
       "path": "src/app",
       "purpose": "Application code",
       "fileCount": 5,
-      "lastAccessed": 1778613729616,
+      "lastAccessed": 1778748108674,
       "keyFiles": [
         "favicon.ico",
         "globals.css",
@@ -185,8 +190,8 @@
     "src/components": {
       "path": "src/components",
       "purpose": "UI components",
-      "fileCount": 25,
-      "lastAccessed": 1778613729617,
+      "fileCount": 27,
+      "lastAccessed": 1778748108674,
       "keyFiles": [
         "animated.tsx",
         "app-shell.tsx",
@@ -197,7 +202,7 @@
       "path": "src/lib",
       "purpose": "Library code",
       "fileCount": 24,
-      "lastAccessed": 1778613729617,
+      "lastAccessed": 1778748108674,
       "keyFiles": [
         "audit.ts",
         "auth-context.tsx",
@@ -207,8 +212,8 @@
     "supabase/migrations": {
       "path": "supabase/migrations",
       "purpose": "Database migrations",
-      "fileCount": 18,
-      "lastAccessed": 1778613729618,
+      "fileCount": 27,
+      "lastAccessed": 1778748108674,
       "keyFiles": [
         "0000_baseline.sql",
         "0001_feature_flags.sql",
