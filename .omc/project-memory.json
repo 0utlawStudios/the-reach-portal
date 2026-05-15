@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1778748108680,
+  "lastScanned": 1778856360907,
   "projectRoot": "/Users/ace/Documents/CURSOR MAIN/ten80ten-smm-portal",
   "techStack": {
     "languages": [
@@ -82,14 +82,14 @@
       "path": "MAIN",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1778748108671,
+      "lastAccessed": 1778856360891,
       "keyFiles": []
     },
     "SANITY": {
       "path": "SANITY",
       "purpose": null,
       "fileCount": 8,
-      "lastAccessed": 1778748108671,
+      "lastAccessed": 1778856360891,
       "keyFiles": [
         "04152026231041@2x.png",
         "04152026231115@2x.png",
@@ -101,8 +101,8 @@
     "docs": {
       "path": "docs",
       "purpose": "Documentation",
-      "fileCount": 3,
-      "lastAccessed": 1778748108671,
+      "fileCount": 4,
+      "lastAccessed": 1778856360895,
       "keyFiles": [
         "TEN80TEN-SMM-CREATOR-STUDIO-MANUAL.html",
         "TEN80TEN-SMM-CREATOR-STUDIO-OPERATOR-MANUAL.md",
@@ -113,7 +113,7 @@
       "path": "migration",
       "purpose": null,
       "fileCount": 4,
-      "lastAccessed": 1778748108673,
+      "lastAccessed": 1778856360895,
       "keyFiles": [
         "migrate.mjs",
         "package-lock.json",
@@ -124,7 +124,7 @@
       "path": "n8n",
       "purpose": null,
       "fileCount": 2,
-      "lastAccessed": 1778748108673,
+      "lastAccessed": 1778856360896,
       "keyFiles": [
         "ten80ten-auto-publisher-v4.json",
         "ten80ten-auto-publisher.json"
@@ -134,7 +134,7 @@
       "path": "public",
       "purpose": "Public files",
       "fileCount": 11,
-      "lastAccessed": 1778748108673,
+      "lastAccessed": 1778856360896,
       "keyFiles": [
         "file.svg",
         "globe.svg",
@@ -146,10 +146,11 @@
     "scripts": {
       "path": "scripts",
       "purpose": "Build/utility scripts",
-      "fileCount": 2,
-      "lastAccessed": 1778748108673,
+      "fileCount": 3,
+      "lastAccessed": 1778856360896,
       "keyFiles": [
         "db-types-check.ts",
+        "generate_ten80ten_2026_calendar.py",
         "studio-smoke.mjs"
       ]
     },
@@ -157,14 +158,14 @@
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1778748108673,
+      "lastAccessed": 1778856360896,
       "keyFiles": []
     },
     "supabase": {
       "path": "supabase",
       "purpose": null,
       "fileCount": 3,
-      "lastAccessed": 1778748108673,
+      "lastAccessed": 1778856360897,
       "keyFiles": [
         "config.toml"
       ]
@@ -172,15 +173,15 @@
     "migration/node_modules": {
       "path": "migration/node_modules",
       "purpose": "Dependencies",
-      "fileCount": 1,
-      "lastAccessed": 1778748108673,
+      "fileCount": 2,
+      "lastAccessed": 1778856360898,
       "keyFiles": []
     },
     "src/app": {
       "path": "src/app",
       "purpose": "Application code",
       "fileCount": 5,
-      "lastAccessed": 1778748108674,
+      "lastAccessed": 1778856360900,
       "keyFiles": [
         "favicon.ico",
         "globals.css",
@@ -191,7 +192,7 @@
       "path": "src/components",
       "purpose": "UI components",
       "fileCount": 27,
-      "lastAccessed": 1778748108674,
+      "lastAccessed": 1778856360900,
       "keyFiles": [
         "animated.tsx",
         "app-shell.tsx",
@@ -202,7 +203,7 @@
       "path": "src/lib",
       "purpose": "Library code",
       "fileCount": 24,
-      "lastAccessed": 1778748108674,
+      "lastAccessed": 1778856360901,
       "keyFiles": [
         "audit.ts",
         "auth-context.tsx",
@@ -213,7 +214,7 @@
       "path": "supabase/migrations",
       "purpose": "Database migrations",
       "fileCount": 27,
-      "lastAccessed": 1778748108674,
+      "lastAccessed": 1778856360901,
       "keyFiles": [
         "0000_baseline.sql",
         "0001_feature_flags.sql",
