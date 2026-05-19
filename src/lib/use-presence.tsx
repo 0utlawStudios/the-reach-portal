@@ -12,8 +12,14 @@
 //      request" path adapted for an SPA. Free-running protection: even if the
 //      user idles on one page, navigating bumps presence.
 //   4. DEPARTURE BEACON (this file → /api/presence/departure):
-//      pagehide + freeze → navigator.sendBeacon({token}) → server upsert.
-//      pagehide replaces unload reliably on iOS Safari; freeze covers BFCache.
+//      pagehide → navigator.sendBeacon({token}) → server upsert.
+//      pagehide replaces unload reliably on iOS Safari AND covers BFCache entry
+//      on both iOS Safari (persisted=true) and Chrome (fires before freeze).
+//      The Chrome-specific `freeze` event used to be wired here too but caused
+//      a 60s-cadence leak: heartbeat tick wakes the backgrounded tab → Chrome
+//      re-freezes → freeze event re-fires → beacon spam (~1,440 calls/day/tab).
+//      Discovered 2026-05-20 via Vercel runtime log audit.
+//      Departure also has a 5-minute cooldown guard as belt-and-suspenders.
 //   5. REALTIME PRESENCE CHANNEL (this file):
 //      Supabase realtime channel keyed by email, broadcasts active/idle/away.
 //      Live indicator only — does not write the DB. The DB write paths above
@@ -100,6 +106,7 @@ const ACTIVITY_BROADCAST_THROTTLE_MS = 10 * 1000;
 const HEARTBEAT_MS = 60 * 1000;
 const FLAP_GUARD_MS = 5 * 1000;
 const SUMMARY_REFRESH_MS = 60 * 1000;
+const DEPARTURE_COOLDOWN_MS = 5 * 60 * 1000; // dedupe rapid-fire pagehide / iframe nav events
 
 const ACTIVITY_EVENTS: Array<keyof DocumentEventMap | keyof WindowEventMap> = [
   "mousemove",
@@ -141,6 +148,7 @@ export function PresenceProvider({
   const currentStatusRef = useRef<PresenceStatus>("active");
   const heartbeatRef = useRef<number | null>(null);
   const summaryRefreshRef = useRef<number | null>(null);
+  const lastDepartureRef = useRef<number>(0);
 
   useEffect(() => {
     lastActivityRef.current = Date.now();
@@ -271,8 +279,15 @@ export function PresenceProvider({
     };
 
     const departure = () => {
+      const now = Date.now();
+      // Cooldown guard: prevents rapid-fire beacon spam if any event source
+      // (iframe nav, multiple pagehide cycles, etc) triggers this in quick
+      // succession. Original Chrome `freeze` event was removed entirely below;
+      // this is the second line of defense.
+      if (now - lastDepartureRef.current < DEPARTURE_COOLDOWN_MS) return;
+      lastDepartureRef.current = now;
       try {
-        const payload = JSON.stringify({ token: accessToken, ts: Date.now() });
+        const payload = JSON.stringify({ token: accessToken, ts: now });
         const blob = new Blob([payload], { type: "application/json" });
         if (navigator.sendBeacon) {
           navigator.sendBeacon("/api/presence/departure", blob);
@@ -292,14 +307,15 @@ export function PresenceProvider({
 
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pagehide", departure);
-    // The "freeze" event fires when the page is fully backgrounded (BFCache).
-    // It's experimental but Chrome/Edge support it; ignored where unsupported.
-    document.addEventListener("freeze", departure);
+    // NOTE: previously also listened on document "freeze" event. Removed
+    // 2026-05-20 — Chrome's freeze fires repeatedly when a backgrounded tab
+    // cycles through freeze/wake (waking caused by the 60s heartbeat tick),
+    // creating ~1,440 beacon calls per stuck tab per day. pagehide covers
+    // BFCache entry on both iOS Safari and Chrome; freeze is redundant.
 
     return () => {
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pagehide", departure);
-      document.removeEventListener("freeze", departure);
     };
   }, [isAuthenticated, myEmail, accessToken, touchPresence, broadcastStatusIfNeeded]);
 
