@@ -25,13 +25,23 @@ function assertEnv(name: string): string {
 }
 
 function createCallerClient(request: NextRequest) {
-  const authorization = request.headers.get("authorization");
+  // SEC-017: Only forward the Authorization header, and only in canonical
+  // `Bearer <token>` form. Previously we relayed the raw value, which
+  // allowed a misformatted client header to round-trip into Supabase
+  // without normalization (and we never want to forward any OTHER header
+  // the caller might attach).
+  const raw = request.headers.get("authorization");
+  const normalized = raw
+    ? raw.startsWith("Bearer ")
+      ? raw
+      : `Bearer ${raw}`
+    : null;
   return createClient(
     assertEnv("NEXT_PUBLIC_SUPABASE_URL"),
     assertEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
     {
       global: {
-        headers: authorization ? { Authorization: authorization } : {},
+        headers: normalized ? { Authorization: normalized } : {},
       },
       auth: {
         persistSession: false,

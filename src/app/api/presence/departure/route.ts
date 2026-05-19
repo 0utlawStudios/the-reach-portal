@@ -11,6 +11,7 @@
 
 import type { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { consume, getClientIp } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -27,6 +28,16 @@ function adminClient() {
 
 export async function POST(req: NextRequest) {
   try {
+    // SEC-011: Beacon endpoints are still a public POST surface. Cap them
+    // at 120/min/IP so a misbehaving client (or attacker) can't fan out
+    // user_presence upserts at line rate. We return 204 on rate-limit hit
+    // to preserve beacon semantics — sendBeacon() doesn't surface non-2xx
+    // and we don't want the dying page to retry.
+    const rl = await consume("presence-departure:ip", getClientIp(req), 120, 60);
+    if (!rl.allowed) {
+      return new Response(null, { status: 204 });
+    }
+
     const text = await req.text();
     let body: BeaconBody = {};
     if (text) {

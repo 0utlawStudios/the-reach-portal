@@ -87,6 +87,20 @@ export function AssetReviewDrawer() {
   const [uploadingFileName, setUploadingFileName] = useState("");
   const [showLightbox, setShowLightbox] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [pendingDelete, setPendingDelete] = useState(false);
+
+  // ESC closes lightbox first, then the drawer
+  useEffect(() => {
+    if (!isDrawerOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (showLightbox) setShowLightbox(false);
+      else if (pendingDelete) setPendingDelete(false);
+      else closeDrawer();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isDrawerOpen, showLightbox, pendingDelete, closeDrawer]);
 
   useEffect(() => {
     if (selectedCard && isEditingOnOpen && prevCardRef.current !== selectedCard.id) {
@@ -349,8 +363,8 @@ export function AssetReviewDrawer() {
             {selectedCard.revised && <Badge variant="outline" className="text-[9px] h-4 px-1.5 border-violet-200 dark:border-violet-500/20 text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-500/10">Revised</Badge>}
           </div>
           <div className="flex items-center gap-1.5">
-            <button onClick={() => { if (confirm("Delete this post?")) { deleteCard(selectedCard.id); closeDrawer(); } }} className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 text-gray-400 hover:text-red-500 transition-all duration-150" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
-            <button onClick={closeDrawer} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-400 transition-all duration-150"><X className="w-4 h-4" /></button>
+            <button onClick={() => setPendingDelete(true)} aria-label="Delete post" className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 text-gray-400 hover:text-red-500 transition-all duration-150" title="Delete"><Trash2 className="w-3.5 h-3.5" aria-hidden="true" /></button>
+            <button onClick={closeDrawer} aria-label="Close drawer" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-400 transition-all duration-150"><X className="w-4 h-4" aria-hidden="true" /></button>
           </div>
         </div>
 
@@ -417,7 +431,7 @@ export function AssetReviewDrawer() {
             <div className="bg-slate-50 dark:bg-white/[0.03] rounded-xl border border-gray-100 dark:border-white/[0.06] px-4 py-3">
               {dateEditing ? (
                 <div className="flex gap-2 items-center">
-                  <Input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} className="h-9 flex-1 bg-white dark:bg-white/[0.04] border-orange-300 dark:border-orange-500/40 rounded-lg text-[12px] text-gray-800 dark:text-gray-200 ring-2 ring-orange-100 dark:ring-orange-500/20" autoFocus />
+                  <Input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} min={new Date().toISOString().slice(0, 10)} className="h-9 flex-1 bg-white dark:bg-white/[0.04] border-orange-300 dark:border-orange-500/40 rounded-lg text-[12px] text-gray-800 dark:text-gray-200 ring-2 ring-orange-100 dark:ring-orange-500/20" autoFocus />
                   <Input type="time" value={editTime} onChange={(e) => setEditTime(e.target.value)} className="h-9 w-28 bg-white dark:bg-white/[0.04] border-orange-300 dark:border-orange-500/40 rounded-lg text-[12px] text-gray-800 dark:text-gray-200 ring-2 ring-orange-100 dark:ring-orange-500/20" />
                   <Button size="sm" onClick={saveDate} className="h-9 px-3 rounded-lg bg-orange-600 hover:bg-orange-700 text-white text-[11px]"><Save className="w-3 h-3" /></Button>
                   <button onClick={() => setDateEditing(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer"><X className="w-4 h-4" /></button>
@@ -689,7 +703,7 @@ export function AssetReviewDrawer() {
               { id: "audit" as DrawerTab, label: "Audit Trail", icon: <History className="w-3 h-3" /> },
             ]).map((tab) => (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-1.5 px-4 py-2.5 text-[11px] font-semibold border-b-2 -mb-px transition-colors cursor-pointer ${activeTab === tab.id ? "border-orange-500 text-orange-700 dark:text-orange-400" : "border-transparent text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"}`}>
+                className={`flex items-center gap-1.5 px-4 py-3 min-h-[44px] text-[12px] font-semibold border-b-2 -mb-px transition-colors cursor-pointer ${activeTab === tab.id ? "border-orange-500 text-orange-700 dark:text-orange-400" : "border-transparent text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"}`}>
                 {tab.icon}{tab.label}
               </button>
             ))}
@@ -984,7 +998,7 @@ export function AssetReviewDrawer() {
         </div>
 
         {/* ─── Footer — context-aware actions ─── */}
-        <div className="px-6 py-4 border-t border-gray-100 dark:border-white/[0.06] shrink-0 space-y-2.5 bg-white dark:bg-[#0e0e11]">
+        <div className="sticky bottom-0 px-6 pt-4 pb-[max(env(safe-area-inset-bottom),1rem)] border-t border-gray-100 dark:border-white/[0.06] shrink-0 space-y-2.5 bg-white dark:bg-[#0e0e11]">
           {revisionMode && (
             <div className="space-y-2">
               <div className="bg-red-50 dark:bg-red-500/5 rounded-xl border border-red-200 dark:border-red-500/20 p-3 space-y-2">
@@ -1126,24 +1140,65 @@ export function AssetReviewDrawer() {
 
       {/* ─── Thumbnail Lightbox ─── */}
       {showLightbox && selectedCard.thumbnailUrl && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Image preview"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowLightbox(false); }}
+          className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 sm:p-8"
+        >
+          <div className="relative max-w-4xl w-full max-h-[90dvh]">
+            <RawImage
+              src={selectedCard.thumbnailUrl}
+              alt={selectedCard.title}
+              className="max-w-full max-h-[85dvh] object-contain mx-auto rounded-lg shadow-2xl"
+            />
+            <button
+              onClick={() => setShowLightbox(false)}
+              aria-label="Close preview"
+              className="absolute -top-3 -right-3 w-9 h-9 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/80 transition-colors cursor-pointer shadow-lg"
+            >
+              <X className="w-4 h-4" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Delete Confirmation Dialog ─── */}
+      {pendingDelete && (
         <>
-          <div
-            onClick={() => setShowLightbox(false)}
-            className="fixed inset-0 bg-black/80 z-[60] backdrop-blur-sm cursor-pointer"
-          />
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-8 pointer-events-none">
-            <div className="relative max-w-4xl w-full max-h-[90vh] pointer-events-auto">
-              <RawImage
-                src={selectedCard.thumbnailUrl}
-                alt={selectedCard.title}
-                className="max-w-full max-h-[85vh] object-contain mx-auto rounded-lg shadow-2xl"
-              />
-              <button
-                onClick={() => setShowLightbox(false)}
-                className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/80 transition-colors cursor-pointer shadow-lg"
-              >
-                <X className="w-4 h-4" />
-              </button>
+          <div onClick={() => setPendingDelete(false)} className="fixed inset-0 bg-black/40 dark:bg-black/60 z-[100] backdrop-blur-sm" />
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6" onClick={() => setPendingDelete(false)}>
+            <div
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="delete-post-title"
+              aria-describedby="delete-post-desc"
+              className="w-full max-w-md sm:max-w-lg max-h-[75dvh] flex flex-col rounded-2xl overflow-hidden bg-white/85 dark:bg-[#18181b]/85 backdrop-blur-2xl border border-gray-200/60 dark:border-white/[0.12] shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-200/40 dark:border-white/[0.08] shrink-0">
+                <div className="w-9 h-9 rounded-xl bg-red-500/10 dark:bg-red-500/15 flex items-center justify-center shrink-0">
+                  <Trash2 className="w-5 h-5 text-red-500" aria-hidden="true" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 id="delete-post-title" className="text-[15px] font-bold text-gray-900 dark:text-white">Delete this post?</h3>
+                </div>
+                <button onClick={() => setPendingDelete(false)} aria-label="Cancel delete" className="p-1.5 rounded-lg hover:bg-gray-100/80 dark:hover:bg-white/[0.06] text-gray-400 cursor-pointer transition-colors">
+                  <X className="w-4 h-4" aria-hidden="true" />
+                </button>
+              </div>
+              <div className="px-5 py-4">
+                <p id="delete-post-desc" className="text-[13px] text-gray-700 dark:text-gray-300 leading-relaxed">
+                  This permanently removes the card and its history. Cannot be undone.
+                </p>
+              </div>
+              <div className="px-5 py-4 border-t border-gray-200/40 dark:border-white/[0.08] shrink-0 flex gap-2">
+                <Button variant="outline" onClick={() => setPendingDelete(false)} className="flex-1 h-10 rounded-xl text-[13px] cursor-pointer">Cancel</Button>
+                <Button onClick={() => { deleteCard(selectedCard.id); setPendingDelete(false); closeDrawer(); }} className="flex-1 h-10 rounded-xl bg-red-600 hover:bg-red-700 text-white text-[13px] font-medium cursor-pointer shadow-sm shadow-red-500/20">
+                  Delete Post
+                </Button>
+              </div>
             </div>
           </div>
         </>

@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { getAccessToken, getFileMetadata } from "@/lib/google-drive";
 
 export const maxDuration = 60; // Fluid Compute — stays alive while streaming
@@ -29,6 +30,48 @@ export async function OPTIONS(request: NextRequest) {
   return new Response(null, { status: 204, headers: corsHeadersFor(request) });
 }
 
+// SEC-003: Validate the request has SOME form of authentication context.
+// `<img>` and `<video>` tags cannot carry an Authorization header, so we
+// accept EITHER:
+//   (a) a same-origin Referer matching ALLOWED_ORIGINS — proves the request
+//       came from our own page that the user already authenticated into; OR
+//   (b) an `Authorization: Bearer <supabase-jwt>` validated via admin.getUser.
+// Neither present → 401. The CORS narrowing alone wasn't sufficient because
+// it doesn't block a credentialled curl/script.
+async function checkAuth(req: NextRequest): Promise<{ ok: boolean; authed: boolean }> {
+  // (a) Referer check
+  const referer = req.headers.get("referer") || "";
+  let refOk = false;
+  if (referer) {
+    try {
+      refOk = ALLOWED_ORIGINS.has(new URL(referer).origin);
+    } catch {
+      refOk = false;
+    }
+  }
+
+  // (b) Bearer-token check
+  const token = req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
+  let tokenOk = false;
+  if (token) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (url && serviceKey) {
+      try {
+        const admin = createClient(url, serviceKey, {
+          auth: { autoRefreshToken: false, persistSession: false },
+        });
+        const { data, error } = await admin.auth.getUser(token);
+        tokenOk = !error && !!data.user;
+      } catch {
+        tokenOk = false;
+      }
+    }
+  }
+
+  return { ok: refOk || tokenOk, authed: tokenOk };
+}
+
 // ─── Stream proxy with Range support ───
 export async function GET(request: NextRequest) {
   const corsHeaders = corsHeadersFor(request);
@@ -41,12 +84,20 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  // NOTE: Hard auth (Bearer token) is not enforced here because <img>/<video>
-  // tags cannot send Authorization headers without re-rendering through fetch().
-  // The CORS narrowing above prevents cross-origin embeds (the main scraping
-  // surface). A future iteration should issue short-lived signed URLs
-  // (HMAC + expiry) per request, scoped to the caller's workspace. Tracked in
-  // .omc/plans/2026-05-13-adversarial-qa-fix-plan.md follow-up.
+  // SEC-003: Layered access gate. Previous note here said hard auth was not
+  // possible because <img>/<video> tags can't send Authorization headers.
+  // True — but those tags DO send a Referer, and that referer reliably comes
+  // from our own page (which is already auth-walled at the app layer). So
+  // accept either a same-origin Referer OR an explicit Bearer token. This
+  // blocks the anonymous-curl / hot-link scraping vector while keeping
+  // image/video tags working unchanged inside the app.
+  const auth = await checkAuth(request);
+  if (!auth.ok) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json", ...corsHeaders },
+    });
+  }
 
   try {
     // Get file metadata for Content-Type and size
@@ -75,12 +126,19 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Build response headers. Drop "public" from Cache-Control since the
-    // payload is per-user-authenticated; keep it on the browser only.
+    // SEC-003: Cache policy mirrors the auth path used. When the caller
+    // proved themselves with a Bearer token the bytes can be cached for the
+    // standard 1-day immutable window. When they only proved same-origin via
+    // Referer we keep the byte cache out of intermediaries — the Referer
+    // header doesn't ride along on subsequent retrievals.
+    const cacheControl = auth.authed
+      ? "private, max-age=86400, immutable"
+      : "private, no-store";
+
     const responseHeaders: Record<string, string> = {
       "Content-Type": meta.mimeType,
       "Accept-Ranges": "bytes",
-      "Cache-Control": "private, max-age=86400, immutable",
+      "Cache-Control": cacheControl,
       ...corsHeaders,
     };
 

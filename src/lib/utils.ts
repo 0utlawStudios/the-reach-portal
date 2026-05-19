@@ -53,3 +53,12 @@ export function isOverdue(dateStr?: string): boolean {
   if (!dateStr) return false;
   return new Date(dateStr) < new Date();
 }
+
+/**
+ * Strict UUID validator — version (1-5) and variant (8/9/a/b) nibbles enforced.
+ * Rejects the zero-UUID and other technically-formatted-but-invalid shapes.
+ * Use this before every Supabase op that takes a card/post id.
+ */
+export function isValidUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}

@@ -120,14 +120,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     init();
 
-    // Listen for auth state changes
+    // Listen for auth state changes.
+    // PERF-010: TOKEN_REFRESHED fires roughly hourly with no user-facing change.
+    // Re-running buildProfile + enrichFromTeamMembers on every refresh cost a
+    // round-trip and forced a currentUser identity change (cascade re-renders).
+    // For TOKEN_REFRESHED, just bump accessToken and leave currentUser alone.
+    // Re-enrich only when the identity actually changed.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
+        if (_event === "TOKEN_REFRESHED") {
+          setAccessToken(session.access_token);
+          return;
+        }
         const email = session.user.email || "";
         const meta = session.user.user_metadata || {};
         const profile = buildProfile(email, meta);
         setCurrentUser(profile);
         setIsAuthenticated(true);
+        setAccessToken(session.access_token);
         // Enrich from DB in background (non-blocking)
         enrichFromTeamMembers(email, profile).then((enriched) => {
           setCurrentUser(enriched);
@@ -135,6 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setIsAuthenticated(false);
         setCurrentUser(DEFAULT_USER);
+        setAccessToken(null);
       }
     });
 

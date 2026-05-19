@@ -1,7 +1,7 @@
 "use client";
 
 import { RawImage } from "@/components/raw-image";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ContentCard, Platform, ALL_PLATFORMS, ContentType } from "@/lib/types";
 import { usePipeline } from "@/lib/pipeline-context";
 import { useToast } from "@/lib/toast-context";
@@ -32,6 +32,12 @@ export function RepurposeModal({ card, onClose }: Props) {
   const [contentType] = useState<ContentType>(card.contentType);
   const [scheduledDate, setScheduledDate] = useState("");
   const [scheduledTime, setScheduledTime] = useState("");
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   const togglePlatform = (p: Platform) => {
     setPlatforms((prev) => prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]);
@@ -152,7 +158,7 @@ export function RepurposeModal({ card, onClose }: Props) {
     <>
       <div onClick={onClose} className="fixed inset-0 bg-black/30 dark:bg-black/60 z-50" />
       <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-        <div className="bg-white dark:bg-[#151518] rounded-2xl border border-gray-200 dark:border-white/[0.08] shadow-2xl w-full max-w-[520px] max-h-[85vh] flex flex-col">
+        <div className="bg-white dark:bg-[#151518] rounded-2xl border border-gray-200 dark:border-white/[0.08] shadow-2xl w-full max-w-[520px] max-h-[85dvh] flex flex-col">
           <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-white/[0.06] shrink-0">
             <div className="flex items-center gap-2">
               <button onClick={() => setMode("select")} className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-400 cursor-pointer"><ArrowRight className="w-4 h-4 rotate-180" /></button>
@@ -215,8 +221,8 @@ export function RepurposeModal({ card, onClose }: Props) {
             <div className="space-y-1">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.08em]">New Schedule <span className="text-red-400">*</span></label>
               <div className="flex gap-2">
-                <Input type="date" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} className="h-9 flex-1 bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[12px] text-gray-800 dark:text-gray-200" />
-                <Input type="time" value={scheduledTime} onChange={(e) => setScheduledTime(e.target.value)} className="h-9 w-28 bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[12px] text-gray-800 dark:text-gray-200" />
+                <Input type="date" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} min={new Date().toISOString().slice(0, 10)} className="h-9 flex-1 bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[12px] text-gray-800 dark:text-gray-200" />
+                <Input type="time" value={scheduledTime} onChange={(e) => setScheduledTime(e.target.value)} className="h-9 w-[120px] sm:w-28 bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[12px] text-gray-800 dark:text-gray-200" />
               </div>
               <p className="text-[10px] text-gray-400">All times shown in Central Time (CST).</p>
               {(!scheduledDate || !scheduledTime) && <p className="text-[10px] text-amber-500">Select when this should be published</p>}

@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef, ReactNode } from "react";
 import { loadState, saveState } from "./persistence";
 import { supabase } from "./supabaseClient";
+import { useToast } from "./toast-context";
 
 export type UserRole = "superadmin" | "admin" | "approver" | "creative_director" | "social_media_specialist" | "video_editor" | "graphic_designer";
 export type InviteStatus = "active" | "pending";
@@ -91,9 +92,13 @@ function dbToMember(row: TeamMemberRow): TeamMember {
 const DEFAULT_MEMBERS: TeamMember[] = [];
 
 export function TeamProvider({ children }: { children: ReactNode }) {
+  const { addToast } = useToast();
   const [members, setMembers] = useState<TeamMember[]>(DEFAULT_MEMBERS);
   const [pendingRequests, setPendingRequests] = useState<SignupRequest[]>([]);
   const hydrated = useRef(false);
+  // PERF-015: debounce localStorage writes so a burst of realtime updates
+  // (e.g. five member rows arriving back-to-back) collapses into one save.
+  const persistTimeoutRef = useRef<number | null>(null);
   const useDb = isSupabaseConfigured();
 
   useEffect(() => {
@@ -155,8 +160,22 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     return () => { supabase.removeChannel(channel); };
   }, [useDb]);
 
+  // PERF-015: 500ms debounce — saveState fires synchronous JSON.stringify on
+  // the whole team list. A realtime sync burst (5+ INSERT/UPDATE events in
+  // succession) used to trigger 5+ stringifies. One save at the tail suffices.
   useEffect(() => {
-    if (hydrated.current) saveState(STORAGE_KEY, members);
+    if (!hydrated.current) return;
+    if (persistTimeoutRef.current) window.clearTimeout(persistTimeoutRef.current);
+    persistTimeoutRef.current = window.setTimeout(() => {
+      saveState(STORAGE_KEY, members);
+      persistTimeoutRef.current = null;
+    }, 500);
+    return () => {
+      if (persistTimeoutRef.current) {
+        window.clearTimeout(persistTimeoutRef.current);
+        persistTimeoutRef.current = null;
+      }
+    };
   }, [members]);
 
   const inviteMember = useCallback((email: string, name: string, role: UserRole) => {
@@ -164,11 +183,20 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     const member: TeamMember = { id: tempId, name, email, role, status: "pending", joinedAt: new Date().toISOString().split("T")[0] };
     setMembers((prev) => [...prev, member]);
     if (useDb) {
-      supabase.from("team_members").insert({ name, email, role, status: "pending" }).select().single().then(({ data }) => {
+      // DATA-007: mirror the pipeline-context.createCard rollback pattern.
+      // On insert failure (RLS, duplicate email, etc.), strip the optimistic
+      // row and toast the error so the UI never carries a phantom invite.
+      supabase.from("team_members").insert({ name, email, role, status: "pending" }).select().single().then(({ data, error }) => {
+        if (error) {
+          console.error("[team] inviteMember sync failed:", error.message);
+          setMembers((prev) => prev.filter((m) => m.id !== tempId));
+          addToast(`Invite failed: ${error.message}. Member was not added.`, "error");
+          return;
+        }
         if (data) setMembers((prev) => prev.map((m) => m.id === tempId ? { ...m, id: data.id } : m));
       });
     }
-  }, [useDb]);
+  }, [useDb, addToast]);
 
   const removeMember = useCallback((id: string, email: string, requestedBy: string) => {
     setMembers((prev) => prev.filter((m) => m.id !== id));

@@ -17,7 +17,20 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { timingSafeEqual } from "node:crypto";
 import { studioEnabled } from "@/lib/ai/feature-flag";
+
+// SEC-007: Constant-time string compare for shared-secret auth. A raw `===`
+// comparison leaks information about the secret one byte at a time via
+// response timing. timingSafeEqual is the standard mitigation.
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  try {
+    return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+  } catch {
+    return false;
+  }
+}
 
 function adminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -62,7 +75,7 @@ export async function POST(req: NextRequest) {
   const secret = process.env.SUPABASE_WEBHOOK_SECRET || "";
   const authHeader = req.headers.get("authorization") || req.headers.get("Authorization") || "";
   const provided = authHeader.replace(/^Bearer\s+/i, "");
-  if (!secret || provided !== secret) {
+  if (!secret || !safeEqual(provided, secret)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   // Feature kill switch — silently drop webhooks when disabled so Supabase

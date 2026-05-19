@@ -46,6 +46,14 @@ export function MediaPicker({ open, onClose, onSelect, folder = "raw-files", car
     if (open) { setTab(defaultTab); setSelectedAsset(null); }
   }, [open, defaultTab]);
 
+  // ESC closes the picker
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
   // Build media index: accumulate ALL card references per URL
   const allMedia = useMemo(() => {
     const urlMap = new Map<string, MediaEntry>();

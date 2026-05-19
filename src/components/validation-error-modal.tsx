@@ -59,7 +59,7 @@ export function ValidationErrorModal({ errors, onClose }: Props) {
           aria-modal="true"
           aria-labelledby={titleId}
           aria-describedby={descId}
-          className="w-full max-w-sm sm:max-w-md max-h-[75vh] sm:max-h-[80vh] flex flex-col rounded-2xl overflow-hidden
+          className="w-full max-w-md sm:max-w-lg max-h-[75dvh] sm:max-h-[80dvh] flex flex-col rounded-2xl overflow-hidden
             bg-white/80 dark:bg-[#18181b]/85
             backdrop-blur-2xl
             border border-gray-200/60 dark:border-white/[0.12]

@@ -1,14 +1,62 @@
 import { NextRequest, NextResponse } from "next/server";
 import { setPublicPermission, getStreamUrl, getFileMetadata } from "@/lib/google-drive";
+import { requireBearerTeamRole } from "@/lib/auth/require";
+import { consume, getClientIp } from "@/lib/rate-limit";
 
 export const maxDuration = 10;
 
+// SEC-002: Drive file IDs are base64-url-ish strings, generally 20-80 chars.
+// We don't want to forward arbitrary client input into Drive API calls or
+// audit logs.
+const DRIVE_FILE_ID_RE = /^[a-zA-Z0-9_-]{20,80}$/;
+
+// Any active team member can finalize — finalize just toggles `public`
+// on a Drive file the caller already produced via proxy-upload. Viewer
+// is fine here.
+const ALLOWED_FINALIZE_ROLES: ReadonlyArray<string> = [
+  "superadmin",
+  "admin",
+  "owner",
+  "approver",
+  "creative_director",
+  "editor",
+  "social_media_specialist",
+  "video_editor",
+  "graphic_designer",
+  "specialist",
+  "technician",
+  "viewer",
+];
+
 export async function POST(request: NextRequest) {
   try {
+    // SEC-002: Gate on bearer-team-role. Without this, an unauthenticated
+    // caller could iterate fileIds and force-publicize unrelated workspace
+    // assets.
+    const auth = await requireBearerTeamRole(request, ALLOWED_FINALIZE_ROLES);
+    if (auth instanceof NextResponse) return auth;
+    const { user } = auth;
+
+    // SEC-002: 60/min/user. Same envelope as publish-jobs — finalize is a
+    // bursty action when a creator uploads several files in a row but
+    // shouldn't be hammered.
+    const rlKey = `user:${user.id}|ip:${getClientIp(request)}`;
+    const rl = await consume("drive-finalize:user", rlKey, 60, 60);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Too many finalize requests. Please slow down." },
+        { status: 429 },
+      );
+    }
+
     const { fileId } = await request.json();
 
     if (!fileId || typeof fileId !== "string") {
       return NextResponse.json({ error: "Missing fileId" }, { status: 400 });
+    }
+    // SEC-002: Reject malformed fileIds before we hand them to the Drive API.
+    if (!DRIVE_FILE_ID_RE.test(fileId)) {
+      return NextResponse.json({ error: "Invalid fileId" }, { status: 400 });
     }
 
     // Set public permission so the file is servable

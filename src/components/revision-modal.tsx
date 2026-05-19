@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { usePipeline } from "@/lib/pipeline-context";
 import { useToast } from "@/lib/toast-context";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,14 @@ export function RevisionModal() {
   const { pendingReapproval, submitReapproval, cancelReapproval } = usePipeline();
   const { addToast } = useToast();
   const [note, setNote] = useState("");
+
+  const open = !!pendingReapproval;
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") cancelReapproval(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, cancelReapproval]);
 
   if (!pendingReapproval) return null;
 

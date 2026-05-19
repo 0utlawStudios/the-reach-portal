@@ -438,6 +438,15 @@ export function StudioPage() {
         </div>
       )}
 
+      {spendUsd / dailyCap >= 0.9 && !readOnly && (
+        <div className="mb-4 rounded-xl border border-rose-200 dark:border-rose-500/20 bg-rose-50/60 dark:bg-rose-500/[0.06] p-3 flex items-start gap-2.5">
+          <Sparkles className="w-4 h-4 mt-0.5 text-rose-600 dark:text-rose-400 shrink-0" />
+          <p className="text-[12px] text-rose-900 dark:text-rose-200 leading-relaxed">
+            <span className="font-semibold">Daily AI cap almost reached.</span> Spent ${spendUsd.toFixed(2)} of ${dailyCap.toFixed(2)} today. New generations may be blocked until midnight.
+          </p>
+        </div>
+      )}
+
       {loading && !readOnly ? (
         <div className="py-12 text-center text-gray-400 text-[12px] flex items-center justify-center gap-2">
           <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading rows…
@@ -474,15 +483,15 @@ function SpendChip({ spent, cap }: { spent: number; cap: number }) {
     : pct >= 60 ? "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"
     : "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300";
   return (
-    <div className={`text-[10px] px-2 py-0.5 rounded-full font-medium tabular-nums ${tone}`}>
-      ${spent.toFixed(2)} / ${cap.toFixed(2)} today
+    <div className={`text-[11px] px-2 py-0.5 rounded-full font-medium tabular-nums ${tone}`}>
+      Daily AI cap: ${spent.toFixed(2)} / ${cap.toFixed(2)}
     </div>
   );
 }
 
 function StatusChip({ status }: { status: PlanRowStatus }) {
   return (
-    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9.5px] font-semibold ${STATUS_COLOR[status]}`}>
+    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${STATUS_COLOR[status]}`}>
       {(status === "generating" || status === "revising") && <Loader2 className="w-2.5 h-2.5 animate-spin" />}
       {STATUS_LABEL[status]}
     </span>
@@ -492,7 +501,7 @@ function StatusChip({ status }: { status: PlanRowStatus }) {
 function FieldLabel({ children, hint }: { children: React.ReactNode; hint?: string }) {
   return (
     <div className="flex items-baseline justify-between mb-1">
-      <p className="text-[9.5px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">{children}</p>
+      <p className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">{children}</p>
       {hint && <p className="text-[9px] text-gray-300 dark:text-gray-600">{hint}</p>}
     </div>
   );
@@ -647,11 +656,11 @@ function StudioCard(props: CardProps) {
               Open card <ExternalLink className="w-3 h-3" />
             </button>
           )}
-          {row.status === "generating" || row.status === "revising" ? (
+          {row.status === "generating" || row.status === "revising" || busy ? (
             <Button size="sm" variant="outline" onClick={onCancel} className="h-7 text-[11px] px-2 cursor-pointer"><X className="w-3 h-3 mr-1" />Cancel</Button>
           ) : (
-            <Button size="sm" onClick={onGenerate} disabled={!canGenerate || busy} className="h-7 text-[11px] px-2.5 cursor-pointer">
-              {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <><Sparkles className="w-3 h-3 mr-1" />Generate</>}
+            <Button size="sm" onClick={onGenerate} disabled={!canGenerate} className="h-7 text-[11px] px-2.5 cursor-pointer">
+              <Sparkles className="w-3 h-3 mr-1" />Generate
             </Button>
           )}
         </div>
@@ -665,14 +674,14 @@ function StudioCard(props: CardProps) {
             <FieldLabel>Date</FieldLabel>
             <div className="relative">
               <Calendar className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
-              <Input type="date" value={row.scheduled_date || ""} onChange={(e) => onChange({ scheduled_date: e.target.value || null })} disabled={isLocked} className="h-8 text-[12px] pl-7 pr-2 cursor-pointer" />
+              <Input type="date" value={row.scheduled_date || ""} onChange={(e) => onChange({ scheduled_date: e.target.value || null })} disabled={isLocked} min={new Date().toISOString().slice(0, 10)} className="h-8 text-[13px] sm:text-[12px] pl-7 pr-2 cursor-pointer" />
             </div>
           </div>
           <div className="col-span-1">
             <FieldLabel>Time</FieldLabel>
             <div className="relative">
               <Clock className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
-              <Input type="time" value={(row.scheduled_time || "").slice(0, 5)} onChange={(e) => onChange({ scheduled_time: e.target.value || null })} disabled={isLocked} className="h-8 text-[12px] pl-7 pr-2 cursor-pointer" />
+              <Input type="time" value={(row.scheduled_time || "").slice(0, 5)} onChange={(e) => onChange({ scheduled_time: e.target.value || null })} disabled={isLocked} className="h-8 text-[13px] sm:text-[12px] pl-7 pr-2 cursor-pointer" />
             </div>
           </div>
           <div className="col-span-2 sm:col-span-2">

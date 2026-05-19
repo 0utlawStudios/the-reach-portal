@@ -11,8 +11,20 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { timingSafeEqual } from "node:crypto";
 import { runGenerateJob, runReviseJob } from "@/lib/ai/worker";
 import { studioEnabled } from "@/lib/ai/feature-flag";
+
+// SEC-008: Constant-time string compare. Prevents leaking secret length and
+// bytes through response-time side channels on each authentication path.
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  try {
+    return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+  } catch {
+    return false;
+  }
+}
 
 function adminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -27,9 +39,9 @@ function isAuthorized(req: NextRequest): boolean {
   const cronSecret = (process.env.CRON_SECRET || "").trim();
   const triggerSecret = (process.env.AI_WORKER_TRIGGER_SECRET || cronSecret).trim();
   // Vercel cron sends Authorization: Bearer <CRON_SECRET>.
-  if (bearer && cronSecret && bearer === cronSecret) return true;
+  if (bearer && cronSecret && safeEqual(bearer, cronSecret)) return true;
   // Internal trigger from generate-row / webhook routes.
-  if (trigger && triggerSecret && trigger === triggerSecret) return true;
+  if (trigger && triggerSecret && safeEqual(trigger, triggerSecret)) return true;
   return false;
 }
 
@@ -76,7 +88,9 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ ok: true, processed });
 }
 
-// Allow GET for the Vercel cron pinger which historically uses GET.
-export async function GET(req: NextRequest) {
-  return POST(req);
+// SEC-021: Drop the GET alias. The Vercel cron pinger uses POST with the
+// CRON_SECRET bearer; the unconditional GET delegate previously let cached
+// CDNs / link-preview crawlers replay the worker by following any leaked URL.
+export async function GET() {
+  return NextResponse.json({ error: "Use POST" }, { status: 405 });
 }

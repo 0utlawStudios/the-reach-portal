@@ -10,7 +10,7 @@ import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, ThumbsUp, Share2,
 // ─── Platform Preview Components ───
 function InstagramPreview({ card }: { card: ContentCard }) {
   return (
-    <div className="w-[340px] bg-white rounded-xl overflow-hidden border border-gray-200 shadow-lg">
+    <div className="max-w-full overflow-x-auto"><div className="w-full max-w-[400px] mx-auto bg-white rounded-xl overflow-hidden border border-gray-200 shadow-lg">
       <div className="flex items-center gap-2.5 px-3 py-2.5">
         <div className="w-8 h-8 rounded-full bg-white ring-1 ring-gray-200 overflow-hidden flex items-center justify-center shrink-0">
           <RawImage src="/ten80ten-logo.png" alt="Ten80Ten" className="w-[80%] h-[80%] object-contain" />
@@ -29,13 +29,13 @@ function InstagramPreview({ card }: { card: ContentCard }) {
           <span className="font-semibold">ten80ten</span>{" "}{card.caption || "No caption yet..."}
         </p>
       </div>
-    </div>
+    </div></div>
   );
 }
 
 function FacebookPreview({ card }: { card: ContentCard }) {
   return (
-    <div className="w-[400px] bg-white rounded-xl overflow-hidden border border-gray-200 shadow-lg">
+    <div className="max-w-full overflow-x-auto"><div className="w-full max-w-[400px] mx-auto bg-white rounded-xl overflow-hidden border border-gray-200 shadow-lg">
       <div className="p-3 flex items-center gap-2.5">
         <div className="w-10 h-10 rounded-full bg-white ring-1 ring-gray-200 overflow-hidden flex items-center justify-center shrink-0">
           <RawImage src="/ten80ten-logo.png" alt="Ten80Ten" className="w-[80%] h-[80%] object-contain" />
@@ -54,13 +54,13 @@ function FacebookPreview({ card }: { card: ContentCard }) {
           ))}
         </div>
       </div>
-    </div>
+    </div></div>
   );
 }
 
 function YouTubePreview({ card }: { card: ContentCard }) {
   return (
-    <div className="w-[420px] bg-white rounded-xl overflow-hidden border border-gray-200 shadow-lg">
+    <div className="max-w-full overflow-x-auto"><div className="w-full max-w-[400px] mx-auto bg-white rounded-xl overflow-hidden border border-gray-200 shadow-lg">
       <div className="aspect-video w-full bg-black relative"><RawImage src={card.thumbnailUrl} alt="" className="w-full h-full object-cover" />
         <div className="absolute inset-0 flex items-center justify-center"><div className="w-16 h-11 rounded-xl bg-red-600/90 flex items-center justify-center"><Play className="w-6 h-6 text-white ml-0.5" /></div></div>
         <div className="absolute bottom-2 right-2 bg-black/80 text-white text-[10px] px-1.5 py-0.5 rounded font-medium">3:42</div>
@@ -71,13 +71,13 @@ function YouTubePreview({ card }: { card: ContentCard }) {
         </div>
         <div><p className="text-[13px] font-medium text-gray-900 line-clamp-2 leading-tight">{card.title}</p><p className="text-[11px] text-gray-500 mt-1">Ten80Ten · 1.2K views · 2 hours ago</p></div>
       </div>
-    </div>
+    </div></div>
   );
 }
 
 function LinkedInPreview({ card }: { card: ContentCard }) {
   return (
-    <div className="w-[420px] bg-white rounded-xl overflow-hidden border border-gray-200 shadow-lg">
+    <div className="max-w-full overflow-x-auto"><div className="w-full max-w-[400px] mx-auto bg-white rounded-xl overflow-hidden border border-gray-200 shadow-lg">
       <div className="p-3 flex items-center gap-3">
         <div className="w-12 h-12 rounded-full bg-white ring-1 ring-gray-200 overflow-hidden flex items-center justify-center shrink-0">
           <RawImage src="/ten80ten-logo.png" alt="Ten80Ten" className="w-[80%] h-[80%] object-contain" />
@@ -94,13 +94,13 @@ function LinkedInPreview({ card }: { card: ContentCard }) {
           ))}
         </div>
       </div>
-    </div>
+    </div></div>
   );
 }
 
 function TikTokPreview({ card }: { card: ContentCard }) {
   return (
-    <div className="w-[290px] h-[500px] bg-black rounded-[2rem] overflow-hidden border-[3px] border-gray-800 shadow-lg relative">
+    <div className="max-w-full overflow-x-auto"><div className="w-full max-w-[290px] mx-auto h-[500px] bg-black rounded-[2rem] overflow-hidden border-[3px] border-gray-800 shadow-lg relative">
       <RawImage src={card.thumbnailUrl} alt="" className="w-full h-full object-cover" />
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
       {/* TikTok UI overlay */}
@@ -116,7 +116,7 @@ function TikTokPreview({ card }: { card: ContentCard }) {
       </div>
       {/* Notch */}
       <div className="absolute top-2 left-1/2 -translate-x-1/2 w-20 h-5 bg-black rounded-full" />
-    </div>
+    </div></div>
   );
 }
 

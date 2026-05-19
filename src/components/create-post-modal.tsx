@@ -1,7 +1,7 @@
 "use client";
 
 import { RawImage } from "@/components/raw-image";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { usePipeline } from "@/lib/pipeline-context";
 import { Platform, ContentType, ALL_PLATFORMS, DEFAULT_CHECKLIST } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -89,6 +89,14 @@ export function CreatePostModal({ open, onClose }: Props) {
   const rawFilesRef = useRef<Map<string, File>>(new Map());
   const [showMediaPicker, setShowMediaPicker] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+
+  // ESC key closes the modal
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
 
   if (!open) return null;
 
@@ -266,11 +274,11 @@ export function CreatePostModal({ open, onClose }: Props) {
     <>
       <div onClick={onClose} className="fixed inset-0 bg-black/30 dark:bg-black/60 z-50" />
       <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-        <div className="bg-white dark:bg-[#151518] rounded-2xl border border-gray-200 dark:border-white/[0.08] shadow-2xl w-full max-w-[580px] max-h-[90vh] flex flex-col">
+        <div className="bg-white dark:bg-[#151518] rounded-2xl border border-gray-200 dark:border-white/[0.08] shadow-2xl w-full max-w-[580px] max-h-[90dvh] flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-white/[0.06] shrink-0">
             <h2 className="text-[15px] font-semibold text-gray-900 dark:text-white">Create New Post</h2>
-            <button onClick={onClose} className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-400 cursor-pointer"><X className="w-4 h-4" /></button>
+            <button onClick={onClose} aria-label="Close create post" className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-400 cursor-pointer"><X className="w-4 h-4" aria-hidden="true" /></button>
           </div>
 
           {/* Tab bar */}
@@ -411,7 +419,7 @@ export function CreatePostModal({ open, onClose }: Props) {
                   <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Post Date & Time <span className="text-red-400">*</span></label>
                   <p className="text-[9px] text-gray-400 dark:text-gray-500 leading-relaxed -mt-0.5">When this post goes live on social media. n8n publishes automatically at this exact date and time.</p>
                   <div className="flex gap-2">
-                    <input type="date" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} className={`${inputClass} flex-[3]`} required />
+                    <input type="date" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} min={new Date().toISOString().slice(0, 10)} className={`${inputClass} flex-[3]`} required />
                     <input type="time" value={scheduledTime} onChange={(e) => setScheduledTime(e.target.value)} className={`${inputClass} flex-[2]`} required />
                   </div>
                 </div>

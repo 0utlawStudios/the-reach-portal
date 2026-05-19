@@ -16,7 +16,7 @@ export function ToastContainer() {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 max-w-sm">
+    <div className="fixed bottom-4 right-4 md:top-4 md:bottom-auto z-[100] flex flex-col gap-2 max-w-[calc(100vw-32px)] md:max-w-sm">
       {toasts.map((toast) => {
         const style = typeStyles[toast.type];
         return (
@@ -29,13 +29,13 @@ export function ToastContainer() {
               <p className={`text-[12px] font-medium ${style.text} leading-relaxed`}>{toast.message}</p>
               {toast.message.includes("Email dispatched") && (
                 <div className="flex items-center gap-1 mt-1 text-[10px] text-gray-500">
-                  <Mail className="w-3 h-3" />
+                  <Mail className="w-3 h-3" aria-hidden="true" />
                   <span>Notification sent via email</span>
                 </div>
               )}
             </div>
-            <button onClick={() => removeToast(toast.id)} className="shrink-0 text-gray-400 hover:text-gray-600 cursor-pointer">
-              <X className="w-3.5 h-3.5" />
+            <button onClick={() => removeToast(toast.id)} aria-label="Dismiss notification" className="shrink-0 text-gray-400 hover:text-gray-600 cursor-pointer">
+              <X className="w-3.5 h-3.5" aria-hidden="true" />
             </button>
           </div>
         );

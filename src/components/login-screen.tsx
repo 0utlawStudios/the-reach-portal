@@ -4,7 +4,7 @@ import { RawImage } from "@/components/raw-image";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
-import { Mail, Lock, ArrowRight, AlertCircle, Eye, EyeOff, Zap, Shield, BarChart3, Send } from "lucide-react";
+import { Mail, Lock, ArrowRight, AlertCircle, Eye, EyeOff, Zap, BarChart3, Send } from "lucide-react";
 import { motion } from "framer-motion";
 
 const ease = [0.25, 0.4, 0.25, 1] as const;
@@ -57,12 +57,12 @@ export function LoginScreen() {
   };
 
   return (
-    <div className="min-h-screen w-full lg:grid lg:grid-cols-[45fr_55fr]">
+    <div className="min-h-dvh w-full lg:grid lg:grid-cols-[45fr_55fr]">
 
       {/* ═══════════════════════════════════════════════
           LEFT: Authentication Panel
           ═══════════════════════════════════════════════ */}
-      <div className="relative flex flex-col min-h-screen lg:min-h-0 bg-white dark:bg-[#09090b]">
+      <div className="relative flex flex-col min-h-dvh lg:min-h-0 bg-white dark:bg-[#09090b]">
 
         {/* Form — vertically centered cohesive group */}
         <div className="flex-1 flex items-center justify-center px-8 lg:px-14 xl:px-20">
@@ -75,7 +75,7 @@ export function LoginScreen() {
                 Welcome back
               </h1>
               <p className="text-[14px] text-gray-400 dark:text-gray-500 mt-2.5">
-                Sign in to your content pipeline
+                Sign in to your Content Engine
               </p>
             </motion.div>
 
@@ -90,6 +90,7 @@ export function LoginScreen() {
                     placeholder="you@company.com"
                     value={email}
                     onChange={(e) => { setEmail(e.target.value); setError(""); }}
+                    autoComplete="email"
                     className="w-full h-12 pl-11 pr-4 rounded-xl bg-slate-50 dark:bg-white/[0.04] border border-gray-200/80 dark:border-white/[0.08] text-[14px] text-gray-900 dark:text-gray-100 placeholder:text-gray-300 dark:placeholder:text-gray-600 outline-none focus:bg-white dark:focus:bg-white/[0.06] focus:border-[#f59e0b] focus:ring-2 focus:ring-[#f59e0b]/20 transition-all"
                     autoFocus
                   />
@@ -109,6 +110,7 @@ export function LoginScreen() {
                     placeholder="Enter your password"
                     value={password}
                     onChange={(e) => { setPassword(e.target.value); setError(""); }}
+                    autoComplete="current-password"
                     className="w-full h-12 pl-11 pr-11 rounded-xl bg-slate-50 dark:bg-white/[0.04] border border-gray-200/80 dark:border-white/[0.08] text-[14px] text-gray-900 dark:text-gray-100 placeholder:text-gray-300 dark:placeholder:text-gray-600 outline-none focus:bg-white dark:focus:bg-white/[0.06] focus:border-[#f59e0b] focus:ring-2 focus:ring-[#f59e0b]/20 transition-all"
                   />
                   <button
@@ -209,7 +211,7 @@ export function LoginScreen() {
             </div>
           </motion.div>
 
-          {/* Card 2 — Center left: Pipeline status */}
+          {/* Card 2 — Center left: Content Engine status */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
@@ -217,7 +219,7 @@ export function LoginScreen() {
             className="absolute top-[38%] left-[6%] w-[200px] backdrop-blur-xl bg-white/[0.06] border border-white/[0.08] rounded-2xl p-5 shadow-2xl"
           >
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] font-semibold text-white/40 uppercase tracking-[0.1em]">Pipeline</span>
+              <span className="text-[10px] font-semibold text-white/40 uppercase tracking-[0.1em]">Content Engine</span>
               <Zap className="w-3.5 h-3.5 text-[#f59e0b]/60" />
             </div>
             <div className="space-y-2.5">
@@ -265,17 +267,6 @@ export function LoginScreen() {
             </div>
           </motion.div>
 
-          {/* Card 4 — Top left: Security badge */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 1.0, ease: [0.25, 0.4, 0.25, 1] }}
-            className="absolute top-[14%] left-[10%] backdrop-blur-xl bg-white/[0.04] border border-white/[0.06] rounded-xl px-4 py-2.5 shadow-xl flex items-center gap-2.5"
-          >
-            <Shield className="w-3.5 h-3.5 text-emerald-400/70" />
-            <span className="text-[10px] font-bold text-white/40 uppercase tracking-[0.08em]">Enterprise Secured</span>
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          </motion.div>
         </div>
 
         {/* ── Bottom typography ── */}
@@ -289,12 +280,12 @@ export function LoginScreen() {
               The ultimate<br />social engine.
             </h2>
             <p className="text-[14px] text-white/35 mt-5 max-w-[420px] leading-relaxed">
-              Deploy campaigns, manage approvals, and dominate algorithms from one master dashboard.
+              Ship social campaigns. Manage approvals. Post on schedule.
             </p>
 
             <div className="flex items-center gap-8 mt-10 pb-2">
               {[
-                { label: "Pipeline", color: "bg-[#f59e0b]" },
+                { label: "Content Engine", color: "bg-[#f59e0b]" },
                 { label: "Approvals", color: "bg-emerald-400" },
                 { label: "Scheduling", color: "bg-sky-400" },
                 { label: "Publishing", color: "bg-violet-400" },

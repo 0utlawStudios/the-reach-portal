@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { createHash } from "node:crypto";
 
 // Self-healing workspace provisioner.
 // Called on every app load. If the authenticated user has a team_members row
@@ -16,6 +17,12 @@ function getAdminClient() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error("Supabase admin credentials not configured");
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+}
+
+// SEC-014: Hash the email before logging. Cleartext emails in server logs
+// turn into a credential-stuffing target if the log store leaks.
+function hashEmail(email: string | null | undefined): string {
+  return createHash("sha256").update(email || "").digest("hex").slice(0, 12);
 }
 
 export async function GET(request: NextRequest) {
@@ -48,17 +55,44 @@ export async function GET(request: NextRequest) {
       .ilike("email", user.email ?? "")
       .maybeSingle();
 
-    const role = (tm?.role as string) || "editor";
-    const status = tm?.status === "active" ? "active" : "pending";
+    // SEC-006: REJECT users without a team_members row instead of silently
+    // creating a pending editor. The previous behavior turned the
+    // provisioner into a self-service signup endpoint: anyone who could
+    // authenticate to Supabase auth would get an editor row and the
+    // approval queue. Now: no team_members row → 403.
+    if (!tm) {
+      return NextResponse.json({ error: "Not on team" }, { status: 403 });
+    }
 
-    await admin.from("workspace_members").insert({
-      workspace_id: BASELINE_WORKSPACE_ID,
-      user_id: user.id,
-      role,
-      status,
-    });
+    const role = tm.role as string;
+    if (!role) {
+      // team_members row exists but role is empty — treat as misconfigured,
+      // not as a permission upgrade.
+      return NextResponse.json({ error: "Not on team" }, { status: 403 });
+    }
+    const status = tm.status === "active" ? "active" : "pending";
 
-    console.log(`[workspace/provision] Provisioned ${user.email} as ${role} (${status})`);
+    // SEC-018 / DATA-010: dual-tab race fix. Two simultaneous /provision
+    // calls would both observe `existing = null` and both try to INSERT,
+    // colliding on the unique (user_id, workspace_id) index. Use upsert
+    // with ignoreDuplicates so the second writer no-ops cleanly.
+    const { error: upsertErr } = await admin
+      .from("workspace_members")
+      .upsert(
+        {
+          workspace_id: BASELINE_WORKSPACE_ID,
+          user_id: user.id,
+          role,
+          status,
+        },
+        { onConflict: "user_id,workspace_id", ignoreDuplicates: true },
+      );
+    if (upsertErr) {
+      console.error("[workspace/provision] upsert error", upsertErr.message);
+      return NextResponse.json({ error: "Provisioning failed" }, { status: 500 });
+    }
+
+    console.log(`[workspace/provision] Provisioned email_hash=${hashEmail(user.email)} as ${role} (${status})`);
     return NextResponse.json({ workspaceId: BASELINE_WORKSPACE_ID, provisioned: true });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";

@@ -9,6 +9,7 @@ import {
 } from "@/lib/email-utils";
 import { APP_TIMEZONE } from "@/lib/utils";
 import { consume, getClientIp } from "@/lib/rate-limit";
+import { requireBearerUser } from "@/lib/auth/require";
 
 export const maxDuration = 10;
 
@@ -56,6 +57,12 @@ interface ApprovedRequest {
 
 export async function POST(request: NextRequest) {
   try {
+    // SEC-012: Authenticate the caller. `approvedBy` is now derived from
+    // the bearer-token user's team_members row — clients cannot forge the
+    // approver name.
+    const auth = await requireBearerUser(request);
+    if (auth instanceof NextResponse) return auth;
+
     const ip = getClientIp(request);
     const ipCheck = await consume("notifications:approved:ip", ip, 10, 60);
     if (!ipCheck.allowed) {
@@ -64,7 +71,7 @@ export async function POST(request: NextRequest) {
 
     const body: ApprovedRequest = await request.json();
 
-    if (!body.postId || !body.postTitle || !body.approvedBy) {
+    if (!body.postId || !body.postTitle) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
@@ -73,6 +80,16 @@ export async function POST(request: NextRequest) {
     }
 
     const admin = getAdminClient();
+
+    // SEC-012: Override `approvedBy` with the server-resolved team_members
+    // name for the authenticated caller.
+    const callerEmail = (auth.user.email || "").toLowerCase();
+    const { data: approverRow } = await admin
+      .from("team_members")
+      .select("name, email")
+      .ilike("email", callerEmail)
+      .maybeSingle();
+    const approvedBy = (approverRow?.name as string) || auth.user.email || "Approver";
 
     // Fetch full post data for rich email
     const { data: post } = await admin
@@ -114,7 +131,7 @@ export async function POST(request: NextRequest) {
       const transporter = getTransporter();
       const html = buildPostApprovedEmailHtml({
         creatorName: creator.name || body.createdBy,
-        approverName: body.approvedBy,
+        approverName: approvedBy,
         postTitle: body.postTitle,
         platforms,
         scheduled,
@@ -140,7 +157,7 @@ export async function POST(request: NextRequest) {
       p_entity_type: "post",
       p_action: "post_approved_notified",
       p_entity_id: body.postId,
-      p_metadata: { approvedBy: body.approvedBy, notified: creator.email, sent },
+      p_metadata: { approvedBy, notified: creator.email, sent },
     });
 
     return NextResponse.json({ sent, recipient: creator.email });

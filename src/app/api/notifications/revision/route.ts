@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getTransporter, getFromAddress, safeSubject, buildRevisionEmailHtml } from "@/lib/email-utils";
 import { consume, getClientIp } from "@/lib/rate-limit";
+import { requireBearerUser } from "@/lib/auth/require";
 
 export const maxDuration = 10;
 
@@ -23,6 +24,10 @@ interface RevisionRequest {
 
 export async function POST(request: NextRequest) {
   try {
+    // SEC-012: Authenticate the caller and derive `requestedBy` server-side.
+    const auth = await requireBearerUser(request);
+    if (auth instanceof NextResponse) return auth;
+
     // Rate limit: 10 per minute per IP.
     const ip = getClientIp(request);
     const ipCheck = await consume("notifications:revision:ip", ip, 10, 60);
@@ -31,12 +36,23 @@ export async function POST(request: NextRequest) {
     }
 
     const body: RevisionRequest = await request.json();
-    if (!body.postId || !body.postTitle || !body.revisionNote || !body.requestedBy) {
+    if (!body.postId || !body.postTitle || !body.revisionNote) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
     const admin = getAdminClient();
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://smm.ten80ten.com";
+
+    // SEC-012: Trust the authenticated caller's identity, not the body.
+    const callerEmail = (auth.user.email || "").toLowerCase();
+    const { data: callerRow } = await admin
+      .from("team_members")
+      .select("name, email")
+      .ilike("email", callerEmail)
+      .maybeSingle();
+    const requestedBy = (callerRow?.name as string) || auth.user.email || "Reviewer";
+    const requesterEmail = (callerRow?.email as string) || auth.user.email || "";
+
     const recipients: string[] = [];
 
     // Find the Creator's email
@@ -46,7 +62,7 @@ export async function POST(request: NextRequest) {
         .select("email")
         .eq("name", body.createdBy)
         .maybeSingle();
-      if (creator?.email && creator.email !== body.requestedBy) {
+      if (creator?.email && creator.email !== requesterEmail) {
         recipients.push(creator.email);
       }
     }
@@ -59,7 +75,7 @@ export async function POST(request: NextRequest) {
 
     if (directors) {
       for (const d of directors) {
-        if (d.email && !recipients.includes(d.email) && d.email !== body.requestedBy) {
+        if (d.email && !recipients.includes(d.email) && d.email !== requesterEmail) {
           recipients.push(d.email);
         }
       }
@@ -75,7 +91,7 @@ export async function POST(request: NextRequest) {
     if (smtpConfigured) {
       const transporter = getTransporter();
 
-      const htmlEmail = buildRevisionEmailHtml(body.postTitle, body.revisionNote, body.requestedBy, siteUrl);
+      const htmlEmail = buildRevisionEmailHtml(body.postTitle, body.revisionNote, requestedBy, siteUrl);
 
       for (const email of recipients) {
         try {
@@ -97,7 +113,7 @@ export async function POST(request: NextRequest) {
       p_entity_type: "post",
       p_action: "revision_requested",
       p_entity_id: body.postId,
-      p_metadata: { user_name: body.requestedBy, details: `Notified: ${recipients.join(", ")}. Note: ${body.revisionNote.slice(0, 100)}` },
+      p_metadata: { user_name: requestedBy, details: `Notified: ${recipients.join(", ")}. Note: ${body.revisionNote.slice(0, 100)}` },
     });
 
     return NextResponse.json({ sent, recipients });

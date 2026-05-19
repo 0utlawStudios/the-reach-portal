@@ -193,7 +193,11 @@ export function MediaPage() {
     }
   };
 
-  const getUsageInfo = (asset: MediaAsset) => (!asset.usedIn || asset.usedIn.length === 0) ? null : asset.usedIn.map((id) => cards.find((c) => c.id === id)).filter(Boolean);
+  // PERF-017: O(1) lookups by card id instead of N×M find() scans inside
+  // getUsageInfo. Empty cards array yields an empty Map (safe — get returns
+  // undefined and filter(Boolean) drops it).
+  const cardsById = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards]);
+  const getUsageInfo = (asset: MediaAsset) => (!asset.usedIn || asset.usedIn.length === 0) ? null : asset.usedIn.map((id) => cardsById.get(id)).filter(Boolean);
 
   const copyShareLink = (asset: MediaAsset) => {
     const siteUrl = typeof window !== "undefined" ? window.location.origin : "";
@@ -244,7 +248,9 @@ export function MediaPage() {
   return (
     <div className="flex h-full flex-col md:flex-row">
       {/* Sidebar */}
-      <div className="w-full md:w-[200px] border-b md:border-b-0 md:border-r border-gray-100 dark:border-white/[0.06] bg-white dark:bg-[#111] p-3 flex md:flex-col shrink-0 overflow-x-auto md:overflow-x-visible gap-1 md:gap-0">
+      <div className="relative w-full md:w-[200px] border-b md:border-b-0 md:border-r border-gray-100 dark:border-white/[0.06] bg-white dark:bg-[#111] p-3 flex md:flex-col shrink-0 overflow-x-auto md:overflow-x-visible gap-1 md:gap-0">
+        {/* UX-021: mobile-only right-edge fade hints at horizontal scroll */}
+        <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-[#111] to-transparent pointer-events-none md:hidden" />
         <h2 className="hidden md:block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em] px-2 mb-3">Media Library</h2>
         <div className="hidden md:block px-2 mb-3 space-y-1">
           <div className="flex gap-2">

@@ -39,8 +39,7 @@ export function PipelineColumn({ column, cards }: Props) {
             {cards.map((card) => <ContentCard key={card.id} card={card} stageColor={column.color} />)}
             {isLoading && cards.length === 0 && (
               <div className="space-y-2.5">
-                <SkeletonCard />
-                <SkeletonCard />
+                {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
               </div>
             )}
             {!isLoading && cards.length === 0 && (

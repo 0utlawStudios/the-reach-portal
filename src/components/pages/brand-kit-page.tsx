@@ -124,7 +124,7 @@ export function BrandKitPage() {
   return (
     <div className="w-full h-full overflow-y-auto">
       {/* ─── Hero Header with subtle gradient ─── */}
-      <div className="relative px-8 pt-8 pb-0">
+      <div className="relative px-4 sm:px-8 pt-8 pb-0">
         <div className="absolute inset-0 bg-gradient-to-b from-orange-50/40 via-transparent to-transparent dark:from-orange-500/[0.03] dark:via-transparent pointer-events-none" />
         <div className="relative flex items-start justify-between mb-2">
           <div>
@@ -158,7 +158,7 @@ export function BrandKitPage() {
         )}
 
         {/* ─── Tab Navigation ─── */}
-        <div className="relative flex items-center gap-0.5 mt-6 border-b border-gray-200 dark:border-white/[0.06]">
+        <div className="relative flex items-center gap-0.5 mt-6 border-b border-gray-200 dark:border-white/[0.06] overflow-x-auto -mx-4 sm:-mx-8 px-4 sm:px-8 [mask-image:linear-gradient(to_right,transparent,black_24px,black_calc(100%-24px),transparent)]">
           {TABS.map((tab) => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-1.5 px-5 py-3 text-[12px] font-semibold border-b-2 -mb-px transition-all duration-150 cursor-pointer ${activeTab === tab.id ? "border-orange-500 text-orange-700 dark:text-orange-400" : "border-transparent text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"}`}>
@@ -169,7 +169,7 @@ export function BrandKitPage() {
       </div>
 
       {/* ─── Tab Content ─── */}
-      <div className="px-8 py-8">
+      <div className="px-4 sm:px-8 py-8">
 
         {/* ═══════════════ TAB 1: COPY HUB ═══════════════ */}
         {activeTab === "copy" && (

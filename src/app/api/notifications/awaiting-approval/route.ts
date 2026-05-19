@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getTransporter, getFromAddress, esc, safeSubject } from "@/lib/email-utils";
 import { APP_TIMEZONE } from "@/lib/utils";
 import { consume, getClientIp } from "@/lib/rate-limit";
+import { requireBearerUser } from "@/lib/auth/require";
 
 export const maxDuration = 10;
 
@@ -59,6 +60,11 @@ interface AwaitingApprovalRequest {
 
 export async function POST(request: NextRequest) {
   try {
+    // SEC-012: Require an authenticated caller and trust the server's
+    // resolution of `movedBy` over whatever the body claims.
+    const auth = await requireBearerUser(request);
+    if (auth instanceof NextResponse) return auth;
+
     const ip = getClientIp(request);
     const ipCheck = await consume("notifications:awaiting-approval:ip", ip, 10, 60);
     if (!ipCheck.allowed) {
@@ -66,11 +72,20 @@ export async function POST(request: NextRequest) {
     }
 
     const body: AwaitingApprovalRequest = await request.json();
-    if (!body.postId || !body.postTitle || !body.movedBy) {
+    if (!body.postId || !body.postTitle) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
     const admin = getAdminClient();
+
+    // SEC-012: Resolve `movedBy` from the authenticated caller.
+    const callerEmail = (auth.user.email || "").toLowerCase();
+    const { data: callerRow } = await admin
+      .from("team_members")
+      .select("name, email")
+      .ilike("email", callerEmail)
+      .maybeSingle();
+    const movedBy = (callerRow?.name as string) || auth.user.email || "Team member";
 
     // Fetch full post data for rich email
     const { data: post } = await admin
@@ -161,7 +176,7 @@ export async function POST(request: NextRequest) {
     <div style="padding:28px 32px 24px;">
 
       <p style="color:#9ca3af;font-size:12px;font-weight:500;margin:0 0 10px;letter-spacing:0.01em;">
-        Submitted by <strong style="color:#6b7280;">${esc(body.movedBy)}</strong>
+        Submitted by <strong style="color:#6b7280;">${esc(movedBy)}</strong>
         &nbsp;&middot;&nbsp;
         moved from <strong style="color:#6b7280;">${esc(fromLabel)}</strong>
       </p>
@@ -226,7 +241,7 @@ export async function POST(request: NextRequest) {
       p_entity_type: "post",
       p_action: "awaiting_approval_notified",
       p_entity_id: body.postId,
-      p_metadata: { movedBy: body.movedBy, notified: recipients },
+      p_metadata: { movedBy, notified: recipients },
     });
 
     return NextResponse.json({ sent, recipients });

@@ -105,7 +105,10 @@ const IDLE_FOR_MS = 15 * 60 * 1000; // 15 min → away
 const ACTIVITY_BROADCAST_THROTTLE_MS = 10 * 1000;
 const HEARTBEAT_MS = 60 * 1000;
 const FLAP_GUARD_MS = 5 * 1000;
-const SUMMARY_REFRESH_MS = 60 * 1000;
+// PERF-011: dropped from 60s → 5min. Presence dot is driven by the realtime
+// channel; the DB summary only needs to backfill "last seen" labels, which are
+// already minute-resolution on the wire.
+const SUMMARY_REFRESH_MS = 5 * 60 * 1000;
 const DEPARTURE_COOLDOWN_MS = 5 * 60 * 1000; // dedupe rapid-fire pagehide / iframe nav events
 
 const ACTIVITY_EVENTS: Array<keyof DocumentEventMap | keyof WindowEventMap> = [
@@ -205,12 +208,16 @@ export function PresenceProvider({
   }, []);
 
   // ── summary refresh (DB view) ──
+  // PERF-011: narrowed the SELECT to only the columns consumed by
+  // PresenceLabel (email + the four timestamp signals it ranks). The full
+  // PresenceSummaryRow type stays intact; absent fields default to undefined
+  // and the resolver tolerates missing values.
   const refreshSummary = useCallback(async () => {
     if (!isSupabaseConfigured || !isAuthenticated) return;
     try {
       const { data, error } = await supabase
         .from("v_user_presence_summary")
-        .select("*");
+        .select("email, presence_last_seen, audit_last, auth_last_sign_in, best_known_seen");
       if (error || !data) return;
       const next: Record<string, PresenceSummaryRow> = {};
       for (const row of data as PresenceSummaryRow[]) {
@@ -323,14 +330,45 @@ export function PresenceProvider({
   // Initial fetch is deferred via setTimeout(0) so the setState that lands
   // inside refreshSummary runs in a callback rather than synchronously in the
   // effect body (react-hooks/set-state-in-effect).
+  // PERF-011: pause the 5-minute interval whenever the tab is hidden. The
+  // visibilitychange listener restarts it on next focus AND fires one
+  // immediate refresh so the summary is fresh when the user comes back.
   useEffect(() => {
     if (!isAuthenticated) return;
+
+    const startInterval = () => {
+      if (summaryRefreshRef.current) return;
+      summaryRefreshRef.current = window.setInterval(refreshSummary, SUMMARY_REFRESH_MS);
+    };
+    const stopInterval = () => {
+      if (summaryRefreshRef.current) {
+        window.clearInterval(summaryRefreshRef.current);
+        summaryRefreshRef.current = null;
+      }
+    };
+
     const initial = window.setTimeout(refreshSummary, 0);
-    summaryRefreshRef.current = window.setInterval(refreshSummary, SUMMARY_REFRESH_MS);
+    if (typeof document === "undefined" || !document.hidden) startInterval();
+
+    const onVis = () => {
+      if (document.hidden) {
+        stopInterval();
+      } else {
+        void refreshSummary();
+        startInterval();
+      }
+    };
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", onVis);
+    }
+
     return () => {
       window.clearTimeout(initial);
-      if (summaryRefreshRef.current) window.clearInterval(summaryRefreshRef.current);
-      summaryRefreshRef.current = null;
+      stopInterval();
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", onVis);
+      }
     };
   }, [isAuthenticated, refreshSummary]);
 

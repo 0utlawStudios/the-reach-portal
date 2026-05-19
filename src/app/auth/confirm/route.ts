@@ -1,11 +1,49 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const VALID_TYPES = ["invite", "recovery", "magiclink", "signup", "email"] as const;
+// SEC-005: Narrow VALID_TYPES to only the two flows this route actually
+// supports. Permitting "magiclink"/"signup"/"email" allowed a confirmed-link
+// recipient to land on /auth/setup with a full session, bypassing the
+// dedicated sign-in flow.
+const VALID_TYPES = ["invite", "recovery"] as const;
 type ValidType = (typeof VALID_TYPES)[number];
 
 function isValidType(type: string): type is ValidType {
   return (VALID_TYPES as readonly string[]).includes(type);
+}
+
+// SEC-004: Attach the freshly-minted session as short-lived HttpOnly cookies
+// on the redirect, AND keep them in the URL fragment so the client SDK can
+// also hydrate the session. Fragments are NEVER sent to the server in the
+// Referer header and don't appear in standard access logs, unlike query
+// strings (which were the previous transport — see git blame).
+//
+// Wave B note: the downstream /auth/setup and /auth/reset-password pages
+// currently read from `searchParams`. They MUST be patched to read from
+// `window.location.hash` instead, otherwise the cookie path (10-minute TTL)
+// is the only thing keeping them functional.
+const TOKEN_COOKIE_MAX_AGE = 600; // 10 minutes
+function attachTokenCookies(
+  res: NextResponse,
+  accessToken: string,
+  refreshToken: string | null,
+) {
+  res.cookies.set("sb-access-token", accessToken, {
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: TOKEN_COOKIE_MAX_AGE,
+  });
+  if (refreshToken) {
+    res.cookies.set("sb-refresh-token", refreshToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: TOKEN_COOKIE_MAX_AGE,
+    });
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -51,18 +89,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${siteUrl}?error=no_session`);
   }
 
-  // Route based on type — pass both tokens so client can establish a full session
+  // Tokens go into the URL fragment (not the query string) so they aren't
+  // captured by Referer headers or server access logs. We ALSO mirror them
+  // into short-lived HttpOnly cookies as a fallback transport for the
+  // downstream client pages (see Wave B follow-up).
   const params = new URLSearchParams({ access_token: accessToken });
   if (refreshToken) params.set("refresh_token", refreshToken);
 
   if (type === "invite") {
-    return NextResponse.redirect(`${siteUrl}/auth/setup?${params.toString()}`);
+    const res = NextResponse.redirect(`${siteUrl}/auth/setup#${params.toString()}`);
+    attachTokenCookies(res, accessToken, refreshToken ?? null);
+    return res;
   }
 
-  if (type === "recovery") {
-    return NextResponse.redirect(`${siteUrl}/auth/reset-password?${params.toString()}`);
-  }
-
-  // All other valid types → dashboard
-  return NextResponse.redirect(`${siteUrl}`);
+  // type === "recovery" — exhaustive over VALID_TYPES
+  const res = NextResponse.redirect(`${siteUrl}/auth/reset-password#${params.toString()}`);
+  attachTokenCookies(res, accessToken, refreshToken ?? null);
+  return res;
 }

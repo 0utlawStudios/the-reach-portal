@@ -8,7 +8,7 @@ import { supabase } from "./supabaseClient";
 import { logAudit } from "./audit";
 import { useAuth } from "./auth-context";
 import { useToast } from "./toast-context";
-import { APP_TIMEZONE, formatDateTimeCompact } from "./utils";
+import { APP_TIMEZONE, formatDateTimeCompact, isValidUuid } from "./utils";
 
 // Real @mention pattern — @username form, not any "@" character. Avoids
 // false-positive mention notifications on pasted emails or URLs containing "@".
@@ -17,10 +17,6 @@ const MENTION_RE = /@[a-zA-Z][\w.-]*/;
 const STORAGE_KEY = "pipeline_cards";
 const POSTS_SELECT_FULL = "*, publish_jobs(state, platform_publish_attempts(platform, state, external_post_id))";
 const POSTS_SELECT_BASIC = "*";
-
-function isValidUuid(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
-}
 
 // ─── Supabase <-> ContentCard mappers ───
 
@@ -311,11 +307,14 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
   const workspaceIdRef = useRef<string | null>(null);
   const useSupabase = isSupabaseConfigured();
 
-  // Track local mutations to prevent realtime echo (dedup)
+  // Track local mutations to prevent realtime echo (dedup).
+  // TTL bumped from 2000 → 10000ms because realtime fanout can lag past 2s
+  // under load, leading to the local mutator double-applying its own change
+  // (e.g. an INSERT echo arriving after the dedup window expires).
   const recentMutations = useRef<Set<string>>(new Set());
   const markMutation = (id: string) => {
     recentMutations.current.add(id);
-    setTimeout(() => recentMutations.current.delete(id), 2000);
+    setTimeout(() => recentMutations.current.delete(id), 10000);
   };
 
   // ─── Initial data load ───
@@ -383,8 +382,9 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
         { event: "INSERT", schema: "public", table: "posts", filter: `workspace_id=eq.${wsId}` },
         (payload) => {
           const newCard = dbToCard(payload.new as PostRow);
-          // Skip if this was our own insert (dedup)
-          if (recentMutations.current.has("create")) return;
+          // Dedup is keyed by tempId + real UUID inside createCard via
+          // markMutation; we no longer carry a stale literal "create" key.
+          if (recentMutations.current.has(newCard.id)) return;
           setCards((prev) => {
             if (prev.some((c) => c.id === newCard.id)) return prev;
             return [newCard, ...prev];
@@ -486,7 +486,11 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
           if (error) throw error;
           stageUpdated = true;
 
-          if (newStage === "approved_scheduled" && card?.scheduledDate && card.scheduledTime) {
+          // Accept either the date+time pair OR a pre-computed scheduled_at.
+          // Otherwise we silently approve cards into "approved_scheduled" with
+          // no publish job — the orphan-approved-no-job hole.
+          const hasSchedule = (card?.scheduledDate && card?.scheduledTime) || (card as Partial<ContentCard> & { scheduledAt?: string })?.scheduledAt;
+          if (newStage === "approved_scheduled" && hasSchedule) {
             await createPublishJob(cardId);
           }
 
@@ -557,6 +561,10 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     const historyEntry = { note, by: author, at: now.toISOString() };
     const noteLine = `${author} (${timestamp}): Fix submitted — ${note}`;
 
+    // Snapshot previous state for rollback if DB write fails.
+    const previousCard = cards.find((c) => c.id === cardId);
+    const previousSelected = selectedCard;
+
     setCards((prev) => prev.map((c) => {
       if (c.id !== cardId) return c;
       const revisionHistory = [...(c.revisionHistory || []), historyEntry];
@@ -572,10 +580,22 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
 
     if (useSupabase && isValidUuid(cardId)) {
       markMutation(cardId);
-      const card = cards.find((c) => c.id === cardId);
+      const card = previousCard;
       const notes = card?.notes ? card.notes + "\n\n" + noteLine : noteLine;
       supabase.from("posts").update({ stage: "awaiting_approval", notes }).eq("id", cardId).then(({ error }) => {
-        if (error) { console.error("[pipeline] reapproval sync failed:", error.message); return; }
+        if (error) {
+          console.error("[pipeline] reapproval sync failed:", error.message);
+          // Rollback local state — DB write failed, so the prior version is canonical.
+          if (previousCard) {
+            setCards((prev) => prev.map((c) => c.id === cardId ? previousCard : c));
+            setSelectedCard(previousSelected);
+          }
+          addToast(`Save failed: ${error.message}. Changes reverted.`, "error");
+          return;
+        }
+        // Only fire the audit + notification once the DB write actually committed.
+        // Previously these ran unconditionally, which produced phantom emails (DATA-002).
+        logAudit(cardId, author, "revision_submitted", `Fix submitted: ${note}`);
         supabase.auth.getSession().then(({ data: { session } }) => {
           const headers: HeadersInit = { "Content-Type": "application/json" };
           if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
@@ -586,11 +606,13 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
           }).catch((e) => console.error("[pipeline] awaiting-approval notify failed:", e));
         }).catch(() => {});
       });
+    } else {
+      // Local-only path (no Supabase configured or temp id): still record audit locally.
+      logAudit(cardId, author, "revision_submitted", `Fix submitted: ${note}`);
     }
 
     setPendingReapproval(null);
-    logAudit(cardId, author, "revision_submitted", `Fix submitted: ${note}`);
-  }, [useSupabase, cards, currentUser.name]);
+  }, [useSupabase, cards, selectedCard, currentUser.name, addToast]);
 
   const cancelReapproval = useCallback(() => {
     setPendingReapproval(null);
@@ -609,6 +631,8 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     const author = currentUser.name;
     // Capture card before state mutation so notification can read title + createdBy
     const card = cards.find((c) => c.id === cardId);
+    const previousCard = card;
+    const previousSelected = selectedCard;
     let noteLine = `${author} (${timestamp}): Revision requested — ${note}`;
     if (attachmentUrl) noteLine += `\n📎 ${attachmentUrl}`;
 
@@ -623,61 +647,92 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
       return { ...prev, stage: "revision_needed" as PipelineStage, revised: false, notes };
     });
 
+    // Pull these once so the success branch below can fire them cleanly.
+    const fireNotifications = () => {
+      logAudit(cardId, author, "revision_requested", `Kickback: ${note}`);
+      // Notify creator + all approvers/creative directors
+      fetch("/api/notifications/revision", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          postId: cardId,
+          postTitle: card?.title ?? "",
+          revisionNote: note,
+          requestedBy: currentUser.email,
+          createdBy: card?.createdBy,
+        }),
+      }).catch(() => {});
+
+      // Fire @mention notifications if anyone was tagged. Strict regex so we
+      // don't trigger on every "@" in arbitrary text (e.g. pasted emails or URLs).
+      if (MENTION_RE.test(note)) {
+        fetch("/api/notifications/mention", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            comment: note,
+            postTitle: card?.title ?? "",
+            postId: cardId,
+            authorName: currentUser.name,
+            authorEmail: currentUser.email,
+          }),
+        }).catch(() => {});
+      }
+    };
+
     if (useSupabase && isValidUuid(cardId)) {
       markMutation(cardId);
       const notes = card?.notes ? card.notes + "\n\n" + noteLine : noteLine;
       supabase.from("posts").update({ stage: "revision_needed", notes }).eq("id", cardId).then(({ error }) => {
-        if (error) console.error("[pipeline] kickback sync failed:", error.message);
+        if (error) {
+          console.error("[pipeline] kickback sync failed:", error.message);
+          // Rollback local state — DB write failed, so prior version is canonical.
+          if (previousCard) {
+            setCards((prev) => prev.map((c) => c.id === cardId ? previousCard : c));
+            setSelectedCard(previousSelected);
+          }
+          addToast(`Kickback failed: ${error.message}. Changes reverted.`, "error");
+          return;
+        }
+        // Only fire audit + notifications + @mention emails on confirmed DB commit.
+        // This closes the DATA-002 phantom-email path.
+        fireNotifications();
       });
+    } else {
+      // Local-only path: no DB to confirm, so fire audit + notifications now.
+      fireNotifications();
     }
 
     setPendingKickback(null);
-    logAudit(cardId, author, "revision_requested", `Kickback: ${note}`);
-
-    // Notify creator + all approvers/creative directors
-    fetch("/api/notifications/revision", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        postId: cardId,
-        postTitle: card?.title ?? "",
-        revisionNote: note,
-        requestedBy: currentUser.email,
-        createdBy: card?.createdBy,
-      }),
-    }).catch(() => {});
-
-    // Fire @mention notifications if anyone was tagged. Strict regex so we
-    // don't trigger on every "@" in arbitrary text (e.g. pasted emails or URLs).
-    if (MENTION_RE.test(note)) {
-      fetch("/api/notifications/mention", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          comment: note,
-          postTitle: card?.title ?? "",
-          postId: cardId,
-          authorName: currentUser.name,
-          authorEmail: currentUser.email,
-        }),
-      }).catch(() => {});
-    }
-  }, [useSupabase, cards, currentUser.name, currentUser.email]);
+  }, [useSupabase, cards, selectedCard, currentUser.name, currentUser.email, addToast]);
 
   const cancelKickback = useCallback(() => {
     setPendingKickback(null);
   }, []);
 
   const updateCard = useCallback((cardId: string, updates: Partial<ContentCard>) => {
+    // Snapshot pre-mutation state so we can fully restore on DB failure.
+    // Iron-law spirit: a save that fails silently leaves the user looking at
+    // a card that will revert on the next refresh. Mirror moveCard's pattern.
+    const previousCard = cards.find((c) => c.id === cardId);
+    const previousSelected = selectedCard;
+
     setCards((prev) => prev.map((c) => (c.id === cardId ? { ...c, ...updates } : c)));
     setSelectedCard((prev) => (prev?.id === cardId ? { ...prev, ...updates } : prev));
     if (useSupabase && isValidUuid(cardId)) {
       markMutation(cardId);
       supabase.from("posts").update(cardToDb(updates)).eq("id", cardId).then(({ error }) => {
-        if (error) console.error("[pipeline] updateCard sync failed:", error.message);
+        if (error) {
+          console.error("[pipeline] updateCard sync failed:", error.message);
+          if (previousCard) {
+            setCards((prev) => prev.map((c) => c.id === cardId ? previousCard : c));
+            setSelectedCard(previousSelected);
+          }
+          addToast(`Save failed: ${error.message}. Changes reverted.`, "error");
+        }
       });
     }
-  }, [useSupabase]);
+  }, [useSupabase, cards, selectedCard, addToast]);
 
   const createCard = useCallback((card: Partial<Pick<ContentCard, "checklist">> & Omit<ContentCard, "id" | "createdAt" | "updatedAt" | "checklist">) => {
     const now = new Date().toISOString();

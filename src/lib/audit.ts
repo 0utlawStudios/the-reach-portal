@@ -1,10 +1,7 @@
 import { supabase } from "./supabaseClient";
+import { isValidUuid } from "./utils";
 
 const isConfigured = !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
-
-function isValidUuid(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
-}
 
 // Writes through the record_audit_event() security-definer RPC (migration 0009).
 // The function derives workspace_id from auth.uid() automatically, so no

@@ -1,12 +1,13 @@
 "use client";
 
+import { memo, useMemo } from "react";
 import { RawImage } from "@/components/raw-image";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { ContentCard as ContentCardType, Platform, isPlatform } from "@/lib/types";
 import { usePipeline } from "@/lib/pipeline-context";
 import { PlatformIcon } from "./platform-icons";
-import { Calendar, AlertCircle, Bot, Sparkles } from "lucide-react";
+import { Calendar, AlertCircle, Bot, Sparkles, GripVertical } from "lucide-react";
 import { isUrgent, isOverdue, formatDateShort } from "@/lib/utils";
 
 interface Props {
@@ -15,7 +16,7 @@ interface Props {
   stageColor?: string;
 }
 
-export function ContentCard({ card, isDragOverlay, stageColor }: Props) {
+function ContentCardInner({ card, isDragOverlay, stageColor }: Props) {
   const { selectCard, selectCardForEditing } = usePipeline();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: card.id,
@@ -31,21 +32,26 @@ export function ContentCard({ card, isDragOverlay, stageColor }: Props) {
     transition,
   };
 
-  const checkedCount = card.checklist.filter((c) => c.checked).length;
-  const totalChecklist = card.checklist.length;
-  const urgent = isUrgent(card.scheduledDate);
-  const overdue = card.stage !== "posted" && card.stage !== "ideas" && isOverdue(card.scheduledDate);
-  const publishState = card.publishJob?.state;
-  const verifiedPlatforms = Array.from(new Set(
-    (card.publishJob?.platformAttempts || [])
-      .filter((attempt) => attempt.externalPostId !== null && isPlatform(attempt.platform))
-      .map((attempt) => attempt.platform as Platform)
-  ));
-  const showAutoPostedBadge =
-    card.stage === "posted" &&
-    !!card.publishJob &&
-    (publishState === "succeeded" || publishState === "partial") &&
-    verifiedPlatforms.length > 0;
+  // PERF-006: single useMemo collapses six per-render derivations into one pass.
+  const derived = useMemo(() => {
+    const checkedCount = card.checklist.filter((c) => c.checked).length;
+    const totalChecklist = card.checklist.length;
+    const urgent = isUrgent(card.scheduledDate);
+    const overdue = card.stage !== "posted" && card.stage !== "ideas" && isOverdue(card.scheduledDate);
+    const publishState = card.publishJob?.state;
+    const verifiedPlatforms = Array.from(new Set(
+      (card.publishJob?.platformAttempts || [])
+        .filter((attempt) => attempt.externalPostId !== null && isPlatform(attempt.platform))
+        .map((attempt) => attempt.platform as Platform),
+    ));
+    const showAutoPostedBadge =
+      card.stage === "posted" &&
+      !!card.publishJob &&
+      (publishState === "succeeded" || publishState === "partial") &&
+      verifiedPlatforms.length > 0;
+    return { checkedCount, totalChecklist, urgent, overdue, publishState, verifiedPlatforms, showAutoPostedBadge };
+  }, [card]);
+  const { checkedCount, totalChecklist, urgent, overdue, publishState, verifiedPlatforms, showAutoPostedBadge } = derived;
 
   const cardContent = (
     <>
@@ -145,7 +151,7 @@ export function ContentCard({ card, isDragOverlay, stageColor }: Props) {
 
   if (isDragOverlay) {
     return (
-      <div className="rounded-xl overflow-hidden bg-white dark:bg-[#1a1a1a] border-2 border-orange-400 dark:border-orange-500 shadow-[0_20px_60px_rgba(234,88,12,0.2)] w-[220px] rotate-[2deg] scale-105 pointer-events-none">
+      <div className="rounded-xl overflow-hidden bg-white dark:bg-[#1a1a1a] border-2 border-orange-400 dark:border-orange-500 shadow-[0_20px_60px_rgba(234,88,12,0.2)] w-[220px] rotate-0 scale-100 md:rotate-[2deg] md:scale-105 pointer-events-none">
         {cardContent}
       </div>
     );
@@ -155,12 +161,28 @@ export function ContentCard({ card, isDragOverlay, stageColor }: Props) {
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
       onClick={() => !isDragging && selectCard(card)}
-      className={`group rounded-xl overflow-hidden cursor-pointer bg-white dark:bg-[#151518] border hover:shadow-md transition-all duration-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${isDragging ? "opacity-20 scale-[0.97]" : "hover:-translate-y-0.5"} ${overdue ? "border-red-300 dark:border-red-500/30 shadow-red-100 dark:shadow-red-500/5" : "border-gray-200/80 dark:border-white/[0.06] hover:border-gray-300 dark:hover:border-white/[0.12]"}`}
+      className={`group relative rounded-xl overflow-hidden cursor-pointer bg-white dark:bg-[#151518] border hover:shadow-md transition-all duration-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${isDragging ? "opacity-20 scale-[0.97]" : "hover:-translate-y-0.5"} ${overdue ? "border-red-300 dark:border-red-500/30 shadow-red-100 dark:shadow-red-500/5" : "border-gray-200/80 dark:border-white/[0.06] hover:border-gray-300 dark:hover:border-white/[0.12]"}`}
     >
+      {/* UX-012: explicit drag handle. Listeners now live on this button only,
+          so the rest of the card is a clean click surface. */}
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        onClick={(e) => e.stopPropagation()}
+        aria-label="Drag card"
+        className="absolute top-1 left-1 z-10 p-1 rounded-md bg-black/40 backdrop-blur-sm text-white/80 hover:text-white hover:bg-black/60 opacity-0 group-hover:opacity-100 focus:opacity-100 cursor-grab active:cursor-grabbing transition-opacity duration-200 touch-none"
+      >
+        <GripVertical className="w-3 h-3" />
+      </button>
       {cardContent}
     </div>
   );
 }
+
+// PERF-006: memoize with a custom comparator so a card only re-renders when
+// the object identity or its stage color / drag state actually changes.
+export const ContentCard = memo(ContentCardInner, (a, b) =>
+  a.card === b.card && a.stageColor === b.stageColor && a.isDragOverlay === b.isDragOverlay,
+);

@@ -143,7 +143,7 @@ export default function SetupPasswordPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-[#f8f9fb] dark:bg-[#09090b] flex items-center justify-center p-4">
+      <div className="min-h-dvh bg-[#f8f9fb] dark:bg-[#09090b] flex items-center justify-center p-4">
         <div className="w-full max-w-[400px] text-center space-y-4">
           <div className="w-16 h-16 mx-auto rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center">
             <CheckCircle className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
@@ -157,7 +157,7 @@ export default function SetupPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8f9fb] dark:bg-[#09090b] flex items-center justify-center p-4">
+    <div className="min-h-dvh bg-[#f8f9fb] dark:bg-[#09090b] flex items-center justify-center p-4">
       <div className="w-full max-w-[460px]">
         <div className="bg-white dark:bg-[#131316] rounded-2xl border border-gray-200/80 dark:border-white/[0.06] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_6px_24px_rgba(0,0,0,0.03)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.2),0_6px_24px_rgba(0,0,0,0.15)] overflow-hidden">
 
@@ -197,9 +197,9 @@ export default function SetupPasswordPage() {
             {/* Profile Photo */}
             <div className="flex flex-col items-center gap-2">
               <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Profile Photo <span className="text-red-400">*</span></label>
-              <label className="cursor-pointer group">
+              <label className="cursor-pointer group p-1.5">
                 <input type="file" accept="image/*" onChange={handleAvatarSelect} className="hidden" />
-                <div className="w-20 h-20 rounded-full border-2 border-dashed border-gray-300 dark:border-white/[0.12] group-hover:border-orange-400 dark:group-hover:border-orange-500 transition-colors flex items-center justify-center overflow-hidden bg-gray-50 dark:bg-white/[0.04]">
+                <div className="w-24 h-24 sm:w-20 sm:h-20 rounded-full border-2 border-dashed border-gray-300 dark:border-white/[0.12] group-hover:border-orange-400 dark:group-hover:border-orange-500 transition-colors flex items-center justify-center overflow-hidden bg-gray-50 dark:bg-white/[0.04]">
                   {avatarPreview ? (
                     <RawImage src={avatarPreview} alt="Preview" className="w-full h-full object-cover" />
                   ) : (
@@ -216,12 +216,12 @@ export default function SetupPasswordPage() {
                 <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">First Name <span className="text-red-400">*</span></label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300 dark:text-gray-600" />
-                  <input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First" className={`${inputClass} pl-10`} autoFocus />
+                  <input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First" autoComplete="given-name" className={`${inputClass} pl-10`} autoFocus />
                 </div>
               </div>
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Last Name <span className="text-red-400">*</span></label>
-                <input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last" className={inputClass} />
+                <input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last" autoComplete="family-name" className={inputClass} />
               </div>
             </div>
 
@@ -230,7 +230,7 @@ export default function SetupPasswordPage() {
               <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">WhatsApp Number <span className="text-red-400">*</span></label>
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300 dark:text-gray-600" />
-                <input type="tel" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="+63 912 345 6789" className={`${inputClass} pl-10 font-mono`} />
+                <input type="tel" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="+63 912 345 6789" autoComplete="tel" className={`${inputClass} pl-10 font-mono`} />
               </div>
               <p className="text-[10px] text-gray-400">Include country code. Used for team communication.</p>
             </div>
@@ -240,7 +240,7 @@ export default function SetupPasswordPage() {
               <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Password <span className="text-red-400">*</span></label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300 dark:text-gray-600" />
-                <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Minimum 8 characters" className={`${inputClass} pl-10 pr-10`} />
+                <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Minimum 8 characters" autoComplete="new-password" className={`${inputClass} pl-10 pr-10`} />
                 <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer">
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -251,7 +251,7 @@ export default function SetupPasswordPage() {
             {/* Confirm */}
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Confirm Password <span className="text-red-400">*</span></label>
-              <input type={showPassword ? "text" : "password"} value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Re-enter password" className={inputClass} />
+              <input type={showPassword ? "text" : "password"} value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Re-enter password" autoComplete="new-password" className={inputClass} />
               {confirm.length > 0 && password !== confirm && <p className="text-[10px] text-red-500">Passwords don&apos;t match</p>}
             </div>
 

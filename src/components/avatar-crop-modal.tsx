@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Cropper from "react-easy-crop";
 import { X, ZoomIn, ZoomOut, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -62,6 +62,12 @@ export function AvatarCropModal({ imageSrc, onCropComplete, onClose }: Props) {
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<CropArea | null>(null);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   const onCropChange = useCallback((crop: { x: number; y: number }) => setCrop(crop), []);
   const onZoomChange = useCallback((zoom: number) => setZoom(zoom), []);

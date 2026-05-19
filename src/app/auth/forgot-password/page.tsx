@@ -3,7 +3,7 @@
 import { RawImage } from "@/components/raw-image";
 import { useState } from "react";
 import Link from "next/link";
-import { Mail, ArrowLeft, CheckCircle, AlertCircle, KeyRound, Shield } from "lucide-react";
+import { Mail, ArrowLeft, CheckCircle, AlertCircle, KeyRound } from "lucide-react";
 import { motion } from "framer-motion";
 
 const ease = [0.25, 0.4, 0.25, 1] as const;
@@ -44,8 +44,8 @@ export default function ForgotPasswordPage() {
 
   if (sent) {
     return (
-      <div className="min-h-screen w-full lg:grid lg:grid-cols-[45fr_55fr]">
-        <div className="relative flex flex-col min-h-screen lg:min-h-0 bg-white dark:bg-[#09090b]">
+      <div className="min-h-dvh w-full lg:grid lg:grid-cols-[45fr_55fr]">
+        <div className="relative flex flex-col min-h-dvh lg:min-h-0 bg-white dark:bg-[#09090b]">
           <div className="flex-1 flex items-center justify-center px-8 lg:px-14 xl:px-20">
             <div className="w-full max-w-[360px] text-center space-y-5">
               <div className="w-16 h-16 mx-auto rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center">
@@ -67,9 +67,9 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen w-full lg:grid lg:grid-cols-[45fr_55fr]">
+    <div className="min-h-dvh w-full lg:grid lg:grid-cols-[45fr_55fr]">
       {/* ═══ LEFT: Form ═══ */}
-      <div className="relative flex flex-col min-h-screen lg:min-h-0 bg-white dark:bg-[#09090b]">
+      <div className="relative flex flex-col min-h-dvh lg:min-h-0 bg-white dark:bg-[#09090b]">
         <div className="flex-1 flex items-center justify-center px-8 lg:px-14 xl:px-20">
           <motion.div className="w-full max-w-[360px]" variants={stagger} initial="hidden" animate="show">
             {/* Logo + heading */}
@@ -94,6 +94,7 @@ export default function ForgotPasswordPage() {
                     placeholder="you@company.com"
                     value={email}
                     onChange={(e) => { setEmail(e.target.value); setError(""); }}
+                    autoComplete="email"
                     className="w-full h-[52px] pl-11 pr-4 rounded-xl bg-slate-50/80 dark:bg-white/[0.04] border border-gray-200/70 dark:border-white/[0.08] text-[14px] text-gray-900 dark:text-gray-100 placeholder:text-gray-300 dark:placeholder:text-gray-600 outline-none focus:bg-white dark:focus:bg-white/[0.06] focus:border-[#f59e0b] focus:ring-2 focus:ring-[#f59e0b]/15 transition-all"
                     autoFocus
                   />
@@ -168,16 +169,6 @@ function RightPanel() {
           </div>
         </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.7, ease: [0.25, 0.4, 0.25, 1] }}
-          className="absolute top-[14%] left-[10%] backdrop-blur-xl bg-white/[0.04] border border-white/[0.06] rounded-xl px-4 py-2.5 shadow-xl flex items-center gap-2.5"
-        >
-          <Shield className="w-3.5 h-3.5 text-emerald-400/70" />
-          <span className="text-[10px] font-bold text-white/40 uppercase tracking-[0.08em]">Enterprise Secured</span>
-          <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-        </motion.div>
       </div>
 
       {/* Bottom typography */}
@@ -187,7 +178,7 @@ function RightPanel() {
             Secure account<br />recovery.
           </h2>
           <p className="text-[14px] text-white/35 mt-5 max-w-[420px] leading-relaxed">
-            Reset your credentials safely with our enterprise-grade security system.
+            Reset your password and get back to work.
           </p>
         </motion.div>
       </div>

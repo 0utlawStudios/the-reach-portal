@@ -7,10 +7,22 @@ import { useTheme } from "@/lib/theme-context";
 import { useNavigation } from "@/lib/navigation-context";
 import { Sun, Moon, User, Settings, LogOut, ChevronDown, Menu } from "lucide-react";
 
+const PAGE_TITLES: Record<string, string> = {
+  dashboard: "Dashboard",
+  pipeline: "Content Engine",
+  studio: "Creator Studio",
+  calendar: "Calendar",
+  preview: "Post Preview",
+  media: "Media Library",
+  brandkit: "Brand Kit",
+  team: "Settings",
+  settings: "Settings",
+};
+
 export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
   const { logout, currentUser } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const { navigate } = useNavigation();
+  const { navigate, currentPage } = useNavigation();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -22,6 +34,8 @@ export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
+  const pageTitle = PAGE_TITLES[currentPage] || "";
+
   return (
     <header className="h-12 flex items-center gap-2 px-4 border-b border-gray-100 bg-white dark:bg-[#111] dark:border-white/[0.06] shrink-0">
       {/* Mobile / tablet hamburger */}
@@ -32,16 +46,19 @@ export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
       >
         <Menu className="w-5 h-5" aria-hidden="true" />
       </button>
+      <h1 className="md:hidden text-[14px] font-semibold text-gray-700 dark:text-gray-300 capitalize truncate">{pageTitle}</h1>
       <div className="flex-1" />
       {/* Theme toggle */}
       <button
         onClick={toggleTheme}
         aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
+        aria-pressed={theme === "dark"}
         className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50 dark:hover:bg-white/[0.06] dark:hover:text-gray-300 transition-colors cursor-pointer"
         title={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
       >
         {theme === "light" ? <Moon className="w-4 h-4" aria-hidden="true" /> : <Sun className="w-4 h-4" aria-hidden="true" />}
       </button>
+      <span aria-live="polite" aria-atomic="true" className="sr-only">{theme === "light" ? "Light mode" : "Dark mode"}</span>
 
       {/* User menu */}
       <div ref={menuRef} className="relative">
@@ -66,10 +83,10 @@ export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
         </button>
 
         {menuOpen && (
-          <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-white/[0.1] shadow-lg py-1 z-50">
+          <div className="absolute right-0 top-full mt-1 w-56 max-w-[calc(100vw-32px)] bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-white/[0.1] shadow-lg py-1 z-50">
             <div className="px-3 py-2 border-b border-gray-100 dark:border-white/[0.06]">
-              <p className="text-[12px] font-medium text-gray-800 dark:text-gray-200">{currentUser.name}</p>
-              <p className="text-[10px] text-gray-400">{currentUser.email}</p>
+              <p className="text-[12px] font-medium text-gray-800 dark:text-gray-200 truncate">{currentUser.name}</p>
+              <p className="text-[10px] text-gray-400 overflow-hidden text-ellipsis whitespace-nowrap">{currentUser.email}</p>
             </div>
             <button onClick={() => { navigate("settings"); setMenuOpen(false); }} className="w-full flex items-center gap-2 px-3 py-2 text-[12px] text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/[0.06] transition-colors cursor-pointer">
               <Settings className="w-3.5 h-3.5" /> Settings

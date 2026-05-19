@@ -70,13 +70,13 @@ function DashboardLayout() {
         <PipelineProvider>
           <TeamProvider>
             <AvatarSync />
-            <div className="h-screen flex bg-[#fafbfc] dark:bg-[#0a0a0a] overflow-hidden">
+            <div className="h-dvh flex bg-[#fafbfc] dark:bg-[#0a0a0a] overflow-hidden">
               <Sidebar onCreatePost={() => setCreateOpen(true)} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
               <main className="flex-1 flex flex-col min-w-0">
                 <TopBar onMenuClick={() => setMobileOpen(true)} />
                 <PageContent />
                 <div className="h-8 flex items-center justify-center border-t border-gray-100 dark:border-white/[0.04] bg-white dark:bg-[#111] shrink-0">
-                  <p className="text-[10px] text-gray-300 dark:text-gray-600">Ten80Ten Social Media Management Platform &copy; 2026</p>
+                  <p className="text-[10px] text-gray-400 dark:text-gray-600">Ten80Ten Social Media Management Platform &copy; 2026</p>
                 </div>
               </main>
               <AssetReviewDrawer />
@@ -136,21 +136,11 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
   }, [inStudioRole]);
 
   const canAccessStudio = inStudioRole && studioAccessConfirmed && studioAccessAllowed;
-  const autoCollapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hoverExpandRef = useRef(false);
-  // Auto-collapse after 6s on desktop (not mobile, not pinned)
-  useEffect(() => {
-    if (sidebarPinned) return;
-    autoCollapseTimer.current = setTimeout(() => {
-      setSidebarCollapsed(true);
-    }, 6000);
-    return () => { if (autoCollapseTimer.current) clearTimeout(autoCollapseTimer.current); };
-  }, [sidebarPinned, setSidebarCollapsed]);
 
   // Desktop hover handlers
   const handleMouseEnter = () => {
     if (sidebarPinned) return;
-    if (autoCollapseTimer.current) { clearTimeout(autoCollapseTimer.current); autoCollapseTimer.current = null; }
     if (sidebarCollapsed) { hoverExpandRef.current = true; setSidebarCollapsed(false); }
   };
   const handleMouseLeave = () => {
@@ -278,7 +268,7 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
       <aside
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className={`hidden md:flex h-screen flex-col bg-white dark:bg-[#0c0c0f] shrink-0 overflow-hidden transition-[width] duration-200 ease-out shadow-[1px_0_0_rgba(0,0,0,0.04)] dark:shadow-[1px_0_0_rgba(255,255,255,0.04)] ${sidebarCollapsed ? "w-[56px]" : "w-[230px]"}`}
+        className={`hidden md:flex h-dvh flex-col bg-white dark:bg-[#0c0c0f] shrink-0 overflow-hidden transition-[width] duration-200 ease-out shadow-[1px_0_0_rgba(0,0,0,0.04)] dark:shadow-[1px_0_0_rgba(255,255,255,0.04)] ${sidebarCollapsed ? "w-[56px]" : "w-[230px]"}`}
       >
         {sidebarContent(false)}
       </aside>

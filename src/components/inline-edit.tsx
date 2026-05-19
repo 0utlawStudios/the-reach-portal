@@ -79,7 +79,11 @@ export function InlineEdit({ value, onSave, placeholder = "Click to edit...", cl
   return (
     <Tag
       onClick={() => setEditing(true)}
-      className={`cursor-text rounded-lg px-3 py-2 -mx-3 -my-2 transition-all duration-150 hover:bg-gray-50 dark:hover:bg-white/[0.03] hover:ring-1 hover:ring-gray-200 dark:hover:ring-white/[0.08] ${isEmpty ? "text-gray-400 dark:text-gray-500 italic" : ""} ${className}`}
+      role="button"
+      tabIndex={0}
+      aria-label="Click to edit"
+      onKeyDown={(e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setEditing(true); } }}
+      className={`group cursor-text rounded-lg px-3 py-2 -mx-3 -my-2 transition-all duration-150 hover:bg-gray-50 dark:hover:bg-white/[0.03] hover:ring-1 hover:ring-gray-200 dark:hover:ring-white/[0.08] ${isEmpty ? "text-gray-400 dark:text-gray-500 italic" : ""} ${className}`}
     >
       {isEmpty ? placeholder : value}
     </Tag>

@@ -366,7 +366,7 @@ export function SettingsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-1 border-b border-gray-100 dark:border-white/[0.06]">
+      <div className="flex items-center gap-1 border-b border-gray-100 dark:border-white/[0.06] overflow-x-auto -mx-5 px-5">
         {[
           { id: "general" as const, label: "General", icon: <SettingsIcon className="w-3.5 h-3.5" /> },
           { id: "team" as const, label: "Team Members", icon: <Users className="w-3.5 h-3.5" />, badge: pendingRequests.length > 0 ? pendingRequests.length : undefined },
@@ -1282,7 +1282,15 @@ function StudioAccessPanel({ addToast }: { addToast: (msg: string, kind?: "info"
   const [configured, setConfigured] = useState(false);
   const [newEmail, setNewEmail] = useState("");
   const [saving, setSaving] = useState(false);
+  const [showOpenAllDialog, setShowOpenAllDialog] = useState(false);
   const STUDIO_ROLES = useMemo(() => new Set(["superadmin", "admin", "owner", "creative_director", "social_media_specialist"]), []);
+
+  useEffect(() => {
+    if (!showOpenAllDialog) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setShowOpenAllDialog(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showOpenAllDialog]);
 
   const reload = async () => {
     try {
@@ -1345,8 +1353,12 @@ function StudioAccessPanel({ addToast }: { addToast: (msg: string, kind?: "info"
     await save(emails.filter((x) => x !== e), "set");
   };
 
-  const openToAll = async () => {
-    if (!confirm("Open Studio to every writer role (admin, owner, creative_director, social_media_specialist)? You can re-lock anytime.")) return;
+  const openToAll = () => {
+    setShowOpenAllDialog(true);
+  };
+
+  const confirmOpenToAll = async () => {
+    setShowOpenAllDialog(false);
     await save([], "clear");
   };
 
@@ -1438,6 +1450,45 @@ function StudioAccessPanel({ addToast }: { addToast: (msg: string, kind?: "info"
         >
           Open Studio to all writer roles
         </button>
+      )}
+
+      {showOpenAllDialog && (
+        <>
+          <div onClick={() => setShowOpenAllDialog(false)} className="fixed inset-0 bg-black/40 dark:bg-black/60 z-[100] backdrop-blur-sm" />
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6" onClick={() => setShowOpenAllDialog(false)}>
+            <div
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="open-studio-title"
+              aria-describedby="open-studio-desc"
+              className="w-full max-w-md sm:max-w-lg flex flex-col rounded-2xl overflow-hidden bg-white/85 dark:bg-[#18181b]/85 backdrop-blur-2xl border border-gray-200/60 dark:border-white/[0.12] shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-200/40 dark:border-white/[0.08] shrink-0">
+                <div className="w-9 h-9 rounded-xl bg-violet-500/10 dark:bg-violet-500/15 flex items-center justify-center shrink-0">
+                  <Unlock className="w-5 h-5 text-violet-500" aria-hidden="true" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 id="open-studio-title" className="text-[15px] font-bold text-gray-900 dark:text-white">Open Studio to all writer roles?</h3>
+                </div>
+                <button onClick={() => setShowOpenAllDialog(false)} aria-label="Cancel" className="p-1.5 rounded-lg hover:bg-gray-100/80 dark:hover:bg-white/[0.06] text-gray-400 cursor-pointer transition-colors">
+                  <X className="w-4 h-4" aria-hidden="true" />
+                </button>
+              </div>
+              <div className="px-5 py-4">
+                <p id="open-studio-desc" className="text-[13px] text-gray-700 dark:text-gray-300 leading-relaxed">
+                  Every admin, owner, creative_director, and social_media_specialist will get Studio access. You can re-lock anytime by adding emails again.
+                </p>
+              </div>
+              <div className="px-5 py-4 border-t border-gray-200/40 dark:border-white/[0.08] shrink-0 flex gap-2">
+                <Button variant="outline" onClick={() => setShowOpenAllDialog(false)} className="flex-1 h-10 rounded-xl text-[13px] cursor-pointer">Cancel</Button>
+                <Button onClick={confirmOpenToAll} className="flex-1 h-10 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-[13px] font-medium cursor-pointer shadow-sm shadow-violet-500/20">
+                  Open to all
+                </Button>
+              </div>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

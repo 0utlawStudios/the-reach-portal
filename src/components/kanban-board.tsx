@@ -4,8 +4,9 @@ import { RawImage } from "@/components/raw-image";
 import { useCallback, useState, useMemo, useEffect } from "react";
 import {
   DndContext, DragEndEvent, DragStartEvent, DragOverlay,
-  PointerSensor, TouchSensor, useSensor, useSensors, pointerWithin, rectIntersection,
+  PointerSensor, TouchSensor, KeyboardSensor, useSensor, useSensors, pointerWithin, rectIntersection,
 } from "@dnd-kit/core";
+import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { usePipeline } from "@/lib/pipeline-context";
 import { useAuth } from "@/lib/auth-context";
 import { useTeam } from "@/lib/team-context";
@@ -20,10 +21,12 @@ import { RepurposeModal } from "./repurpose-modal";
 import { ValidationErrorModal } from "./validation-error-modal";
 import { useNavigation } from "@/lib/navigation-context";
 
-// ─── Context-aware sorting per column ───
+// ─── Context-aware comparators per column ───
+// PERF-012: comparators only — no array clone here. The single-pass useMemo
+// below pushes into pre-allocated per-column arrays then sorts each in place.
 
-function sortForColumn(cards: ContentCardType[], stage: PipelineStage): ContentCardType[] {
-  return [...cards].sort((a, b) => {
+function compareForStage(stage: PipelineStage) {
+  return (a: ContentCardType, b: ContentCardType): number => {
     switch (stage) {
       // Ideas: newest created first (recency)
       case "ideas":
@@ -49,7 +52,7 @@ function sortForColumn(cards: ContentCardType[], stage: PipelineStage): ContentC
       default:
         return 0;
     }
-  });
+  };
 }
 
 // ─── RBAC: columns that require Approver ───
@@ -73,9 +76,13 @@ export function KanbanBoard() {
   const [repurposingCard, setRepurposingCard] = useState<ContentCardType | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
+  // UX-041: tightened TouchSensor delay (200→150) and tolerance (5→8) for a
+  // less sluggish drag start on mobile.
+  // UX-025: KeyboardSensor enables Tab + Space + Arrow-key card moves for a11y.
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
   // ─── Auto-open card from cross-page navigation ───
@@ -119,17 +126,23 @@ export function KanbanBoard() {
     return sunday;
   }, []);
 
+  // PERF-012: single-pass partition by stage, then sort each bucket in place.
+  // Replaces N filter+clone+sort passes. Empty cards array → empty buckets (safe).
   const sortedColumnCards = useMemo(() => {
-    const map: Record<string, ContentCardType[]> = {};
-    PIPELINE_COLUMNS.forEach((col) => {
-      let colCards = cards.filter((c) => c.stage === col.id);
-      // Posted column only shows this week's posts — older ones auto-archive
-      if (col.id === "posted") {
-        colCards = colCards.filter((c) => !c.scheduledDate || new Date(c.scheduledDate) >= thisWeekStart);
-      }
-      map[col.id] = sortForColumn(colCards, col.id);
-    });
-    return map;
+    const groups: Record<string, ContentCardType[]> = {};
+    for (const col of PIPELINE_COLUMNS) groups[col.id] = [];
+    for (const c of cards) {
+      if (groups[c.stage]) groups[c.stage].push(c);
+    }
+    // Posted column only shows this week's posts — older ones auto-archive.
+    // Filter mutates the bucket reference; the prior arrays were never observed.
+    if (groups.posted) {
+      groups.posted = groups.posted.filter((c) => !c.scheduledDate || new Date(c.scheduledDate) >= thisWeekStart);
+    }
+    for (const col of PIPELINE_COLUMNS) {
+      groups[col.id].sort(compareForStage(col.id));
+    }
+    return groups;
   }, [cards, thisWeekStart]);
 
   // Archive = posted cards before this week

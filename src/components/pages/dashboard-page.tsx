@@ -44,7 +44,6 @@ export function DashboardPage() {
   const { navigate } = useNavigation();
   const { currentUser } = useAuth();
   const [renderTime] = useState(() => Date.now());
-  const mounted = true;
 
   // Auto-fit: scale dashboard to fill viewport without scrolling
   const containerRef = useRef<HTMLDivElement>(null);
@@ -70,11 +69,27 @@ export function DashboardPage() {
     return () => ro.disconnect();
   }, []);
 
+  // PERF-002: Single-pass stage tally. Replaces 12+ unmemoized filter passes
+  // that ran on every render. If cards is empty, counts default to 0 (safe).
+  const counts = useMemo(() => {
+    const c: Record<string, number> = {
+      ideas: 0,
+      awaiting_approval: 0,
+      revision_needed: 0,
+      approved_scheduled: 0,
+      posted: 0,
+    };
+    for (const card of cards) {
+      if (c[card.stage] !== undefined) c[card.stage]++;
+    }
+    return c;
+  }, [cards]);
+
   const totalCards = cards.length;
-  const pendingApproval = cards.filter((c) => c.stage === "awaiting_approval").length;
-  const needsRevision = cards.filter((c) => c.stage === "revision_needed").length;
-  const postedCount = cards.filter((c) => c.stage === "posted").length;
-  const scheduledCount = cards.filter((c) => c.stage === "approved_scheduled").length;
+  const pendingApproval = counts.awaiting_approval;
+  const needsRevision = counts.revision_needed;
+  const postedCount = counts.posted;
+  const scheduledCount = counts.approved_scheduled;
   const approvedCount = scheduledCount + postedCount;
   const completionPct = totalCards > 0 ? Math.round((approvedCount / totalCards) * 100) : 0;
 
@@ -87,17 +102,26 @@ export function DashboardPage() {
     cards.filter((c) => c.stage === "posted").sort((a, b) => (b.scheduledDate || b.updatedAt).localeCompare(a.scheduledDate || a.updatedAt)).slice(0, 5)
   , [cards]);
 
+  // PERF-002: Single-pass platform tally. Empty cards array yields [] (safe).
   const platformCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    cards.forEach((c) => c.platforms.forEach((p) => { counts[p] = (counts[p] || 0) + 1; }));
-    return Object.entries(counts).sort(([, a], [, b]) => b - a);
+    const out: Record<string, number> = {};
+    for (const c of cards) {
+      for (const p of c.platforms) {
+        out[p] = (out[p] || 0) + 1;
+      }
+    }
+    return Object.entries(out).sort(([, a], [, b]) => b - a);
   }, [cards]);
 
-  const stageCounts = PIPELINE_COLUMNS.map((col) => ({
-    ...col,
-    count: cards.filter((c) => c.stage === col.id).length,
-    pct: totalCards > 0 ? (cards.filter((c) => c.stage === col.id).length / totalCards) * 100 : 0,
-  }));
+  // PERF-002: Derive stage rows from the single counts pass instead of
+  // re-filtering cards twice per column.
+  const stageCounts = useMemo(() =>
+    PIPELINE_COLUMNS.map((col) => ({
+      ...col,
+      count: counts[col.id] || 0,
+      pct: totalCards > 0 ? ((counts[col.id] || 0) / totalCards) * 100 : 0,
+    }))
+  , [counts, totalCards]);
 
   return (
     <div ref={containerRef} className="h-full w-full overflow-y-auto sm:overflow-hidden bg-[#ecedf2] dark:bg-[#09090b]">
@@ -118,12 +142,12 @@ export function DashboardPage() {
                 Welcome back, {currentUser.name.split(" ")[0]}
               </h1>
               {pendingApproval > 0 ? (
-                <p className="text-[13px] text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1.5">
+                <p className="text-[13px] text-gray-500 dark:text-gray-400 mt-1 flex flex-wrap items-center gap-1.5">
                   <AlertCircle className="w-3.5 h-3.5 text-orange-500" />
                   You have <span className="font-semibold text-orange-600 dark:text-orange-400">{pendingApproval} post{pendingApproval !== 1 ? "s" : ""} awaiting approval.</span>
                 </p>
               ) : (
-                <p className="text-[13px] text-gray-400 mt-1 flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5 text-emerald-500" />All caught up — no posts pending.</p>
+                <p className="text-[13px] text-gray-400 mt-1 flex flex-wrap items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5 text-emerald-500" />All caught up — no posts pending.</p>
               )}
             </div>
           </div>
@@ -149,10 +173,10 @@ export function DashboardPage() {
                   <span style={{ color: col.color }} className="shrink-0 group-hover:scale-110 transition-transform duration-300"><Icon className="w-4 h-4" /></span>
                   <span className="text-[11px] text-gray-600 dark:text-gray-400 w-24 shrink-0 font-medium text-left">{col.title.split("/")[0].trim()}</span>
                   <div className="flex-1 h-2 rounded-full bg-gray-100 dark:bg-white/[0.04] overflow-hidden">
-                    {mounted && <AnimatedBar width={Math.max(col.pct, 3)} color={`linear-gradient(90deg, ${col.color}, ${col.color}88)`} delay={i * 120} duration={2000} />}
+                    <AnimatedBar width={Math.max(col.pct, 3)} color={`linear-gradient(90deg, ${col.color}, ${col.color}88)`} delay={i * 120} duration={2000} />
                   </div>
                   <span className="text-[14px] text-gray-800 dark:text-gray-200 tabular-nums w-6 text-right font-bold font-mono tracking-tight">
-                    {mounted ? <AnimatedCounter value={col.count} duration={2000} /> : "0"}
+                    <AnimatedCounter value={col.count} duration={2000} />
                   </span>
                 </button>
               );
@@ -168,11 +192,11 @@ export function DashboardPage() {
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider">Approval Rate</span>
                 <span className="text-[20px] sm:text-[24px] font-black text-gray-900 dark:text-white tabular-nums font-mono tracking-tighter">
-                  {mounted ? <AnimatedCounter value={completionPct} duration={2000} suffix="%" /> : "0%"}
+                  <AnimatedCounter value={completionPct} duration={2000} suffix="%" />
                 </span>
               </div>
               <div className="w-full h-2 rounded-full bg-gray-100 dark:bg-white/[0.04] overflow-hidden">
-                {mounted && <AnimatedBar width={completionPct} color="linear-gradient(90deg, #ea580c, #d97706)" delay={200} duration={2000} />}
+                <AnimatedBar width={completionPct} color="linear-gradient(90deg, #ea580c, #d97706)" delay={200} duration={2000} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2 sm:gap-3 pt-1">
@@ -184,7 +208,7 @@ export function DashboardPage() {
               ].map((s) => (
                 <div key={s.label} onClick={s.action} className={`bg-gray-50/80 dark:bg-white/[0.02] rounded-lg sm:rounded-xl p-2 sm:p-3 text-center border border-gray-100/60 dark:border-white/[0.04] ${s.action ? "cursor-pointer hover:bg-gray-100/80 dark:hover:bg-white/[0.05] hover:border-gray-200 dark:hover:border-white/[0.08] transition-all duration-200 active:scale-[0.97]" : ""}`}>
                   <p className={`text-[20px] sm:text-[26px] font-black tabular-nums font-mono tracking-tighter ${s.color}`}>
-                    {mounted ? <AnimatedCounter value={s.value} duration={2000} /> : "0"}
+                    <AnimatedCounter value={s.value} duration={2000} />
                   </p>
                   <p className="text-[8px] text-gray-400 font-bold uppercase tracking-[0.12em] mt-0.5">{s.label}</p>
                 </div>
@@ -205,10 +229,10 @@ export function DashboardPage() {
                   <span style={{ color: brandColor }} className="shrink-0"><PlatformIcon platform={platform as Platform} className="w-5 h-5" /></span>
                   <span className="text-[11px] text-gray-700 dark:text-gray-300 w-16 capitalize font-semibold">{platform}</span>
                   <div className="flex-1 h-2 rounded-full bg-gray-100 dark:bg-white/[0.04] overflow-hidden">
-                    {mounted && <AnimatedBar width={(count / totalCards) * 100} color={brandColor} delay={300 + i * 100} duration={2000} />}
+                    <AnimatedBar width={totalCards > 0 ? (count / totalCards) * 100 : 0} color={brandColor} delay={300 + i * 100} duration={2000} />
                   </div>
                   <span className="text-[13px] text-gray-800 dark:text-gray-200 tabular-nums w-6 text-right font-bold font-mono tracking-tight">
-                    {mounted ? <AnimatedCounter value={count} duration={2000} /> : "0"}
+                    <AnimatedCounter value={count} duration={2000} />
                   </span>
                 </div>
               );
@@ -285,6 +309,8 @@ export function DashboardPage() {
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const stageColors: Record<string, string> = { ideas: "#8b5cf6", awaiting_approval: "#f59e0b", revision_needed: "#ef4444", approved_scheduled: "#22c55e", posted: "#0ea5e9" };
 
+const EMPTY_CARDS: ContentCard[] = [];
+
 function MiniCalendar({ cards, navigate }: { cards: ContentCard[]; navigate: (page: Page) => void }) {
   const [calDate, setCalDate] = useState(() => new Date());
   const year = calDate.getFullYear();
@@ -299,9 +325,21 @@ function MiniCalendar({ cards, navigate }: { cards: ContentCard[]; navigate: (pa
     return days;
   }, [year, month]);
 
+  // PERF-003: one-pass index by scheduledDate. Empty cards → empty Map (safe).
+  const cardsByDate = useMemo(() => {
+    const map = new Map<string, ContentCard[]>();
+    for (const c of cards) {
+      if (!c.scheduledDate) continue;
+      const arr = map.get(c.scheduledDate);
+      if (arr) arr.push(c);
+      else map.set(c.scheduledDate, [c]);
+    }
+    return map;
+  }, [cards]);
+
   const getCardsForDay = (day: number) => {
     const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    return cards.filter((c) => c.scheduledDate === dateStr);
+    return cardsByDate.get(dateStr) ?? EMPTY_CARDS;
   };
 
   const today = new Date();
