@@ -74,6 +74,12 @@ async function uploadViaProxy(
   onProgress: ProgressCallback | undefined
 ): Promise<DriveUploadResult> {
   return withRetry(async () => {
+    // The proxy route requires a Bearer token (SEC-001 hardening). Attach the
+    // caller's current session token, mirroring the resumable path's headers.
+    const { supabase } = await import("@/lib/supabaseClient");
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+
     const formData = new FormData();
     formData.append("file", file);
     formData.append("folder", folder);
@@ -84,6 +90,7 @@ async function uploadViaProxy(
     return new Promise<DriveUploadResult>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open("POST", "/api/drive/proxy-upload", true);
+      if (accessToken) xhr.setRequestHeader("Authorization", `Bearer ${accessToken}`);
 
       xhr.upload.onprogress = (e) => {
         if (e.lengthComputable) {
