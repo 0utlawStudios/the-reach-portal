@@ -64,11 +64,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Failed to load chat" }, { status: 500 });
   }
 
-  const messages: SupportMessage[] = [];
-  for (const r of (msgRows as SupportMessageRow[]) || []) {
-    const fresh = await resignAttachments(admin, r.attachments);
-    messages.push(rowToMessage({ ...r, attachments: fresh }));
-  }
+  const messages: SupportMessage[] = await Promise.all(
+    ((msgRows as SupportMessageRow[]) || []).map(async (r) => {
+      const fresh = await resignAttachments(admin, r.attachments);
+      return rowToMessage({ ...r, attachments: fresh });
+    }),
+  );
   return NextResponse.json({ thread: rowToThread(thread), messages });
 }
 

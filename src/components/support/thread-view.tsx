@@ -4,11 +4,17 @@
 // widget (tickets and live chat) and the admin Support Inbox. Tolerates a
 // null thread so the chat tab can render before its thread exists.
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { ArrowLeft, Send } from "lucide-react";
 import type { SupportThread, SupportMessage, SupportThreadStatus } from "@/lib/support/types";
-import { threadShortCode, SUPPORT_STATUS_LABEL, SUPPORT_MAX_BODY } from "@/lib/support/format";
+import {
+  threadShortCode,
+  SUPPORT_STATUS_LABEL,
+  SUPPORT_MAX_BODY,
+  spliceAtSelection,
+} from "@/lib/support/format";
 import { AttachmentBar } from "./attachment-bar";
+import { EmojiPicker } from "./emoji-picker";
 
 const STATUS_STYLE: Record<SupportThreadStatus, string> = {
   open: "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
@@ -53,10 +59,30 @@ export function ThreadView({
   const [files, setFiles] = useState<File[]>([]);
   const [sending, setSending] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
   }, [messages.length]);
+
+  const insertEmoji = useCallback(
+    (emoji: string) => {
+      const el = textareaRef.current;
+      const start = el?.selectionStart ?? body.length;
+      const end = el?.selectionEnd ?? body.length;
+      const { value, caret } = spliceAtSelection(body, start, end, emoji);
+      if (value.length > SUPPORT_MAX_BODY) return;
+      setBody(value);
+      requestAnimationFrame(() => {
+        const node = textareaRef.current;
+        if (node) {
+          node.focus();
+          node.setSelectionRange(caret, caret);
+        }
+      });
+    },
+    [body],
+  );
 
   async function handleSend() {
     const trimmed = body.trim();
@@ -179,6 +205,7 @@ export function ThreadView({
       {/* Composer */}
       <div className="border-t border-gray-100 p-3 dark:border-white/[0.06]">
         <textarea
+          ref={textareaRef}
           value={body}
           onChange={(e) => setBody(e.target.value)}
           onKeyDown={(e) => {
@@ -194,7 +221,10 @@ export function ThreadView({
           className="w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-[13px] text-gray-900 outline-none placeholder:text-gray-400 focus:border-orange-400 dark:border-white/10 dark:bg-white/[0.03] dark:text-white"
         />
         <div className="mt-2 flex items-end justify-between gap-2">
-          <AttachmentBar files={files} onChange={setFiles} onError={onError} disabled={sending} />
+          <div className="flex min-w-0 flex-1 items-end gap-1">
+            <EmojiPicker onPick={insertEmoji} disabled={sending} />
+            <AttachmentBar files={files} onChange={setFiles} onError={onError} disabled={sending} />
+          </div>
           <button
             type="button"
             onClick={handleSend}

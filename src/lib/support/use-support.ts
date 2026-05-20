@@ -61,6 +61,24 @@ async function apiFetch<T>(
 }
 
 /**
+ * Run a callback when the browser is idle, falling back to a short timeout
+ * where requestIdleCallback is unavailable (Safari). Returns a canceller.
+ */
+function onIdle(cb: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  const w = window as typeof window & {
+    requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+    cancelIdleCallback?: (handle: number) => void;
+  };
+  if (typeof w.requestIdleCallback === "function") {
+    const handle = w.requestIdleCallback(cb, { timeout: 2000 });
+    return () => w.cancelIdleCallback?.(handle);
+  }
+  const t = window.setTimeout(cb, 1200);
+  return () => window.clearTimeout(t);
+}
+
+/**
  * Upload files straight to Supabase Storage via one-shot signed URLs, then
  * return the storage keys to attach. Keeps large files off the 4.5 MB Vercel
  * function body limit.
@@ -73,16 +91,19 @@ async function uploadFiles(files: File[], token: string): Promise<AttachmentClai
     method: "POST",
     body: { files: files.map((f) => ({ name: f.name, mime: f.type, size: f.size })) },
   });
-  for (let i = 0; i < uploads.length; i++) {
-    const target = uploads[i];
-    const file = files[i];
-    const { error } = await supabase.storage
-      .from(BUCKET)
-      .uploadToSignedUrl(target.storageKey, target.token, file);
-    if (error) {
-      throw new Error(`Could not upload "${file.name}". Please try a smaller file.`);
-    }
-  }
+  // Upload every file in parallel — each goes straight to storage and none
+  // depends on another.
+  await Promise.all(
+    uploads.map(async (target, i) => {
+      const file = files[i];
+      const { error } = await supabase.storage
+        .from(BUCKET)
+        .uploadToSignedUrl(target.storageKey, target.token, file);
+      if (error) {
+        throw new Error(`Could not upload "${file.name}". Please try a smaller file.`);
+      }
+    }),
+  );
   return uploads.map((u) => ({ storageKey: u.storageKey, name: u.name }));
 }
 
@@ -273,42 +294,52 @@ export function useSupport(scope: SupportScope = "own"): UseSupport {
     [accessToken, upsertThread],
   );
 
-  // Initial load.
+  // Initial load — deferred to browser idle so the support feature never sits
+  // in the first-paint critical path. The widget loads closed; its data waits.
   useEffect(() => {
-    if (accessToken && !loadedRef.current) void refresh();
+    if (!accessToken || loadedRef.current) return;
+    return onIdle(() => {
+      if (!loadedRef.current) void refresh();
+    });
   }, [accessToken, refresh]);
 
   // Realtime: thread + message changes for this workspace. RLS narrows the
   // stream to rows the caller may see (own threads, or all for a superadmin).
+  // The subscription opens at idle, not on mount — a websocket handshake has
+  // no place in the first-paint critical path.
   useEffect(() => {
     if (!workspaceId || !accessToken) return;
-    const channel = supabase
-      .channel(`support-${scope}-${workspaceId}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "support_threads", filter: `workspace_id=eq.${workspaceId}` },
-        (payload) => {
-          if (payload.eventType === "DELETE") return;
-          const row = payload.new as SupportThreadRow;
-          if (!row?.id) return;
-          upsertThread(rowToThread(row));
-        },
-      )
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "support_messages", filter: `workspace_id=eq.${workspaceId}` },
-        (payload) => {
-          const row = payload.new as SupportMessageRow;
-          if (!row?.id || row.thread_id !== activeIdRef.current) return;
-          const message = rowToMessage(row);
-          setActiveMessages((prev) =>
-            prev.some((m) => m.id === message.id) ? prev : [...prev, message],
-          );
-        },
-      )
-      .subscribe();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    const cancelIdle = onIdle(() => {
+      channel = supabase
+        .channel(`support-${scope}-${workspaceId}`)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "support_threads", filter: `workspace_id=eq.${workspaceId}` },
+          (payload) => {
+            if (payload.eventType === "DELETE") return;
+            const row = payload.new as SupportThreadRow;
+            if (!row?.id) return;
+            upsertThread(rowToThread(row));
+          },
+        )
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "support_messages", filter: `workspace_id=eq.${workspaceId}` },
+          (payload) => {
+            const row = payload.new as SupportMessageRow;
+            if (!row?.id || row.thread_id !== activeIdRef.current) return;
+            const message = rowToMessage(row);
+            setActiveMessages((prev) =>
+              prev.some((m) => m.id === message.id) ? prev : [...prev, message],
+            );
+          },
+        )
+        .subscribe();
+    });
     return () => {
-      void supabase.removeChannel(channel);
+      cancelIdle();
+      if (channel) void supabase.removeChannel(channel);
     };
   }, [workspaceId, accessToken, scope, upsertThread]);
 

@@ -132,26 +132,27 @@ export async function createUploadTargets(args: {
   if (files.length > SUPPORT_MAX_FILES) {
     throw new SupportValidationError(`Please attach at most ${SUPPORT_MAX_FILES} files.`);
   }
-  const targets: UploadTarget[] = [];
-  for (const f of files) {
-    const mime = (f.mime || "").toLowerCase();
-    if (!isAllowedSupportMime(mime)) {
-      throw new SupportValidationError(`"${sanitizeFileName(f.name)}" is not a supported file type.`);
-    }
-    if (!Number.isFinite(f.size) || f.size <= 0) {
-      throw new SupportValidationError(`"${sanitizeFileName(f.name)}" is empty.`);
-    }
-    if (f.size > SUPPORT_MAX_FILE_BYTES) {
-      throw new SupportValidationError(`"${sanitizeFileName(f.name)}" is larger than 25 MB.`);
-    }
-    const storageKey = `${workspaceId}/${userId}/${randomUUID()}.${extForMime(mime)}`;
-    const { data, error } = await admin.storage.from(BUCKET).createSignedUploadUrl(storageKey);
-    if (error || !data?.token) {
-      throw new Error(`Could not prepare upload: ${error?.message || "unknown"}`);
-    }
-    targets.push({ storageKey, token: data.token, name: sanitizeFileName(f.name), mime, size: f.size });
-  }
-  return targets;
+  // Mint every signed upload URL in parallel; Promise.all preserves order.
+  return Promise.all(
+    files.map(async (f) => {
+      const mime = (f.mime || "").toLowerCase();
+      if (!isAllowedSupportMime(mime)) {
+        throw new SupportValidationError(`"${sanitizeFileName(f.name)}" is not a supported file type.`);
+      }
+      if (!Number.isFinite(f.size) || f.size <= 0) {
+        throw new SupportValidationError(`"${sanitizeFileName(f.name)}" is empty.`);
+      }
+      if (f.size > SUPPORT_MAX_FILE_BYTES) {
+        throw new SupportValidationError(`"${sanitizeFileName(f.name)}" is larger than 25 MB.`);
+      }
+      const storageKey = `${workspaceId}/${userId}/${randomUUID()}.${extForMime(mime)}`;
+      const { data, error } = await admin.storage.from(BUCKET).createSignedUploadUrl(storageKey);
+      if (error || !data?.token) {
+        throw new Error(`Could not prepare upload: ${error?.message || "unknown"}`);
+      }
+      return { storageKey, token: data.token, name: sanitizeFileName(f.name), mime, size: f.size };
+    }),
+  );
 }
 
 /** Parse a raw request `attachments` field into safe AttachmentClaim records. */
@@ -185,47 +186,48 @@ export async function buildAttachmentsFromClaims(args: {
     throw new SupportValidationError(`Please attach at most ${SUPPORT_MAX_FILES} files.`);
   }
   const prefix = `${workspaceId}/${userId}/`;
-  const out: SupportAttachment[] = [];
-  for (const claim of claims) {
-    const key = String(claim.storageKey || "");
-    if (!key.startsWith(prefix) || key.includes("..")) {
-      throw new SupportValidationError("That attachment could not be verified.");
-    }
-    const slash = key.lastIndexOf("/");
-    const folder = key.slice(0, slash);
-    const fileName = key.slice(slash + 1);
-    const { data: listed, error: listErr } = await admin.storage
-      .from(BUCKET)
-      .list(folder, { limit: 100, search: fileName });
-    if (listErr) throw new Error(`Attachment check failed: ${listErr.message}`);
-    const obj = (listed || []).find((o) => o.name === fileName);
-    if (!obj) {
-      throw new SupportValidationError("An attachment did not finish uploading. Please try again.");
-    }
-    const size = Number(obj.metadata?.size ?? 0);
-    const mime = String(obj.metadata?.mimetype || "application/octet-stream").toLowerCase();
-    if (!isAllowedSupportMime(mime)) {
-      throw new SupportValidationError("That attachment type is not supported.");
-    }
-    if (size > SUPPORT_MAX_FILE_BYTES) {
-      throw new SupportValidationError("That attachment is larger than 25 MB.");
-    }
-    const { data: signed, error: signErr } = await admin.storage
-      .from(BUCKET)
-      .createSignedUrl(key, SIGNED_URL_TTL);
-    if (signErr || !signed?.signedUrl) {
-      throw new Error(`Attachment URL failed: ${signErr?.message || "unknown"}`);
-    }
-    out.push({
-      storageKey: key,
-      signedUrl: signed.signedUrl,
-      mime,
-      name: sanitizeFileName(claim.name || fileName),
-      size,
-      kind: attachmentKind(mime),
-    });
-  }
-  return out;
+  // Verify + re-sign every claimed attachment in parallel; order is preserved.
+  return Promise.all(
+    claims.map(async (claim) => {
+      const key = String(claim.storageKey || "");
+      if (!key.startsWith(prefix) || key.includes("..")) {
+        throw new SupportValidationError("That attachment could not be verified.");
+      }
+      const slash = key.lastIndexOf("/");
+      const folder = key.slice(0, slash);
+      const fileName = key.slice(slash + 1);
+      const { data: listed, error: listErr } = await admin.storage
+        .from(BUCKET)
+        .list(folder, { limit: 100, search: fileName });
+      if (listErr) throw new Error(`Attachment check failed: ${listErr.message}`);
+      const obj = (listed || []).find((o) => o.name === fileName);
+      if (!obj) {
+        throw new SupportValidationError("An attachment did not finish uploading. Please try again.");
+      }
+      const size = Number(obj.metadata?.size ?? 0);
+      const mime = String(obj.metadata?.mimetype || "application/octet-stream").toLowerCase();
+      if (!isAllowedSupportMime(mime)) {
+        throw new SupportValidationError("That attachment type is not supported.");
+      }
+      if (size > SUPPORT_MAX_FILE_BYTES) {
+        throw new SupportValidationError("That attachment is larger than 25 MB.");
+      }
+      const { data: signed, error: signErr } = await admin.storage
+        .from(BUCKET)
+        .createSignedUrl(key, SIGNED_URL_TTL);
+      if (signErr || !signed?.signedUrl) {
+        throw new Error(`Attachment URL failed: ${signErr?.message || "unknown"}`);
+      }
+      return {
+        storageKey: key,
+        signedUrl: signed.signedUrl,
+        mime,
+        name: sanitizeFileName(claim.name || fileName),
+        size,
+        kind: attachmentKind(mime),
+      };
+    }),
+  );
 }
 
 /**
@@ -239,13 +241,17 @@ export async function resignAttachments(
   attachments: SupportAttachment[] | null | undefined,
 ): Promise<SupportAttachment[]> {
   if (!attachments || attachments.length === 0) return [];
-  const out: SupportAttachment[] = [];
-  for (const a of attachments) {
-    if (!a?.storageKey) continue;
-    const { data, error } = await admin.storage.from(BUCKET).createSignedUrl(a.storageKey, SIGNED_URL_TTL);
-    out.push({ ...a, signedUrl: error || !data?.signedUrl ? a.signedUrl : data.signedUrl });
-  }
-  return out;
+  // Re-sign every attachment in parallel.
+  return Promise.all(
+    attachments
+      .filter((a) => Boolean(a?.storageKey))
+      .map(async (a) => {
+        const { data, error } = await admin.storage
+          .from(BUCKET)
+          .createSignedUrl(a.storageKey, SIGNED_URL_TTL);
+        return { ...a, signedUrl: error || !data?.signedUrl ? a.signedUrl : data.signedUrl };
+      }),
+  );
 }
 
 // ─── audit ───

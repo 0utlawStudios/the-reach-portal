@@ -4,6 +4,7 @@ import {
   isAllowedSupportMime,
   attachmentKind,
   categoryLabel,
+  spliceAtSelection,
   SUPPORT_ALLOWED_MIME,
   SUPPORT_MAX_FILE_BYTES,
   SUPPORT_MAX_FILES,
@@ -76,5 +77,36 @@ describe("support constants", () => {
     expect(SUPPORT_STATUS_LABEL.in_progress).toBe("In Progress");
     expect(SUPPORT_STATUS_LABEL.resolved).toBe("Resolved");
     expect(SUPPORT_STATUS_LABEL.closed).toBe("Closed");
+  });
+});
+
+describe("spliceAtSelection", () => {
+  it("inserts at the caret when start === end", () => {
+    expect(spliceAtSelection("hello", 5, 5, "!")).toEqual({ value: "hello!", caret: 6 });
+    expect(spliceAtSelection("hello", 0, 0, "!")).toEqual({ value: "!hello", caret: 1 });
+    expect(spliceAtSelection("hello", 2, 2, "X")).toEqual({ value: "heXllo", caret: 3 });
+  });
+  it("replaces a selected range", () => {
+    expect(spliceAtSelection("hello world", 6, 11, "there")).toEqual({
+      value: "hello there",
+      caret: 11,
+    });
+  });
+  it("places the caret after a multi-code-unit emoji", () => {
+    const fire = "🔥"; // surrogate pair, length 2
+    const out = spliceAtSelection("ok ", 3, 3, fire);
+    expect(out.value).toBe("ok 🔥");
+    expect(out.caret).toBe(3 + fire.length);
+  });
+  it("clamps out-of-range indices", () => {
+    expect(spliceAtSelection("hi", 99, 99, "!")).toEqual({ value: "hi!", caret: 3 });
+    expect(spliceAtSelection("hi", -5, -5, "!")).toEqual({ value: "!hi", caret: 1 });
+  });
+  it("treats a reversed selection as a caret, removing nothing", () => {
+    // end < start: safeEnd clamps up to safeStart, so the range is empty.
+    expect(spliceAtSelection("abcd", 3, 1, "X")).toEqual({ value: "abcXd", caret: 4 });
+  });
+  it("falls back to the string end for non-finite indices", () => {
+    expect(spliceAtSelection("abc", NaN, NaN, "!")).toEqual({ value: "abc!", caret: 4 });
   });
 });

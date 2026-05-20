@@ -3,9 +3,15 @@
 // The "Report an issue" form: issue type, description, optional attachments.
 // Success is shown by the parent widget once onSubmit resolves.
 
-import { useState } from "react";
-import { SUPPORT_ISSUE_CATEGORIES, SUPPORT_MIN_BODY, SUPPORT_MAX_BODY } from "@/lib/support/format";
+import { useState, useRef, useCallback } from "react";
+import {
+  SUPPORT_ISSUE_CATEGORIES,
+  SUPPORT_MIN_BODY,
+  SUPPORT_MAX_BODY,
+  spliceAtSelection,
+} from "@/lib/support/format";
 import { AttachmentBar } from "./attachment-bar";
+import { EmojiPicker } from "./emoji-picker";
 
 interface TicketFormProps {
   onSubmit: (input: { body: string; category: string | null; files: File[] }) => Promise<void>;
@@ -17,6 +23,26 @@ export function TicketForm({ onSubmit, onError }: TicketFormProps) {
   const [body, setBody] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const insertEmoji = useCallback(
+    (emoji: string) => {
+      const el = textareaRef.current;
+      const start = el?.selectionStart ?? body.length;
+      const end = el?.selectionEnd ?? body.length;
+      const { value, caret } = spliceAtSelection(body, start, end, emoji);
+      if (value.length > SUPPORT_MAX_BODY) return;
+      setBody(value);
+      requestAnimationFrame(() => {
+        const node = textareaRef.current;
+        if (node) {
+          node.focus();
+          node.setSelectionRange(caret, caret);
+        }
+      });
+    },
+    [body],
+  );
 
   const trimmed = body.trim();
   const canSubmit = trimmed.length >= SUPPORT_MIN_BODY && !submitting;
@@ -67,6 +93,7 @@ export function TicketForm({ onSubmit, onError }: TicketFormProps) {
           </label>
           <textarea
             id="support-ticket-body"
+            ref={textareaRef}
             value={body}
             onChange={(e) => setBody(e.target.value)}
             maxLength={SUPPORT_MAX_BODY}
@@ -74,6 +101,9 @@ export function TicketForm({ onSubmit, onError }: TicketFormProps) {
             placeholder="Tell us what happened and what you expected to see…"
             className="mt-2 w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-[13px] text-gray-900 outline-none placeholder:text-gray-400 focus:border-orange-400 dark:border-white/10 dark:bg-white/[0.03] dark:text-white"
           />
+          <div className="mt-1.5">
+            <EmojiPicker onPick={insertEmoji} disabled={submitting} />
+          </div>
         </div>
 
         <div>

@@ -62,3 +62,24 @@ export const SUPPORT_STATUS_LABEL: Record<SupportThreadStatus, string> = {
 // Description bounds for a ticket submission.
 export const SUPPORT_MIN_BODY = 5;
 export const SUPPORT_MAX_BODY = 4000;
+
+/**
+ * Insert `insert` into `value`, replacing the [start, end) selection range.
+ * Returns the new string and the caret position to place just after the
+ * insertion. Indices are clamped, so out-of-range selection values are safe.
+ * Used by the support composers' emoji picker.
+ */
+export function spliceAtSelection(
+  value: string,
+  start: number,
+  end: number,
+  insert: string,
+): { value: string; caret: number } {
+  const len = value.length;
+  const safeStart = Math.max(0, Math.min(Number.isFinite(start) ? start : len, len));
+  const safeEnd = Math.max(safeStart, Math.min(Number.isFinite(end) ? end : len, len));
+  return {
+    value: value.slice(0, safeStart) + insert + value.slice(safeEnd),
+    caret: safeStart + insert.length,
+  };
+}

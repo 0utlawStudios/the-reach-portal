@@ -84,6 +84,12 @@ export function SupportInbox() {
     closeThread();
   }
 
+  // The inbox is opened deliberately, so fetch immediately rather than waiting
+  // for the useSupport hook's idle-deferred page-load fetch.
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
   // Deep link from a Telegram or email notification. selectedId is
   // lazy-initialised above; here we load the thread and mark it read.
   useEffect(() => {
