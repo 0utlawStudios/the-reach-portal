@@ -243,6 +243,12 @@
       "type": "file"
     },
     {
+      "path": "src/app/auth/setup/page.tsx",
+      "accessCount": 20,
+      "lastAccessed": 1779296546283,
+      "type": "file"
+    },
+    {
       "path": "src/app/api/health/deep-check/route.ts",
       "accessCount": 19,
       "lastAccessed": 1779263684774,
@@ -256,8 +262,8 @@
     },
     {
       "path": "src/lib/auth/require.ts",
-      "accessCount": 17,
-      "lastAccessed": 1779278291622,
+      "accessCount": 18,
+      "lastAccessed": 1779295312195,
       "type": "file"
     },
     {
@@ -285,21 +291,15 @@
       "type": "file"
     },
     {
-      "path": "src/app/auth/setup/page.tsx",
+      "path": "src/lib/team-context.tsx",
       "accessCount": 15,
-      "lastAccessed": 1779263629052,
+      "lastAccessed": 1779294058323,
       "type": "file"
     },
     {
       "path": "src/app/auth/reset-password/page.tsx",
       "accessCount": 14,
       "lastAccessed": 1779263631592,
-      "type": "file"
-    },
-    {
-      "path": "src/lib/team-context.tsx",
-      "accessCount": 14,
-      "lastAccessed": 1779264012242,
       "type": "file"
     },
     {
@@ -424,8 +424,8 @@
     },
     {
       "path": "supabase/migrations/0009_audit_log_v2.sql",
-      "accessCount": 6,
-      "lastAccessed": 1779278234321,
+      "accessCount": 7,
+      "lastAccessed": 1779295368172,
       "type": "file"
     },
     {
@@ -471,15 +471,15 @@
       "type": "file"
     },
     {
-      "path": "src/app/api/auth/logout/route.ts",
-      "accessCount": 3,
-      "lastAccessed": 1779262068921,
+      "path": "supabase/migrations/0002_tenant_model.sql",
+      "accessCount": 4,
+      "lastAccessed": 1779295387959,
       "type": "file"
     },
     {
-      "path": "supabase/migrations/0002_tenant_model.sql",
+      "path": "src/app/api/auth/logout/route.ts",
       "accessCount": 3,
-      "lastAccessed": 1779278117301,
+      "lastAccessed": 1779262068921,
       "type": "file"
     },
     {

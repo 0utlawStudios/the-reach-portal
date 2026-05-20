@@ -9,3 +9,8 @@
 {"t":0,"agent":"a3d4e03","agent_type":"unknown","event":"agent_stop","success":true}
 {"t":0,"agent":"aa0f439","agent_type":"unknown","event":"agent_stop","success":true}
 {"t":0,"agent":"acabbcc","agent_type":"unknown","event":"agent_stop","success":true}
+{"t":0,"agent":"a286417","agent_type":"unknown","event":"agent_stop","success":true}
+{"t":0,"agent":"a4408e6","agent_type":"security-reviewer","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"a05ed88","agent_type":"code-reviewer","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"a4408e6","agent_type":"security-reviewer","event":"agent_stop","success":true,"duration_ms":177351}
+{"t":0,"agent":"a05ed88","agent_type":"code-reviewer","event":"agent_stop","success":true,"duration_ms":180287}
