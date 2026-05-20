@@ -302,6 +302,12 @@
       "type": "file"
     },
     {
+      "path": "package.json",
+      "accessCount": 12,
+      "lastAccessed": 1779290518083,
+      "type": "file"
+    },
+    {
       "path": "src/components/pipeline-column.tsx",
       "accessCount": 11,
       "lastAccessed": 1779263623849,
@@ -317,12 +323,6 @@
       "path": "src/app/api/notifications/approved/route.ts",
       "accessCount": 11,
       "lastAccessed": 1779278120789,
-      "type": "file"
-    },
-    {
-      "path": "package.json",
-      "accessCount": 11,
-      "lastAccessed": 1779278186049,
       "type": "file"
     },
     {
