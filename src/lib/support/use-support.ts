@@ -101,6 +101,8 @@ export interface UseSupport {
   sendMessage: (threadId: string, body: string, files: File[]) => Promise<void>;
   markRead: (threadId: string) => Promise<void>;
   setStatus: (threadId: string, status: SupportThreadStatus) => Promise<void>;
+  loadChat: () => Promise<void>;
+  sendChatMessage: (body: string, files: File[]) => Promise<void>;
 }
 
 export function useSupport(scope: SupportScope = "own"): UseSupport {
@@ -227,6 +229,50 @@ export function useSupport(scope: SupportScope = "own"): UseSupport {
     [accessToken, upsertThread],
   );
 
+  // Load the caller's single live-chat thread into the active slot.
+  const loadChat = useCallback(async () => {
+    if (!accessToken) return;
+    try {
+      const { thread, messages } = await apiFetch<{
+        thread: SupportThread | null;
+        messages: SupportMessage[];
+      }>("/api/support/chat", accessToken);
+      activeIdRef.current = thread ? thread.id : null;
+      setActiveThread(thread);
+      setActiveMessages(messages);
+      if (thread) {
+        void apiFetch(`/api/support/threads/${thread.id}/read`, accessToken, {
+          method: "POST",
+        }).catch(() => {});
+      }
+    } catch (err) {
+      console.error("[support] loadChat failed:", err);
+      throw err;
+    }
+  }, [accessToken]);
+
+  // Send a chat message; the server lazily creates the chat thread.
+  const sendChatMessage = useCallback(
+    async (body: string, files: File[]) => {
+      if (!accessToken) throw new Error("Please sign in again.");
+      const claims = await uploadFiles(files, accessToken);
+      const { thread, message } = await apiFetch<{
+        thread: SupportThread;
+        message: SupportMessage;
+      }>("/api/support/chat", accessToken, {
+        method: "POST",
+        body: { body, attachments: claims },
+      });
+      upsertThread(thread);
+      activeIdRef.current = thread.id;
+      setActiveThread(thread);
+      setActiveMessages((prev) =>
+        prev.some((m) => m.id === message.id) ? prev : [...prev, message],
+      );
+    },
+    [accessToken, upsertThread],
+  );
+
   // Initial load.
   useEffect(() => {
     if (accessToken && !loadedRef.current) void refresh();
@@ -285,5 +331,7 @@ export function useSupport(scope: SupportScope = "own"): UseSupport {
     sendMessage,
     markRead,
     setStatus,
+    loadChat,
+    sendChatMessage,
   };
 }

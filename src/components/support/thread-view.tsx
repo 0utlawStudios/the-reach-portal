@@ -1,7 +1,8 @@
 "use client";
 
 // Conversation view: message history + composer. Shared by the user-facing
-// widget (viewerRole "user") and the admin Support Inbox (viewerRole "admin").
+// widget (tickets and live chat) and the admin Support Inbox. Tolerates a
+// null thread so the chat tab can render before its thread exists.
 
 import { useState, useRef, useEffect } from "react";
 import { ArrowLeft, Send } from "lucide-react";
@@ -26,13 +27,15 @@ function timeLabel(iso: string): string {
 }
 
 interface ThreadViewProps {
-  thread: SupportThread;
+  thread: SupportThread | null;
   messages: SupportMessage[];
   viewerRole: "user" | "admin";
   onSend: (body: string, files: File[]) => Promise<void>;
   onBack?: () => void;
   onError?: (message: string) => void;
   headerExtra?: React.ReactNode;
+  hideSubHeader?: boolean;
+  emptyLabel?: string;
 }
 
 export function ThreadView({
@@ -43,6 +46,8 @@ export function ThreadView({
   onBack,
   onError,
   headerExtra,
+  hideSubHeader,
+  emptyLabel,
 }: ThreadViewProps) {
   const [body, setBody] = useState("");
   const [files, setFiles] = useState<File[]>([]);
@@ -72,38 +77,42 @@ export function ThreadView({
 
   return (
     <div className="flex h-full flex-col">
-      {/* Sub-header */}
-      <div className="flex items-center gap-2 border-b border-gray-100 px-3 py-2.5 dark:border-white/[0.06]">
-        {onBack && (
-          <button
-            type="button"
-            onClick={onBack}
-            aria-label="Back"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/[0.06]"
+      {/* Sub-header — shown for tickets and the admin inbox, hidden for chat */}
+      {thread && !hideSubHeader && (
+        <div className="flex items-center gap-2 border-b border-gray-100 px-3 py-2.5 dark:border-white/[0.06]">
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              aria-label="Back"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/[0.06]"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[13px] font-semibold text-gray-900 dark:text-white">
+              {thread.subject || `Ticket #${threadShortCode(thread.id)}`}
+            </p>
+            <p className="text-[11px] text-gray-400">
+              {thread.kind === "chat" ? "Live chat" : `Ticket #${threadShortCode(thread.id)}`}
+            </p>
+          </div>
+          <span
+            className={`shrink-0 rounded-md px-2 py-0.5 text-[10px] font-semibold ${STATUS_STYLE[thread.status]}`}
           >
-            <ArrowLeft className="h-4 w-4" />
-          </button>
-        )}
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[13px] font-semibold text-gray-900 dark:text-white">
-            {thread.subject || `Ticket #${threadShortCode(thread.id)}`}
-          </p>
-          <p className="text-[11px] text-gray-400">
-            {thread.kind === "chat" ? "Live chat" : `Ticket #${threadShortCode(thread.id)}`}
-          </p>
+            {SUPPORT_STATUS_LABEL[thread.status]}
+          </span>
+          {headerExtra}
         </div>
-        <span
-          className={`shrink-0 rounded-md px-2 py-0.5 text-[10px] font-semibold ${STATUS_STYLE[thread.status]}`}
-        >
-          {SUPPORT_STATUS_LABEL[thread.status]}
-        </span>
-        {headerExtra}
-      </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 space-y-3 overflow-y-auto px-3 py-4">
         {messages.length === 0 && (
-          <p className="py-8 text-center text-[12px] text-gray-400">No messages yet.</p>
+          <p className="py-8 text-center text-[12px] text-gray-400">
+            {emptyLabel ?? "No messages yet."}
+          </p>
         )}
         {messages.map((m) => {
           if (m.senderType === "system") {
