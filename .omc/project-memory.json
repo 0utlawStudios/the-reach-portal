@@ -76,7 +76,14 @@
     ],
     "gitBranches": null
   },
-  "customNotes": [],
+  "customNotes": [
+    {
+      "timestamp": 1779293051195,
+      "source": "manual",
+      "category": "architecture",
+      "content": "Support Center performance pass + emoji picker — shipped 2026-05-21, commit b9a1c36, deployed live to smm.ten80ten.com.\n\nARCHITECTURE: the support widget is code-split. src/components/support/support-widget.tsx is a featherweight always-mounted shell (trigger button + the useSupport hook that feeds the unread dot). src/components/support/support-panel.tsx is the heavy panel (framer-motion + ticket form + conversation view), loaded via next/dynamic ssr:false only on first open; the trigger hover/focus-prefetches it. useSupport (src/lib/support/use-support.ts) defers its threads fetch + Supabase realtime subscription to requestIdleCallback (1.2s setTimeout fallback), so the support feature is off every page's first-paint path. The panel calls refresh() on open and the admin Support Inbox calls refresh() on mount, so both deliberately-opened surfaces still load immediately. Note: framer-motion still ships in the / route via login-screen.tsx and /auth/* — the support split does NOT remove it from the bundle.\n\nEMOJI PICKER: src/components/support/emoji-picker.tsx + src/lib/support/emoji-data.ts. To grow the emoji set, edit QUICK_EMOJIS in emoji-data.ts. Pure helpers spliceAtSelection (in format.ts) and nextRecents (in emoji-data.ts) are unit-tested.\n\nBUILD/TEST: test command is `npm test` (vitest run) — 169 tests as of 2026-05-21. The auto-scanned build.testCommand reads null but the script exists. Full preflight = lint + typecheck + test + build.\n\nDEPLOY: `vercel --prod --yes` from the repo root builds on Vercel and aliases smm.ten80ten.com. Do NOT git-add .omc/ into source commits — .omc state stays out of GitHub (project rule)."
+    }
+  ],
   "directoryMap": {
     "MAIN": {
       "path": "MAIN",
