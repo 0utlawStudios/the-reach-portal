@@ -10,6 +10,7 @@ import {
   resignAttachments,
   recordSupportAudit,
   resolveUserName,
+  resolveWorkspaceId,
 } from "@/lib/support/server";
 import { rowToThread, rowToMessage } from "@/lib/support/types";
 import type {
@@ -48,6 +49,11 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ id: str
     const role = await getTeamRole(admin, auth.user.email ?? "");
     // Don't reveal that the thread exists to anyone but its owner / superadmin.
     if (role !== "superadmin") return NextResponse.json({ error: "Not found" }, { status: 404 });
+    // Multi-tenant guard: a superadmin only reaches threads in their own workspace.
+    const workspaceId = await resolveWorkspaceId(admin, auth.user.id);
+    if (thread.workspace_id !== workspaceId) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
   }
 
   const { data: msgRows, error: msgErr } = await admin
@@ -89,10 +95,12 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
   }
 
   const admin = getSupportAdminClient();
+  const workspaceId = await resolveWorkspaceId(admin, adminAuth.user.id);
   const { data: threadRow, error } = await admin
     .from("support_threads")
     .update({ status, updated_at: new Date().toISOString() })
     .eq("id", id)
+    .eq("workspace_id", workspaceId)
     .select("*")
     .maybeSingle();
   if (error) {

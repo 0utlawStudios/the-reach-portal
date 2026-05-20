@@ -5,13 +5,14 @@
 // null thread so the chat tab can render before its thread exists.
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { ArrowLeft, Send } from "lucide-react";
+import { ArrowLeft, Send, CheckCheck } from "lucide-react";
 import type { SupportThread, SupportMessage, SupportThreadStatus } from "@/lib/support/types";
 import {
   threadShortCode,
   SUPPORT_STATUS_LABEL,
   SUPPORT_MAX_BODY,
   spliceAtSelection,
+  seenReceipt,
 } from "@/lib/support/format";
 import { AttachmentBar } from "./attachment-bar";
 import { EmojiPicker } from "./emoji-picker";
@@ -100,6 +101,15 @@ export function ThreadView({
   }
 
   const canSend = (body.trim().length > 0 || files.length > 0) && !sending;
+
+  // A "Seen" receipt sits under the viewer's last sent message once the other
+  // side's last_read_at reaches it.
+  const otherLastReadAt = thread
+    ? viewerRole === "admin"
+      ? thread.userLastReadAt
+      : thread.adminLastReadAt
+    : null;
+  const receipt = seenReceipt(messages, viewerRole, otherLastReadAt);
 
   return (
     <div className="flex h-full flex-col">
@@ -196,6 +206,12 @@ export function ThreadView({
                 )}
               </div>
               <span className="mt-0.5 px-1 text-[10px] text-gray-400">{timeLabel(m.createdAt)}</span>
+              {receipt && receipt.messageId === m.id && (
+                <span className="mt-0.5 flex items-center gap-0.5 px-1 text-[10px] text-gray-400">
+                  <CheckCheck className="h-3 w-3" />
+                  Seen {timeLabel(receipt.readAt)}
+                </span>
+              )}
             </div>
           );
         })}

@@ -6,13 +6,14 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireBearerUser } from "@/lib/auth/require";
 import { consume } from "@/lib/rate-limit";
 import {
   getSupportAdminClient,
   resolveWorkspaceId,
   resolveUserName,
+  findChatThread,
+  getOrCreateChatThread,
   parseAttachmentClaims,
   buildAttachmentsFromClaims,
   resignAttachments,
@@ -32,26 +33,13 @@ import { SUPPORT_MAX_BODY } from "@/lib/support/format";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-async function findChatThread(
-  admin: SupabaseClient,
-  userId: string,
-): Promise<SupportThreadRow | null> {
-  const { data } = await admin
-    .from("support_threads")
-    .select("*")
-    .eq("created_by", userId)
-    .eq("kind", "chat")
-    .limit(1)
-    .maybeSingle();
-  return (data as SupportThreadRow | null) ?? null;
-}
-
 export async function GET(request: NextRequest) {
   const auth = await requireBearerUser(request);
   if (auth instanceof NextResponse) return auth;
 
   const admin = getSupportAdminClient();
-  const thread = await findChatThread(admin, auth.user.id);
+  const workspaceId = await resolveWorkspaceId(admin, auth.user.id);
+  const thread = await findChatThread(admin, auth.user.id, workspaceId);
   if (!thread) return NextResponse.json({ thread: null, messages: [] });
 
   const { data: msgRows, error } = await admin
@@ -103,30 +91,18 @@ export async function POST(request: NextRequest) {
   const email = (auth.user.email ?? "").toLowerCase();
   const name = await resolveUserName(admin, email);
 
-  let thread = await findChatThread(admin, auth.user.id);
-  if (!thread) {
-    const { data: created, error: createErr } = await admin
-      .from("support_threads")
-      .insert({
-        id: randomUUID(),
-        workspace_id: workspaceId,
-        created_by: auth.user.id,
-        created_by_email: email,
-        created_by_name: name,
-        kind: "chat",
-        subject: "Live chat",
-        status: "open",
-        last_sender_type: "user",
-        unread_for_user: false,
-        unread_for_admin: true,
-      })
-      .select("*")
-      .single();
-    if (createErr || !created) {
-      console.error("[support/chat] thread create failed:", createErr?.message);
-      return NextResponse.json({ error: "Could not start the chat. Please try again." }, { status: 500 });
-    }
-    thread = created as SupportThreadRow;
+  let thread: SupportThreadRow;
+  try {
+    thread = await getOrCreateChatThread({
+      admin,
+      workspaceId,
+      ownerUserId: auth.user.id,
+      ownerEmail: email,
+      ownerName: name,
+    });
+  } catch (err) {
+    console.error("[support/chat] thread open failed:", err);
+    return NextResponse.json({ error: "Could not start the chat. Please try again." }, { status: 500 });
   }
 
   let attachments: SupportAttachment[] = [];

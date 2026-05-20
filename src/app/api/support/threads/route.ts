@@ -52,10 +52,12 @@ export async function GET(request: NextRequest) {
   const auth = await requireBearerUser(request);
   if (auth instanceof NextResponse) return auth;
   const admin = getSupportAdminClient();
+  const workspaceId = await resolveWorkspaceId(admin, auth.user.id);
   const { data, error } = await admin
     .from("support_threads")
     .select("*")
     .eq("created_by", auth.user.id)
+    .eq("workspace_id", workspaceId)
     .order("last_message_at", { ascending: false })
     .limit(100);
   if (error) {

@@ -12,6 +12,7 @@ import { useSupport } from "@/lib/support/use-support";
 import { threadShortCode, categoryLabel, SUPPORT_STATUS_LABEL } from "@/lib/support/format";
 import type { SupportThreadStatus } from "@/lib/support/types";
 import { ThreadView } from "./thread-view";
+import { RecipientPicker } from "./recipient-picker";
 
 const KIND_FILTERS = [
   { id: "all", label: "All" },
@@ -51,6 +52,7 @@ export function SupportInbox() {
   const support = useSupport("all");
   const [kindFilter, setKindFilter] = useState<(typeof KIND_FILTERS)[number]["id"]>("all");
   const [statusFilter, setStatusFilter] = useState<SupportThreadStatus | "all">("all");
+  const [starting, setStarting] = useState(false);
   // Lazy-initialised from a deep link so the effect below never setStates sync.
   const [selectedId, setSelectedId] = useState<string | null>(() => pendingSupportThreadId);
 
@@ -109,6 +111,19 @@ export function SupportInbox() {
     }
   }
 
+  async function handleStartChat(email: string) {
+    if (starting) return;
+    setStarting(true);
+    try {
+      const thread = await support.startChatWith(email);
+      setSelectedId(thread.id);
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : "Could not start the chat.", "error");
+    } finally {
+      setStarting(false);
+    }
+  }
+
   const detailReady = activeThread && activeThread.id === selectedId;
 
   return (
@@ -120,6 +135,7 @@ export function SupportInbox() {
         }`}
       >
         <div className="shrink-0 space-y-2 border-b border-gray-100 p-3 dark:border-white/[0.06]">
+          <RecipientPicker onPick={handleStartChat} busy={starting} />
           <div className="flex items-center justify-between gap-2">
             <div className="flex gap-1">
               {KIND_FILTERS.map((f) => (

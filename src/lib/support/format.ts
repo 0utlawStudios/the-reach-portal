@@ -1,7 +1,7 @@
 // Pure formatting helpers and shared constants for the Support Center.
 // No imports — safe to use from server routes, client components, and tests.
 
-import type { SupportThreadStatus } from "./types";
+import type { SupportThreadStatus, SupportSenderType } from "./types";
 
 /**
  * Human-readable reference for a thread, shown to the user and in
@@ -82,4 +82,31 @@ export function spliceAtSelection(
     value: value.slice(0, safeStart) + insert + value.slice(safeEnd),
     caret: safeStart + insert.length,
   };
+}
+
+/**
+ * Decide which of the viewer's own messages should carry a "Seen" receipt.
+ * Returns the id of the viewer's last sent message plus the read time, when
+ * the other party's last_read_at is at or after that message — otherwise null.
+ * Pure; unit-tested.
+ */
+export function seenReceipt(
+  messages: ReadonlyArray<{ id: string; senderType: SupportSenderType; createdAt: string }>,
+  viewerRole: "user" | "admin",
+  otherSideLastReadAt: string | null,
+): { messageId: string; readAt: string } | null {
+  if (!otherSideLastReadAt) return null;
+  const readMs = new Date(otherSideLastReadAt).getTime();
+  if (Number.isNaN(readMs)) return null;
+
+  const mine: SupportSenderType = viewerRole === "admin" ? "admin" : "user";
+  let last: { id: string; createdAt: string } | null = null;
+  for (const m of messages) {
+    if (m.senderType === mine) last = { id: m.id, createdAt: m.createdAt };
+  }
+  if (!last) return null;
+
+  const msgMs = new Date(last.createdAt).getTime();
+  if (Number.isNaN(msgMs)) return null;
+  return readMs >= msgMs ? { messageId: last.id, readAt: otherSideLastReadAt } : null;
 }

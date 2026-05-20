@@ -124,6 +124,7 @@ export interface UseSupport {
   setStatus: (threadId: string, status: SupportThreadStatus) => Promise<void>;
   loadChat: () => Promise<void>;
   sendChatMessage: (body: string, files: File[]) => Promise<void>;
+  startChatWith: (email: string) => Promise<SupportThread>;
 }
 
 export function useSupport(scope: SupportScope = "own"): UseSupport {
@@ -294,6 +295,23 @@ export function useSupport(scope: SupportScope = "own"): UseSupport {
     [accessToken, upsertThread],
   );
 
+  // Superadmin: open (or reuse) a live-chat thread with a chosen teammate,
+  // then load it into the active slot.
+  const startChatWith = useCallback(
+    async (email: string): Promise<SupportThread> => {
+      if (!accessToken) throw new Error("Please sign in again.");
+      const { thread } = await apiFetch<{ thread: SupportThread }>(
+        "/api/support/admin/start-chat",
+        accessToken,
+        { method: "POST", body: { email } },
+      );
+      upsertThread(thread);
+      await openThread(thread.id);
+      return thread;
+    },
+    [accessToken, upsertThread, openThread],
+  );
+
   // Initial load — deferred to browser idle so the support feature never sits
   // in the first-paint critical path. The widget loads closed; its data waits.
   useEffect(() => {
@@ -364,5 +382,6 @@ export function useSupport(scope: SupportScope = "own"): UseSupport {
     setStatus,
     loadChat,
     sendChatMessage,
+    startChatWith,
   };
 }

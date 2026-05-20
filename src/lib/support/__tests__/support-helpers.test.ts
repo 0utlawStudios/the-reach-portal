@@ -22,6 +22,8 @@ describe("rowToThread", () => {
       unread_for_admin: true,
       last_user_notified_at: null,
       last_admin_notified_at: null,
+      user_last_read_at: null,
+      admin_last_read_at: null,
       created_at: "2026-05-20T00:00:00Z",
       updated_at: "2026-05-20T00:00:00Z",
     };

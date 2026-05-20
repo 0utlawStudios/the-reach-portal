@@ -36,6 +36,8 @@ export interface SupportThread {
   lastSenderType: SupportSenderType | null;
   unreadForUser: boolean;
   unreadForAdmin: boolean;
+  userLastReadAt: string | null;
+  adminLastReadAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -73,6 +75,8 @@ export interface SupportThreadRow {
   unread_for_admin: boolean;
   last_user_notified_at: string | null;
   last_admin_notified_at: string | null;
+  user_last_read_at: string | null;
+  admin_last_read_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -105,6 +109,8 @@ export function rowToThread(r: SupportThreadRow): SupportThread {
     lastSenderType: r.last_sender_type,
     unreadForUser: r.unread_for_user,
     unreadForAdmin: r.unread_for_admin,
+    userLastReadAt: r.user_last_read_at,
+    adminLastReadAt: r.admin_last_read_at,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };

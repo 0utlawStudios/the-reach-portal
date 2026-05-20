@@ -5,6 +5,7 @@ import {
   attachmentKind,
   categoryLabel,
   spliceAtSelection,
+  seenReceipt,
   SUPPORT_ALLOWED_MIME,
   SUPPORT_MAX_FILE_BYTES,
   SUPPORT_MAX_FILES,
@@ -108,5 +109,65 @@ describe("spliceAtSelection", () => {
   });
   it("falls back to the string end for non-finite indices", () => {
     expect(spliceAtSelection("abc", NaN, NaN, "!")).toEqual({ value: "abc!", caret: 4 });
+  });
+});
+
+describe("seenReceipt", () => {
+  const adminMsg = (id: string, createdAt: string) =>
+    ({ id, senderType: "admin" as const, createdAt });
+  const userMsg = (id: string, createdAt: string) =>
+    ({ id, senderType: "user" as const, createdAt });
+
+  it("returns null when the other side has never read", () => {
+    expect(seenReceipt([adminMsg("a", "2026-05-21T10:00:00Z")], "admin", null)).toBeNull();
+  });
+
+  it("returns null when the viewer has sent no messages", () => {
+    expect(
+      seenReceipt([userMsg("u", "2026-05-21T10:00:00Z")], "admin", "2026-05-21T12:00:00Z"),
+    ).toBeNull();
+  });
+
+  it("marks the admin's last message Seen once the user has read past it", () => {
+    const out = seenReceipt(
+      [adminMsg("a1", "2026-05-21T10:00:00Z"), adminMsg("a2", "2026-05-21T10:05:00Z")],
+      "admin",
+      "2026-05-21T10:06:00Z",
+    );
+    expect(out).toEqual({ messageId: "a2", readAt: "2026-05-21T10:06:00Z" });
+  });
+
+  it("does not mark Seen when the read time is before the last message", () => {
+    expect(
+      seenReceipt(
+        [adminMsg("a1", "2026-05-21T10:00:00Z"), adminMsg("a2", "2026-05-21T10:05:00Z")],
+        "admin",
+        "2026-05-21T10:02:00Z",
+      ),
+    ).toBeNull();
+  });
+
+  it("treats a read time equal to the message time as Seen", () => {
+    const out = seenReceipt(
+      [adminMsg("a1", "2026-05-21T10:00:00Z")],
+      "admin",
+      "2026-05-21T10:00:00Z",
+    );
+    expect(out?.messageId).toBe("a1");
+  });
+
+  it("uses the user's own last message for a user viewer", () => {
+    const out = seenReceipt(
+      [userMsg("u1", "2026-05-21T09:00:00Z"), adminMsg("a1", "2026-05-21T10:00:00Z")],
+      "user",
+      "2026-05-21T09:30:00Z",
+    );
+    expect(out).toEqual({ messageId: "u1", readAt: "2026-05-21T09:30:00Z" });
+  });
+
+  it("returns null for an unparseable read timestamp", () => {
+    expect(
+      seenReceipt([adminMsg("a", "2026-05-21T10:00:00Z")], "admin", "not-a-date"),
+    ).toBeNull();
   });
 });

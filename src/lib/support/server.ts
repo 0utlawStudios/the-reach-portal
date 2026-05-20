@@ -82,6 +82,71 @@ export async function resolveUserName(admin: SupabaseClient, email: string): Pro
   return name || lower.split("@")[0] || "Team member";
 }
 
+// ─── live-chat threads ───
+
+/** Find a user's single live-chat thread in a workspace, or null. */
+export async function findChatThread(
+  admin: SupabaseClient,
+  ownerUserId: string,
+  workspaceId: string,
+): Promise<SupportThreadRow | null> {
+  const { data } = await admin
+    .from("support_threads")
+    .select("*")
+    .eq("created_by", ownerUserId)
+    .eq("workspace_id", workspaceId)
+    .eq("kind", "chat")
+    .limit(1)
+    .maybeSingle();
+  return (data as SupportThreadRow | null) ?? null;
+}
+
+/**
+ * Find a user's live-chat thread, or create an empty one. Race-safe: the
+ * (workspace_id, created_by) WHERE kind='chat' unique index (migration 0028)
+ * means a concurrent create loses with SQLSTATE 23505, and we re-read the
+ * winner instead of failing. The thread is created neutral — no messages, both
+ * unread flags false; callers set unread state when they append a message.
+ */
+export async function getOrCreateChatThread(args: {
+  admin: SupabaseClient;
+  workspaceId: string;
+  ownerUserId: string;
+  ownerEmail: string;
+  ownerName: string;
+}): Promise<SupportThreadRow> {
+  const { admin, workspaceId, ownerUserId, ownerEmail, ownerName } = args;
+
+  const existing = await findChatThread(admin, ownerUserId, workspaceId);
+  if (existing) return existing;
+
+  const { data: created, error } = await admin
+    .from("support_threads")
+    .insert({
+      id: randomUUID(),
+      workspace_id: workspaceId,
+      created_by: ownerUserId,
+      created_by_email: ownerEmail,
+      created_by_name: ownerName,
+      kind: "chat",
+      subject: "Live chat",
+      status: "open",
+      last_sender_type: null,
+      unread_for_user: false,
+      unread_for_admin: false,
+    })
+    .select("*")
+    .single();
+  if (created) return created as SupportThreadRow;
+
+  // Lost a create/create race against the unique index — re-read the winner.
+  if ((error as { code?: string } | null)?.code === "23505") {
+    const winner = await findChatThread(admin, ownerUserId, workspaceId);
+    if (winner) return winner;
+  }
+  throw new Error(`Could not open the chat thread: ${error?.message || "unknown"}`);
+}
+
 // ─── attachments: staged upload, then claim ───
 
 export interface UploadTarget {
