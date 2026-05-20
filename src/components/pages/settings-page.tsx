@@ -26,8 +26,10 @@ import {
   Shield, Download, Sun, Moon, Mail,
   Smartphone, Calendar, BarChart3, Zap, Link2, Webhook, FileText,
   UserPlus, ShieldCheck, Pencil, Eye, Crown, X, Send, Megaphone, Users, Settings as SettingsIcon,
-  Camera, Save, Upload, Trash2, RefreshCw, Sparkles, Loader2, Lock, Unlock,
+  Camera, Save, Upload, Trash2, RefreshCw, Sparkles, Loader2, Lock, Unlock, Inbox,
 } from "lucide-react";
+import { useNavigation } from "@/lib/navigation-context";
+import { SupportInbox } from "@/components/support/support-inbox";
 
 const roleConfig: Record<UserRole, { label: string; icon: React.ReactNode; color: string }> = {
   superadmin: { label: "Super Admin", icon: <Crown className="w-3 h-3" />, color: "text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20" },
@@ -235,13 +237,16 @@ export function SettingsPage() {
   const { currentUser } = useAuth();
   const { addToast } = useToast();
   const { workspaceId } = usePipeline();
+  const { pendingSupportThreadId } = useNavigation();
   const [workspaceTz, setWorkspaceTz] = useState("America/Chicago");
   const currentMember = members.find((m) => m.email === currentUser.email);
   const isAdmin = currentMember?.role === "superadmin" || currentMember?.role === "admin";
   const isSuperadmin = currentMember?.role === "superadmin";
   const canViewAudit = isAdmin || currentMember?.role === "approver" || currentMember?.role === "creative_director";
   const { getStatus } = usePresence(currentUser.email, workspaceId);
-  const [activeTab, setActiveTab] = useState<"general" | "team" | "audit" | "themes">("general");
+  const [activeTab, setActiveTab] = useState<"general" | "team" | "audit" | "themes" | "support">(
+    () => (pendingSupportThreadId ? "support" : "general"),
+  );
   const [auditLogs, setAuditLogs] = useState<AuditEntry[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
@@ -372,6 +377,7 @@ export function SettingsPage() {
           { id: "team" as const, label: "Team Members", icon: <Users className="w-3.5 h-3.5" />, badge: pendingRequests.length > 0 ? pendingRequests.length : undefined },
           { id: "themes" as const, label: "Themes", icon: <Palette className="w-3.5 h-3.5" /> },
           ...(canViewAudit ? [{ id: "audit" as const, label: "Audit Logs", icon: <FileText className="w-3.5 h-3.5" /> }] : []),
+          ...(isSuperadmin ? [{ id: "support" as const, label: "Support Inbox", icon: <Inbox className="w-3.5 h-3.5" /> }] : []),
         ].map((tab) => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
             className={`flex items-center gap-1.5 px-4 py-2.5 text-[12px] font-medium border-b-2 -mb-px transition-colors cursor-pointer ${activeTab === tab.id ? "border-blue-600 text-blue-700 dark:text-blue-400" : "border-transparent text-gray-400 hover:text-gray-600"}`}>
@@ -388,6 +394,8 @@ export function SettingsPage() {
         </div>
       ) : activeTab === "audit" ? (
         <AuditLogTab auditLogs={auditLogs} auditLoading={auditLoading} setAuditLogs={setAuditLogs} setAuditLoading={setAuditLoading} />
+      ) : activeTab === "support" ? (
+        <SupportInbox />
       ) : activeTab === "general" ? (
         <div className="space-y-4">
           <Section title="Workspace" icon={<Globe className="w-3.5 h-3.5 text-blue-500" />}>

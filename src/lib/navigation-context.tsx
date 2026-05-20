@@ -13,6 +13,9 @@ interface NavigationContextType {
   navigate: (page: Page) => void;
   navigateToPost: (postId: string) => void;
   clearPendingPost: () => void;
+  pendingSupportThreadId: string | null;
+  navigateToSupport: (threadId: string) => void;
+  clearPendingSupport: () => void;
   toggleSidebar: () => void;
   setSidebarCollapsed: (v: boolean) => void;
   togglePin: () => void;
@@ -29,6 +32,7 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsedState] = useState(() => loadState<boolean>(PIN_KEY, false) ? false : loadState<boolean>(SIDEBAR_KEY, false));
   const [sidebarPinned, setSidebarPinned] = useState(() => loadState<boolean>(PIN_KEY, false));
   const [pendingOpenPostId, setPendingOpenPostId] = useState<string | null>(null);
+  const [pendingSupportThreadId, setPendingSupportThreadId] = useState<string | null>(null);
   const hydrated = useRef(false);
 
   useEffect(() => {
@@ -47,6 +51,15 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const clearPendingPost = useCallback(() => { setPendingOpenPostId(null); }, []);
+
+  // Deep link: route the superadmin to Settings → Support Inbox at a thread.
+  const navigateToSupport = useCallback((threadId: string) => {
+    setPendingSupportThreadId(threadId);
+    setCurrentPage("settings");
+    saveState(PAGE_KEY, "settings");
+  }, []);
+
+  const clearPendingSupport = useCallback(() => { setPendingSupportThreadId(null); }, []);
 
   const toggleSidebar = useCallback(() => {
     setSidebarCollapsedState((p) => {
@@ -74,8 +87,8 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ currentPage, sidebarCollapsed, sidebarPinned, pendingOpenPostId, navigate, navigateToPost, clearPendingPost, toggleSidebar, setSidebarCollapsed, togglePin }),
-    [currentPage, sidebarCollapsed, sidebarPinned, pendingOpenPostId, navigate, navigateToPost, clearPendingPost, toggleSidebar, setSidebarCollapsed, togglePin]
+    () => ({ currentPage, sidebarCollapsed, sidebarPinned, pendingOpenPostId, pendingSupportThreadId, navigate, navigateToPost, clearPendingPost, navigateToSupport, clearPendingSupport, toggleSidebar, setSidebarCollapsed, togglePin }),
+    [currentPage, sidebarCollapsed, sidebarPinned, pendingOpenPostId, pendingSupportThreadId, navigate, navigateToPost, clearPendingPost, navigateToSupport, clearPendingSupport, toggleSidebar, setSidebarCollapsed, togglePin]
   );
 
   return <NavigationContext.Provider value={value}>{children}</NavigationContext.Provider>;

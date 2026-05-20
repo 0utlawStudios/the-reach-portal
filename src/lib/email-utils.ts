@@ -285,3 +285,74 @@ export function buildAdminNotificationHtml(requester: { name: string; email: str
   <div style="text-align:center;">${ctaButton("Review in Portal", siteUrl)}</div>
 </div>`);
 }
+
+// ─── Support: New Ticket (to admin) ───
+
+export function buildSupportTicketEmailHtml(params: {
+  shortCode: string;
+  userName: string;
+  userEmail: string;
+  category: string;
+  body: string;
+  attachments: ReadonlyArray<{ name: string; signedUrl: string; kind: "image" | "video" }>;
+  threadUrl: string;
+}): string {
+  const { shortCode, userName, userEmail, category, body, attachments, threadUrl } = params;
+
+  const attachmentBlock = attachments.length
+    ? `<div style="margin:0 0 24px;">
+         <p style="color:#9ca3af;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 10px;">Attachments (${attachments.length})</p>
+         ${attachments
+           .map((a) =>
+             a.kind === "image"
+               ? `<a href="${esc(a.signedUrl)}" style="display:block;margin:0 0 8px;"><img src="${esc(a.signedUrl)}" alt="${esc(a.name)}" style="max-width:100%;border-radius:8px;border:1px solid #eee;" /></a>`
+               : `<a href="${esc(a.signedUrl)}" style="display:inline-block;margin:0 8px 8px 0;background:#f3f4f6;color:#374151;text-decoration:none;padding:9px 14px;border-radius:8px;font-size:12px;font-weight:600;">&#9658; ${esc(a.name)}</a>`,
+           )
+           .join("")}
+       </div>`
+    : "";
+
+  return wrapEmail(`
+<div style="background:#0a0a0e;padding:28px 32px;">
+  <p style="color:#f59e0b;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin:0;">New Support Ticket</p>
+  <p style="color:#fff;font-size:18px;font-weight:800;margin:6px 0 0;">#${esc(shortCode)} &middot; ${esc(category)}</p>
+</div>
+<div style="background:#fff;padding:32px;">
+  <p style="color:#111;font-size:15px;line-height:1.6;margin:0 0 4px;"><strong>${esc(userName)}</strong> reported an issue.</p>
+  <p style="color:#6b7280;font-size:13px;margin:0 0 20px;">${esc(userEmail)}</p>
+  <div style="background:#f9fafb;border-left:3px solid #ea580c;padding:14px 18px;border-radius:0 10px 10px 0;margin:0 0 24px;">
+    <p style="color:#6b7280;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 6px;">The issue</p>
+    <p style="color:#374151;font-size:14px;line-height:1.6;margin:0;white-space:pre-wrap;">${esc(body)}</p>
+  </div>
+  ${attachmentBlock}
+  <div style="text-align:center;margin:8px 0 4px;">${ctaButton("Open in Support Inbox", threadUrl)}</div>
+  <p style="color:#9ca3af;font-size:11px;text-align:center;margin:18px 0 0;">Reply from the Support Inbox tab in Settings.</p>
+</div>`);
+}
+
+// ─── Support: Reply Notification (to user) ───
+
+export function buildSupportReplyEmailHtml(params: {
+  userName: string;
+  shortCode: string;
+  replyPreview: string;
+  threadUrl: string;
+}): string {
+  const { userName, shortCode, replyPreview, threadUrl } = params;
+  const logoUrl = `${getSiteUrl()}/ten80ten-logo.png`;
+  return wrapEmail(`
+<div style="background:linear-gradient(135deg,#ea580c,#f59e0b);padding:32px;text-align:center;">
+  <img src="${logoUrl}" alt="Ten80Ten" width="52" height="52" style="display:block;margin:0 auto 16px;border-radius:14px;background:rgba(255,255,255,0.2);padding:8px;" />
+  <h1 style="color:#fff;font-size:22px;font-weight:800;margin:0;">You have a reply</h1>
+  <p style="color:rgba(255,255,255,0.8);font-size:13px;margin:8px 0 0;">Support request #${esc(shortCode)}</p>
+</div>
+<div style="background:#fff;padding:32px;">
+  <p style="color:#111;font-size:15px;line-height:1.6;margin:0 0 16px;">Hi <strong>${esc(userName)}</strong>,</p>
+  <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 16px;">Our tech team replied to your support request:</p>
+  <div style="background:#f9fafb;border-left:3px solid #ea580c;padding:14px 18px;border-radius:0 10px 10px 0;margin:0 0 24px;">
+    <p style="color:#374151;font-size:14px;line-height:1.6;margin:0;white-space:pre-wrap;">${esc(replyPreview)}</p>
+  </div>
+  <div style="text-align:center;margin:8px 0 4px;">${ctaButton("View the reply", threadUrl)}</div>
+  <p style="color:#9ca3af;font-size:11px;text-align:center;margin:18px 0 0;">Open the support panel in the portal to continue the conversation.</p>
+</div>`);
+}

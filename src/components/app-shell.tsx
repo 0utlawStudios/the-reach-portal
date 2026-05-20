@@ -24,6 +24,7 @@ import { BrandKitPage } from "./pages/brand-kit-page";
 import { StudioPage } from "./pages/studio-page";
 import { RevisionModal } from "./revision-modal";
 import { KickbackModal } from "./kickback-modal";
+import { SupportWidget } from "./support/support-widget";
 import {
   CalendarDays,
   ChevronLeft,
@@ -83,6 +84,7 @@ function DashboardLayout() {
               <CreatePostModal open={createOpen} onClose={() => setCreateOpen(false)} />
               <RevisionModal />
               <KickbackModal />
+              <SupportWidget />
               <ToastContainer />
             </div>
           </TeamProvider>
