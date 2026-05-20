@@ -8,6 +8,7 @@
 //   no Authorization header        → 401
 //   token whose getUser errors     → 401
 //   valid user, no team_members row → 403
+//   valid pending team member       → 403 and no workspaceId
 //   valid active team member        → 200 + { workspaceId }
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -118,7 +119,7 @@ describe("GET /api/workspace/provision — membership contract", () => {
     tableResults = {
       workspace_members: {
         maybeSingle: {
-          data: { workspace_id: "00000000-0000-0000-0000-000000000001" },
+          data: { workspace_id: "00000000-0000-0000-0000-000000000001", status: "active" },
           error: null,
         },
       },
@@ -129,9 +130,29 @@ describe("GET /api/workspace/provision — membership contract", () => {
     expect(body.workspaceId).toBe("00000000-0000-0000-0000-000000000001");
   });
 
+  it("returns 403 and no workspaceId for a pending invite", async () => {
+    getUserResult = {
+      data: { user: { id: "user-4", email: "pending@ten80ten.com" } },
+      error: null,
+    };
+    tableResults = {
+      workspace_members: {
+        maybeSingle: { data: { workspace_id: "00000000-0000-0000-0000-000000000001", status: "pending" }, error: null },
+      },
+      team_members: {
+        maybeSingle: { data: { role: "social_media_specialist", status: "pending" }, error: null },
+      },
+    };
+    const res = await GET(makeRequest({ Authorization: "Bearer pending-token" }));
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.workspaceId).toBeUndefined();
+    expect(body.status).toBe("pending");
+  });
+
   it("returns 200 + workspaceId after provisioning a new active team member", async () => {
     getUserResult = {
-      data: { user: { id: "user-4", email: "newhire@ten80ten.com" } },
+      data: { user: { id: "user-5", email: "newhire@ten80ten.com" } },
       error: null,
     };
     // Not yet a workspace member, but has an active team_members row →
@@ -150,5 +171,26 @@ describe("GET /api/workspace/provision — membership contract", () => {
     const body = await res.json();
     expect(typeof body.workspaceId).toBe("string");
     expect(body.workspaceId.length).toBeGreaterThan(0);
+  });
+
+  it("promotes a stale pending workspace_members row when team_members is active", async () => {
+    getUserResult = {
+      data: { user: { id: "user-6", email: "retry@ten80ten.com" } },
+      error: null,
+    };
+    tableResults = {
+      workspace_members: {
+        maybeSingle: { data: { workspace_id: "00000000-0000-0000-0000-000000000001", status: "pending" }, error: null },
+        upsert: { data: null, error: null },
+      },
+      team_members: {
+        maybeSingle: { data: { role: "social_media_specialist", status: "active" }, error: null },
+      },
+    };
+    const res = await GET(makeRequest({ Authorization: "Bearer retry-token" }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.workspaceId).toBe("00000000-0000-0000-0000-000000000001");
+    expect(body.provisioned).toBe(true);
   });
 });

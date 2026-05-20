@@ -40,6 +40,7 @@ interface TeamContextType {
   inviteMember: (email: string, name: string, role: UserRole) => void;
   removeMember: (id: string, email: string, requestedBy: string) => void;
   updateMember: (id: string, updates: Partial<TeamMember>) => void;
+  refreshMembers: () => Promise<void>;
   refreshPendingRequests: () => void;
 }
 
@@ -101,26 +102,36 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   const persistTimeoutRef = useRef<number | null>(null);
   const useDb = isSupabaseConfigured();
 
-  useEffect(() => {
-    async function load() {
-      if (useDb) {
-        try {
-          const { data, error } = await supabase.from("team_members").select("*").order("joined_at");
-          if (!error && data) {
-            setMembers(data.map(dbToMember));
-          } else {
-            setMembers(loadState(STORAGE_KEY, DEFAULT_MEMBERS));
-          }
-        } catch {
-          setMembers(loadState(STORAGE_KEY, DEFAULT_MEMBERS));
-        }
-      } else {
-        setMembers(loadState(STORAGE_KEY, DEFAULT_MEMBERS));
-      }
+  const refreshMembers = useCallback(async () => {
+    if (!useDb) {
+      setMembers(loadState(STORAGE_KEY, DEFAULT_MEMBERS));
       hydrated.current = true;
+      return;
     }
-    load();
-  }, [useDb]);
+    try {
+      const { data, error } = await supabase.from("team_members").select("*").order("joined_at");
+      if (error) {
+        console.error("[team] load failed:", error.message);
+        // With Supabase configured, stale localStorage is worse than an empty
+        // authoritative view because it can make revoked/pending access look
+        // active. Keep the UI honest and let AppShell handle access failures.
+        setMembers(DEFAULT_MEMBERS);
+        addToast("Could not refresh team members. Try again.", "error");
+        hydrated.current = true;
+        return;
+      }
+      setMembers((data || []).map(dbToMember));
+    } catch (err) {
+      console.error("[team] load failed:", err);
+      setMembers(DEFAULT_MEMBERS);
+      addToast("Could not refresh team members. Try again.", "error");
+    }
+    hydrated.current = true;
+  }, [useDb, addToast]);
+
+  useEffect(() => {
+    void Promise.resolve().then(() => refreshMembers());
+  }, [refreshMembers]);
 
   // Load pending signup requests
   const refreshPendingRequests = useCallback(() => {
@@ -211,27 +222,33 @@ export function TeamProvider({ children }: { children: ReactNode }) {
           method: "POST",
           headers,
           body: JSON.stringify({ memberId: id, memberEmail: email, requestedBy }),
-        }).then((res) => {
+        }).then(async (res) => {
+          const data = await res.json().catch(() => ({}));
           // On failure, restore the optimistically removed member so the UI
           // does not show someone as gone when they still have access.
           if (!res.ok && previousMember) {
             setMembers((prev) => prev.some((m) => m.id === id) ? prev : [...prev, previousMember]);
-            addToast("Remove failed. Member was restored.", "error");
+            addToast(`Remove failed: ${data.error || "member was restored"}.`, "error");
+          } else if (res.ok) {
+            addToast(`${email} removed from team, workspace access, and auth.`, "success");
           }
+          void refreshMembers();
         }).catch(() => {
           if (previousMember) {
             setMembers((prev) => prev.some((m) => m.id === id) ? prev : [...prev, previousMember]);
             addToast("Remove failed. Member was restored.", "error");
           }
+          void refreshMembers();
         });
       }).catch(() => {
         if (previousMember) {
           setMembers((prev) => prev.some((m) => m.id === id) ? prev : [...prev, previousMember]);
           addToast("Remove failed. Member was restored.", "error");
         }
+        void refreshMembers();
       });
     }
-  }, [useDb, members, addToast]);
+  }, [useDb, members, addToast, refreshMembers]);
 
   const updateMember = useCallback((id: string, updates: Partial<TeamMember>) => {
     // DATA-007: snapshot the member so a failed update can be rolled back.
@@ -259,8 +276,8 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   }, [useDb, members, addToast]);
 
   const value = useMemo(
-    () => ({ members, pendingRequests, inviteMember, removeMember, updateMember, refreshPendingRequests }),
-    [members, pendingRequests, inviteMember, removeMember, updateMember, refreshPendingRequests]
+    () => ({ members, pendingRequests, inviteMember, removeMember, updateMember, refreshMembers, refreshPendingRequests }),
+    [members, pendingRequests, inviteMember, removeMember, updateMember, refreshMembers, refreshPendingRequests]
   );
 
   return <TeamContext.Provider value={value}>{children}</TeamContext.Provider>;

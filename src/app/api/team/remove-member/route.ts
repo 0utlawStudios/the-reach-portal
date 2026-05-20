@@ -11,6 +11,23 @@ function getAdminClient() {
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
 }
 
+type AdminClient = ReturnType<typeof getAdminClient>;
+
+/** Find an existing auth user by email using paginated listUsers. */
+async function findAuthUserByEmail(admin: AdminClient, email: string) {
+  let page = 1;
+  const perPage = 100;
+  while (true) {
+    const { data: { users }, error } = await admin.auth.admin.listUsers({ page, perPage });
+    if (error) throw new Error(`Auth lookup failed: ${error.message}`);
+    if (!users || users.length === 0) return null;
+    const found = users.find((u) => u.email?.toLowerCase() === email);
+    if (found) return found;
+    if (users.length < perPage) return null;
+    page++;
+  }
+}
+
 interface RemoveBody {
   memberId: string;
   memberEmail: string;
@@ -31,29 +48,55 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
+    const memberEmail = body.memberEmail.trim().toLowerCase();
+
     // ─── Guard against self-removal (no one can lock themselves out) ───
-    if (body.memberEmail.toLowerCase() === actorEmail) {
+    if (memberEmail === actorEmail) {
       return NextResponse.json({ error: "You cannot remove yourself" }, { status: 400 });
     }
 
     const admin = getAdminClient();
+    const authUser = await findAuthUserByEmail(admin, memberEmail);
 
-    // ─── Delete from team_members ───
-    await admin.from("team_members").delete().eq("id", body.memberId);
-
-    // ─── Delete auth user by email (paginated search) ───
-    let page = 1;
-    const perPage = 100;
-    while (true) {
-      const { data: { users }, error } = await admin.auth.admin.listUsers({ page, perPage });
-      if (error || !users || users.length === 0) break;
-      const found = users.find((u) => u.email?.toLowerCase() === body.memberEmail.toLowerCase());
-      if (found) {
-        await admin.auth.admin.deleteUser(found.id);
-        break;
+    // Remove active/pending workspace access before removing the profile row.
+    // This makes the revoke immediate even if the auth user cleanup has to be
+    // retried later by the invite route's orphan-user cleanup.
+    if (authUser?.id) {
+      const { error: workspaceDeleteErr } = await admin
+        .from("workspace_members")
+        .delete()
+        .eq("user_id", authUser.id);
+      if (workspaceDeleteErr) {
+        throw new Error(`Workspace membership cleanup failed: ${workspaceDeleteErr.message}`);
       }
-      if (users.length < perPage) break;
-      page++;
+    }
+
+    // Delete from team_members by both id and email. The id keeps the common
+    // path precise; the email cleanup makes the route idempotent when the UI
+    // has a stale row id after a realtime race.
+    const { error: teamDeleteErr } = await admin
+      .from("team_members")
+      .delete()
+      .eq("id", body.memberId);
+    if (teamDeleteErr) {
+      throw new Error(`Team profile cleanup failed: ${teamDeleteErr.message}`);
+    }
+
+    const { error: emailDeleteErr } = await admin
+      .from("team_members")
+      .delete()
+      .eq("email", memberEmail);
+    if (emailDeleteErr) {
+      throw new Error(`Team email cleanup failed: ${emailDeleteErr.message}`);
+    }
+
+    let authDeleted = false;
+    if (authUser?.id) {
+      const { error: authDeleteErr } = await admin.auth.admin.deleteUser(authUser.id);
+      if (authDeleteErr) {
+        throw new Error(`Auth user cleanup failed: ${authDeleteErr.message}`);
+      }
+      authDeleted = true;
     }
 
     // ─── Audit log ───
@@ -62,11 +105,11 @@ export async function POST(request: NextRequest) {
         p_entity_type: "team",
         p_action: "member_removed",
         p_entity_id: null,
-        p_metadata: { user_name: actorEmail, details: `Removed ${body.memberEmail} from team and auth` },
+        p_metadata: { user_name: actorEmail, details: `Removed ${memberEmail} from team, workspace access, and auth` },
       });
     } catch { /* best-effort */ }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, authDeleted });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[remove-member]", message);

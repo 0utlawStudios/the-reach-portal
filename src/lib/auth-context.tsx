@@ -12,11 +12,15 @@ interface UserProfile {
   role?: string;
 }
 
+type ProvisionStatus = "unknown" | "active" | "pending" | "denied" | "error";
+
 interface AuthContextType {
   isAuthenticated: boolean;
   currentUser: UserProfile;
   accessToken: string | null;
   provisionResult: { workspaceId: string } | null;
+  provisionStatus: ProvisionStatus;
+  provisionMessage: string | null;
   updateCurrentUserAvatar: (avatar: string | undefined) => void;
   login: (email: string, password: string) => Promise<string | null>;
   logout: () => void;
@@ -83,12 +87,39 @@ async function enrichFromTeamMembers(email: string, profile: UserProfile): Promi
   return profile;
 }
 
+async function provisionWorkspace(token: string): Promise<{
+  result: { workspaceId: string } | null;
+  status: ProvisionStatus;
+  message: string | null;
+}> {
+  try {
+    const res = await fetch("/api/workspace/provision", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const body = await res.json().catch(() => ({}));
+    if (res.ok && body?.workspaceId) {
+      return { result: { workspaceId: body.workspaceId }, status: "active", message: null };
+    }
+    if (body?.status === "pending") {
+      return { result: null, status: "pending", message: body.error || "Workspace access is pending." };
+    }
+    if (res.status === 403) {
+      return { result: null, status: "denied", message: body?.error || "No active workspace access." };
+    }
+    return { result: null, status: "error", message: body?.error || "Workspace provisioning failed." };
+  } catch {
+    return { result: null, status: "error", message: "Workspace provisioning failed." };
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [currentUser, setCurrentUser] = useState<UserProfile>(DEFAULT_USER);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [provisionResult, setProvisionResult] = useState<{ workspaceId: string } | null>(null);
+  const [provisionStatus, setProvisionStatus] = useState<ProvisionStatus>("unknown");
+  const [provisionMessage, setProvisionMessage] = useState<string | null>(null);
 
   // Check for existing Supabase session on mount
   useEffect(() => {
@@ -104,14 +135,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // before PipelineProvider ever mounts, eliminating the waterfall.
           const [enriched, provisioned] = await Promise.all([
             enrichFromTeamMembers(email, profile),
-            fetch("/api/workspace/provision", {
-              headers: { Authorization: `Bearer ${token}` },
-            }).then((r) => r.ok ? r.json() : null).catch(() => null),
+            provisionWorkspace(token),
           ]);
           setCurrentUser(enriched);
           setIsAuthenticated(true);
           setAccessToken(token);
-          if (provisioned?.workspaceId) setProvisionResult(provisioned);
+          setProvisionResult(provisioned.result);
+          setProvisionStatus(provisioned.status);
+          setProvisionMessage(provisioned.message);
         }
       } catch (err) {
         console.error("[auth] init failed:", err);
@@ -138,11 +169,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setCurrentUser(profile);
         setIsAuthenticated(true);
         setAccessToken(session.access_token);
+        setProvisionStatus("unknown");
+        setProvisionMessage(null);
         // Enrich from DB in background (non-blocking).
         // PERF-004: only call setCurrentUser a second time when the enriched
         // profile actually differs (name/role/avatar). Mirrors the AvatarSync
         // equality guard so a no-op enrich does not trigger a cascade re-render.
-        enrichFromTeamMembers(email, profile).then((enriched) => {
+        Promise.all([
+          enrichFromTeamMembers(email, profile),
+          provisionWorkspace(session.access_token),
+        ]).then(([enriched, provisioned]) => {
           setCurrentUser((prev) =>
             enriched.name === prev.name &&
             enriched.role === prev.role &&
@@ -150,11 +186,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               ? prev
               : enriched
           );
+          setProvisionResult(provisioned.result);
+          setProvisionStatus(provisioned.status);
+          setProvisionMessage(provisioned.message);
         }).catch(() => {});
       } else {
         setIsAuthenticated(false);
         setCurrentUser(DEFAULT_USER);
         setAccessToken(null);
+        setProvisionResult(null);
+        setProvisionStatus("unknown");
+        setProvisionMessage(null);
       }
     });
 
@@ -172,9 +214,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const userEmail = data.user?.email || email;
     const meta = data.user?.user_metadata || {};
     let profile = buildProfile(userEmail, meta);
-    profile = await enrichFromTeamMembers(userEmail, profile);
+    const [enriched, provisioned] = await Promise.all([
+      enrichFromTeamMembers(userEmail, profile),
+      provisionWorkspace(data.session.access_token),
+    ]);
+    profile = enriched;
     setCurrentUser(profile);
     setIsAuthenticated(true);
+    setAccessToken(data.session.access_token);
+    setProvisionResult(provisioned.result);
+    setProvisionStatus(provisioned.status);
+    setProvisionMessage(provisioned.message);
     // Reset navigation to dashboard on fresh login
     saveState("nav_page", "dashboard");
     return null;
@@ -188,6 +238,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setCurrentUser(DEFAULT_USER);
     setAccessToken(null);
     setProvisionResult(null);
+    setProvisionStatus("unknown");
+    setProvisionMessage(null);
   }, []);
 
   const updateCurrentUserAvatar = useCallback((avatar: string | undefined) => {
@@ -195,8 +247,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ isAuthenticated, currentUser, accessToken, provisionResult, updateCurrentUserAvatar, login, logout }),
-    [isAuthenticated, currentUser, accessToken, provisionResult, updateCurrentUserAvatar, login, logout]
+    () => ({
+      isAuthenticated,
+      currentUser,
+      accessToken,
+      provisionResult,
+      provisionStatus,
+      provisionMessage,
+      updateCurrentUserAvatar,
+      login,
+      logout,
+    }),
+    [isAuthenticated, currentUser, accessToken, provisionResult, provisionStatus, provisionMessage, updateCurrentUserAvatar, login, logout]
   );
 
   if (!hydrated) return null;

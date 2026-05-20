@@ -1,7 +1,7 @@
 "use client";
 
 import { RawImage } from "@/components/raw-image";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabaseClient";
 import { NavigationProvider, useNavigation } from "@/lib/navigation-context";
@@ -32,10 +32,13 @@ import {
   FolderOpen,
   Kanban,
   LayoutDashboard,
+  Loader2,
+  Lock,
   Palette,
   Pin,
   PinOff,
   Plus,
+  RefreshCw,
   Settings,
   Sparkles,
 } from "lucide-react";
@@ -292,7 +295,46 @@ function AvatarSync() {
 }
 
 export function AppShell() {
-  const { isAuthenticated, currentUser } = useAuth();
+  const { isAuthenticated, currentUser, provisionStatus, provisionMessage, logout } = useAuth();
   if (!isAuthenticated) return <LoginScreen />;
+  if (provisionStatus !== "active") {
+    return (
+      <div className="min-h-dvh bg-[#09090b] flex items-center justify-center p-4">
+        <div className="w-full max-w-[420px] rounded-2xl border border-white/[0.08] bg-[#131316] p-6 text-center shadow-2xl">
+          <div className="w-12 h-12 mx-auto rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center mb-4">
+            {provisionStatus === "unknown" ? (
+              <Loader2 className="w-5 h-5 text-orange-400 animate-spin" />
+            ) : (
+              <Lock className="w-5 h-5 text-orange-400" />
+            )}
+          </div>
+          <h1 className="text-[17px] font-bold text-white">
+            {provisionStatus === "unknown" ? "Checking workspace access" : "Workspace access not active"}
+          </h1>
+          <p className="text-[13px] text-gray-400 mt-2 leading-relaxed">
+            {provisionStatus === "unknown"
+              ? "Confirming your team membership before loading shared content."
+              : provisionMessage || "Your invitation is not active yet. Ask an admin to resend the invite or complete setup again."}
+          </p>
+          {provisionStatus !== "unknown" && (
+            <div className="flex gap-2 mt-5">
+              <button
+                onClick={() => window.location.reload()}
+                className="flex-1 h-10 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-[12px] font-semibold flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />Refresh
+              </button>
+              <button
+                onClick={logout}
+                className="flex-1 h-10 rounded-lg border border-white/[0.08] text-gray-300 hover:bg-white/[0.04] text-[12px] font-semibold cursor-pointer"
+              >
+                Sign Out
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
   return <ThemeProvider email={currentUser.email}><DashboardLayout /></ThemeProvider>;
 }

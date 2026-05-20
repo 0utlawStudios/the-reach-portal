@@ -101,6 +101,16 @@ export function StudioPage() {
     return ["superadmin", "admin", "owner", "creative_director", "social_media_specialist"].includes(role);
   }, [currentUser.role]);
 
+  const makeBlankRow = useCallback((rowIndex: number): PlanRow => ({
+    id: `tmp-${rowIndex}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    workspace_id: "", created_by: currentUser.email || "", row_index: rowIndex,
+    scheduled_date: todayIso(rowIndex - 3 < 0 ? 0 : rowIndex - 3),
+    scheduled_time: null, platforms: [], media_type: null, format: null, slides_count: null, resolved_aspect: null,
+    feel: null, visual_style: null, style_prompt: null, topic: null, notes: null, status: "empty",
+    generated_post_id: null, last_error: null, cost_usd: null,
+    created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+  }), [currentUser.email]);
+
   // Feature flag + allowlist check. Runs before fetching rows so we render
   // a clean disabled state if the kill switch is flipped (rather than a
   // sea of error toasts from the rows endpoint 503-ing).
@@ -135,10 +145,7 @@ export function StudioPage() {
         if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
         if (cancelled) return;
         const fetched = (json.data?.rows || []) as PlanRow[];
-        const have = fetched.length;
-        const placeholders: PlanRow[] = [];
-        for (let i = 0; i < Math.max(0, 14 - have); i++) placeholders.push(makeBlankRow(have + i));
-        setRows([...fetched, ...placeholders]);
+        setRows(fetched.length > 0 ? fetched : [makeBlankRow(0)]);
       } catch (err) {
         if (!cancelled) addToast(`Failed to load Studio rows: ${err instanceof Error ? err.message : String(err)}`, "error");
       } finally {
@@ -148,7 +155,7 @@ export function StudioPage() {
     if (accessState === "ok") load();
     else setLoading(false);
     return () => { cancelled = true; };
-  }, [addToast, accessState]);
+  }, [addToast, accessState, makeBlankRow]);
 
   // Track tmp→real id swaps so the realtime echo doesn't duplicate the row.
   // When a POST /rows succeeds, the new server row may also arrive via
@@ -250,18 +257,6 @@ export function StudioPage() {
     load();
     return () => { cancelled = true; };
   }, [rows]);
-
-  function makeBlankRow(rowIndex: number): PlanRow {
-    return {
-      id: `tmp-${rowIndex}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      workspace_id: "", created_by: currentUser.email || "", row_index: rowIndex,
-      scheduled_date: todayIso(rowIndex - 3 < 0 ? 0 : rowIndex - 3),
-      scheduled_time: null, platforms: [], media_type: null, format: null, slides_count: null, resolved_aspect: null,
-      feel: null, visual_style: null, style_prompt: null, topic: null, notes: null, status: "empty",
-      generated_post_id: null, last_error: null, cost_usd: null,
-      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-    };
-  }
 
   // Tracks tmp rows that failed to save so we don't spam the user with the
   // same toast on every keystroke; we retry on the next debounce instead.
@@ -379,8 +374,11 @@ export function StudioPage() {
   }, [rows, addToast]);
 
   const addRow = useCallback(() => {
-    setRows((prev) => [...prev, makeBlankRow(prev.length)]);
-  }, []);
+    setRows((prev) => {
+      const nextIndex = prev.reduce((max, row) => Math.max(max, row.row_index ?? -1), -1) + 1;
+      return [...prev, makeBlankRow(nextIndex)];
+    });
+  }, [makeBlankRow]);
 
   const openGeneratedPost = useCallback((row: PlanRow) => {
     if (!row.generated_post_id) return;
@@ -416,7 +414,7 @@ export function StudioPage() {
   // tells them how to request access. Placeholder rows are seeded below so
   // the page isn't empty.
   const displayRows = readOnly && rows.length === 0
-    ? Array.from({ length: 3 }, (_, i) => makeBlankRow(i))
+    ? [makeBlankRow(0)]
     : rows;
 
   const readyCount = rows.filter((r) => r.status === "ready").length;
@@ -445,7 +443,7 @@ export function StudioPage() {
           <LockIcon className="w-4 h-4 mt-0.5 text-violet-600 dark:text-violet-300 shrink-0" />
           <div className="text-[12px] text-violet-900 dark:text-violet-200 leading-relaxed">
             <p className="font-semibold mb-0.5">Read-only preview</p>
-            <p>You&apos;re seeing what Creator Studio looks like, but you can&apos;t edit or generate. Ask an admin (Aldridge or Carlo) to add your email in <span className="font-medium">Settings → General → Creator Studio Access</span>.</p>
+            <p>You&apos;re seeing what Creator Studio looks like, but you can&apos;t edit or generate. Ask a developer in chat or create a support ticket to request Creator Studio access.</p>
           </div>
         </div>
       )}
@@ -622,7 +620,7 @@ interface CardProps {
 
 function StudioCard(props: CardProps) {
   const { row, index, busy, onChange, onGenerate, onCancel, onOpenCard, hasCard } = props;
-  const platforms = row.platforms || [];
+  const platforms = useMemo(() => row.platforms || [], [row.platforms]);
   const mediaType: MediaType = (row.media_type as MediaType) || "image";
   const format = (row.format as StudioFormat) || (mediaType === "video" ? "reel" : "single");
   const slides = row.slides_count ?? (format === "carousel" ? 5 : null);

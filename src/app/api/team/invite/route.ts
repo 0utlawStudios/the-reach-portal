@@ -78,7 +78,19 @@ export async function POST(request: NextRequest) {
     // ─── Clean up any orphaned auth user (e.g. previously removed member) ───
     const existingAuthUser = await findAuthUserByEmail(admin, email);
     if (existingAuthUser) {
-      await admin.auth.admin.deleteUser(existingAuthUser.id);
+      const { error: workspaceCleanupErr } = await admin
+        .from("workspace_members")
+        .delete()
+        .eq("user_id", existingAuthUser.id);
+      if (workspaceCleanupErr) {
+        console.error("[team/invite] orphan workspace cleanup failed:", workspaceCleanupErr.message);
+        return NextResponse.json({ error: "Failed to clean up previous workspace access" }, { status: 500 });
+      }
+      const { error: orphanAuthDeleteErr } = await admin.auth.admin.deleteUser(existingAuthUser.id);
+      if (orphanAuthDeleteErr) {
+        console.error("[team/invite] orphan auth cleanup failed:", orphanAuthDeleteErr.message);
+        return NextResponse.json({ error: "Failed to clean up previous auth account" }, { status: 500 });
+      }
     }
 
     // ─── Step 1: Create user silently with random temp password ───

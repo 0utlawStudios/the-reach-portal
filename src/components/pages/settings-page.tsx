@@ -42,7 +42,19 @@ const roleConfig: Record<UserRole, { label: string; icon: React.ReactNode; color
 };
 
 // ─── Edit Profile Modal ───
-function EditProfileModal({ member, onClose, onDelete, canDelete }: { member: TeamMember; onClose: () => void; onDelete?: () => void; canDelete?: boolean }) {
+function EditProfileModal({
+  member,
+  onClose,
+  onDelete,
+  canDelete,
+  canManageTeam,
+}: {
+  member: TeamMember;
+  onClose: () => void;
+  onDelete?: () => void;
+  canDelete?: boolean;
+  canManageTeam: boolean;
+}) {
   const { updateMember } = useTeam();
   const { addToast } = useToast();
   const { currentUser, updateCurrentUserAvatar } = useAuth();
@@ -56,8 +68,10 @@ function EditProfileModal({ member, onClose, onDelete, canDelete }: { member: Te
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Avatar crop flow
   const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
+  const canEditRole = canManageTeam && member.role !== "superadmin";
 
   const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!canManageTeam) return;
     const file = e.target.files?.[0];
     if (!file) return;
     const src = URL.createObjectURL(file);
@@ -89,8 +103,16 @@ function EditProfileModal({ member, onClose, onDelete, canDelete }: { member: Te
   };
 
   const handleSave = () => {
-    const roleChanged = role !== member.role;
-    updateMember(member.id, { name, email, phone: phone || undefined, role, avatar: avatarUrl || undefined });
+    if (!canManageTeam) return;
+    const roleChanged = canEditRole && role !== member.role;
+    const updates: Partial<TeamMember> = {
+      name,
+      email,
+      phone: phone || undefined,
+      avatar: avatarUrl || undefined,
+    };
+    if (canEditRole) updates.role = role;
+    updateMember(member.id, updates);
     if (member.email === currentUser.email) {
       updateCurrentUserAvatar(avatarUrl || undefined);
     }
@@ -122,14 +144,14 @@ function EditProfileModal({ member, onClose, onDelete, canDelete }: { member: Te
                     {name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
                   </div>
                 )}
-                <button onClick={() => fileInputRef.current?.click()} className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
+                <button disabled={!canManageTeam} onClick={() => fileInputRef.current?.click()} className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer disabled:cursor-not-allowed">
                   {uploading ? (
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   ) : (
                     <Camera className="w-5 h-5 text-white" />
                   )}
                 </button>
-                <button onClick={() => fileInputRef.current?.click()} className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-blue-600 border-2 border-white dark:border-[#151518] flex items-center justify-center cursor-pointer hover:bg-blue-700 transition-colors">
+                <button disabled={!canManageTeam} onClick={() => fileInputRef.current?.click()} className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-blue-600 border-2 border-white dark:border-[#151518] flex items-center justify-center cursor-pointer hover:bg-blue-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50">
                   <Upload className="w-3 h-3 text-white" />
                 </button>
               </div>
@@ -138,27 +160,27 @@ function EditProfileModal({ member, onClose, onDelete, canDelete }: { member: Te
             {/* Name */}
             <div className="space-y-1">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.08em]">Full Name</label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} className="h-9 bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[13px] text-gray-800 dark:text-gray-200" />
+              <Input disabled={!canManageTeam} value={name} onChange={(e) => setName(e.target.value)} className="h-9 bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[13px] text-gray-800 dark:text-gray-200" />
             </div>
 
             {/* Email */}
             <div className="space-y-1">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.08em]">Email</label>
-              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="h-9 bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[13px] text-gray-800 dark:text-gray-200" />
+              <Input disabled={!canManageTeam} type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="h-9 bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[13px] text-gray-800 dark:text-gray-200" />
             </div>
 
             {/* Phone */}
             <div className="space-y-1">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.08em]">Phone / WhatsApp</label>
-              <Input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+1 234 567 8900" className="h-9 bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[13px] text-gray-800 dark:text-gray-200 font-mono" />
+              <Input disabled={!canManageTeam} type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+1 234 567 8900" className="h-9 bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[13px] text-gray-800 dark:text-gray-200 font-mono" />
             </div>
 
             {/* Role */}
             <div className="space-y-1">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.08em]">Role</label>
-              {member.role === "superadmin" ? (
+              {!canEditRole ? (
                 <div className="h-9 px-3 flex items-center rounded-lg bg-amber-50 dark:bg-amber-500/5 border border-amber-200 dark:border-amber-500/20 text-[13px] text-amber-700 dark:text-amber-400 font-medium">
-                  <Crown className="w-3.5 h-3.5 mr-2" />Owner — cannot be reassigned
+                  <Crown className="w-3.5 h-3.5 mr-2" />{roleConfig[member.role]?.label || member.role}
                 </div>
               ) : (
                 <select value={role} onChange={(e) => setRole(e.target.value as UserRole)} className="w-full h-9 px-3 rounded-lg bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-[13px] text-gray-700 dark:text-gray-300 outline-none cursor-pointer">
@@ -172,7 +194,7 @@ function EditProfileModal({ member, onClose, onDelete, canDelete }: { member: Te
             {/* Actions */}
             <div className="flex gap-2 pt-2">
               <Button variant="outline" onClick={onClose} className="flex-1 h-9 rounded-lg text-[12px]">Cancel</Button>
-              <Button onClick={handleSave} className="flex-1 h-9 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-[12px] shadow-sm">
+              <Button disabled={!canManageTeam} onClick={handleSave} className="flex-1 h-9 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-[12px] shadow-sm disabled:opacity-40">
                 <Save className="w-3.5 h-3.5 mr-1.5" />Save Changes
               </Button>
             </div>
@@ -298,6 +320,7 @@ export function SettingsPage() {
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isAdmin) return;
     if (!inviteEmail.trim() || !inviteName.trim() || inviting) return;
     setInviting(true);
     try {
@@ -338,6 +361,7 @@ export function SettingsPage() {
   };
 
   const handleResendInvite = async (member: TeamMember) => {
+    if (!isAdmin) return;
     setResendingInvite(member.id);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -382,7 +406,7 @@ export function SettingsPage() {
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
             className={`flex items-center gap-1.5 px-4 py-2.5 text-[12px] font-medium border-b-2 -mb-px transition-colors cursor-pointer ${activeTab === tab.id ? "border-blue-600 text-blue-700 dark:text-blue-400" : "border-transparent text-gray-400 hover:text-gray-600"}`}>
             {tab.icon}{tab.label}
-            {tab.id === "team" && <span className="text-[9px] bg-gray-100 dark:bg-white/[0.06] text-gray-500 px-1.5 rounded-full">{members.length}</span>}
+            {tab.id === "team" && <span className="text-[9px] bg-gray-100 dark:bg-white/[0.06] text-gray-500 px-1.5 rounded-full">{activeMembers.length}</span>}
             {tab.id === "team" && pendingRequests.length > 0 && <span className="w-4 h-4 rounded-full bg-amber-500 text-white text-[8px] font-bold flex items-center justify-center animate-pulse">{pendingRequests.length}</span>}
           </button>
         ))}
@@ -513,13 +537,15 @@ export function SettingsPage() {
         /* Team tab */
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-[13px] text-gray-500 dark:text-gray-400">{members.length} members with workspace access</p>
-            <Button size="sm" onClick={() => setShowInvite(!showInvite)} className="h-8 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-[11px] font-medium cursor-pointer shadow-sm">
-              <UserPlus className="w-3.5 h-3.5 mr-1.5" />Invite
-            </Button>
+            <p className="text-[13px] text-gray-500 dark:text-gray-400">{activeMembers.length} members with workspace access</p>
+            {isAdmin && (
+              <Button size="sm" onClick={() => setShowInvite(!showInvite)} className="h-8 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-[11px] font-medium cursor-pointer shadow-sm">
+                <UserPlus className="w-3.5 h-3.5 mr-1.5" />Invite
+              </Button>
+            )}
           </div>
 
-          {showInvite && (
+          {isAdmin && showInvite && (
             <form onSubmit={handleInvite} className="bg-white dark:bg-[#151518] rounded-xl border border-blue-200 dark:border-blue-500/20 p-4 space-y-2.5 shadow-sm shadow-blue-500/5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -543,7 +569,7 @@ export function SettingsPage() {
           )}
 
           {/* Pending access requests — visible to ALL, approve/reject buttons for superadmin ONLY */}
-          {pendingRequests.length > 0 && (
+          {isAdmin && pendingRequests.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-[0.08em] flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
@@ -587,9 +613,10 @@ export function SettingsPage() {
               <div className="bg-white dark:bg-[#151518] rounded-2xl border border-gray-100 dark:border-white/[0.06] overflow-hidden shadow-sm">
                 {activeMembers.map((member, i) => {
                   const role = roleConfig[member.role];
+                  const canEditMember = isAdmin && (member.role !== "superadmin" || isSuperadmin);
                   return (
-                    <button key={member.id} onClick={() => setEditingMember(member)}
-                      className={`w-full flex items-start gap-3 px-4 py-3.5 hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors cursor-pointer text-left ${i > 0 ? "border-t border-gray-50 dark:border-white/[0.03]" : ""}`}>
+                    <button key={member.id} onClick={canEditMember ? () => setEditingMember(member) : undefined}
+                      className={`w-full flex items-start gap-3 px-4 py-3.5 transition-colors text-left ${canEditMember ? "hover:bg-slate-50 dark:hover:bg-white/[0.02] cursor-pointer" : "cursor-default"} ${i > 0 ? "border-t border-gray-50 dark:border-white/[0.03]" : ""}`}>
                       <div className="relative shrink-0 mt-0.5">
                         {member.avatar ? (
                           <RawImage src={member.avatar} alt={member.name} className="w-9 h-9 rounded-full object-cover" />
@@ -603,7 +630,7 @@ export function SettingsPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
                           <p className="text-[13px] font-medium text-gray-800 dark:text-gray-200">{member.name}</p>
-                          <Pencil className="w-3.5 h-3.5 text-gray-300 shrink-0 ml-2" />
+                          {canEditMember && <Pencil className="w-3.5 h-3.5 text-gray-300 shrink-0 ml-2" />}
                         </div>
                         <p className="text-[11px] text-gray-400 mt-0.5">{member.email}{member.phone ? ` · ${member.phone}` : ""}</p>
                         <div className="flex flex-wrap items-center gap-1.5 mt-2">
@@ -628,7 +655,7 @@ export function SettingsPage() {
           )}
 
           {/* Pending Invites */}
-          {pendingMembers.length > 0 && (
+          {isAdmin && pendingMembers.length > 0 && (
             <div>
               <h3 className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-[0.08em] mb-2 flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
@@ -681,12 +708,13 @@ export function SettingsPage() {
         <EditProfileModal
           member={editingMember}
           onClose={() => setEditingMember(null)}
+          canManageTeam={isAdmin}
           canDelete={
             editingMember.role !== "superadmin" &&
             (currentUser.email !== editingMember.email) &&
             members.some((m) => m.email === currentUser.email && (m.role === "superadmin" || m.role === "admin"))
           }
-          onDelete={() => { removeMember(editingMember.id, editingMember.email, currentUser.email); addToast(`${editingMember.name} removed from team and auth`, "success"); }}
+          onDelete={() => { removeMember(editingMember.id, editingMember.email, currentUser.email); }}
         />
       )}
 

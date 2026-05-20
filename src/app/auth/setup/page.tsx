@@ -30,6 +30,7 @@ export default function SetupPasswordPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("");
   const [ready, setReady] = useState(false);
+  const [passwordUpdated, setPasswordUpdated] = useState(false);
 
   useEffect(() => {
     async function initSession() {
@@ -110,22 +111,35 @@ export default function SetupPasswordPage() {
     const cleanPhone = whatsapp.trim().replace(/[^0-9+]/g, "");
     const supabase = getSupabase();
 
-    // Update password
-    const { error: pwError } = await supabase.auth.updateUser({
-      password,
-      data: { name: fullName, phone: cleanPhone },
-    });
-    if (pwError) {
-      const msg = pwError.message.includes("different from the old")
-        ? "Please choose a different password."
-        : pwError.message;
-      setError(msg);
+    // Update password. If a previous activation attempt already changed the
+    // password but failed later, Supabase may reject the same password as "not
+    // different"; in that retry case, keep going to the server activation step.
+    if (!passwordUpdated) {
+      const { error: pwError } = await supabase.auth.updateUser({
+        password,
+        data: { name: fullName, phone: cleanPhone },
+      });
+      if (pwError) {
+        if (!pwError.message.includes("different from the old")) {
+          setError(pwError.message);
+          setLoading(false);
+          return;
+        }
+      } else {
+        setPasswordUpdated(true);
+      }
+    }
+
+    // Get user/session after password update so the activation API can verify
+    // the actor and promote workspace access with the service role.
+    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { user } } = await supabase.auth.getUser();
+    const accessToken = session?.access_token;
+    if (!accessToken) {
+      setError("Session expired. Please request a new invite link.");
       setLoading(false);
       return;
     }
-
-    // Get user email
-    const { data: { user } } = await supabase.auth.getUser();
 
     // Upload avatar
     let avatarUrl: string | null = null;
@@ -142,25 +156,28 @@ export default function SetupPasswordPage() {
       avatarUrl = urlData.publicUrl;
     }
 
-    // Update team_members: status → active, name, phone, avatar
-    if (user?.email) {
-      await supabase
-        .from("team_members")
-        .update({
-          status: "active",
-          name: fullName,
-          phone: cleanPhone || null,
-          avatar_url: avatarUrl,
-        })
-        .eq("email", user.email);
+    const activation = await fetch("/api/auth/complete-setup", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        name: fullName,
+        phone: cleanPhone,
+        avatarUrl,
+      }),
+    });
+    const activationBody = await activation.json().catch(() => ({}));
+    if (!activation.ok) {
+      setError(activationBody?.error || "Could not activate workspace access. Please try again.");
+      setLoading(false);
+      return;
     }
-
-    // Sign out so user must log in with their new credentials
-    await supabase.auth.signOut();
 
     setSuccess(true);
     setLoading(false);
-    setTimeout(() => { window.location.href = "/"; }, 2000);
+    setTimeout(() => { window.location.replace("/"); }, 700);
   };
 
   if (success) {
@@ -171,7 +188,7 @@ export default function SetupPasswordPage() {
             <CheckCircle className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
           </div>
           <h1 className="text-[20px] font-bold text-gray-900 dark:text-white">You&apos;re all set!</h1>
-          <p className="text-[13px] text-gray-500 dark:text-gray-400">Account created. Redirecting to login...</p>
+          <p className="text-[13px] text-gray-500 dark:text-gray-400">Account created. Opening your workspace...</p>
           <div className="w-8 h-8 mx-auto border-3 border-gray-200 border-t-orange-500 rounded-full animate-spin" />
         </div>
       </div>

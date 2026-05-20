@@ -35,16 +35,17 @@ export async function GET(request: NextRequest) {
     const { data: { user }, error: authErr } = await admin.auth.getUser(token);
     if (authErr || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    // Check if user is already an active workspace member
+    // Check if user already has a workspace membership. Pending rows are not
+    // usable access, but we must see them so activation can promote the same row
+    // instead of colliding with the primary key.
     const { data: existing } = await admin
       .from("workspace_members")
-      .select("workspace_id")
+      .select("workspace_id, status")
       .eq("user_id", user.id)
-      .eq("status", "active")
       .limit(1)
       .maybeSingle();
 
-    if (existing) {
+    if (existing?.status === "active") {
       return NextResponse.json({ workspaceId: existing.workspace_id });
     }
 
@@ -73,12 +74,20 @@ export async function GET(request: NextRequest) {
       // not as a permission upgrade.
       return NextResponse.json({ error: "Not on team" }, { status: 403 });
     }
-    const status = tm.status === "active" ? "active" : "pending";
+    if (tm.status !== "active") {
+      // A pending invite has an auth session but must not receive domain-table
+      // access yet. Returning a workspaceId here makes the client render a fake
+      // empty workspace because RLS correctly hides posts/media/team rows.
+      return NextResponse.json(
+        { error: "Workspace access pending. Complete invite setup first.", status: "pending" },
+        { status: 403 },
+      );
+    }
 
     // SEC-018 / DATA-010: dual-tab race fix. Two simultaneous /provision
-    // calls would both observe `existing = null` and both try to INSERT,
-    // colliding on the unique (user_id, workspace_id) index. Use upsert
-    // with ignoreDuplicates so the second writer no-ops cleanly.
+    // calls would both observe no active membership and both try to INSERT,
+    // colliding on the workspace/user primary key. Use upsert without
+    // ignoreDuplicates so a stale pending row is promoted to active.
     const { error: upsertErr } = await admin
       .from("workspace_members")
       .upsert(
@@ -86,16 +95,16 @@ export async function GET(request: NextRequest) {
           workspace_id: BASELINE_WORKSPACE_ID,
           user_id: user.id,
           role,
-          status,
+          status: "active",
         },
-        { onConflict: "user_id,workspace_id", ignoreDuplicates: true },
+        { onConflict: "workspace_id,user_id" },
       );
     if (upsertErr) {
       console.error("[workspace/provision] upsert error", upsertErr.message);
       return NextResponse.json({ error: "Provisioning failed" }, { status: 500 });
     }
 
-    console.log(`[workspace/provision] Provisioned email_hash=${hashEmail(user.email)} as ${role} (${status})`);
+    console.log(`[workspace/provision] Provisioned email_hash=${hashEmail(user.email)} as ${role} (active)`);
     return NextResponse.json({ workspaceId: BASELINE_WORKSPACE_ID, provisioned: true });
   } catch (err: unknown) {
     // SEC-011: log the full error server-side, return a generic message.
