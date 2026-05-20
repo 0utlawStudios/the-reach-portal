@@ -53,11 +53,13 @@ export async function POST(request: NextRequest) {
 
     // SEC-012: Derive the author identity from the authenticated user's
     // team_members row. Anything sent in the body is ignored / overridden.
+    // SEC-010: `.eq` — callerEmail is already lowercased; `.ilike` would let
+    // wildcard chars in a crafted email act as SQL patterns.
     const callerEmail = (auth.user.email || "").toLowerCase();
     const { data: callerRow } = await admin
       .from("team_members")
       .select("name, email")
-      .ilike("email", callerEmail)
+      .eq("email", callerEmail)
       .maybeSingle();
     const authorEmail = (callerRow?.email as string) || auth.user.email || "";
     const authorName = (callerRow?.name as string) || authorEmail || "Team member";

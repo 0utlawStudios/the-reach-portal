@@ -106,7 +106,9 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     if (postError) {
-      return NextResponse.json({ error: postError.message }, { status: 500 });
+      // SEC-011: log the full PostgREST error, return a generic message.
+      console.error("[publish-jobs] post lookup failed", postError);
+      return NextResponse.json({ error: "Failed to load post" }, { status: 500 });
     }
     if (!post) {
       return NextResponse.json({ error: "Post not found" }, { status: 404 });
@@ -121,7 +123,9 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     if (membershipError) {
-      return NextResponse.json({ error: membershipError.message }, { status: 500 });
+      // SEC-011: log the full PostgREST error, return a generic message.
+      console.error("[publish-jobs] membership lookup failed", membershipError);
+      return NextResponse.json({ error: "Failed to verify membership" }, { status: 500 });
     }
     if (!membership || !WRITE_ROLES.has(String(membership.role))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -139,13 +143,15 @@ export async function POST(request: NextRequest) {
     });
 
     if (jobError) {
-      return NextResponse.json({ error: jobError.message }, { status: 500 });
+      // SEC-011: log the full RPC error, return a generic message.
+      console.error("[publish-jobs] create_publish_job_for_post failed", jobError);
+      return NextResponse.json({ error: "Failed to create publish job" }, { status: 500 });
     }
 
     return NextResponse.json({ job });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    console.error("[publish-jobs]", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-011: log the full error server-side, return a generic message.
+    console.error("[publish-jobs]", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

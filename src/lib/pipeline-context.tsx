@@ -31,7 +31,7 @@ type PublishJobRow = {
   platform_publish_attempts?: PublishAttemptRow[] | PublishAttemptRow | null;
 };
 
-type PostRow = {
+export type PostRow = {
   id: string;
   title: string;
   stage: PipelineStage;
@@ -103,7 +103,7 @@ function normalizePlatforms(platforms?: string[] | null): ContentCard["platforms
   return (platforms || []).filter(isPlatform);
 }
 
-function normalizePublishJob(raw: PostRow["publish_jobs"]): ContentCard["publishJob"] | undefined {
+export function normalizePublishJob(raw: PostRow["publish_jobs"]): ContentCard["publishJob"] | undefined {
   const job = Array.isArray(raw) ? raw[0] : raw;
   if (!job) return undefined;
 
@@ -121,7 +121,7 @@ function normalizePublishJob(raw: PostRow["publish_jobs"]): ContentCard["publish
 }
 
 /** Convert a user-entered date+time (in APP_TIMEZONE) to a UTC ISO string. */
-function toScheduledAt(date?: string, time?: string): string | null | undefined {
+export function toScheduledAt(date?: string, time?: string): string | null | undefined {
   if (date === undefined && time === undefined) return undefined;
   if (!date || !time) return null;
 
@@ -145,7 +145,7 @@ function toScheduledAt(date?: string, time?: string): string | null | undefined 
   }
 }
 
-function dbToCard(row: PostRow): ContentCard {
+export function dbToCard(row: PostRow): ContentCard {
   const notes = row.notes || undefined;
   // Reconstruct revised flag from notes — if notes contain "Revision Note" entries, card was revised
   const revised = notes ? /(Revision Note \(|Fix submitted —)/.test(notes) : false;
@@ -228,6 +228,23 @@ function cardToDb(card: Partial<ContentCard> & { id?: string }): PostUpdate {
   return obj;
 }
 
+export { cardToDb };
+
+/**
+ * Iron-law §1b resolver for the initial board load. An empty array is a VALID
+ * empty board ("no posts yet") and must render as such. The localStorage
+ * backup is read ONLY when the DB returned a real error — never on an empty
+ * result. Extracted as a pure function so the guard can be unit-tested
+ * directly without mounting the whole provider.
+ */
+export function resolveLoadedCards(
+  result: { error: unknown; data: PostRow[] | null },
+  fallback: () => ContentCard[],
+): ContentCard[] {
+  if (!result.error && result.data) return result.data.map(dbToCard);
+  return fallback();
+}
+
 function isSupabaseConfigured(): boolean {
   return !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 }
@@ -284,7 +301,7 @@ interface PipelineContextType {
   requestKickback: (cardId: string) => void;
   submitKickback: (cardId: string, note: string, attachmentUrl?: string) => void;
   cancelKickback: () => void;
-  updateCard: (cardId: string, updates: Partial<ContentCard>) => void;
+  updateCard: (cardId: string, updates: Partial<ContentCard>, onResult?: (persisted: boolean) => void) => void;
   createCard: (card: Partial<Pick<ContentCard, "checklist">> & Omit<ContentCard, "id" | "createdAt" | "updatedAt" | "checklist">) => void;
   deleteCard: (cardId: string) => void;
 }
@@ -306,6 +323,16 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
   const postsSelect = useRef(POSTS_SELECT_FULL);
   const workspaceIdRef = useRef<string | null>(null);
   const useSupabase = isSupabaseConfigured();
+
+  // Latest-value ref: lets the action callbacks read the current cards array
+  // without listing `cards` in their dependency arrays, which keeps their
+  // identity (and thus the context value) stable across card mutations
+  // (PERF-007). Assigned every render so it is never stale.
+  const cardsRef = useRef<ContentCard[]>(cards);
+  cardsRef.current = cards;
+
+  // Pending debounced localStorage backup write (PERF-002).
+  const backupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Track local mutations to prevent realtime echo (dedup).
   // TTL bumped from 2000 → 10000ms because realtime fanout can lag past 2s
@@ -353,11 +380,9 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
             postsSelect.current = POSTS_SELECT_BASIC;
             result = await supabase.from("posts").select(POSTS_SELECT_BASIC).order("created_at", { ascending: false });
           }
-          if (!result.error && result.data) {
-            setCards(result.data.map(dbToCard));
-          } else {
-            setCards(loadState(STORAGE_KEY, PLACEHOLDER_CARDS));
-          }
+          // Iron-law §1b: an empty array is a valid empty board. resolveLoadedCards
+          // falls back to the localStorage backup ONLY on a real DB error.
+          setCards(resolveLoadedCards(result, () => loadState(STORAGE_KEY, PLACEHOLDER_CARDS)));
         } catch {
           setCards(loadState(STORAGE_KEY, PLACEHOLDER_CARDS));
         }
@@ -407,7 +432,12 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
         { event: "DELETE", schema: "public", table: "posts", filter: `workspace_id=eq.${wsId}` },
         (payload) => {
           const deletedId = (payload.old as Partial<PostRow>).id;
-          if (!deletedId || recentMutations.current.has(deletedId)) return;
+          if (!deletedId) return;
+          // A delete is idempotent and authoritative — it is NEVER suppressed
+          // via the dedup set. Suppressing a peer's DELETE would leave a card
+          // the user can still click, and their next save would target a row
+          // that no longer exists (DATA-010). Removing an already-absent card
+          // is a harmless no-op, so applying our own echo is safe too.
           setCards((prev) => prev.filter((c) => c.id !== deletedId));
           setSelectedCard((prev) => (prev?.id === deletedId ? null : prev));
         }
@@ -419,10 +449,28 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     };
   }, [useSupabase, workspaceId]);
 
-  // ─── Persist localStorage backup ───
+  // ─── Persist localStorage backup (debounced) ───
+  // localStorage is only a fallback read when a DB load errors, so a sub-second
+  // write delay is harmless. Debouncing avoids a synchronous full-board
+  // JSON.stringify on every keystroke and every realtime echo (PERF-002).
   useEffect(() => {
-    if (hydrated.current) saveState(STORAGE_KEY, cards);
+    if (!hydrated.current) return;
+    if (backupTimer.current) clearTimeout(backupTimer.current);
+    backupTimer.current = setTimeout(() => {
+      saveState(STORAGE_KEY, cards);
+      backupTimer.current = null;
+    }, 800);
   }, [cards]);
+
+  // Flush a pending backup on unmount so the last change is not lost.
+  useEffect(() => {
+    return () => {
+      if (backupTimer.current) {
+        clearTimeout(backupTimer.current);
+        if (hydrated.current) saveState(STORAGE_KEY, cardsRef.current);
+      }
+    };
+  }, []);
 
   // ─── Actions ───
 
@@ -457,8 +505,17 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    // TEMP-ID GUARD: the card's createCard INSERT is still in flight (its id
+    // is a timestamp, not a UUID). Applying a stage move now would be lost —
+    // the in-flight INSERT carries the card's original stage. Reject so the
+    // user retries once the post has a real id (DATA-004).
+    if (useSupabase && !isValidUuid(cardId)) {
+      addToast("Still saving this post. Try moving it again in a moment.", "warning");
+      return;
+    }
+
     // INTERCEPT: revision_needed → awaiting_approval requires a note
-    const card = cards.find((c) => c.id === cardId);
+    const card = cardsRef.current.find((c) => c.id === cardId);
     if (card?.stage === "revision_needed" && newStage === "awaiting_approval") {
       setPendingReapproval({ cardId, cardTitle: card.title });
       return; // Don't move yet — modal will handle it
@@ -480,79 +537,81 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
       };
       markMutation(cardId);
       (async () => {
-        let stageUpdated = false;
         try {
           const { error } = await supabase.from("posts").update({ stage: newStage }).eq("id", cardId);
           if (error) throw error;
-          stageUpdated = true;
-
-          // Accept either the date+time pair OR a pre-computed scheduled_at.
-          // Otherwise we silently approve cards into "approved_scheduled" with
-          // no publish job — the orphan-approved-no-job hole.
-          const hasSchedule = (card?.scheduledDate && card?.scheduledTime) || (card as Partial<ContentCard> & { scheduledAt?: string })?.scheduledAt;
-          if (newStage === "approved_scheduled" && hasSchedule) {
-            await createPublishJob(cardId);
-          }
-
-          if (newStage === "approved_scheduled") {
-            supabase.auth.getSession().then(({ data: { session } }) => {
-              const headers: HeadersInit = { "Content-Type": "application/json" };
-              if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
-              fetch("/api/notifications/approved", {
-                method: "POST",
-                headers,
-                body: JSON.stringify({
-                  postId: cardId,
-                  postTitle: card?.title || "",
-                  approvedBy: currentUser.name,
-                  createdBy: card?.createdBy || "",
-                }),
-              }).catch((e) => console.error("[pipeline] approved notify failed:", e));
-            }).catch(() => {});
-          }
-
-          if (newStage === "awaiting_approval") {
-            supabase.auth.getSession().then(({ data: { session } }) => {
-              const headers: HeadersInit = { "Content-Type": "application/json" };
-              if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
-              fetch("/api/notifications/awaiting-approval", {
-                method: "POST",
-                headers,
-                body: JSON.stringify({ postId: cardId, postTitle: card?.title || "", movedBy: currentUser.name, fromStage }),
-              }).catch((e) => console.error("[pipeline] awaiting-approval notify failed:", e));
-            }).catch(() => {});
-          }
+          // Stage move committed — record the audit entry NOW, not before the
+          // write. Logging before confirmation produced phantom audit rows on
+          // failed moves and an extra RPC on every drag (PERF-001 / DATA-004).
+          logAudit(cardId, currentUser.name, "stage_change", `Moved from ${fromLabel} to ${toLabel}`);
         } catch (error) {
+          // The stage UPDATE itself failed — nothing committed. Roll local
+          // state back and clear the dedup mark so a realtime echo can
+          // re-sync the card.
           const message = error instanceof Error ? error.message : String(error);
           console.error("[pipeline] stage_change failed:", message);
           rollback();
+          recentMutations.current.delete(cardId);
           addToast(`Move failed: ${message}. Card restored to "${fromLabel}".`, "error");
-          if (stageUpdated) {
-            markMutation(cardId);
+          return;
+        }
+
+        // ── Post-commit side effects ───────────────────────────────────────
+        // The stage move is committed and valid. A failure BELOW must NEVER
+        // roll the stage back: the publish job is created lazily and the n8n
+        // claimer reconciles it, so an approved card with no job yet is a
+        // valid state. Rolling the stage back here would silently un-approve
+        // the user's card and diverge the board from the DB (DATA-001).
+        if (newStage === "approved_scheduled") {
+          const hasSchedule = card?.scheduledDate && card?.scheduledTime;
+          if (hasSchedule) {
             try {
-              const { error: rbErr } = await supabase
-                .from("posts")
-                .update({ stage: fromStage })
-                .eq("id", cardId);
-              if (rbErr) {
-                console.error("[pipeline] CRITICAL: rollback also failed:", rbErr.message);
-                addToast("Critical: card state may diverge between server and UI. Refresh recommended.", "error");
-              }
-            } catch (rbErr) {
-              console.error("[pipeline] CRITICAL: rollback exception:", rbErr);
-              addToast("Critical: card state may diverge between server and UI. Refresh recommended.", "error");
+              await createPublishJob(cardId);
+            } catch (jobErr) {
+              const m = jobErr instanceof Error ? jobErr.message : String(jobErr);
+              console.error("[pipeline] publish job not queued (stage move kept):", m);
+              addToast("Approved. The publish job could not be queued yet, it will retry automatically.", "warning");
             }
           }
+
+          supabase.auth.getSession().then(({ data: { session } }) => {
+            const headers: HeadersInit = { "Content-Type": "application/json" };
+            if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+            fetch("/api/notifications/approved", {
+              method: "POST",
+              headers,
+              body: JSON.stringify({
+                postId: cardId,
+                postTitle: card?.title || "",
+                approvedBy: currentUser.name,
+                createdBy: card?.createdBy || "",
+              }),
+            }).catch((e) => console.error("[pipeline] approved notify failed:", e));
+          }).catch(() => {});
+        }
+
+        if (newStage === "awaiting_approval") {
+          supabase.auth.getSession().then(({ data: { session } }) => {
+            const headers: HeadersInit = { "Content-Type": "application/json" };
+            if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+            fetch("/api/notifications/awaiting-approval", {
+              method: "POST",
+              headers,
+              body: JSON.stringify({ postId: cardId, postTitle: card?.title || "", movedBy: currentUser.name, fromStage }),
+            }).catch((e) => console.error("[pipeline] awaiting-approval notify failed:", e));
+          }).catch(() => {});
         }
       })();
+    } else {
+      // Local-only mode (no Supabase configured): record the audit locally.
+      logAudit(cardId, currentUser.name, "stage_change", `Moved from ${fromLabel} to ${toLabel}`);
     }
-    logAudit(cardId, currentUser.name, "stage_change", `Moved from ${fromLabel} to ${toLabel}`);
-  }, [useSupabase, cards, currentUser.name, addToast]);
+  }, [useSupabase, currentUser.name, addToast]);
 
   const requestReapproval = useCallback((cardId: string) => {
-    const card = cards.find((c) => c.id === cardId);
+    const card = cardsRef.current.find((c) => c.id === cardId);
     if (card) setPendingReapproval({ cardId, cardTitle: card.title });
-  }, [cards]);
+  }, []);
 
   const submitReapproval = useCallback((cardId: string, note: string) => {
     const now = new Date();
@@ -562,7 +621,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     const noteLine = `${author} (${timestamp}): Fix submitted — ${note}`;
 
     // Snapshot previous state for rollback if DB write fails.
-    const previousCard = cards.find((c) => c.id === cardId);
+    const previousCard = cardsRef.current.find((c) => c.id === cardId);
     const previousSelected = selectedCard;
 
     setCards((prev) => prev.map((c) => {
@@ -590,6 +649,8 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
             setCards((prev) => prev.map((c) => c.id === cardId ? previousCard : c));
             setSelectedCard(previousSelected);
           }
+          // Clear the dedup mark so a realtime echo can re-sync the card (DATA-003).
+          recentMutations.current.delete(cardId);
           addToast(`Save failed: ${error.message}. Changes reverted.`, "error");
           return;
         }
@@ -612,7 +673,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     }
 
     setPendingReapproval(null);
-  }, [useSupabase, cards, selectedCard, currentUser.name, addToast]);
+  }, [useSupabase, selectedCard, currentUser.name, addToast]);
 
   const cancelReapproval = useCallback(() => {
     setPendingReapproval(null);
@@ -621,16 +682,16 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
   // ─── Kickback flow (Awaiting Approval → Revision Needed) ───
 
   const requestKickback = useCallback((cardId: string) => {
-    const card = cards.find((c) => c.id === cardId);
+    const card = cardsRef.current.find((c) => c.id === cardId);
     if (card) setPendingKickback({ cardId, cardTitle: card.title });
-  }, [cards]);
+  }, []);
 
   const submitKickback = useCallback((cardId: string, note: string, attachmentUrl?: string) => {
     const now = new Date();
     const timestamp = formatDateTimeCompact(now);
     const author = currentUser.name;
     // Capture card before state mutation so notification can read title + createdBy
-    const card = cards.find((c) => c.id === cardId);
+    const card = cardsRef.current.find((c) => c.id === cardId);
     const previousCard = card;
     const previousSelected = selectedCard;
     let noteLine = `${author} (${timestamp}): Revision requested — ${note}`;
@@ -691,6 +752,8 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
             setCards((prev) => prev.map((c) => c.id === cardId ? previousCard : c));
             setSelectedCard(previousSelected);
           }
+          // Clear the dedup mark so a realtime echo can re-sync the card (DATA-003).
+          recentMutations.current.delete(cardId);
           addToast(`Kickback failed: ${error.message}. Changes reverted.`, "error");
           return;
         }
@@ -704,17 +767,17 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     }
 
     setPendingKickback(null);
-  }, [useSupabase, cards, selectedCard, currentUser.name, currentUser.email, addToast]);
+  }, [useSupabase, selectedCard, currentUser.name, currentUser.email, addToast]);
 
   const cancelKickback = useCallback(() => {
     setPendingKickback(null);
   }, []);
 
-  const updateCard = useCallback((cardId: string, updates: Partial<ContentCard>) => {
+  const updateCard = useCallback((cardId: string, updates: Partial<ContentCard>, onResult?: (persisted: boolean) => void) => {
     // Snapshot pre-mutation state so we can fully restore on DB failure.
     // Iron-law spirit: a save that fails silently leaves the user looking at
     // a card that will revert on the next refresh. Mirror moveCard's pattern.
-    const previousCard = cards.find((c) => c.id === cardId);
+    const previousCard = cardsRef.current.find((c) => c.id === cardId);
     const previousSelected = selectedCard;
 
     setCards((prev) => prev.map((c) => (c.id === cardId ? { ...c, ...updates } : c)));
@@ -728,11 +791,22 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
             setCards((prev) => prev.map((c) => c.id === cardId ? previousCard : c));
             setSelectedCard(previousSelected);
           }
+          // Clear the dedup mark so a realtime echo can re-sync the card (DATA-003).
+          recentMutations.current.delete(cardId);
           addToast(`Save failed: ${error.message}. Changes reverted.`, "error");
+          onResult?.(false);
+        } else {
+          // The write committed — callers gating a side-effect (e.g. an
+          // @mention email) on a confirmed persist can safely fire now.
+          onResult?.(true);
         }
       });
+    } else {
+      // No DB write happened (local-only mode or a temp-id card mid-create).
+      // Report not-persisted so callers do not fire persistence-gated effects.
+      onResult?.(false);
     }
-  }, [useSupabase, cards, selectedCard, addToast]);
+  }, [useSupabase, selectedCard, addToast]);
 
   const createCard = useCallback((card: Partial<Pick<ContentCard, "checklist">> & Omit<ContentCard, "id" | "createdAt" | "updatedAt" | "checklist">) => {
     const now = new Date().toISOString();
@@ -765,6 +839,10 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
           addToast(`Save failed: ${error.message}. Card was not created.`, "error");
         } else if (data) {
           setCards((prev) => prev.map((c) => c.id === tempId ? { ...c, id: data.id } : c));
+          // Remap an open drawer's selectedCard from the temp id to the real
+          // UUID too. Without this, every subsequent save from that drawer
+          // fails the isValidUuid guard and is silently skipped (DATA-005).
+          setSelectedCard((prev) => prev?.id === tempId ? { ...prev, id: data.id } : prev);
           // Also mark the real id so the realtime INSERT echo (which will
           // arrive with the real UUID) is suppressed.
           markMutation(data.id);
@@ -778,7 +856,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     // Iron law spirit: a post must never appear to vanish, then quietly come
     // back on refresh. If the 0015 trigger blocks the delete (approved_scheduled
     // / posted), we surface the error and re-insert the card locally.
-    const previousCard = cards.find((c) => c.id === cardId);
+    const previousCard = cardsRef.current.find((c) => c.id === cardId);
     const previousSelected = selectedCard;
     setCards((prev) => prev.filter((c) => c.id !== cardId));
     setSelectedCard((prev) => (prev?.id === cardId ? null : prev));
@@ -795,6 +873,12 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
           if (previousCard) {
             setCards((prev) => prev.some((c) => c.id === cardId) ? prev : [previousCard, ...prev]);
             setSelectedCard(previousSelected);
+            // The card is back on the board — reopen the drawer the user
+            // deleted from so it does not silently vanish along with the
+            // failed delete (DATA-006).
+            if (previousSelected?.id === cardId) setIsDrawerOpen(true);
+            // Clear the dedup mark so a realtime echo can re-sync the card.
+            recentMutations.current.delete(cardId);
             const isProtected = /protected|approved|posted|cannot.*delete/i.test(error.message);
             addToast(
               isProtected
@@ -808,7 +892,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
         }
       });
     }
-  }, [cards, selectedCard, useSupabase, addToast]);
+  }, [selectedCard, useSupabase, addToast]);
 
   const value = useMemo(
     () => ({ cards, isLoading, selectedCard, isDrawerOpen, isEditingOnOpen, pendingReapproval, pendingKickback, workspaceId, selectCard, selectCardForEditing, closeDrawer, moveCard, requestReapproval, submitReapproval, cancelReapproval, requestKickback, submitKickback, cancelKickback, updateCard, createCard, deleteCard }),

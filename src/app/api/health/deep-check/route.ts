@@ -1,9 +1,21 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { timingSafeEqual } from "node:crypto";
 
 // ─── Auth ───
 
 const HEALTH_SECRET = process.env.HEALTH_CHECK_SECRET;
+
+// SEC-002: Constant-time secret comparison. A plain `!==` leaks the secret
+// one byte at a time via response-timing differences.
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  try {
+    return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+  } catch {
+    return false;
+  }
+}
 
 function unauthorized() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -42,11 +54,18 @@ type MediaRow = {
   added_by?: string | null;
 };
 
+// SEC-007: audit reads now target audit_log_v2 (migration 0009), the table
+// the app actually writes to via record_audit_event(). Columns differ from
+// the legacy post_audit_logs: the entity reference is `entity_id`, the verb
+// is `action`, and the human actor name lives inside `metadata.user_name`.
 type AuditRow = {
   id?: string;
-  post_id?: string | null;
-  user_name?: string | null;
-  action_type?: string | null;
+  entity_id?: string | null;
+  entity_type?: string | null;
+  action?: string | null;
+  actor_user_id?: string | null;
+  actor_role?: string | null;
+  metadata?: { user_name?: string | null } | null;
   created_at?: string | null;
 };
 
@@ -108,7 +127,7 @@ async function timedFetch(url: string, opts?: RequestInit & { timeout?: number }
 
 export async function GET(req: Request) {
   const token = req.headers.get("authorization")?.replace("Bearer ", "");
-  if (!HEALTH_SECRET || token !== HEALTH_SECRET) return unauthorized();
+  if (!HEALTH_SECRET || !safeEqual(token ?? "", HEALTH_SECRET)) return unauthorized();
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -137,7 +156,8 @@ export async function GET(req: Request) {
     const [pRes, mRes, aRes, cRes] = await Promise.all([
       admin.from("posts").select("*"),
       admin.from("media_assets").select("*"),
-      admin.from("post_audit_logs").select("*").order("created_at", { ascending: false }).limit(5000),
+      // SEC-007: audit metrics read from audit_log_v2, the table the app writes to.
+      admin.from("audit_log_v2").select("*").order("created_at", { ascending: false }).limit(5000),
       admin.from("post_comments").select("*"),
     ]);
     allPosts = (pRes.data || []) as PostRow[];
@@ -238,7 +258,9 @@ export async function GET(req: Request) {
 
   // ═══ 5. API ENDPOINT SELF-TEST ═══
   try {
-    const base = "https://smm.ten80ten.com";
+    // SEC-006: Derive the probe host from NEXT_PUBLIC_SITE_URL instead of
+    // hardcoding the prod domain, so preview/staging deploys probe themselves.
+    const base = process.env.NEXT_PUBLIC_SITE_URL || "https://smm.ten80ten.com";
     const endpoints = ["/api/team/invite", "/api/notifications/mention", "/api/notifications/revision"];
     const results: Record<string, string> = {};
     for (const ep of endpoints) {
@@ -307,15 +329,17 @@ export async function GET(req: Request) {
     // Check last sign-in — users with auth but never logged in
     const neverLoggedIn = authUsers.filter((u) => !u.last_sign_in_at && u.email && memberEmails.has(u.email.toLowerCase())).map((u) => u.email);
 
+    // SEC-003: Report counts only — raw email lists are PII and must not
+    // land in the response body or in joined message strings.
     const issues: string[] = [];
-    if (orphanedAuth.length > 0) issues.push(`${orphanedAuth.length} auth user(s) without team record: ${orphanedAuth.join(", ")}`);
-    if (orphanedMembers.length > 0) issues.push(`${orphanedMembers.length} active member(s) without auth: ${orphanedMembers.join(", ")}`);
-    if (pendingWithAuth.length > 0) issues.push(`${pendingWithAuth.length} pending with auth session: ${pendingWithAuth.join(", ")}`);
-    if (unconfirmed.length > 0) issues.push(`${unconfirmed.length} unconfirmed email(s): ${unconfirmed.join(", ")}`);
-    if (neverLoggedIn.length > 0) issues.push(`${neverLoggedIn.length} never logged in: ${neverLoggedIn.join(", ")}`);
+    if (orphanedAuth.length > 0) issues.push(`${orphanedAuth.length} auth user(s) without team record`);
+    if (orphanedMembers.length > 0) issues.push(`${orphanedMembers.length} active member(s) without auth`);
+    if (pendingWithAuth.length > 0) issues.push(`${pendingWithAuth.length} pending with auth session`);
+    if (unconfirmed.length > 0) issues.push(`${unconfirmed.length} unconfirmed email(s)`);
+    if (neverLoggedIn.length > 0) issues.push(`${neverLoggedIn.length} never logged in`);
 
     checks["07_auth_consistency"] = issues.length > 0
-      ? warn(issues.join("; "), { authUsers: authUsers.length, teamMembers: allMembers.length, orphanedAuth, orphanedMembers, pendingWithAuth, unconfirmed, neverLoggedIn })
+      ? warn(issues.join("; "), { authUsers: authUsers.length, teamMembers: allMembers.length, orphanedAuthCount: orphanedAuth.length, orphanedMembersCount: orphanedMembers.length, pendingWithAuthCount: pendingWithAuth.length, unconfirmedCount: unconfirmed.length, neverLoggedInCount: neverLoggedIn.length })
       : pass(`${authUsers.length} auth users, ${allMembers.length} team members — all synced`);
   } catch (e: unknown) {
     checks["07_auth_consistency"] = fail(`Auth check error: ${errorMessage(e)}`);
@@ -378,9 +402,12 @@ export async function GET(req: Request) {
     const postIds = new Set((posts || []).map((p) => p.id));
     const orphanedMedia = (media || []).filter((m) => m.post_id && !postIds.has(m.post_id));
 
-    // Audit logs referencing non-existent posts
+    // Audit logs referencing non-existent posts.
+    // SEC-007: audit_log_v2 uses entity_id (scoped to entity_type 'post').
     const auditSample = allAuditLogs.slice(0, 200);
-    const orphanedAudits = (auditSample || []).filter((a) => a.post_id && !postIds.has(a.post_id));
+    const orphanedAudits = (auditSample || []).filter(
+      (a) => a.entity_type === "post" && a.entity_id && !postIds.has(a.entity_id),
+    );
 
     const issues: string[] = [];
     if (uniqueUnknown.length > 0) issues.push(`${uniqueUnknown.length} unknown creator(s): ${uniqueUnknown.join(", ")}`);
@@ -462,15 +489,16 @@ export async function GET(req: Request) {
     const stalePending = pending.filter((m) => m.joined_at && m.joined_at < sevenDaysAgo);
     const noAvatar = active.filter((m) => !m.avatar_url);
 
+    // SEC-003: Count-only — no raw emails/names in the message or details.
     const issues: string[] = [];
-    if (stalePending.length > 0) issues.push(`${stalePending.length} stale invite(s) >7 days: ${stalePending.map((m) => m.email).join(", ")}`);
+    if (stalePending.length > 0) issues.push(`${stalePending.length} stale invite(s) >7 days`);
     if (noAvatar.length > 0) issues.push(`${noAvatar.length} active member(s) without avatar`);
     if (active.length === 0) issues.push("CRITICAL: Zero active team members");
 
     checks["13_team_health"] = issues.some((i) => i.startsWith("CRITICAL"))
       ? fail(issues.join("; "), { active: active.length, pending: pending.length })
       : issues.length > 0
-        ? warn(issues.join("; "), { active: active.length, pending: pending.length, stalePending: stalePending.map((m) => m.email), noAvatar: noAvatar.map((m) => m.name) })
+        ? warn(issues.join("; "), { active: active.length, pending: pending.length, stalePendingCount: stalePending.length, noAvatarCount: noAvatar.length })
         : pass(`${active.length} active, ${pending.length} pending — all healthy`, { active: active.length, pending: pending.length });
   } catch (e: unknown) {
     checks["13_team_health"] = fail(`Team health error: ${errorMessage(e)}`);
@@ -488,23 +516,26 @@ export async function GET(req: Request) {
     const weekLogs = allAuditLogs.filter(a => a.created_at && a.created_at >= weekAgo);
     const activityMap: Record<string, number> = {};
     (weekLogs || []).forEach((l) => {
-      const userName = l.user_name || "unknown";
+      // SEC-007: audit_log_v2 stores the actor name in metadata.user_name.
+      const userName = l.metadata?.user_name || "unknown";
       activityMap[userName] = (activityMap[userName] || 0) + 1;
     });
     const topUsers = Object.entries(activityMap).sort(([, a], [, b]) => b - a).slice(0, 5);
 
     // Members with zero audit entries ever
     const allAuditNames = allAuditLogs;
-    const auditNames = new Set((allAuditNames || []).map((a) => a.user_name));
+    const auditNames = new Set((allAuditNames || []).map((a) => a.metadata?.user_name));
     const ghostMembers = allMembers.filter((m) => m.status === "active" && !auditNames.has(m.name)).map((m) => m.name);
 
+    // SEC-003: Counts only — inactive/never-signed-in emails and ghost-member
+    // names are PII and stay out of the response.
     const issues: string[] = [];
-    if (inactive.length > 0) issues.push(`${inactive.length} user(s) inactive >30 days: ${inactive.map((u) => u.email).join(", ")}`);
-    if (neverSignedIn.length > 0) issues.push(`${neverSignedIn.length} user(s) never logged in: ${neverSignedIn.map((u) => u.email).join(", ")}`);
-    if (ghostMembers.length > 0) issues.push(`${ghostMembers.length} active member(s) with zero activity: ${ghostMembers.join(", ")}`);
+    if (inactive.length > 0) issues.push(`${inactive.length} user(s) inactive >30 days`);
+    if (neverSignedIn.length > 0) issues.push(`${neverSignedIn.length} user(s) never logged in`);
+    if (ghostMembers.length > 0) issues.push(`${ghostMembers.length} active member(s) with zero activity`);
 
     checks["14_user_activity"] = issues.length > 0
-      ? warn(issues.join("; "), { inactive: inactive.map((u) => u.email), neverSignedIn: neverSignedIn.map((u) => u.email), ghostMembers, topUsersThisWeek: topUsers })
+      ? warn(issues.join("; "), { inactiveCount: inactive.length, neverSignedInCount: neverSignedIn.length, ghostMembersCount: ghostMembers.length, topUsersThisWeek: topUsers })
       : pass(`All users active, top this week: ${topUsers.map(([n, c]) => `${n} (${c})`).join(", ")}`, { topUsersThisWeek: topUsers });
   } catch (e: unknown) {
     checks["14_user_activity"] = fail(`Activity analysis error: ${errorMessage(e)}`);
@@ -642,10 +673,11 @@ export async function GET(req: Request) {
     const lastWeek = allAuditLogs.filter(a => a.created_at && a.created_at >= weekAgo).length;
 
     // Action type breakdown this week
+    // SEC-007: audit_log_v2's verb column is `action`, not `action_type`.
     const weekActions = allAuditLogs.filter(a => a.created_at && a.created_at >= weekAgo);
     const breakdown: Record<string, number> = {};
     (weekActions || []).forEach((a) => {
-      const actionType = a.action_type || "unknown";
+      const actionType = a.action || "unknown";
       breakdown[actionType] = (breakdown[actionType] || 0) + 1;
     });
 
@@ -730,8 +762,9 @@ export async function GET(req: Request) {
       const lastUpdate = u.updated_at || u.created_at;
       return lastUpdate && lastUpdate < ninetyDaysAgo;
     });
+    // SEC-003: Count only — stale-account emails are PII.
     checks["24_password_age"] = staleAccounts.length > 0
-      ? warn(`${staleAccounts.length} active user(s) haven't updated account in 90+ days`, { users: staleAccounts.map((u) => u.email) })
+      ? warn(`${staleAccounts.length} active user(s) haven't updated account in 90+ days`, { staleCount: staleAccounts.length })
       : pass("All active users have recent account updates");
   } catch (e: unknown) {
     checks["24_password_age"] = fail(`Password age check error: ${errorMessage(e)}`);
@@ -857,10 +890,11 @@ export async function GET(req: Request) {
     const completeCount = activeMembers.length - incomplete.length;
     const pct = activeMembers.length > 0 ? Math.round((completeCount / activeMembers.length) * 100) : 0;
 
+    // SEC-003: Report the count of incomplete profiles, not member names.
     checks["32_member_completeness"] = pct < 100
       ? warn(`${pct}% complete profiles (${completeCount}/${activeMembers.length})`, {
           percentage: pct,
-          incomplete: incomplete.map((m) => ({ name: m.name, missing: requiredFields.filter((f) => !m[f]) })),
+          incompleteCount: incomplete.length,
         })
       : pass(`100% complete profiles (${activeMembers.length}/${activeMembers.length})`, { percentage: 100 });
   } catch (e: unknown) {
@@ -975,8 +1009,9 @@ export async function GET(req: Request) {
 
   // ═══ 39. AUDIT COVERAGE ═══
   try {
+    // SEC-007: audit_log_v2 keeps the actor name in metadata.user_name.
     const allAuditEntries = allAuditLogs;
-    const auditedNames = new Set((allAuditEntries || []).map((a) => a.user_name));
+    const auditedNames = new Set((allAuditEntries || []).map((a) => a.metadata?.user_name));
     const activeMembersForAudit = allMembers.filter((m) => m.status === "active");
     const uncovered = activeMembersForAudit.filter((m) => !auditedNames.has(m.name));
     checks["39_audit_coverage"] = uncovered.length > 0

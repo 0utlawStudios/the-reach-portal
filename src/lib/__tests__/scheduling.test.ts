@@ -1,42 +1,19 @@
 // Tests for the scheduled_at conversion contract used by pipeline-context.tsx.
 //
-// PRAGMATIC NOTE: `toScheduledAt` is a private helper inside pipeline-context.tsx
-// (Wave-C-owned, not exported in this pass). Rather than reach across wave
-// boundaries to extract it, this suite re-implements the exact same logic
-// here and asserts its behavior against the shared `APP_TIMEZONE` constant.
+// `toScheduledAt` is now EXPORTED from pipeline-context.tsx, so this suite
+// imports and exercises the real production function — no mirror copy. A
+// mirror could drift silently and pass while production broke; importing the
+// real export means these assertions guard the actual code path.
 //
 // What this catches:
 //   - Drift in APP_TIMEZONE (e.g. someone flipping Nashville HQ to UTC).
 //   - Drift in the date+time → ISO contract (DST edges, null guard, malformed).
 //   - Drift in the "scheduled_at is required when stage moves to approved_scheduled"
 //     pre-condition — verified indirectly by the round-trip test below.
-//
-// TODO: when ownership consolidates, extract `toScheduledAt` to src/lib/utils.ts
-// and import it here so the test exercises the real production code path.
 
 import { describe, it, expect } from "vitest";
 import { APP_TIMEZONE } from "../utils";
-
-/** Mirror of pipeline-context.tsx#toScheduledAt — keep in sync. */
-function toScheduledAt(date?: string, time?: string): string | null | undefined {
-  if (date === undefined && time === undefined) return undefined;
-  if (!date || !time) return null;
-
-  try {
-    const naive = new Date(`${date}T${time}:00Z`);
-    if (Number.isNaN(naive.getTime())) return null;
-
-    const utcWall = new Date(naive.toLocaleString("en-US", { timeZone: "UTC" }));
-    const tzWall = new Date(naive.toLocaleString("en-US", { timeZone: APP_TIMEZONE }));
-    const offsetMs = utcWall.getTime() - tzWall.getTime();
-
-    const corrected = new Date(naive.getTime() + offsetMs);
-    if (Number.isNaN(corrected.getTime())) return null;
-    return corrected.toISOString();
-  } catch {
-    return null;
-  }
-}
+import { toScheduledAt } from "../pipeline-context";
 
 describe("APP_TIMEZONE", () => {
   it("is pinned to America/Chicago (Nashville HQ)", () => {

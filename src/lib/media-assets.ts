@@ -1,10 +1,8 @@
 import { supabase } from "./supabaseClient";
-
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-function isValidUuid(value: string): boolean {
-  return UUID_REGEX.test(value);
-}
+// Single source of truth for UUID validation. A local copy here drifted from
+// the canonical guard (it lacked the version/variant nibble checks and so
+// accepted the zero-UUID) — see AGENTS.md §5. Always import the strict one.
+import { isValidUuid } from "./utils";
 
 interface EnsureMediaAssetParams {
   name: string;

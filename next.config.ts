@@ -17,14 +17,19 @@ const nextConfig: NextConfig = {
       },
       {
         // Baseline security headers on every response.
-        // CSP intentionally omitted — too brittle for an app that streams
-        // arbitrary Google Drive media. Add per-route if needed later.
+        // SEC-012: CSP is shipped in Report-Only mode — browsers report
+        // violations without blocking, so this is non-destructive. Promote
+        // to an enforcing `Content-Security-Policy` once reports are clean.
         source: "/:path*",
         headers: [
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "X-Frame-Options", value: "DENY" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+          {
+            key: "Content-Security-Policy-Report-Only",
+            value: "default-src 'self'; img-src 'self' data: https://*.supabase.co https://lh3.googleusercontent.com; media-src 'self'; connect-src 'self' https://*.supabase.co; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-ancestors 'none'; base-uri 'self'",
+          },
         ],
       },
     ];

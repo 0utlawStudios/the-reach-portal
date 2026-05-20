@@ -27,7 +27,11 @@ export async function GET(req: NextRequest, ctxParams: { params: Promise<{ id: s
     .eq("id", id)
     .eq("workspace_id", ctx.workspaceId)
     .maybeSingle();
-  if (error) return errorResponse(500, error.message);
+  // SEC-011: log the raw PostgREST error, return a generic message.
+  if (error) {
+    console.error("[ai-jobs/:id] lookup failed", error);
+    return errorResponse(500, "Failed to load job");
+  }
   if (!data) return errorResponse(404, "Job not found");
   return okResponse({ job: data });
 }

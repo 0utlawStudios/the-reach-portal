@@ -18,10 +18,10 @@ function isValidType(type: string): type is ValidType {
 // Referer header and don't appear in standard access logs, unlike query
 // strings (which were the previous transport — see git blame).
 //
-// Wave B note: the downstream /auth/setup and /auth/reset-password pages
-// currently read from `searchParams`. They MUST be patched to read from
-// `window.location.hash` instead, otherwise the cookie path (10-minute TTL)
-// is the only thing keeping them functional.
+// The downstream /auth/setup and /auth/reset-password pages read these tokens
+// from `window.location.hash` and scrub the fragment immediately after
+// consuming it, so the credentials never persist in the browser address bar
+// or history.
 const TOKEN_COOKIE_MAX_AGE = 600; // 10 minutes
 function attachTokenCookies(
   res: NextResponse,

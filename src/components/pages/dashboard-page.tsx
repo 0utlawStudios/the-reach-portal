@@ -49,19 +49,27 @@ export function DashboardPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
+  // UX-008: when content cannot fit even at the 0.8 scale floor, stop shrinking
+  // and let the container scroll vertically instead.
+  const [needsScroll, setNeedsScroll] = useState(false);
 
   useEffect(() => {
     const el = containerRef.current;
     const inner = innerRef.current;
     if (!el || !inner) return;
     const fit = () => {
-      // Disable auto-scaling on mobile — let users scroll naturally
+      // Disable auto-scaling on mobile. Let users scroll naturally.
       if (window.innerWidth < 640) {
         setScale(1);
+        setNeedsScroll(false);
         return;
       }
-      const s = Math.min(el.clientHeight / inner.scrollHeight, 1);
+      // UX-008: clamp the computed scale with a 0.8 floor so content never
+      // shrinks unboundedly on short windows.
+      const raw = Math.min(el.clientHeight / inner.scrollHeight, 1);
+      const s = Math.max(raw, 0.8);
       setScale(prev => Math.abs(prev - s) > 0.003 ? s : prev);
+      setNeedsScroll(raw < 0.8);
     };
     fit();
     const ro = new ResizeObserver(fit);
@@ -124,7 +132,7 @@ export function DashboardPage() {
   , [counts, totalCards]);
 
   return (
-    <div ref={containerRef} className="h-full w-full overflow-y-auto sm:overflow-hidden bg-[#ecedf2] dark:bg-[#09090b]">
+    <div ref={containerRef} className={`h-full w-full overflow-y-auto bg-[#ecedf2] dark:bg-[#09090b] ${needsScroll ? "" : "sm:overflow-hidden"}`}>
       <div ref={innerRef} className="p-2 sm:p-4 lg:p-5 space-y-2 sm:space-y-3" style={scale < 1 ? { transform: `scale(${scale})`, transformOrigin: 'top left', width: `${100 / scale}%` } : undefined}>
 
       {/* ═══ Welcome Banner ═══ */}
@@ -162,9 +170,9 @@ export function DashboardPage() {
       {/* ═══ Row 1: Funnel + Scorecard + Platforms ═══ */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-2 sm:gap-3">
 
-        {/* Pipeline Funnel */}
+        {/* Content Funnel */}
         <Card idx={0} className="md:col-span-1 lg:col-span-5 flex flex-col">
-          <SectionLabel icon={<BarChart3 className="w-4 h-4 text-orange-500" />} badge={<span className="text-[8px] text-gray-400 bg-gray-50 dark:bg-white/[0.04] px-2.5 py-1 rounded-full font-semibold uppercase tracking-[0.1em]">This week</span>}>Pipeline Funnel</SectionLabel>
+          <SectionLabel icon={<BarChart3 className="w-4 h-4 text-orange-500" />} badge={<span className="text-[8px] text-gray-400 bg-gray-50 dark:bg-white/[0.04] px-2.5 py-1 rounded-full font-semibold uppercase tracking-[0.1em]">This week</span>}>Content Funnel</SectionLabel>
           <div className="space-y-2 sm:space-y-3.5 flex-1">
             {stageCounts.map((col, i) => {
               const Icon = stageIcons[i];
@@ -269,7 +277,7 @@ export function DashboardPage() {
             </div>
           ) : <p className="text-[12px] text-gray-400 text-center py-10">No upcoming posts</p>}
           <div className="mt-auto pt-2 sm:pt-4 border-t border-gray-100/60 dark:border-white/[0.04] text-right">
-            <button onClick={() => navigate("pipeline")} className="text-[10px] text-orange-500 hover:text-orange-600 cursor-pointer font-semibold transition-colors duration-300">View full pipeline →</button>
+            <button onClick={() => navigate("pipeline")} className="text-[10px] text-orange-500 hover:text-orange-600 cursor-pointer font-semibold transition-colors duration-300">View full board →</button>
           </div>
         </Card>
 

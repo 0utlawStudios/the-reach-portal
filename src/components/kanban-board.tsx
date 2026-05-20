@@ -1,7 +1,7 @@
 "use client";
 
 import { RawImage } from "@/components/raw-image";
-import { useCallback, useState, useMemo, useEffect } from "react";
+import { useCallback, useState, useMemo, useEffect, useRef } from "react";
 import {
   DndContext, DragEndEvent, DragStartEvent, DragOverlay,
   PointerSensor, TouchSensor, KeyboardSensor, useSensor, useSensors, pointerWithin, rectIntersection,
@@ -63,7 +63,7 @@ function isApprover(role: string): boolean {
 }
 
 export function KanbanBoard() {
-  const { cards, moveCard, requestKickback, selectCard } = usePipeline();
+  const { cards, moveCard, requestKickback, selectCard, isLoading } = usePipeline();
   const { currentUser } = useAuth();
   const { members } = useTeam();
   const { addToast } = useToast();
@@ -75,6 +75,15 @@ export function KanbanBoard() {
   });
   const [repurposingCard, setRepurposingCard] = useState<ContentCardType | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+
+  // UX-007: per-column refs + mobile tab strip. Lets users jump to columns 3-5
+  // that would otherwise be undiscoverable in the horizontal scroll on mobile.
+  const columnRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [activeColumnId, setActiveColumnId] = useState<string>(PIPELINE_COLUMNS[0]?.id || "");
+  const scrollToColumn = useCallback((columnId: string) => {
+    setActiveColumnId(columnId);
+    columnRefs.current[columnId]?.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
+  }, []);
 
   // UX-041: tightened TouchSensor delay (200→150) and tolerance (5→8) for a
   // less sluggish drag start on mobile.
@@ -230,7 +239,7 @@ export function KanbanBoard() {
       <div className="flex items-center gap-1 px-4 pt-3 pb-1 shrink-0">
         <button onClick={() => setView("pipeline")}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors cursor-pointer ${view === "pipeline" ? "bg-gray-900 text-white dark:bg-white dark:text-gray-900" : "text-gray-400 hover:text-gray-600 hover:bg-gray-50 dark:hover:bg-white/[0.04]"}`}>
-          Pipeline
+          Board
         </button>
         <button onClick={() => setView("archive")}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors cursor-pointer ${view === "archive" ? "bg-gray-900 text-white dark:bg-white dark:text-gray-900" : "text-gray-400 hover:text-gray-600 hover:bg-gray-50 dark:hover:bg-white/[0.04]"}`}>
@@ -246,9 +255,33 @@ export function KanbanBoard() {
           if (pw.length > 0) return pw;
           return rectIntersection(args);
         }} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
+          {/* UX-007: mobile-only column tab strip. Scrolls a column into view. */}
+          <div className="md:hidden flex items-center gap-1.5 px-4 pb-2 overflow-x-auto shrink-0">
+            {PIPELINE_COLUMNS.map((column) => (
+              <button
+                key={column.id}
+                onClick={() => scrollToColumn(column.id)}
+                className={`flex items-center gap-1.5 px-2.5 h-9 rounded-lg text-[11px] font-semibold whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
+                  activeColumnId === column.id
+                    ? "bg-gray-900 text-white dark:bg-white dark:text-gray-900"
+                    : "bg-gray-100 text-gray-500 dark:bg-white/[0.06] dark:text-gray-400"
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: column.color }} />
+                {column.title.split("/")[0].trim()}
+                <span className="tabular-nums opacity-70">{(sortedColumnCards[column.id] || []).length}</span>
+              </button>
+            ))}
+          </div>
           <div className="flex gap-3 p-4 overflow-x-auto min-h-0 flex-1 snap-x snap-mandatory md:snap-none touch-pan-x">
             {PIPELINE_COLUMNS.map((column) => (
-              <PipelineColumn key={column.id} column={column} cards={sortedColumnCards[column.id] || []} />
+              <PipelineColumn
+                key={column.id}
+                column={column}
+                cards={sortedColumnCards[column.id] || []}
+                isLoading={isLoading}
+                columnRef={(el) => { columnRefs.current[column.id] = el; }}
+              />
             ))}
           </div>
           {typeof document !== "undefined" && createPortal(

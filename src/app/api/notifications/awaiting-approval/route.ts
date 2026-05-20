@@ -79,11 +79,13 @@ export async function POST(request: NextRequest) {
     const admin = getAdminClient();
 
     // SEC-012: Resolve `movedBy` from the authenticated caller.
+    // SEC-010: `.eq` — callerEmail is already lowercased; `.ilike` would let
+    // wildcard chars in a crafted email act as SQL patterns.
     const callerEmail = (auth.user.email || "").toLowerCase();
     const { data: callerRow } = await admin
       .from("team_members")
       .select("name, email")
-      .ilike("email", callerEmail)
+      .eq("email", callerEmail)
       .maybeSingle();
     const movedBy = (callerRow?.name as string) || auth.user.email || "Team member";
 

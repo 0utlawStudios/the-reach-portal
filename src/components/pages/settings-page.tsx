@@ -77,7 +77,7 @@ function EditProfileModal({ member, onClose, onDelete, canDelete }: { member: Te
         setAvatarUrl(urlData.publicUrl);
         addToast("Photo cropped & uploaded", "success");
       } else {
-        addToast("Upload failed — check Supabase storage bucket", "error");
+        addToast("Upload failed. Check Supabase storage bucket.", "error");
       }
     } else {
       setAvatarUrl(URL.createObjectURL(croppedBlob));
@@ -280,9 +280,9 @@ export function SettingsPage() {
         refreshPendingRequests();
         if (action === "approve" && data.emailSent === false && data.inviteUrl) {
           await navigator.clipboard.writeText(data.inviteUrl);
-          addToast("Approved — email failed, invite link copied to clipboard", "info");
+          addToast("Approved. Email failed, invite link copied to clipboard.", "info");
         } else {
-          addToast(action === "approve" ? `Approved — branded invite sent` : "Request rejected", action === "approve" ? "success" : "info");
+          addToast(action === "approve" ? `Approved. Branded invite sent.` : "Request rejected", action === "approve" ? "success" : "info");
         }
       } else {
         addToast(data.error || "Action failed", "error");
@@ -319,14 +319,14 @@ export function SettingsPage() {
       } else if (data.inviteUrl) {
         // Email failed but user was created — copy invite link
         await navigator.clipboard.writeText(data.inviteUrl);
-        addToast(`Email failed — invite link copied to clipboard. Share it manually.`, "info");
+        addToast(`Email failed. Invite link copied to clipboard. Share it manually.`, "info");
       } else {
         addToast(`Invited ${inviteName.trim()}, but email delivery uncertain`, "info");
       }
       logAudit("system", currentUser.name, "invite_sent", `Invited ${inviteName.trim()} (${inviteEmail.trim()}) as ${inviteRole}`);
       setInviteEmail(""); setInviteName(""); setShowInvite(false);
     } catch {
-      addToast("Network error — invite not sent", "error");
+      addToast("Network error. Invite not sent.", "error");
     } finally {
       setInviting(false);
     }
@@ -349,7 +349,7 @@ export function SettingsPage() {
           addToast(`Invite resent to ${member.email}`, "success");
         } else if (data.inviteUrl) {
           await navigator.clipboard.writeText(data.inviteUrl);
-          addToast(`Email failed — invite link copied to clipboard`, "info");
+          addToast(`Email failed. Invite link copied to clipboard.`, "info");
         }
       } else {
         addToast(data.error || "Resend failed", "error");
@@ -421,10 +421,15 @@ export function SettingsPage() {
                 <option value="UTC">UTC</option>
               </select>
             </SettingRow>
+            {/* UX-013: not yet wired to persistence — disabled with a Coming
+                Soon badge so users are not misled into thinking it saved. */}
             <SettingRow icon={Calendar} label="Week starts on" desc="First day of the week in calendar">
-              <select className="h-8 px-3 rounded-lg bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-[11px] text-gray-600 dark:text-gray-300 outline-none cursor-pointer">
-                <option>Monday</option><option>Sunday</option>
-              </select>
+              <div className="flex items-center gap-2">
+                <select disabled className="h-8 px-3 rounded-lg bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-[11px] text-gray-400 dark:text-gray-500 outline-none cursor-not-allowed opacity-60">
+                  <option>Monday</option><option>Sunday</option>
+                </select>
+                <ComingSoonBadge />
+              </div>
             </SettingRow>
           </Section>
 
@@ -438,17 +443,20 @@ export function SettingsPage() {
             ))}
           </Section>
 
+          {/* UX-013: the toggles below are not yet wired to persistence —
+              disabled with a Coming Soon badge so flipping one does not
+              mislead the user into thinking a setting was saved. */}
           <Section title="Publishing" icon={<Zap className="w-3.5 h-3.5 text-amber-500" />}>
-            <SettingRow icon={Clock} label="Auto-publish" desc="Publish approved posts at scheduled time"><Toggle /></SettingRow>
-            <SettingRow icon={BarChart3} label="Analytics tracking" desc="Track engagement after publishing"><Toggle defaultOn /></SettingRow>
+            <SettingRow icon={Clock} label="Auto-publish" desc="Publish approved posts at scheduled time"><div className="flex items-center gap-2"><ComingSoonBadge /><Toggle disabled /></div></SettingRow>
+            <SettingRow icon={BarChart3} label="Analytics tracking" desc="Track engagement after publishing"><div className="flex items-center gap-2"><ComingSoonBadge /><Toggle defaultOn disabled /></div></SettingRow>
             <SettingRow icon={FileText} label="Hashtag sets" desc="Reusable hashtag groups"><Button size="sm" variant="outline" onClick={() => addToast("Hashtag set management coming soon", "info")} className="h-7 text-[10px] rounded-lg px-3 cursor-pointer">Manage</Button></SettingRow>
             <SettingRow icon={Smartphone} label="Caption templates" desc="Saved caption formats"><Button size="sm" variant="outline" onClick={() => addToast("Caption templates coming soon", "info")} className="h-7 text-[10px] rounded-lg px-3 cursor-pointer">Manage</Button></SettingRow>
           </Section>
 
           <Section title="Notifications" icon={<Bell className="w-3.5 h-3.5 text-violet-500" />}>
-            <SettingRow icon={Mail} label="Email notifications" desc="Alerts for approvals and status changes"><Toggle defaultOn /></SettingRow>
-            <SettingRow icon={Bell} label="Post reminders" desc="Notify 1 hour before scheduled post"><Toggle defaultOn /></SettingRow>
-            <SettingRow icon={Shield} label="Team activity" desc="When team members move posts or @mention"><Toggle /></SettingRow>
+            <SettingRow icon={Mail} label="Email notifications" desc="Alerts for approvals and status changes"><div className="flex items-center gap-2"><ComingSoonBadge /><Toggle defaultOn disabled /></div></SettingRow>
+            <SettingRow icon={Bell} label="Post reminders" desc="Notify 1 hour before scheduled post"><div className="flex items-center gap-2"><ComingSoonBadge /><Toggle defaultOn disabled /></div></SettingRow>
+            <SettingRow icon={Shield} label="Team activity" desc="When team members move posts or @mention"><div className="flex items-center gap-2"><ComingSoonBadge /><Toggle disabled /></div></SettingRow>
           </Section>
 
           {isAdmin && (
@@ -1639,10 +1647,17 @@ function SettingRow({ icon: Icon, label, desc, children }: { icon: LucideIcon; l
   );
 }
 
-function Toggle({ defaultOn = false }: { defaultOn?: boolean }) {
+function Toggle({ defaultOn = false, disabled = false }: { defaultOn?: boolean; disabled?: boolean }) {
   const [on, setOn] = useState(defaultOn);
+  // UX-013: when disabled the toggle is inert — flipping it would not persist
+  // anything, so it must not appear interactive.
   return (
-    <button onClick={() => setOn(!on)} className={`w-9 h-5 rounded-full transition-colors cursor-pointer shrink-0 ${on ? "bg-blue-500" : "bg-gray-200 dark:bg-white/[0.1]"}`}>
+    <button
+      onClick={disabled ? undefined : () => setOn(!on)}
+      disabled={disabled}
+      aria-disabled={disabled}
+      className={`w-9 h-5 rounded-full transition-colors shrink-0 ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"} ${on ? "bg-blue-500" : "bg-gray-200 dark:bg-white/[0.1]"}`}
+    >
       <div className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${on ? "translate-x-[18px]" : "translate-x-[2px]"}`} />
     </button>
   );

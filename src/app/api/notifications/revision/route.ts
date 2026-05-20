@@ -44,11 +44,13 @@ export async function POST(request: NextRequest) {
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://smm.ten80ten.com";
 
     // SEC-012: Trust the authenticated caller's identity, not the body.
+    // SEC-010: `.eq` — callerEmail is already lowercased; `.ilike` would let
+    // wildcard chars in a crafted email act as SQL patterns.
     const callerEmail = (auth.user.email || "").toLowerCase();
     const { data: callerRow } = await admin
       .from("team_members")
       .select("name, email")
-      .ilike("email", callerEmail)
+      .eq("email", callerEmail)
       .maybeSingle();
     const requestedBy = (callerRow?.name as string) || auth.user.email || "Reviewer";
     const requesterEmail = (callerRow?.email as string) || auth.user.email || "";

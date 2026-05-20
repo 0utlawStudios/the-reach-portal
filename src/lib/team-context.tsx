@@ -199,6 +199,8 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   }, [useDb, addToast]);
 
   const removeMember = useCallback((id: string, email: string, requestedBy: string) => {
+    // DATA-007: snapshot the member so a failed delete can be rolled back.
+    const previousMember = members.find((m) => m.id === id);
     setMembers((prev) => prev.filter((m) => m.id !== id));
     if (useDb) {
       // Use the API route to delete both team_members AND auth user
@@ -209,12 +211,31 @@ export function TeamProvider({ children }: { children: ReactNode }) {
           method: "POST",
           headers,
           body: JSON.stringify({ memberId: id, memberEmail: email, requestedBy }),
-        }).catch(() => {});
-      }).catch(() => {});
+        }).then((res) => {
+          // On failure, restore the optimistically removed member so the UI
+          // does not show someone as gone when they still have access.
+          if (!res.ok && previousMember) {
+            setMembers((prev) => prev.some((m) => m.id === id) ? prev : [...prev, previousMember]);
+            addToast("Remove failed. Member was restored.", "error");
+          }
+        }).catch(() => {
+          if (previousMember) {
+            setMembers((prev) => prev.some((m) => m.id === id) ? prev : [...prev, previousMember]);
+            addToast("Remove failed. Member was restored.", "error");
+          }
+        });
+      }).catch(() => {
+        if (previousMember) {
+          setMembers((prev) => prev.some((m) => m.id === id) ? prev : [...prev, previousMember]);
+          addToast("Remove failed. Member was restored.", "error");
+        }
+      });
     }
-  }, [useDb]);
+  }, [useDb, members, addToast]);
 
   const updateMember = useCallback((id: string, updates: Partial<TeamMember>) => {
+    // DATA-007: snapshot the member so a failed update can be rolled back.
+    const previousMember = members.find((m) => m.id === id);
     setMembers((prev) => prev.map((m) => m.id === id ? { ...m, ...updates } : m));
     if (useDb) {
       const dbUpdates: TeamMemberUpdate = {};
@@ -225,9 +246,17 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       if (updates.status !== undefined) dbUpdates.status = updates.status;
       if (updates.avatar !== undefined) dbUpdates.avatar_url = updates.avatar;
       if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
-      supabase.from("team_members").update(dbUpdates).eq("id", id).then(() => {});
+      supabase.from("team_members").update(dbUpdates).eq("id", id).then(({ error }) => {
+        // On failure, revert the optimistic local change so the edit does not
+        // appear saved when the DB rejected it.
+        if (error && previousMember) {
+          console.error("[team] updateMember sync failed:", error.message);
+          setMembers((prev) => prev.map((m) => m.id === id ? previousMember : m));
+          addToast(`Update failed: ${error.message}. Changes reverted.`, "error");
+        }
+      });
     }
-  }, [useDb]);
+  }, [useDb, members, addToast]);
 
   const value = useMemo(
     () => ({ members, pendingRequests, inviteMember, removeMember, updateMember, refreshPendingRequests }),

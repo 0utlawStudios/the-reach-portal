@@ -19,11 +19,20 @@ export function MentionTextarea({ value, onChange, placeholder, className, rows 
   const [showDropdown, setShowDropdown] = useState(false);
   const [mentionQuery, setMentionQuery] = useState("");
   const [cursorPos, setCursorPos] = useState(0);
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const filteredMembers = members.filter((m) =>
     m.status === "active" && m.name.toLowerCase().includes(mentionQuery.toLowerCase())
   );
+
+  // Render-time clamp: the stored index can fall out of range as the filtered
+  // list shrinks. Derive the effective index here instead of syncing it via
+  // an effect (avoids the cascading-render setState-in-effect anti-pattern).
+  const safeHighlightedIndex =
+    filteredMembers.length === 0
+      ? 0
+      : Math.min(highlightedIndex, filteredMembers.length - 1);
 
   const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
@@ -37,7 +46,29 @@ export function MentionTextarea({ value, onChange, placeholder, className, rows 
     if (atMatch) {
       setMentionQuery(atMatch[1]);
       setShowDropdown(true);
+      setHighlightedIndex(0);
     } else {
+      setShowDropdown(false);
+    }
+  };
+
+  // Keyboard navigation for the @mention dropdown. Arrow keys move the
+  // highlighted member, Enter/Tab insert it, Escape closes the dropdown.
+  // Click-to-select is preserved untouched below.
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (!showDropdown || filteredMembers.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightedIndex((safeHighlightedIndex + 1) % filteredMembers.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightedIndex((safeHighlightedIndex - 1 + filteredMembers.length) % filteredMembers.length);
+    } else if (e.key === "Enter" || e.key === "Tab") {
+      e.preventDefault();
+      const member = filteredMembers[safeHighlightedIndex];
+      if (member) insertMention(member.name);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
       setShowDropdown(false);
     }
   };
@@ -70,18 +101,22 @@ export function MentionTextarea({ value, onChange, placeholder, className, rows 
         ref={textareaRef}
         value={value}
         onChange={handleInput}
+        onKeyDown={handleKeyDown}
         placeholder={placeholder}
         rows={rows}
         className={className}
       />
       {showDropdown && filteredMembers.length > 0 && (
-        <div className="absolute left-0 bottom-full mb-1 w-64 max-h-72 overflow-y-auto bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-white/[0.1] shadow-xl py-1 z-50">
+        <div role="listbox" aria-label="Mention someone" className="absolute left-0 bottom-full mb-1 w-64 max-h-72 overflow-y-auto bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-white/[0.1] shadow-xl py-1 z-50">
           <p className="px-3 py-1 text-[9px] font-bold text-gray-400 uppercase tracking-wider">Mention someone</p>
-          {filteredMembers.map((member) => (
+          {filteredMembers.map((member, idx) => (
             <button
               key={member.id}
+              role="option"
+              aria-selected={idx === safeHighlightedIndex}
               onClick={() => insertMention(member.name)}
-              className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 dark:hover:bg-white/[0.04] transition-colors cursor-pointer text-left"
+              onMouseEnter={() => setHighlightedIndex(idx)}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 transition-colors cursor-pointer text-left ${idx === safeHighlightedIndex ? "bg-gray-50 dark:bg-white/[0.04]" : "hover:bg-gray-50 dark:hover:bg-white/[0.04]"}`}
             >
               {member.avatar ? (
                 <RawImage src={member.avatar} alt={member.name} className="w-7 h-7 rounded-full object-cover shrink-0" />

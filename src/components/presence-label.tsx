@@ -73,7 +73,7 @@ function fmtWeekday(d: Date): string {
 
 function relativeLastSeen(iso: string): string {
   const t = new Date(iso).getTime();
-  if (!Number.isFinite(t)) return "—";
+  if (!Number.isFinite(t)) return "Not set";
   const ageMs = Date.now() - t;
   if (ageMs < 60 * 1000) return "just now";
   if (ageMs < 60 * 60 * 1000) {

@@ -1,11 +1,12 @@
 "use client";
 
 import { RawImage } from "@/components/raw-image";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { usePipeline } from "@/lib/pipeline-context";
 import { useToast } from "@/lib/toast-context";
 import { X, Upload, FolderOpen, Image as ImageIcon, Film, Search, CheckCircle, Clock, Link2, ExternalLink } from "lucide-react";
 import { PLACEHOLDER_MEDIA } from "@/lib/placeholder-data";
+import { useFocusTrap } from "./use-focus-trap";
 
 const ASSET_SOURCES = ["Canva Pro", "Envato Elements", "Pexels", "Shot by Team", "Client Provided", "Google Images", "AI Generated"];
 
@@ -40,6 +41,7 @@ export function MediaPicker({ open, onClose, onSelect, folder = "raw-files", car
   const [search, setSearch] = useState("");
   const [unusedOnly, setUnusedOnly] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<MediaEntry | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   // Reset tab to defaultTab when picker opens
   useEffect(() => {
@@ -53,6 +55,8 @@ export function MediaPicker({ open, onClose, onSelect, folder = "raw-files", car
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
+
+  useFocusTrap(dialogRef, open);
 
   // Build media index: accumulate ALL card references per URL
   const allMedia = useMemo(() => {
@@ -137,17 +141,17 @@ export function MediaPicker({ open, onClose, onSelect, folder = "raw-files", car
   const copyShareLink = (asset: MediaEntry) => {
     const siteUrl = typeof window !== "undefined" ? window.location.origin : "";
     const shareUrl = asset.url.startsWith("/") ? `${siteUrl}${asset.url}` : asset.url;
-    navigator.clipboard.writeText(shareUrl).then(() => addToast("Link copied — share with your team", "success"));
+    navigator.clipboard.writeText(shareUrl).then(() => addToast("Link copied. Share with your team.", "success"));
   };
 
   return (
     <>
       <div onClick={onClose} className="fixed inset-0 bg-black/50 z-[60]" />
-      <div className="fixed inset-4 md:inset-8 lg:inset-y-12 lg:inset-x-[12%] z-[60] bg-white dark:bg-[#111] rounded-2xl border border-gray-200 dark:border-white/[0.08] shadow-2xl flex flex-col overflow-hidden">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="media-picker-title" className="fixed inset-4 md:inset-8 lg:inset-y-12 lg:inset-x-[12%] z-[60] bg-white dark:bg-[#111] rounded-2xl border border-gray-200 dark:border-white/[0.08] shadow-2xl flex flex-col overflow-hidden">
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-white/[0.06] shrink-0">
-          <h2 className="text-[15px] font-bold text-gray-900 dark:text-white">Select Media</h2>
+          <h2 id="media-picker-title" className="text-[15px] font-bold text-gray-900 dark:text-white">Select Media</h2>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-400 cursor-pointer"><X className="w-4 h-4" /></button>
         </div>
 

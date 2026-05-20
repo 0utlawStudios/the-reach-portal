@@ -1,6 +1,18 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { timingSafeEqual } from "node:crypto";
 import { log, newCorrelationId } from "@/lib/logger";
+
+// SEC-002: Constant-time secret comparison so the health token can't be
+// recovered byte-by-byte via response-timing analysis.
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  try {
+    return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+  } catch {
+    return false;
+  }
+}
 
 // Live integration health probes. Gated by the same HEALTH_CHECK_SECRET as
 // /api/health/deep-check. Used to replace the hardcoded "connected" cards on
@@ -162,7 +174,7 @@ async function probeFeatureFlags(): Promise<Probe> {
 export async function GET(request: Request) {
   const correlation_id = newCorrelationId();
   const token = request.headers.get("x-health-token");
-  if (!HEALTH_SECRET || token !== HEALTH_SECRET) {
+  if (!HEALTH_SECRET || !safeEqual(token ?? "", HEALTH_SECRET)) {
     log.warn("integrations health unauthorized", {
       route: "/api/health/integrations",
       correlation_id,

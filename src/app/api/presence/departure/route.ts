@@ -1,10 +1,12 @@
 // /api/presence/departure — departure beacon endpoint.
 //
-// Called via navigator.sendBeacon() on `pagehide` and `freeze` events. The
-// browser typically gives us ≤ 100ms to complete this, so we keep the work
-// minimal: validate the bearer token in the body, then upsert user_presence
-// using the service-role client (RPC requires an auth context that isn't
-// available on a beacon request).
+// Called via navigator.sendBeacon() on the `pagehide` event only (the `freeze`
+// listener was removed). The client also applies a 5-minute cooldown so a
+// pagehide that fires repeatedly won't fan out beacons. The browser typically
+// gives us ≤ 100ms to complete this, so we keep the work minimal: validate the
+// bearer token in the body, then upsert user_presence using the service-role
+// client (RPC requires an auth context that isn't available on a beacon
+// request).
 //
 // Returns 204 on success or on any swallowed error — the client doesn't care
 // about the response and we don't want to retry a torn-down request.

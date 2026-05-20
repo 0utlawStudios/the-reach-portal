@@ -165,16 +165,20 @@ function ContentCardInner({ card, isDragOverlay, stageColor }: Props) {
       className={`group relative rounded-xl overflow-hidden cursor-pointer bg-white dark:bg-[#151518] border hover:shadow-md transition-all duration-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${isDragging ? "opacity-20 scale-[0.97]" : "hover:-translate-y-0.5"} ${overdue ? "border-red-300 dark:border-red-500/30 shadow-red-100 dark:shadow-red-500/5" : "border-gray-200/80 dark:border-white/[0.06] hover:border-gray-300 dark:hover:border-white/[0.12]"}`}
     >
       {/* UX-012: explicit drag handle. Listeners now live on this button only,
-          so the rest of the card is a clean click surface. */}
+          so the rest of the card is a clean click surface.
+          UX-001: visible on touch (no hover), hover-only on desktop; 44x44 hit
+          area via padding while the grip icon stays visually small. */}
       <button
         type="button"
         {...attributes}
         {...listeners}
         onClick={(e) => e.stopPropagation()}
         aria-label="Drag card"
-        className="absolute top-1 left-1 z-10 p-1 rounded-md bg-black/40 backdrop-blur-sm text-white/80 hover:text-white hover:bg-black/60 opacity-0 group-hover:opacity-100 focus:opacity-100 cursor-grab active:cursor-grabbing transition-opacity duration-200 touch-none"
+        className="absolute top-1 left-1 z-10 flex h-11 w-11 items-center justify-center rounded-md text-white/80 hover:text-white opacity-100 md:opacity-0 md:group-hover:opacity-100 focus:opacity-100 cursor-grab active:cursor-grabbing transition-opacity duration-200 touch-none"
       >
-        <GripVertical className="w-3 h-3" />
+        <span className="flex h-6 w-6 items-center justify-center rounded-md bg-black/40 backdrop-blur-sm hover:bg-black/60 transition-colors duration-200">
+          <GripVertical className="w-3 h-3" />
+        </span>
       </button>
       {cardContent}
     </div>

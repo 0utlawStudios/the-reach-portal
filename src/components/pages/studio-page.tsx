@@ -200,12 +200,19 @@ export function StudioPage() {
     return () => { supabase.removeChannel(ch); };
   }, [isAllowedRole]);
 
+  // PERF-005: a single boolean gate for the job-status poll. The poll effect
+  // depends ONLY on this flag, so it keeps one steady 3s timer running across
+  // unrelated rows edits instead of tearing down/recreating on every change.
+  const hasActiveJobs = rows.some((r) => r.status === "generating" || r.status === "revising");
+
   useEffect(() => {
-    const generating = rows.filter((r) => r.status === "generating" || r.status === "revising");
-    if (generating.length === 0) return;
+    if (!hasActiveJobs) return;
     const interval = setInterval(async () => {
+      // Read the current rows + jobId map from refs each tick so the timer
+      // never needs to be rebuilt when those change.
+      const generating = rowsRef.current.filter((r) => r.status === "generating" || r.status === "revising");
       for (const row of generating) {
-        const jobId = jobIdByRow[row.id];
+        const jobId = jobIdByRowRef.current[row.id];
         if (!jobId) continue;
         try {
           const res = await authedFetch(`/api/ai/jobs/${jobId}`);
@@ -214,7 +221,7 @@ export function StudioPage() {
             const j = json.data.job;
             if (j.status === "completed" || j.status === "failed" || j.status === "cancelled") {
               setJobIdByRow((m) => { const out = { ...m }; delete out[row.id]; return out; });
-              if (j.status === "completed") addToast("AI draft ready — check Awaiting Approval.", "success");
+              if (j.status === "completed") addToast("AI draft ready. Check Awaiting Approval.", "success");
               else if (j.status === "failed") addToast(`AI generation failed: ${j.error || "unknown error"}`, "error");
             }
           }
@@ -222,7 +229,7 @@ export function StudioPage() {
       }
     }, 3000);
     return () => clearInterval(interval);
-  }, [rows, jobIdByRow, addToast]);
+  }, [hasActiveJobs, addToast]);
 
   useEffect(() => {
     let cancelled = false;
@@ -316,6 +323,11 @@ export function StudioPage() {
   const rowsRef = useRef<PlanRow[]>(rows);
   useEffect(() => { rowsRef.current = rows; }, [rows]);
 
+  // PERF-005: keep the latest jobId map in a ref so the job-status poll can
+  // read it without listing jobIdByRow as an effect dependency.
+  const jobIdByRowRef = useRef<Record<string, string>>(jobIdByRow);
+  useEffect(() => { jobIdByRowRef.current = jobIdByRow; }, [jobIdByRow]);
+
   const generateRow = useCallback(async (row: PlanRow) => {
     if (row.id.startsWith("tmp-")) {
       addToast("Save the row first by filling fields, then generate.", "info");
@@ -328,7 +340,7 @@ export function StudioPage() {
       if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
       const jobId = json.data?.job?.id;
       if (jobId) setJobIdByRow((m) => ({ ...m, [row.id]: jobId }));
-      addToast("AI generation started — back in about 20 seconds.", "info");
+      addToast("AI generation started. Back in about 20 seconds.", "info");
     } catch (err) {
       addToast(`Generation failed: ${err instanceof Error ? err.message : String(err)}`, "error");
     } finally {
@@ -391,7 +403,7 @@ export function StudioPage() {
             <Sparkles className="w-4 h-4" />Creator Studio is paused
           </h1>
           <p className="text-[12px] text-amber-800/80 dark:text-amber-300/80 leading-relaxed">
-            Studio has been temporarily disabled by an admin. Drafts you already generated are unaffected — they stay in Awaiting Approval and can be reviewed and published normally. The Studio sheet itself will come back when the flag is flipped.
+            Studio has been temporarily disabled by an admin. Drafts you already generated are unaffected. They stay in Awaiting Approval and can be reviewed and published normally. The Studio sheet itself will come back when the flag is flipped.
           </p>
         </div>
       </div>
@@ -417,7 +429,7 @@ export function StudioPage() {
           <h1 className="text-[15px] sm:text-base font-semibold flex items-center gap-1.5 text-gray-900 dark:text-gray-100">
             <Sparkles className="w-4 h-4 text-violet-500" />Creator Studio
           </h1>
-          <p className="text-[11px] text-gray-500 mt-0.5 max-w-xl">Plan a row, click Generate. Drafts land in Awaiting Approval — AI never auto-approves or publishes.</p>
+          <p className="text-[11px] text-gray-500 mt-0.5 max-w-xl">Plan a row, click Generate. Drafts land in Awaiting Approval. AI never auto-approves or publishes.</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <SpendChip spent={spendUsd} cap={dailyCap} />
@@ -717,7 +729,7 @@ function StudioCard(props: CardProps) {
           <div>
             <FieldLabel>Aspect</FieldLabel>
             <div className="h-8 flex items-center px-2 text-[11px] font-mono text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-white/[0.02] rounded-md border border-gray-100 dark:border-white/[0.05]">
-              {resolved ? formatAspectChip(resolved) : "—"}
+              {resolved ? formatAspectChip(resolved) : "Not set"}
             </div>
           </div>
         </div>

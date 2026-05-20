@@ -27,10 +27,12 @@ export async function POST(request: NextRequest) {
   if (authErr || !user?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  // SEC-010: lowercase + `.eq` for the identity lookup. `.ilike` would
+  // interpret wildcard chars in a crafted email as SQL patterns.
   const { data: tm } = await admin
     .from("team_members")
     .select("role")
-    .ilike("email", user.email)
+    .eq("email", user.email.toLowerCase())
     .maybeSingle();
   if (!tm || !ADMIN_ROLES.has(tm.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });

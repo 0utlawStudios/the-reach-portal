@@ -48,11 +48,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ workspaceId: existing.workspace_id });
     }
 
-    // Not in workspace_members — look up their team_members row and provision
+    // Not in workspace_members — look up their team_members row and provision.
+    // SEC-010: lowercase the email and match with `.eq`. `.ilike` treated
+    // wildcard chars in a crafted email as SQL patterns.
+    const lookupEmail = (user.email ?? "").toLowerCase();
     const { data: tm } = await admin
       .from("team_members")
       .select("role, status")
-      .ilike("email", user.email ?? "")
+      .eq("email", lookupEmail)
       .maybeSingle();
 
     // SEC-006: REJECT users without a team_members row instead of silently
@@ -95,8 +98,8 @@ export async function GET(request: NextRequest) {
     console.log(`[workspace/provision] Provisioned email_hash=${hashEmail(user.email)} as ${role} (${status})`);
     return NextResponse.json({ workspaceId: BASELINE_WORKSPACE_ID, provisioned: true });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    console.error("[workspace/provision]", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-011: log the full error server-side, return a generic message.
+    console.error("[workspace/provision]", err);
+    return NextResponse.json({ error: "Provisioning failed" }, { status: 500 });
   }
 }

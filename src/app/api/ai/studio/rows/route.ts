@@ -61,7 +61,11 @@ export async function GET(req: NextRequest) {
   if (from) query = query.gte("scheduled_date", from);
   if (to) query = query.lte("scheduled_date", to);
   const { data, error } = await query;
-  if (error) return errorResponse(500, error.message);
+  // SEC-011: log the raw PostgREST error, return a generic message.
+  if (error) {
+    console.error("[studio-rows] list failed", error);
+    return errorResponse(500, "Failed to load plan rows");
+  }
   return okResponse({ rows: data || [] });
 }
 
@@ -106,6 +110,10 @@ export async function POST(req: NextRequest) {
   }
 
   const { data, error } = await sb.from("content_plan_rows").insert(row).select("*").single();
-  if (error) return errorResponse(500, error.message);
+  // SEC-011: log the raw PostgREST error, return a generic message.
+  if (error) {
+    console.error("[studio-rows] insert failed", error);
+    return errorResponse(500, "Failed to create plan row");
+  }
   return okResponse({ row: data });
 }

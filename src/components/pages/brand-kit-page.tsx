@@ -99,9 +99,19 @@ export function BrandKitPage() {
 
   const saveEdit = async () => {
     setSaving(true);
+    // DATA-008: snapshot so a failed DB write can be rolled back instead of
+    // leaving the optimistic local state with a misleading success toast.
+    const previousData = data;
     setData(editData);
     if (useSupabase) {
-      await supabase.from("brand_playbook").update({ data: editData, updated_by: currentUser.name }).eq("id", "singleton");
+      const { error } = await supabase.from("brand_playbook").update({ data: editData, updated_by: currentUser.name }).eq("id", "singleton");
+      if (error) {
+        console.error("[brand-kit] saveEdit sync failed:", error.message);
+        setData(previousData);
+        setSaving(false);
+        addToast(`Save failed: ${error.message}. Changes reverted.`, "error");
+        return;
+      }
     }
     setSaving(false);
     setEditMode(false);

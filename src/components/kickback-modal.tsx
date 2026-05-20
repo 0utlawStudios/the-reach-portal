@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { X, AlertTriangle, Send, Paperclip, Image as ImageIcon, Trash2 } from "lucide-react";
 import { MentionTextarea } from "./mention-textarea";
+import { useFocusTrap } from "./use-focus-trap";
 
 const useSupabase = !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
@@ -19,6 +20,7 @@ export function KickbackModal() {
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   const open = !!pendingKickback;
   useEffect(() => {
@@ -27,6 +29,8 @@ export function KickbackModal() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, cancelKickback]);
+
+  useFocusTrap(dialogRef, open);
 
   if (!pendingKickback) return null;
 
@@ -66,7 +70,7 @@ export function KickbackModal() {
     }
 
     submitKickback(pendingKickback.cardId, note.trim(), attachmentUrl);
-    addToast("Revision requested — creator and approvers notified.", "warning");
+    addToast("Revision requested. Creator and approvers notified.", "warning");
     setNote("");
     removeFile();
     setUploading(false);
@@ -85,7 +89,7 @@ export function KickbackModal() {
 
       {/* Modal */}
       <div className="fixed inset-0 flex items-center justify-center z-[60] p-4">
-        <div className="bg-white dark:bg-[#151518] rounded-2xl border border-gray-200 dark:border-white/[0.08] shadow-2xl w-full max-w-[480px] overflow-hidden">
+        <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="kickback-modal-title" className="bg-white dark:bg-[#151518] rounded-2xl border border-gray-200 dark:border-white/[0.08] shadow-2xl w-full max-w-[480px] overflow-hidden">
           {/* Header */}
           <div className="relative px-6 pt-6 pb-4">
             <div className="absolute top-4 right-4">
@@ -98,7 +102,7 @@ export function KickbackModal() {
                 <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
               </div>
               <div>
-                <h2 className="text-[16px] font-bold text-gray-900 dark:text-white">Request Revision</h2>
+                <h2 id="kickback-modal-title" className="text-[16px] font-bold text-gray-900 dark:text-white">Request Revision</h2>
                 <p className="text-[12px] text-gray-400 mt-0.5">Send this post back for fixes with your feedback.</p>
               </div>
             </div>

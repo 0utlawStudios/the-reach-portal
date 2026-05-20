@@ -51,7 +51,10 @@ export async function POST(req: NextRequest) {
     .select("*")
     .in("id", ids)
     .eq("workspace_id", ctx.workspaceId);
-  if (rowsErr) return errorResponse(500, rowsErr.message);
+  if (rowsErr) {
+    console.error("[ai/studio/generate-batch] rows fetch failed:", rowsErr.message);
+    return errorResponse(500, "Could not load plan rows");
+  }
   const usableRows = (rows || []).filter((r) => r.status === "ready" || r.status === "empty" || r.status === "failed");
   if (usableRows.length === 0) return errorResponse(400, "No rows are ready to generate");
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { RawImage } from "@/components/raw-image";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ContentCard, Platform, ALL_PLATFORMS, ContentType } from "@/lib/types";
 import { usePipeline } from "@/lib/pipeline-context";
 import { useToast } from "@/lib/toast-context";
@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { X, RotateCcw, Sparkles, Copy, Calendar, ArrowRight, CheckCircle } from "lucide-react";
 import { ensureMediaAsset } from "@/lib/media-assets";
 import { useAuth } from "@/lib/auth-context";
+import { useFocusTrap } from "./use-focus-trap";
 
 type RepurposeMode = "select" | "repost" | "rewrite" | "seasonal";
 
@@ -32,6 +33,9 @@ export function RepurposeModal({ card, onClose }: Props) {
   const [contentType] = useState<ContentType>(card.contentType);
   const [scheduledDate, setScheduledDate] = useState("");
   const [scheduledTime, setScheduledTime] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const selectDialogRef = useRef<HTMLDivElement>(null);
+  const configDialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -39,12 +43,17 @@ export function RepurposeModal({ card, onClose }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  // Trap focus in whichever step is currently shown.
+  useFocusTrap(selectDialogRef, mode === "select");
+  useFocusTrap(configDialogRef, mode !== "select");
+
   const togglePlatform = (p: Platform) => {
     setPlatforms((prev) => prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]);
   };
 
   const handleSubmit = () => {
-    if (!title.trim() || platforms.length === 0 || !scheduledDate || !scheduledTime) return;
+    if (!title.trim() || platforms.length === 0 || !scheduledDate || !scheduledTime || submitting) return;
+    setSubmitting(true);
     createCard({
       title: mode === "repost" ? `[Repost] ${card.title}` : `[Repurposed] ${title.trim()}`,
       stage: "ideas",
@@ -79,7 +88,8 @@ export function RepurposeModal({ card, onClose }: Props) {
         }).catch((err) => console.error("[repurpose] media_assets sync failed:", err));
       }
     }
-    addToast(`Content repurposed and added to Ideas pipeline.`, "success");
+    addToast(`Content repurposed and added to Ideas.`, "success");
+    setSubmitting(false);
     onClose();
   };
 
@@ -89,12 +99,12 @@ export function RepurposeModal({ card, onClose }: Props) {
       <>
         <div onClick={onClose} className="fixed inset-0 bg-black/30 dark:bg-black/60 z-50" />
         <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-[#151518] rounded-2xl border border-gray-200 dark:border-white/[0.08] shadow-2xl w-full max-w-[480px]">
+          <div ref={selectDialogRef} role="dialog" aria-modal="true" aria-labelledby="repurpose-select-title" className="bg-white dark:bg-[#151518] rounded-2xl border border-gray-200 dark:border-white/[0.08] shadow-2xl w-full max-w-[480px]">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-white/[0.06]">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center"><RotateCcw className="w-4 h-4 text-blue-600 dark:text-blue-400" /></div>
                 <div>
-                  <h2 className="text-[15px] font-semibold text-gray-900 dark:text-white">Repurpose Content</h2>
+                  <h2 id="repurpose-select-title" className="text-[15px] font-semibold text-gray-900 dark:text-white">Repurpose Content</h2>
                   <p className="text-[11px] text-gray-400 mt-0.5">Give this post a second life</p>
                 </div>
               </div>
@@ -158,11 +168,11 @@ export function RepurposeModal({ card, onClose }: Props) {
     <>
       <div onClick={onClose} className="fixed inset-0 bg-black/30 dark:bg-black/60 z-50" />
       <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-        <div className="bg-white dark:bg-[#151518] rounded-2xl border border-gray-200 dark:border-white/[0.08] shadow-2xl w-full max-w-[520px] max-h-[85dvh] flex flex-col">
+        <div ref={configDialogRef} role="dialog" aria-modal="true" aria-labelledby="repurpose-config-title" className="bg-white dark:bg-[#151518] rounded-2xl border border-gray-200 dark:border-white/[0.08] shadow-2xl w-full max-w-[520px] max-h-[85dvh] flex flex-col">
           <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-white/[0.06] shrink-0">
             <div className="flex items-center gap-2">
               <button onClick={() => setMode("select")} className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-400 cursor-pointer"><ArrowRight className="w-4 h-4 rotate-180" /></button>
-              <h2 className="text-[15px] font-semibold text-gray-900 dark:text-white">
+              <h2 id="repurpose-config-title" className="text-[15px] font-semibold text-gray-900 dark:text-white">
                 {mode === "repost" ? "Repost As-Is" : mode === "rewrite" ? "Rewrite for New Platform" : "Update for Season"}
               </h2>
             </div>
@@ -235,11 +245,11 @@ export function RepurposeModal({ card, onClose }: Props) {
               <Button variant="outline" onClick={() => setMode("select")} className="flex-1 h-10 rounded-lg text-[12px]">Back</Button>
               <Button
                 onClick={handleSubmit}
-                disabled={platforms.length === 0 || !scheduledDate || !scheduledTime}
+                disabled={platforms.length === 0 || !scheduledDate || !scheduledTime || submitting}
                 className="flex-1 h-10 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-[12px] shadow-sm disabled:opacity-40"
               >
                 <CheckCircle className="w-3.5 h-3.5 mr-1.5" />
-                {mode === "repost" ? "Schedule Repost" : "Send to Pipeline"}
+                {mode === "repost" ? "Schedule Repost" : "Send to Content Engine"}
               </Button>
             </div>
           </div>

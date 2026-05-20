@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import Cropper from "react-easy-crop";
 import { X, ZoomIn, ZoomOut, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/lib/toast-context";
+import { useFocusTrap } from "./use-focus-trap";
 
 interface CropArea {
   x: number;
@@ -58,16 +60,20 @@ async function getCroppedImg(imageSrc: string, pixelCrop: CropArea): Promise<Blo
 }
 
 export function AvatarCropModal({ imageSrc, onCropComplete, onClose }: Props) {
+  const { addToast } = useToast();
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<CropArea | null>(null);
   const [saving, setSaving] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  useFocusTrap(dialogRef, true);
 
   const onCropChange = useCallback((crop: { x: number; y: number }) => setCrop(crop), []);
   const onZoomChange = useCallback((zoom: number) => setZoom(zoom), []);
@@ -83,21 +89,28 @@ export function AvatarCropModal({ imageSrc, onCropComplete, onClose }: Props) {
       const croppedBlob = await getCroppedImg(imageSrc, croppedAreaPixels);
       onCropComplete(croppedBlob);
     } catch {
-      // fallback: use original
+      // UX-014: canvas crop failed (e.g. tainted cross-origin image). Fall
+      // back to the uncropped original so the save still completes, and tell
+      // the user the photo was not cropped.
       const res = await fetch(imageSrc);
       const blob = await res.blob();
+      addToast("Couldn't crop the photo. Using the original instead.", "info");
       onCropComplete(blob);
+    } finally {
+      // UX-014: always reset so the Apply button never gets stuck disabled
+      // on the catch/fallback path.
+      setSaving(false);
     }
   };
 
   return (
     <>
       <div className="fixed inset-0 bg-black/70 z-[70]" onClick={onClose} />
-      <div className="fixed inset-4 sm:inset-8 md:inset-16 lg:inset-y-16 lg:inset-x-[25%] z-[70] bg-white dark:bg-[#151518] rounded-2xl border border-gray-200 dark:border-white/[0.08] shadow-2xl flex flex-col overflow-hidden">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="avatar-crop-title" className="fixed inset-4 sm:inset-8 md:inset-16 lg:inset-y-16 lg:inset-x-[25%] z-[70] bg-white dark:bg-[#151518] rounded-2xl border border-gray-200 dark:border-white/[0.08] shadow-2xl flex flex-col overflow-hidden">
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-white/[0.06] shrink-0">
-          <h2 className="text-[15px] font-bold text-gray-900 dark:text-white">Crop Profile Photo</h2>
+          <h2 id="avatar-crop-title" className="text-[15px] font-bold text-gray-900 dark:text-white">Crop Profile Photo</h2>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-400 cursor-pointer"><X className="w-4 h-4" /></button>
         </div>
 

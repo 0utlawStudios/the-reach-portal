@@ -52,7 +52,7 @@ export default function RequestAccessPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-[#f8f9fb] dark:bg-[#09090b] flex items-center justify-center p-4">
+      <div className="min-h-dvh bg-[#f8f9fb] dark:bg-[#09090b] flex items-center justify-center p-4">
         <div className="w-full max-w-[440px] text-center space-y-5">
           <div className="w-16 h-16 mx-auto rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center">
             <CheckCircle className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
@@ -70,7 +70,7 @@ export default function RequestAccessPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8f9fb] dark:bg-[#09090b] flex items-center justify-center p-4">
+    <div className="min-h-dvh bg-[#f8f9fb] dark:bg-[#09090b] flex items-center justify-center p-4">
       <div className="w-full max-w-[480px]">
         <div className="bg-white dark:bg-[#131316] rounded-2xl border border-gray-200/80 dark:border-white/[0.06] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_6px_24px_rgba(0,0,0,0.03)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.2),0_6px_24px_rgba(0,0,0,0.15)] overflow-hidden">
 

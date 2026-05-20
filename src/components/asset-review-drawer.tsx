@@ -28,6 +28,11 @@ import { useTeam } from "@/lib/team-context";
 import { useToast } from "@/lib/toast-context";
 import { ensureMediaAsset } from "@/lib/media-assets";
 import { formatDate, formatDateTime, formatDateShort, formatDateTimeCompact } from "@/lib/utils";
+import { useFocusTrap } from "./use-focus-trap";
+
+// Strict @mention pattern — an @ followed by a name-like token. Used so a
+// pasted email or URL containing "@" does not trigger a phantom mention.
+const MENTION_RE = /@[a-zA-Z][\w.-]*/;
 
 type DrawerTab = "content" | "vault" | "audit";
 
@@ -88,6 +93,7 @@ export function AssetReviewDrawer() {
   const [showLightbox, setShowLightbox] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [pendingDelete, setPendingDelete] = useState(false);
+  const drawerRef = useRef<HTMLDivElement>(null);
 
   // ESC closes lightbox first, then the drawer
   useEffect(() => {
@@ -169,6 +175,14 @@ export function AssetReviewDrawer() {
     return map;
   }, [auditLogs]);
 
+  // Trap focus inside the drawer while it is open. Disabled while a nested
+  // overlay (lightbox, delete confirmation, media picker, validation modal)
+  // is showing so the trap does not fight the nested dialog for focus.
+  useFocusTrap(
+    drawerRef,
+    isDrawerOpen && !!selectedCard && !showLightbox && !pendingDelete && !showMediaPicker && validationErrors.length === 0,
+  );
+
   if (!selectedCard || !isDrawerOpen) return null;
 
   const currentColumn = PIPELINE_COLUMNS.find((c) => c.id === selectedCard.stage);
@@ -228,12 +242,13 @@ export function AssetReviewDrawer() {
     const timestamp = formatDateTimeCompact(new Date());
     const comment = `${currentUser.name} (${timestamp}): ${trimmed}`;
     const existing = selectedCard.notes ? selectedCard.notes + "\n\n" : "";
-    updateCard(selectedCard.id, { notes: existing + comment });
-    logAudit(selectedCard.id, currentUser.name, "comment_added", trimmed);
-    setNewComment("");
-
-    // Fire @mention notifications in background
-    if (trimmed.includes("@")) {
+    // DATA-002: only fire the @mention email once the DB write is confirmed
+    // persisted. Firing eagerly emailed people for comments that never saved.
+    updateCard(selectedCard.id, { notes: existing + comment }, (persisted) => {
+      if (!persisted) return;
+      // Strict mention test — a pasted email or URL containing "@" must not
+      // trigger a mention notification.
+      if (!MENTION_RE.test(trimmed)) return;
       fetch("/api/notifications/mention", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -245,7 +260,9 @@ export function AssetReviewDrawer() {
           authorEmail: currentUser.email,
         }),
       }).catch(() => {});
-    }
+    });
+    logAudit(selectedCard.id, currentUser.name, "comment_added", trimmed);
+    setNewComment("");
   };
 
   const saveDate = () => {
@@ -352,7 +369,7 @@ export function AssetReviewDrawer() {
   return (
     <>
       <div onClick={closeDrawer} className="fixed inset-0 bg-black/20 dark:bg-black/50 z-40 transition-opacity duration-200" />
-      <div className="fixed right-0 top-0 bottom-0 w-full max-w-full md:max-w-[560px] z-50 flex flex-col bg-white dark:bg-[#0e0e11] border-l-0 md:border-l border-gray-200 dark:border-white/[0.08] shadow-2xl animate-in slide-in-from-right duration-200">
+      <div ref={drawerRef} role="dialog" aria-modal="true" aria-label={`Post details: ${selectedCard.title || "Untitled post"}`} className="fixed right-0 top-0 bottom-0 w-full max-w-full md:max-w-[560px] z-50 flex flex-col bg-white dark:bg-[#0e0e11] border-l-0 md:border-l border-gray-200 dark:border-white/[0.08] shadow-2xl animate-in slide-in-from-right duration-200">
 
         {/* ─── Top Bar ─── */}
         <div className="flex items-center justify-between px-6 py-3.5 border-b border-gray-100 dark:border-white/[0.06] shrink-0">

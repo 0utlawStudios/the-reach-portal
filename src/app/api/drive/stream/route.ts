@@ -77,7 +77,9 @@ export async function GET(request: NextRequest) {
   const corsHeaders = corsHeadersFor(request);
   const fileId = request.nextUrl.searchParams.get("id");
 
-  if (!fileId || !/^[\w-]+$/.test(fileId)) {
+  // SEC-009: Tightened to match drive/finalize — Drive file IDs are 20-80
+  // char base64-url-ish strings. The old `/^[\w-]+$/` accepted any length.
+  if (!fileId || !/^[a-zA-Z0-9_-]{20,80}$/.test(fileId)) {
     return new Response(JSON.stringify({ error: "Invalid or missing file ID" }), {
       status: 400,
       headers: { "Content-Type": "application/json", ...corsHeaders },
@@ -100,9 +102,10 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Get file metadata for Content-Type and size
-    const meta = await getFileMetadata(fileId);
-    const token = await getAccessToken();
+    // Get file metadata for Content-Type and size.
+    // PERF-003: metadata fetch and token mint are independent — run them
+    // concurrently instead of sequentially.
+    const [meta, token] = await Promise.all([getFileMetadata(fileId), getAccessToken()]);
     const driveUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
 
     const rangeHeader = request.headers.get("range");

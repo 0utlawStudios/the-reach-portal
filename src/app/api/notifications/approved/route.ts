@@ -83,11 +83,13 @@ export async function POST(request: NextRequest) {
 
     // SEC-012: Override `approvedBy` with the server-resolved team_members
     // name for the authenticated caller.
+    // SEC-010: `.eq` — callerEmail is already lowercased; `.ilike` would let
+    // wildcard chars in a crafted email act as SQL patterns.
     const callerEmail = (auth.user.email || "").toLowerCase();
     const { data: approverRow } = await admin
       .from("team_members")
       .select("name, email")
-      .ilike("email", callerEmail)
+      .eq("email", callerEmail)
       .maybeSingle();
     const approvedBy = (approverRow?.name as string) || auth.user.email || "Approver";
 

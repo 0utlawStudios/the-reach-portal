@@ -29,7 +29,11 @@ export async function POST(req: NextRequest, ctxParams: { params: Promise<{ id: 
     .eq("id", id)
     .eq("workspace_id", ctx.workspaceId)
     .maybeSingle();
-  if (getErr) return errorResponse(500, getErr.message);
+  // SEC-011: log the raw PostgREST error, return a generic message.
+  if (getErr) {
+    console.error("[cancel-job/:id] lookup failed", getErr);
+    return errorResponse(500, "Failed to load job");
+  }
   if (!job) return errorResponse(404, "Job not found");
   if (job.status !== "queued") return errorResponse(409, `Cannot cancel job in status '${job.status}'`);
 
@@ -37,7 +41,11 @@ export async function POST(req: NextRequest, ctxParams: { params: Promise<{ id: 
     .from("ai_generation_jobs")
     .update({ status: "cancelled", completed_at: new Date().toISOString() })
     .eq("id", id);
-  if (error) return errorResponse(500, error.message);
+  // SEC-011: log the raw PostgREST error, return a generic message.
+  if (error) {
+    console.error("[cancel-job/:id] update failed", error);
+    return errorResponse(500, "Failed to cancel job");
+  }
   if (job.plan_row_id) {
     await sb.from("content_plan_rows").update({ status: "ready", last_error: null }).eq("id", job.plan_row_id);
   }

@@ -14,6 +14,7 @@ import { MentionTextarea } from "./mention-textarea";
 import { formatDateTimeCompact } from "@/lib/utils";
 import { MediaPicker } from "./media-picker";
 import { ValidationErrorModal } from "./validation-error-modal";
+import { useFocusTrap } from "./use-focus-trap";
 
 const contentTypes: { id: ContentType; label: string; icon: React.ReactNode }[] = [
   { id: "image", label: "Image", icon: <ImageIcon className="w-3.5 h-3.5" /> },
@@ -89,6 +90,7 @@ export function CreatePostModal({ open, onClose }: Props) {
   const rawFilesRef = useRef<Map<string, File>>(new Map());
   const [showMediaPicker, setShowMediaPicker] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   // ESC key closes the modal
   useEffect(() => {
@@ -97,6 +99,11 @@ export function CreatePostModal({ open, onClose }: Props) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
+
+  // Trap focus inside this dialog. Disabled while a nested overlay (the Media
+  // Library picker or the validation error modal) is open so the trap does
+  // not fight the nested dialog for focus.
+  useFocusTrap(dialogRef, open && !showMediaPicker && validationErrors.length === 0);
 
   if (!open) return null;
 
@@ -274,10 +281,10 @@ export function CreatePostModal({ open, onClose }: Props) {
     <>
       <div onClick={onClose} className="fixed inset-0 bg-black/30 dark:bg-black/60 z-50" />
       <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-        <div className="bg-white dark:bg-[#151518] rounded-2xl border border-gray-200 dark:border-white/[0.08] shadow-2xl w-full max-w-[580px] max-h-[90dvh] flex flex-col">
+        <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="create-post-title" className="bg-white dark:bg-[#151518] rounded-2xl border border-gray-200 dark:border-white/[0.08] shadow-2xl w-full max-w-[580px] max-h-[90dvh] flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-white/[0.06] shrink-0">
-            <h2 className="text-[15px] font-semibold text-gray-900 dark:text-white">Create New Post</h2>
+            <h2 id="create-post-title" className="text-[15px] font-semibold text-gray-900 dark:text-white">Create New Post</h2>
             <button onClick={onClose} aria-label="Close create post" className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-400 cursor-pointer"><X className="w-4 h-4" aria-hidden="true" /></button>
           </div>
 

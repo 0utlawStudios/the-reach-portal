@@ -29,9 +29,17 @@ export default function SetupPasswordPage() {
 
   useEffect(() => {
     async function initSession() {
-      const params = new URLSearchParams(window.location.search);
+      // Tokens arrive in the URL fragment (#access_token=...). Fragments are
+      // never sent to the server or in the Referer header. Read from the hash,
+      // not the query string (SEC-001), then scrub the fragment immediately so
+      // the credentials do not persist in the address bar or history (SEC-004).
+      const hash = window.location.hash.replace(/^#/, "");
+      const params = new URLSearchParams(hash);
       const accessToken = params.get("access_token");
       const refreshToken = params.get("refresh_token");
+      if (hash) {
+        window.history.replaceState({}, "", window.location.pathname);
+      }
 
       if (accessToken) {
         // Establish a proper Supabase session

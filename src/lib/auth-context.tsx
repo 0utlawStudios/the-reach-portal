@@ -138,9 +138,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setCurrentUser(profile);
         setIsAuthenticated(true);
         setAccessToken(session.access_token);
-        // Enrich from DB in background (non-blocking)
+        // Enrich from DB in background (non-blocking).
+        // PERF-004: only call setCurrentUser a second time when the enriched
+        // profile actually differs (name/role/avatar). Mirrors the AvatarSync
+        // equality guard so a no-op enrich does not trigger a cascade re-render.
         enrichFromTeamMembers(email, profile).then((enriched) => {
-          setCurrentUser(enriched);
+          setCurrentUser((prev) =>
+            enriched.name === prev.name &&
+            enriched.role === prev.role &&
+            enriched.avatar === prev.avatar
+              ? prev
+              : enriched
+          );
         }).catch(() => {});
       } else {
         setIsAuthenticated(false);

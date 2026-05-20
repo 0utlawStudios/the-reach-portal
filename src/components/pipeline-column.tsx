@@ -5,19 +5,23 @@ import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { ContentCard as ContentCardType, PipelineColumn as PipelineColumnType } from "@/lib/types";
 import { ContentCard } from "./content-card";
 import { SkeletonCard } from "./skeleton-card";
-import { usePipeline } from "@/lib/pipeline-context";
 
 interface Props {
   column: PipelineColumnType;
   cards: ContentCardType[];
+  isLoading: boolean;
+  /** UX-007: callback ref on the column root so KanbanBoard can scrollIntoView. */
+  columnRef?: (el: HTMLDivElement | null) => void;
 }
 
-export function PipelineColumn({ column, cards }: Props) {
+// PERF-006: isLoading arrives as a prop instead of via usePipeline(). The
+// context subscription previously re-rendered every column on any card
+// mutation; KanbanBoard now reads isLoading once and passes it down.
+export function PipelineColumn({ column, cards, isLoading, columnRef }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
-  const { isLoading } = usePipeline();
 
   return (
-    <div className="flex flex-col flex-1 min-w-[240px] sm:min-w-[190px] snap-start">
+    <div ref={columnRef} className="flex flex-col flex-1 min-w-[240px] sm:min-w-[190px] snap-start">
       {/* Column header */}
       <div className="flex items-center gap-2.5 px-3 py-2.5 mb-2">
         <div className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: column.color, boxShadow: `0 0 6px ${column.color}40` }} />

@@ -1,16 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { usePipeline } from "@/lib/pipeline-context";
 import { useToast } from "@/lib/toast-context";
 import { Button } from "@/components/ui/button";
 import { X, Send, FileCheck, AlertCircle } from "lucide-react";
 import { MentionTextarea } from "./mention-textarea";
+import { useFocusTrap } from "./use-focus-trap";
 
 export function RevisionModal() {
   const { pendingReapproval, submitReapproval, cancelReapproval } = usePipeline();
   const { addToast } = useToast();
   const [note, setNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   const open = !!pendingReapproval;
   useEffect(() => {
@@ -20,16 +23,20 @@ export function RevisionModal() {
     return () => window.removeEventListener("keydown", onKey);
   }, [open, cancelReapproval]);
 
+  useFocusTrap(dialogRef, open);
+
   if (!pendingReapproval) return null;
 
   const isValid = note.trim().length >= 10;
   const charCount = note.trim().length;
 
   const handleSubmit = () => {
-    if (!isValid) return;
+    if (!isValid || submitting) return;
+    setSubmitting(true);
     submitReapproval(pendingReapproval.cardId, note.trim());
-    addToast("Revision submitted — sent for re-approval.", "success");
+    addToast("Revision submitted. Sent for re-approval.", "success");
     setNote("");
+    setSubmitting(false);
   };
 
   const handleCancel = () => {
@@ -44,7 +51,7 @@ export function RevisionModal() {
 
       {/* Modal */}
       <div className="fixed inset-0 flex items-center justify-center z-[60] p-4">
-        <div className="bg-white dark:bg-[#151518] rounded-2xl border border-gray-200 dark:border-white/[0.08] shadow-2xl w-full max-w-[480px] overflow-hidden">
+        <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="revision-modal-title" className="bg-white dark:bg-[#151518] rounded-2xl border border-gray-200 dark:border-white/[0.08] shadow-2xl w-full max-w-[480px] overflow-hidden">
           {/* Header */}
           <div className="relative px-6 pt-6 pb-4">
             <div className="absolute top-4 right-4">
@@ -57,7 +64,7 @@ export function RevisionModal() {
                 <FileCheck className="w-5 h-5 text-violet-600 dark:text-violet-400" />
               </div>
               <div>
-                <h2 className="text-[16px] font-bold text-gray-900 dark:text-white">Submit for Re-Approval</h2>
+                <h2 id="revision-modal-title" className="text-[16px] font-bold text-gray-900 dark:text-white">Submit for Re-Approval</h2>
                 <p className="text-[12px] text-gray-400 mt-0.5">This post will be sent back to the reviewer for review.</p>
               </div>
             </div>
@@ -105,11 +112,11 @@ export function RevisionModal() {
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={!isValid}
+              disabled={!isValid || submitting}
               className="flex-1 h-10 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-[13px] font-medium shadow-sm shadow-violet-500/20 disabled:opacity-40 disabled:shadow-none cursor-pointer transition-all duration-200"
             >
               <Send className="w-3.5 h-3.5 mr-1.5" />
-              Submit Revision
+              {submitting ? "Submitting..." : "Submit Revision"}
             </Button>
           </div>
         </div>

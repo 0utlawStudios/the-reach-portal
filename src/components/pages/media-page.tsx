@@ -60,6 +60,7 @@ export function MediaPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadingFileName, setUploadingFileName] = useState("");
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const useDb = isSupabaseConfigured();
@@ -183,13 +184,29 @@ export function MediaPage() {
     setSelectedIds((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   };
 
-  const deleteSelected = () => {
+  // UX-009: deletes are confirmed via a dialog first; confirmDeleteSelected
+  // runs the actual removal. DATA-008: the Supabase delete error is inspected
+  // and the removed assets are re-inserted locally on failure.
+  const confirmDeleteSelected = () => {
     const idsToDelete = Array.from(selectedIds);
+    const removedAssets = media.filter((m) => selectedIds.has(m.id));
     setMedia((prev) => prev.filter((m) => !selectedIds.has(m.id)));
     setSelectedIds(new Set());
+    setConfirmingDelete(false);
     // Delete from Supabase
     if (useDb && idsToDelete.length > 0) {
-      supabase.from("media_assets").delete().in("id", idsToDelete).then(() => {});
+      supabase.from("media_assets").delete().in("id", idsToDelete).then(({ error }) => {
+        if (error) {
+          console.error("[media] deleteSelected sync failed:", error.message);
+          // Restore the removed assets so they do not vanish on a failed delete.
+          setMedia((prev) => {
+            const present = new Set(prev.map((m) => m.id));
+            const toRestore = removedAssets.filter((a) => !present.has(a.id));
+            return toRestore.length > 0 ? [...toRestore, ...prev] : prev;
+          });
+          addToast(`Delete failed: ${error.message}. Files were restored.`, "error");
+        }
+      });
     }
   };
 
@@ -301,16 +318,17 @@ export function MediaPage() {
             ))}
           </div>
 
-          {/* View toggle */}
-          <div className="hidden sm:flex items-center gap-0.5 border-l border-gray-200 dark:border-white/[0.06] pl-2">
-            <button onClick={() => setViewMode("grid")} className={`p-1.5 rounded-md cursor-pointer transition-all duration-200 ${viewMode === "grid" ? "bg-gray-100 dark:bg-white/[0.08] text-gray-700 dark:text-white" : "text-gray-400"}`}><Grid3X3 className="w-3.5 h-3.5" /></button>
-            <button onClick={() => setViewMode("list")} className={`p-1.5 rounded-md cursor-pointer transition-all duration-200 ${viewMode === "list" ? "bg-gray-100 dark:bg-white/[0.08] text-gray-700 dark:text-white" : "text-gray-400"}`}><List className="w-3.5 h-3.5" /></button>
+          {/* View toggle — UX-012: visible on mobile too so users stuck in
+              the wide list view can switch back to grid. */}
+          <div className="flex items-center gap-0.5 border-l border-gray-200 dark:border-white/[0.06] pl-2">
+            <button onClick={() => setViewMode("grid")} aria-label="Grid view" className={`p-1.5 rounded-md cursor-pointer transition-all duration-200 ${viewMode === "grid" ? "bg-gray-100 dark:bg-white/[0.08] text-gray-700 dark:text-white" : "text-gray-400"}`}><Grid3X3 className="w-3.5 h-3.5" /></button>
+            <button onClick={() => setViewMode("list")} aria-label="List view" className={`p-1.5 rounded-md cursor-pointer transition-all duration-200 ${viewMode === "list" ? "bg-gray-100 dark:bg-white/[0.08] text-gray-700 dark:text-white" : "text-gray-400"}`}><List className="w-3.5 h-3.5" /></button>
           </div>
 
           {selectedIds.size > 0 && (
             <div className="flex items-center gap-2 border-l border-gray-200 dark:border-white/[0.06] pl-2">
               <span className="text-[10px] text-gray-500">{selectedIds.size} selected</span>
-              <button onClick={deleteSelected} className="text-[10px] text-red-500 cursor-pointer font-medium flex items-center gap-1"><Trash2 className="w-3 h-3" />Delete</button>
+              <button onClick={() => setConfirmingDelete(true)} className="text-[10px] text-red-500 cursor-pointer font-medium flex items-center gap-1"><Trash2 className="w-3 h-3" />Delete</button>
               <button onClick={() => setSelectedIds(new Set())} className="text-gray-400 cursor-pointer"><X className="w-3.5 h-3.5" /></button>
             </div>
           )}
@@ -472,6 +490,51 @@ export function MediaPage() {
                     <ChevronRight className="w-5 h-5" />
                   </button>
                 )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ─── Delete Confirmation Dialog (UX-009) ─── */}
+      {confirmingDelete && selectedIds.size > 0 && (
+        <>
+          <div onClick={() => setConfirmingDelete(false)} className="fixed inset-0 bg-black/40 dark:bg-black/60 z-[100] backdrop-blur-sm" />
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6" onClick={() => setConfirmingDelete(false)}>
+            <div
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="delete-media-title"
+              aria-describedby="delete-media-desc"
+              className="w-full max-w-md sm:max-w-lg rounded-2xl overflow-hidden bg-white/85 dark:bg-[#18181b]/85 backdrop-blur-2xl border border-gray-200/60 dark:border-white/[0.12] shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-200/40 dark:border-white/[0.08]">
+                <div className="w-9 h-9 rounded-xl bg-red-500/10 dark:bg-red-500/15 flex items-center justify-center shrink-0">
+                  <Trash2 className="w-5 h-5 text-red-500" aria-hidden="true" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 id="delete-media-title" className="text-[15px] font-bold text-gray-900 dark:text-white">
+                    Delete {selectedIds.size} {selectedIds.size === 1 ? "file" : "files"}?
+                  </h3>
+                </div>
+                <button onClick={() => setConfirmingDelete(false)} aria-label="Cancel delete" className="p-1.5 rounded-lg hover:bg-gray-100/80 dark:hover:bg-white/[0.06] text-gray-400 cursor-pointer transition-colors">
+                  <X className="w-4 h-4" aria-hidden="true" />
+                </button>
+              </div>
+              <div className="px-5 py-4">
+                <p id="delete-media-desc" className="text-[13px] text-gray-700 dark:text-gray-300 leading-relaxed">
+                  This removes {selectedIds.size === 1 ? "this file" : `these ${selectedIds.size} files`} from the media library. This cannot be undone.
+                </p>
+              </div>
+              <div className="px-5 py-4 border-t border-gray-200/40 dark:border-white/[0.08] flex gap-2">
+                <button onClick={() => setConfirmingDelete(false)} className="flex-1 h-10 rounded-xl border border-gray-200 dark:border-white/[0.1] text-[13px] font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/[0.04] cursor-pointer transition-colors">
+                  Cancel
+                </button>
+                <button onClick={confirmDeleteSelected} className="flex-1 h-10 rounded-xl bg-red-600 hover:bg-red-700 text-white text-[13px] font-medium cursor-pointer shadow-sm shadow-red-500/20 transition-colors flex items-center justify-center gap-1.5">
+                  <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+                  Delete {selectedIds.size === 1 ? "File" : "Files"}
+                </button>
               </div>
             </div>
           </div>

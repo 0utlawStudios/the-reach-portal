@@ -89,10 +89,19 @@ export async function POST(request: NextRequest) {
     }
 
     // ─── Email admins about the new request (only for genuinely new emails) ───
+    // SEC-008: Fire-and-forget. Awaiting the SMTP round-trip before responding
+    // turned response latency into an account-enumeration oracle — a "new"
+    // email took noticeably longer than a known one. We dispatch the admin
+    // notification without blocking and return immediately, so the response
+    // timing is identical for known and unknown emails.
     const smtpUser = process.env.SMTP_USER;
     const smtpPass = process.env.SMTP_PASS;
     if (smtpUser && smtpPass && !alreadyKnown && !insertErr) {
-      try {
+      const notifyName = body.name.trim();
+      const notifyPhone = body.phone;
+      const notifyCompany = body.company;
+      const notifyReason = body.reason;
+      void (async () => {
         const transporter = getTransporter();
 
         // Find superadmins and admins to notify
@@ -107,19 +116,19 @@ export async function POST(request: NextRequest) {
           await transporter.sendMail({
             from: getFromAddress(),
             to: adminEmails.join(", "),
-            subject: `New Access Request: ${body.name.trim()}`,
+            subject: `New Access Request: ${notifyName}`,
             html: buildAdminNotificationHtml({
-              name: body.name.trim(),
+              name: notifyName,
               email,
-              phone: body.phone,
-              company: body.company,
-              reason: body.reason,
+              phone: notifyPhone,
+              company: notifyCompany,
+              reason: notifyReason,
             }),
           });
         }
-      } catch (emailErr: unknown) {
+      })().catch((emailErr: unknown) => {
         console.error("[request-access] Email FAILED:", emailErr instanceof Error ? emailErr.message : emailErr);
-      }
+      });
     }
 
     return NextResponse.json({ success: true, smtpConfigured: !!(smtpUser && smtpPass) });

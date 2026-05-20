@@ -63,7 +63,10 @@ export async function POST(req: NextRequest, ctxParams: { params: Promise<{ id: 
     .eq("id", id)
     .eq("workspace_id", ctx.workspaceId)
     .maybeSingle();
-  if (rowErr) return errorResponse(500, rowErr.message);
+  if (rowErr) {
+    console.error("[ai/studio/generate-row] row fetch failed:", rowErr.message);
+    return errorResponse(500, "Could not load the plan row");
+  }
   if (!row) return errorResponse(404, "Row not found");
   if (row.status === "generating" || row.status === "revising") {
     return errorResponse(409, "Row already in flight");
@@ -118,7 +121,10 @@ export async function POST(req: NextRequest, ctxParams: { params: Promise<{ id: 
     })
     .select("*")
     .single();
-  if (jobErr || !job) return errorResponse(500, jobErr?.message || "Failed to enqueue");
+  if (jobErr || !job) {
+    if (jobErr) console.error("[ai/studio/generate-row] job enqueue failed:", jobErr.message);
+    return errorResponse(500, "Failed to enqueue");
+  }
 
   await sb
     .from("content_plan_rows")

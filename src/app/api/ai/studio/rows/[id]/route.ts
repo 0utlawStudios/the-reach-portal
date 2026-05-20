@@ -58,7 +58,11 @@ export async function PATCH(req: NextRequest, ctxParams: { params: Promise<{ id:
     .eq("id", id)
     .eq("workspace_id", ctx.workspaceId)
     .maybeSingle();
-  if (getErr) return errorResponse(500, getErr.message);
+  // SEC-011: log the raw PostgREST error, return a generic message.
+  if (getErr) {
+    console.error("[studio-rows/:id] lookup failed", getErr);
+    return errorResponse(500, "Failed to load plan row");
+  }
   if (!current) return errorResponse(404, "Row not found");
 
   // Once a row is generated/generating/revising the editable surface is locked.
@@ -92,7 +96,11 @@ export async function PATCH(req: NextRequest, ctxParams: { params: Promise<{ id:
     .eq("workspace_id", ctx.workspaceId)
     .select("*")
     .single();
-  if (error) return errorResponse(500, error.message);
+  // SEC-011: log the raw PostgREST error, return a generic message.
+  if (error) {
+    console.error("[studio-rows/:id] update failed", error);
+    return errorResponse(500, "Failed to update plan row");
+  }
   return okResponse({ row: data });
 }
 
@@ -109,13 +117,21 @@ export async function DELETE(req: NextRequest, ctxParams: { params: Promise<{ id
     .eq("id", id)
     .eq("workspace_id", ctx.workspaceId)
     .maybeSingle();
-  if (getErr) return errorResponse(500, getErr.message);
+  // SEC-011: log the raw PostgREST error, return a generic message.
+  if (getErr) {
+    console.error("[studio-rows/:id] delete lookup failed", getErr);
+    return errorResponse(500, "Failed to load plan row");
+  }
   if (!row) return errorResponse(404, "Row not found");
   if (row.status === "generating" || row.status === "revising") {
     return errorResponse(409, "Row is generating, delete blocked");
   }
 
   const { error } = await sb.from("content_plan_rows").delete().eq("id", id).eq("workspace_id", ctx.workspaceId);
-  if (error) return errorResponse(500, error.message);
+  // SEC-011: log the raw PostgREST error, return a generic message.
+  if (error) {
+    console.error("[studio-rows/:id] delete failed", error);
+    return errorResponse(500, "Failed to delete plan row");
+  }
   return okResponse({ deleted: true });
 }

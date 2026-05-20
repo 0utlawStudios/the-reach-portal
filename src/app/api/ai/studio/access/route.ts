@@ -112,7 +112,11 @@ export async function PUT(req: NextRequest) {
     .select("id, data")
     .eq("workspace_id", workspaceId)
     .maybeSingle();
-  if (getErr) return errorResponse(500, getErr.message);
+  // SEC-011: log the raw PostgREST error, return a generic message.
+  if (getErr) {
+    console.error("[studio-access] brand_playbook lookup failed", getErr);
+    return errorResponse(500, "Failed to load brand playbook");
+  }
   if (!current) return errorResponse(404, "Brand playbook row not found for this workspace");
 
   const data = { ...(current.data as Record<string, unknown> || {}) };
@@ -126,7 +130,11 @@ export async function PUT(req: NextRequest) {
     .from("brand_playbook")
     .update({ data })
     .eq("id", current.id);
-  if (upErr) return errorResponse(500, upErr.message);
+  // SEC-011: log the raw PostgREST error, return a generic message.
+  if (upErr) {
+    console.error("[studio-access] brand_playbook update failed", upErr);
+    return errorResponse(500, "Failed to update brand playbook");
+  }
 
   // Audit
   try {

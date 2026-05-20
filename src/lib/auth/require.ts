@@ -7,8 +7,8 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 // requireRole at the top, get back either an AuthContext or a NextResponse
 // (the 401/403 response to return directly).
 //
-// Part of Workstream B (B2) of the security remediation. NOT yet wired to
-// any route — this file is a scaffolding helper for future B/D/E workstreams.
+// Part of Workstream B (B2) of the security remediation. These helpers are
+// wired into the live API routes (drive, notifications, ai/studio, and more).
 //
 // Usage:
 //
@@ -164,10 +164,12 @@ export async function requireBearerTeamRole(
     const admin = createClient(url, serviceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
+    // SEC-010: `.eq` not `.ilike` — the email is already lowercased above,
+    // and `.ilike` would treat `%`/`_` in a crafted email as SQL wildcards.
     const { data } = await admin
       .from("team_members")
       .select("role")
-      .ilike("email", email)
+      .eq("email", email)
       .maybeSingle();
     const role = (data?.role as string) || "";
     const allowed = allowedRoles
