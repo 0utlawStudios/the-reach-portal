@@ -178,7 +178,11 @@ export function SupportInbox() {
               >
                 <div className="flex items-center gap-2">
                   <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${STATUS_DOT[t.status]}`} />
-                  <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-gray-900 dark:text-white">
+                  <span
+                    className={`min-w-0 flex-1 truncate text-[13px] text-gray-900 dark:text-white ${
+                      t.unreadForAdmin ? "font-bold" : "font-semibold"
+                    }`}
+                  >
                     {t.createdByName}
                   </span>
                   {t.unreadForAdmin && (
