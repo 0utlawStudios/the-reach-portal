@@ -4,6 +4,9 @@ import { RawImage } from "@/components/raw-image";
 import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { Lock, CheckCircle, AlertCircle, Eye, EyeOff, User, Phone, Shield, Camera } from "lucide-react";
+import { AvatarCropModal } from "@/components/avatar-crop-modal";
+import { ToastProvider } from "@/lib/toast-context";
+import { ToastContainer } from "@/components/toast-container";
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -19,6 +22,7 @@ export default function SetupPasswordPage() {
   const [confirm, setConfirm] = useState("");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState("");
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -78,10 +82,20 @@ export default function SetupPasswordPage() {
   const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setAvatarFile(file);
+    // Open the crop modal with the chosen image; the cropped result becomes
+    // the avatar. Reset the input so re-selecting the same file re-fires.
+    const reader = new FileReader();
+    reader.onload = (ev) => setCropImageSrc(ev.target?.result as string);
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const handleCroppedAvatar = (croppedBlob: Blob) => {
+    setAvatarFile(new File([croppedBlob], "avatar.jpg", { type: "image/jpeg" }));
     const reader = new FileReader();
     reader.onload = (ev) => setAvatarPreview(ev.target?.result as string);
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(croppedBlob);
+    setCropImageSrc(null);
   };
 
   const inputClass = "w-full h-11 px-3 rounded-xl bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-[13px] text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 dark:focus:ring-orange-500/10 transition-all";
@@ -271,6 +285,17 @@ export default function SetupPasswordPage() {
 
         <p className="text-center text-[10px] text-gray-400 dark:text-gray-600 mt-4">Ten80Ten Social Media Management Portal</p>
       </div>
+
+      {cropImageSrc && (
+        <ToastProvider>
+          <AvatarCropModal
+            imageSrc={cropImageSrc}
+            onCropComplete={handleCroppedAvatar}
+            onClose={() => setCropImageSrc(null)}
+          />
+          <ToastContainer />
+        </ToastProvider>
+      )}
     </div>
   );
 }
