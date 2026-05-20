@@ -225,302 +225,302 @@
   "hotPaths": [
     {
       "path": "src/lib/pipeline-context.tsx",
-      "accessCount": 21,
-      "lastAccessed": 1779207829819,
-      "type": "file"
-    },
-    {
-      "path": "src/app/api/drive/stream/route.ts",
-      "accessCount": 7,
-      "lastAccessed": 1778614462104,
-      "type": "file"
-    },
-    {
-      "path": "src/app/api/team/remove-member/route.ts",
-      "accessCount": 7,
-      "lastAccessed": 1778679166953,
-      "type": "file"
-    },
-    {
-      "path": "AGENTS.md",
-      "accessCount": 6,
-      "lastAccessed": 1778613974559,
-      "type": "file"
-    },
-    {
-      "path": "src/app/api/team/invite/route.ts",
-      "accessCount": 6,
-      "lastAccessed": 1778614328769,
-      "type": "file"
-    },
-    {
-      "path": "src/app/api/team/resend-invite/route.ts",
-      "accessCount": 6,
-      "lastAccessed": 1778614350302,
-      "type": "file"
-    },
-    {
-      "path": "src/app/api/team/approve-request/route.ts",
-      "accessCount": 6,
-      "lastAccessed": 1778614358037,
-      "type": "file"
-    },
-    {
-      "path": "src/lib/auth-context.tsx",
-      "accessCount": 6,
-      "lastAccessed": 1778669110133,
-      "type": "file"
-    },
-    {
-      "path": "src/lib/auth/require.ts",
-      "accessCount": 5,
-      "lastAccessed": 1778634628350,
+      "accessCount": 47,
+      "lastAccessed": 1779278306946,
       "type": "file"
     },
     {
       "path": "src/components/kanban-board.tsx",
-      "accessCount": 5,
-      "lastAccessed": 1778679004823,
-      "type": "file"
-    },
-    {
-      "path": "package.json",
-      "accessCount": 5,
-      "lastAccessed": 1779207804211,
-      "type": "file"
-    },
-    {
-      "path": "src/app/api/team/request-access/route.ts",
-      "accessCount": 4,
-      "lastAccessed": 1778614484558,
-      "type": "file"
-    },
-    {
-      "path": "src/app/api/publish-jobs/route.ts",
-      "accessCount": 4,
-      "lastAccessed": 1778614624180,
-      "type": "file"
-    },
-    {
-      "path": "src/app/api/drive/upload/route.ts",
-      "accessCount": 4,
-      "lastAccessed": 1778614633304,
-      "type": "file"
-    },
-    {
-      "path": "src/lib/supabase/server.ts",
-      "accessCount": 4,
-      "lastAccessed": 1778669245792,
-      "type": "file"
-    },
-    {
-      "path": "src/app/api/workspace/provision/route.ts",
-      "accessCount": 4,
-      "lastAccessed": 1779207826049,
-      "type": "file"
-    },
-    {
-      "path": "src/app/api/admin/backfill-media/route.ts",
-      "accessCount": 3,
-      "lastAccessed": 1778614288159,
-      "type": "file"
-    },
-    {
-      "path": "src/lib/team-context.tsx",
-      "accessCount": 3,
-      "lastAccessed": 1778614366114,
-      "type": "file"
-    },
-    {
-      "path": "src/lib/supabaseClient.ts",
-      "accessCount": 3,
-      "lastAccessed": 1778669093343,
-      "type": "file"
-    },
-    {
-      "path": "supabase/migrations/0015_post_safety.sql",
-      "accessCount": 3,
-      "lastAccessed": 1778675992307,
-      "type": "file"
-    },
-    {
-      "path": "supabase/migrations/0007_rls_v2.sql",
-      "accessCount": 3,
-      "lastAccessed": 1779207817131,
-      "type": "file"
-    },
-    {
-      "path": "supabase/migrations/0000_baseline.sql",
-      "accessCount": 3,
-      "lastAccessed": 1779207818656,
-      "type": "file"
-    },
-    {
-      "path": "src/app/auth/confirm/route.ts",
-      "accessCount": 2,
-      "lastAccessed": 1778613950254,
-      "type": "file"
-    },
-    {
-      "path": "src/app/api/auth/forgot-password/route.ts",
-      "accessCount": 2,
-      "lastAccessed": 1778613960907,
-      "type": "file"
-    },
-    {
-      "path": "supabase/migrations/0016_fix_timezone_defaults.sql",
-      "accessCount": 2,
-      "lastAccessed": 1778615717063,
-      "type": "file"
-    },
-    {
-      "path": "supabase/migrations/0009_audit_log_v2.sql",
-      "accessCount": 2,
-      "lastAccessed": 1778669045584,
-      "type": "file"
-    },
-    {
-      "path": "supabase/migrations/0002_tenant_model.sql",
-      "accessCount": 2,
-      "lastAccessed": 1779207814342,
-      "type": "file"
-    },
-    {
-      "path": "supabase/migrations/0004_workspace_id_columns.sql",
-      "accessCount": 2,
-      "lastAccessed": 1779207815997,
-      "type": "file"
-    },
-    {
-      "path": "src/app/api/auth/logout/route.ts",
-      "accessCount": 1,
-      "lastAccessed": 1778613930718,
-      "type": "file"
-    },
-    {
-      "path": "src/app/api/drive/finalize/route.ts",
-      "accessCount": 1,
-      "lastAccessed": 1778613930918,
-      "type": "file"
-    },
-    {
-      "path": "src/app/api/drive/proxy-upload/route.ts",
-      "accessCount": 1,
-      "lastAccessed": 1778613931095,
-      "type": "file"
-    },
-    {
-      "path": "src/app/api/health/integrations/route.ts",
-      "accessCount": 1,
-      "lastAccessed": 1778613934591,
+      "accessCount": 25,
+      "lastAccessed": 1779263639473,
       "type": "file"
     },
     {
       "path": "src/app/api/health/deep-check/route.ts",
-      "accessCount": 1,
-      "lastAccessed": 1778613934698,
+      "accessCount": 19,
+      "lastAccessed": 1779263684774,
       "type": "file"
     },
     {
-      "path": "src/app/api/notifications/approved/route.ts",
-      "accessCount": 1,
-      "lastAccessed": 1778613934769,
+      "path": "src/app/api/workspace/provision/route.ts",
+      "accessCount": 18,
+      "lastAccessed": 1779278230525,
       "type": "file"
     },
     {
-      "path": "src/app/api/notifications/awaiting-approval/route.ts",
-      "accessCount": 1,
-      "lastAccessed": 1778613935203,
+      "path": "src/lib/auth/require.ts",
+      "accessCount": 17,
+      "lastAccessed": 1779278291622,
       "type": "file"
     },
     {
-      "path": "src/app/api/notifications/mention/route.ts",
-      "accessCount": 1,
-      "lastAccessed": 1778613935254,
+      "path": "AGENTS.md",
+      "accessCount": 16,
+      "lastAccessed": 1779263586726,
       "type": "file"
     },
     {
-      "path": "supabase/migrations/0012_scheduled_at_tstz.sql",
-      "accessCount": 1,
-      "lastAccessed": 1778613938703,
+      "path": "src/app/api/drive/stream/route.ts",
+      "accessCount": 16,
+      "lastAccessed": 1779263732251,
       "type": "file"
     },
     {
-      "path": "supabase/migrations/0013_column_drift.sql",
-      "accessCount": 1,
-      "lastAccessed": 1778613938844,
+      "path": "src/app/api/publish-jobs/route.ts",
+      "accessCount": 16,
+      "lastAccessed": 1779263802054,
       "type": "file"
     },
     {
-      "path": "src/app/api/notifications/revision/route.ts",
-      "accessCount": 1,
-      "lastAccessed": 1778613939911,
-      "type": "file"
-    },
-    {
-      "path": "supabase/migrations/0008_abuse_events.sql",
-      "accessCount": 1,
-      "lastAccessed": 1778613941603,
-      "type": "file"
-    },
-    {
-      "path": "supabase/migrations/0006_rate_limit.sql",
-      "accessCount": 1,
-      "lastAccessed": 1778613942021,
-      "type": "file"
-    },
-    {
-      "path": "supabase/migrations/0010_publish_ledger.sql",
-      "accessCount": 1,
-      "lastAccessed": 1778613942229,
-      "type": "file"
-    },
-    {
-      "path": "supabase/migrations/0011_claim_publish_job.sql",
-      "accessCount": 1,
-      "lastAccessed": 1778613946893,
-      "type": "file"
-    },
-    {
-      "path": "supabase/migrations/0014_create_publish_job_for_post.sql",
-      "accessCount": 1,
-      "lastAccessed": 1778613947231,
-      "type": "file"
-    },
-    {
-      "path": "supabase/migrations/0001_feature_flags.sql",
-      "accessCount": 1,
-      "lastAccessed": 1778613947449,
-      "type": "file"
-    },
-    {
-      "path": "supabase/migrations/0017_media_assets_realtime.sql",
-      "accessCount": 1,
-      "lastAccessed": 1778613947677,
+      "path": "src/lib/auth-context.tsx",
+      "accessCount": 16,
+      "lastAccessed": 1779278231375,
       "type": "file"
     },
     {
       "path": "src/app/auth/setup/page.tsx",
-      "accessCount": 1,
-      "lastAccessed": 1778613950500,
-      "type": "file"
-    },
-    {
-      "path": "src/app/auth/forgot-password/page.tsx",
-      "accessCount": 1,
-      "lastAccessed": 1778613950922,
+      "accessCount": 15,
+      "lastAccessed": 1779263629052,
       "type": "file"
     },
     {
       "path": "src/app/auth/reset-password/page.tsx",
-      "accessCount": 1,
-      "lastAccessed": 1778613950966,
+      "accessCount": 14,
+      "lastAccessed": 1779263631592,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/team-context.tsx",
+      "accessCount": 14,
+      "lastAccessed": 1779264012242,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/notifications/mention/route.ts",
+      "accessCount": 14,
+      "lastAccessed": 1779278230108,
       "type": "file"
     },
     {
       "path": "src/components/pipeline-column.tsx",
-      "accessCount": 1,
-      "lastAccessed": 1778613956901,
+      "accessCount": 11,
+      "lastAccessed": 1779263623849,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/notifications/revision/route.ts",
+      "accessCount": 11,
+      "lastAccessed": 1779278120380,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/notifications/approved/route.ts",
+      "accessCount": 11,
+      "lastAccessed": 1779278120789,
+      "type": "file"
+    },
+    {
+      "path": "package.json",
+      "accessCount": 11,
+      "lastAccessed": 1779278186049,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/drive/proxy-upload/route.ts",
+      "accessCount": 10,
+      "lastAccessed": 1779263614691,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/notifications/awaiting-approval/route.ts",
+      "accessCount": 10,
+      "lastAccessed": 1779263779180,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/team/invite/route.ts",
+      "accessCount": 10,
+      "lastAccessed": 1779278116639,
+      "type": "file"
+    },
+    {
+      "path": "src/app/auth/forgot-password/page.tsx",
+      "accessCount": 9,
+      "lastAccessed": 1779262047717,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/team/remove-member/route.ts",
+      "accessCount": 9,
+      "lastAccessed": 1779262118153,
+      "type": "file"
+    },
+    {
+      "path": "src/app/auth/confirm/route.ts",
+      "accessCount": 9,
+      "lastAccessed": 1779263633550,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/team/request-access/route.ts",
+      "accessCount": 9,
+      "lastAccessed": 1779278117087,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/team/approve-request/route.ts",
+      "accessCount": 9,
+      "lastAccessed": 1779278125064,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/team/resend-invite/route.ts",
+      "accessCount": 9,
+      "lastAccessed": 1779278125249,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/drive/upload/route.ts",
+      "accessCount": 8,
+      "lastAccessed": 1779262053868,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/admin/backfill-media/route.ts",
+      "accessCount": 8,
+      "lastAccessed": 1779263763018,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/supabase/server.ts",
+      "accessCount": 8,
+      "lastAccessed": 1779278292929,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/drive/finalize/route.ts",
+      "accessCount": 7,
+      "lastAccessed": 1779263513941,
+      "type": "file"
+    },
+    {
+      "path": "supabase/migrations/0015_post_safety.sql",
+      "accessCount": 7,
+      "lastAccessed": 1779278123650,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/health/integrations/route.ts",
+      "accessCount": 7,
+      "lastAccessed": 1779278125698,
+      "type": "file"
+    },
+    {
+      "path": "supabase/migrations/0009_audit_log_v2.sql",
+      "accessCount": 6,
+      "lastAccessed": 1779278234321,
+      "type": "file"
+    },
+    {
+      "path": "supabase/migrations/0007_rls_v2.sql",
+      "accessCount": 6,
+      "lastAccessed": 1779278234643,
+      "type": "file"
+    },
+    {
+      "path": "supabase/migrations/0000_baseline.sql",
+      "accessCount": 5,
+      "lastAccessed": 1779278117032,
+      "type": "file"
+    },
+    {
+      "path": "supabase/migrations/0004_workspace_id_columns.sql",
+      "accessCount": 5,
+      "lastAccessed": 1779278117664,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/supabaseClient.ts",
+      "accessCount": 5,
+      "lastAccessed": 1779278293777,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/auth/forgot-password/route.ts",
+      "accessCount": 4,
+      "lastAccessed": 1779262068064,
+      "type": "file"
+    },
+    {
+      "path": "supabase/migrations/0016_fix_timezone_defaults.sql",
+      "accessCount": 4,
+      "lastAccessed": 1779278124080,
+      "type": "file"
+    },
+    {
+      "path": "supabase/migrations/0017_media_assets_realtime.sql",
+      "accessCount": 4,
+      "lastAccessed": 1779278294179,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/auth/logout/route.ts",
+      "accessCount": 3,
+      "lastAccessed": 1779262068921,
+      "type": "file"
+    },
+    {
+      "path": "supabase/migrations/0002_tenant_model.sql",
+      "accessCount": 3,
+      "lastAccessed": 1779278117301,
+      "type": "file"
+    },
+    {
+      "path": "supabase/migrations/0010_publish_ledger.sql",
+      "accessCount": 3,
+      "lastAccessed": 1779278122192,
+      "type": "file"
+    },
+    {
+      "path": "supabase/migrations/0011_claim_publish_job.sql",
+      "accessCount": 3,
+      "lastAccessed": 1779278122616,
+      "type": "file"
+    },
+    {
+      "path": "supabase/migrations/0012_scheduled_at_tstz.sql",
+      "accessCount": 3,
+      "lastAccessed": 1779278122814,
+      "type": "file"
+    },
+    {
+      "path": "supabase/migrations/0013_column_drift.sql",
+      "accessCount": 3,
+      "lastAccessed": 1779278123035,
+      "type": "file"
+    },
+    {
+      "path": "supabase/migrations/0014_create_publish_job_for_post.sql",
+      "accessCount": 3,
+      "lastAccessed": 1779278123451,
+      "type": "file"
+    },
+    {
+      "path": "supabase/migrations/0001_feature_flags.sql",
+      "accessCount": 2,
+      "lastAccessed": 1779278117055,
+      "type": "file"
+    },
+    {
+      "path": "supabase/migrations/0006_rate_limit.sql",
+      "accessCount": 2,
+      "lastAccessed": 1779278118088,
+      "type": "file"
+    },
+    {
+      "path": "supabase/migrations/0008_abuse_events.sql",
+      "accessCount": 2,
+      "lastAccessed": 1779278118513,
       "type": "file"
     }
   ],

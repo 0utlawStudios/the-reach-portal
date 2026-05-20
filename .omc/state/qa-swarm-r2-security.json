@@ -1,0 +1,152 @@
+{
+  "agent": "security",
+  "auditedAt": "2026-05-20",
+  "summary": "The c09439b QA pass closed most server-side auth holes (drive routes, notification routes, provisioner self-grant, timing-safe webhook compares) and those fixes hold up under re-audit. However it introduced one functional-but-broken regression: auth/confirm now emits session tokens in the URL fragment while the downstream setup and reset-password pages still read the query string, so invite and recovery flows depend entirely on an undocumented 10-minute cookie. Two pre-existing issues the pass missed remain: timing-unsafe HEALTH_CHECK_SECRET comparison on both /api/health routes, and /api/health/deep-check returning every user's email and sign-in history as plaintext PII behind that weak gate.",
+  "findingCounts": { "critical": 1, "high": 3, "medium": 4, "low": 4 },
+  "findings": [
+    {
+      "id": "SEC-001",
+      "severity": "critical",
+      "title": "auth/confirm emits tokens in URL fragment but setup/reset pages read the query string — invite & recovery flows broken, sole fallback is a 10-min cookie",
+      "file": "src/app/auth/confirm/route.ts",
+      "lines": "92-108",
+      "description": "The c09439b pass changed /auth/confirm to redirect with the Supabase session in the URL fragment: `${siteUrl}/auth/setup#${params}` and `${siteUrl}/auth/reset-password#${params}` (lines 100 and 106). But the two destination pages still parse `new URLSearchParams(window.location.search)` — the QUERY string, not `window.location.hash`. setup/page.tsx line 32 and reset-password/page.tsx line 32 both read `.search`. A fragment after `#` is never part of `.search`, so `params.get('access_token')` returns null on both pages. The route's own comment block (lines 20-24) admits this: 'the downstream /auth/setup and /auth/reset-password pages currently read from searchParams. They MUST be patched to read from window.location.hash instead, otherwise the cookie path (10-minute TTL) is the only thing keeping them functional.' That patch was never applied. Net effect: every invite-acceptance and password-reset link works ONLY within the 10-minute cookie TTL window; reset-password explicitly errors with 'Missing reset token' once the cookie path is the only transport because the page never reads the cookie either (it only calls supabase.auth.setSession with tokens it failed to extract). This is a half-shipped fix that breaks two core auth flows for any user who opens the link slowly, on a different browser/device than expected, or after the cookie expires.",
+      "reproducer": "1. Admin invites a user via /api/team/invite. 2. User clicks the emailed link to /auth/confirm?token_hash=...&type=invite. 3. verifyOtp succeeds, route redirects to /auth/setup#access_token=...&refresh_token=.... 4. setup/page.tsx initSession() runs `new URLSearchParams(window.location.search)` which is empty (the tokens are in location.hash). accessToken is null, the `if (accessToken)` block is skipped, `ready` stays false. 5. The form's submit is gated on `!ready` so the user can never complete setup via the token transport. Only the sb-access-token HttpOnly cookie (10-min TTL) keeps a session alive, and neither page reads that cookie — they depend on setSession with URL tokens. Same break for type=recovery -> /auth/reset-password.",
+      "recommendedFix": "In src/app/auth/setup/page.tsx line 32 and src/app/auth/reset-password/page.tsx line 32, read tokens from the fragment: replace `new URLSearchParams(window.location.search)` with `new URLSearchParams(window.location.hash.replace(/^#/, ''))`. After extracting the tokens, also strip the fragment via `window.history.replaceState({}, '', window.location.pathname)` so the access token does not linger in the address bar / browser history. This matches the route's documented Wave B intent and restores both flows. Do not revert the route to query-string transport — fragments are the correct choice (not sent in Referer / server logs).",
+      "regressionRisk": "low",
+      "category": "incomplete-prior-fix"
+    },
+    {
+      "id": "SEC-002",
+      "severity": "high",
+      "title": "HEALTH_CHECK_SECRET compared with timing-unsafe !== on both health routes",
+      "file": "src/app/api/health/deep-check/route.ts",
+      "lines": "111",
+      "description": "Both health endpoints authenticate with a plain `!==` string comparison against HEALTH_CHECK_SECRET. deep-check/route.ts line 111: `if (!HEALTH_SECRET || token !== HEALTH_SECRET) return unauthorized();`. integrations/route.ts line 165: `if (!HEALTH_SECRET || token !== HEALTH_SECRET)`. JavaScript string `!==` short-circuits on the first differing byte, leaking the secret one character at a time through response-timing analysis. The c09439b pass explicitly added timing-safe `safeEqual` (timingSafeEqual) to the AI webhook and worker routes (SEC-007, SEC-008) but left these two health routes on the naive compare. deep-check is especially sensitive because it exposes full PII (see SEC-003) — recovering this secret via a timing oracle unlocks a complete user-directory dump.",
+      "reproducer": "Send repeated GET /api/health/deep-check with `Authorization: Bearer <guess>`, measuring response latency. Because `token !== HEALTH_SECRET` returns as soon as the first mismatched character is found, a correct-prefix guess takes measurably longer to reject. Iterate byte-by-byte to reconstruct HEALTH_CHECK_SECRET, then call the endpoint and read every user's email + sign-in history.",
+      "recommendedFix": "Reuse the constant-time pattern already in the codebase. Add a helper `function safeEqual(a: string, b: string): boolean { if (a.length !== b.length) return false; try { return timingSafeEqual(Buffer.from(a), Buffer.from(b)); } catch { return false; } }` (import `timingSafeEqual` from 'node:crypto') to both health routes, and replace `token !== HEALTH_SECRET` with `!safeEqual(token ?? '', HEALTH_SECRET)`. Keep the `!HEALTH_SECRET` guard.",
+      "regressionRisk": "low",
+      "category": "pre-existing"
+    },
+    {
+      "id": "SEC-003",
+      "severity": "high",
+      "title": "health/deep-check returns full PII (every user email, name, sign-in history) in plaintext JSON",
+      "file": "src/app/api/health/deep-check/route.ts",
+      "lines": "298-318, 466-508, 727-735, 858-865",
+      "description": "GET /api/health/deep-check returns a JSON body that embeds the entire user directory in cleartext. Check 07 (lines 311-318) returns `orphanedAuth`, `orphanedMembers`, `unconfirmed`, `neverLoggedIn` — all arrays of raw email addresses. Check 13 (line 466) lists `stalePending` member emails. Check 14 (lines 502-507) lists `inactive` and `neverSignedIn` emails plus `ghostMembers` names. Check 24 (line 734) lists stale-account emails. Check 32 (line 863) lists incomplete-profile member names. The only gate is the timing-unsafe HEALTH_CHECK_SECRET (SEC-002). A health endpoint should report counts and pass/warn/fail, not dump PII. If the secret leaks (timing oracle, log capture, env exposure) or the endpoint is ever proxied/cached, this becomes a one-request export of the org's full membership roster, who's active, who never logged in, and email-confirmation state — a ready-made credential-stuffing and social-engineering target. The provisioner route was already hardened to hash emails before logging (SEC-014 / hashEmail) — the same concern applies here but the fix was not extended.",
+      "reproducer": "GET /api/health/deep-check with the valid HEALTH_CHECK_SECRET bearer. Inspect `checks['07_auth_consistency'].details` — it contains `orphanedAuth`, `orphanedMembers`, `unconfirmed`, `neverLoggedIn` as full email arrays. `checks['14_user_activity'].details.inactive` and `.neverSignedIn` list every inactive user's email. One authorized request returns the complete directory.",
+      "recommendedFix": "Reduce PII in the response body. For checks 07/13/14/24/32, replace raw email/name arrays in `details` with counts only (e.g. `unconfirmedCount: unconfirmed.length` instead of `unconfirmed: [...]`). If operators need the actual identities for triage, hash them with the existing `createHash('sha256')...slice(0,12)` pattern, or move the verbose detail behind a separate `?verbose=1` flag that is off by default. The human-readable `message` strings that interpolate `.join(', ')` of emails (lines 311-315, 466, 502-504, 734) should likewise be reduced to counts.",
+      "regressionRisk": "low",
+      "category": "pre-existing"
+    },
+    {
+      "id": "SEC-004",
+      "severity": "high",
+      "title": "Session access/refresh tokens placed in HttpOnly cookies AND URL fragment by auth/confirm; fragment copy is logged in browser history",
+      "file": "src/app/auth/confirm/route.ts",
+      "lines": "96-108",
+      "description": "auth/confirm builds `params` containing `access_token` and `refresh_token` and appends them to the redirect URL as a fragment (`#access_token=...&refresh_token=...`), in addition to setting them as HttpOnly cookies. The fragment is the better-than-query-string transport the comment intends, but a JWT access token AND a long-lived refresh token sitting in the URL fragment still land in: the browser address bar, browser history, the JS-readable `window.location.hash`, and any client-side analytics/error reporter that captures `location.href`. The refresh token in particular is a long-lived credential — placing it in the URL is risky even as a fragment. Combined with SEC-001 (the pages never strip the fragment because they never even read it), the tokens persist in history indefinitely. Once SEC-001 is fixed so the pages DO consume the fragment, they must also immediately scrub it.",
+      "reproducer": "Complete an invite link. The browser lands on /auth/setup#access_token=eyJ...&refresh_token=.... Open browser history or run `location.hash` in the console — both the short-lived JWT and the long-lived refresh token are fully visible and persist after the page is used.",
+      "recommendedFix": "Two options, pick one: (a) Preferred — drop the URL fragment transport entirely and rely only on the short-lived HttpOnly cookies already being set; have setup/reset-password read the session from the cookie-backed Supabase server session (or a tiny server route that exchanges the cookie). (b) If keeping the fragment for client-side setSession, have the destination pages (after SEC-001 fix) call `window.history.replaceState({}, '', window.location.pathname)` as the very first step after reading the tokens, so the credentials never persist in history. At minimum, do not put the long-lived refresh_token in the URL — pass only the access_token in the fragment and let the refresh token ride in the HttpOnly cookie.",
+      "regressionRisk": "medium",
+      "category": "regression-from-c09439b"
+    },
+    {
+      "id": "SEC-005",
+      "severity": "medium",
+      "title": "presence/departure trusts a Supabase JWT supplied in the POST body, not a header",
+      "file": "src/app/api/presence/departure/route.ts",
+      "lines": "41-69",
+      "description": "The departure beacon reads the auth token from the JSON request BODY (`body.token`, line 53) and validates it via `admin.auth.getUser(token)`. Accepting a bearer credential in the request body (rather than the Authorization header) is necessary for navigator.sendBeacon (which cannot set headers), so this is a justified design choice — but it has two consequences worth flagging. First, request bodies are more likely than headers to be captured by intermediary logging/WAF/APM that does not know the body field is sensitive. Second, the stale comment at the top of the file (lines 3-4) still says the beacon fires on 'pagehide and freeze events' even though commit c5a4147 removed the freeze listener — misleading for the next maintainer. The endpoint itself is otherwise sound: it rate-limits 120/min/IP, validates the token, and only upserts user_presence. Severity is medium, not high, because the token is the user's own and the only writable surface is their own last_seen_at.",
+      "reproducer": "POST /api/presence/departure with body `{\"token\":\"<valid supabase jwt>\"}`. The route extracts the token from the body and upserts user_presence for that user. No header is involved, so any body-capturing log tier records the JWT.",
+      "recommendedFix": "Keep the body-token transport (sendBeacon needs it) but: (1) update the file header comment lines 1-10 to drop the 'freeze' reference and reflect the pagehide-only + 5-min-cooldown reality from c5a4147; (2) consider rate-limiting per-user-id in addition to per-IP once the token resolves, so a single stolen token cannot fan out presence writes from many IPs; (3) ensure Vercel/observability log scrubbing excludes request bodies for this route. No code change is strictly required for correctness — this is a hardening + documentation item.",
+      "regressionRisk": "low",
+      "category": "pre-existing"
+    },
+    {
+      "id": "SEC-006",
+      "severity": "medium",
+      "title": "health/deep-check check 05 self-probes POST endpoints with empty bodies on every invocation",
+      "file": "src/app/api/health/deep-check/route.ts",
+      "lines": "239-255",
+      "description": "Check 05 ('API ENDPOINT SELF-TEST') issues live POST requests to https://smm.ten80ten.com/api/team/invite, /api/notifications/mention, and /api/notifications/revision with body `{}` on every call to deep-check. Those three endpoints are now auth-gated (good — they will return 401), but: (1) it bakes the production hostname as a string literal (line 241) so the check is wrong in any non-prod deploy; (2) it makes the health endpoint generate real inbound traffic / log noise on sensitive routes (invite, notifications) every time it runs; (3) if a future change makes any of those endpoints act on an empty body before the auth check, the health probe becomes an unintended trigger. A health check should not POST to state-changing routes. It is also worth noting check 05 will now always report these as 'alive (401)' which is correct behavior but the check's pass/fail logic only flags >=500, so a route that regressed to 200-on-empty-body would still read as healthy.",
+      "reproducer": "Call GET /api/health/deep-check. Observe outbound POST requests in logs to /api/team/invite etc. with body '{}'. In a staging deploy, check 05 probes the prod host regardless of where it runs.",
+      "recommendedFix": "Replace the live POSTs to state-changing routes with a GET to a dedicated lightweight liveness route, or remove check 05 entirely (checks 02/04/22 already cover Supabase + site reachability). At minimum, derive the base URL from `process.env.NEXT_PUBLIC_SITE_URL` instead of the hardcoded literal on line 241, and never POST to /api/team/invite or notification routes from a health probe.",
+      "regressionRisk": "low",
+      "category": "pre-existing"
+    },
+    {
+      "id": "SEC-007",
+      "severity": "medium",
+      "title": "health/deep-check reads legacy post_audit_logs table, contradicting AGENTS.md rule 3",
+      "file": "src/app/api/health/deep-check/route.ts",
+      "lines": "140, 272, 354",
+      "description": "AGENTS.md rule 3 states 'All audit reads must use audit_log_v2, not post_audit_logs.' deep-check/route.ts violates this in three places: line 140 `admin.from('post_audit_logs').select('*')...limit(5000)`, line 272 the RLS self-test queries `post_audit_logs`, and line 354 the table-stats loop includes `post_audit_logs`. Functionally this is not a vulnerability by itself (the service role can read either table), but it means every audit-derived metric the health endpoint reports (checks 14, 19, 39 — user activity, audit completeness, audit coverage) is computed from the LEGACY table. If audit writes have correctly moved to audit_log_v2 via record_audit_event (as rule 3 mandates and as the rest of the app does), post_audit_logs is now stale or empty, so these health checks silently report wrong numbers — e.g. check 19 would warn 'Audit log empty' or check 39 would flag every active member as having zero audit entries. This is an observability-integrity bug that will produce false alarms post-deploy.",
+      "reproducer": "After deploy, call GET /api/health/deep-check. Because audit writes go to audit_log_v2 (record_audit_event) but check 19/39 read post_audit_logs (line 140), the dashboard reports the legacy table's row count — likely 0 or stale — and warns 'Audit log empty' / 'N active members with zero audit log entries' even though audit_log_v2 is healthy.",
+      "recommendedFix": "Change the three reads to audit_log_v2: line 140 select from `audit_log_v2`, line 354 table-stats list swap `post_audit_logs` for `audit_log_v2`. Note audit_log_v2 column names differ (it uses `action` / `actor_*` rather than `action_type` / `user_name`) so the AuditRow type and the downstream checks 14/19/39 field references must be updated to match. The RLS self-test on line 272 can keep probing whichever table still has an anon-deny policy, but should be commented to say so.",
+      "regressionRisk": "medium",
+      "category": "pre-existing"
+    },
+    {
+      "id": "SEC-008",
+      "severity": "medium",
+      "title": "team/request-access leaks team-membership existence via timing + admin-email harvest to any new requester",
+      "file": "src/app/api/team/request-access/route.ts",
+      "lines": "52-65, 99-119",
+      "description": "request-access is a public, unauthenticated endpoint (rate-limited 5/min/IP). It correctly returns an identical `{success:true}` shape for known and unknown emails to prevent enumeration. However the work it does BEFORE responding differs measurably: for an unknown email it runs two SELECTs, one INSERT, then a team_members admin-role lookup and an SMTP send (lines 99-119); for a known email it runs only the two SELECTs and skips insert + email. The SMTP send in particular adds hundreds of ms. A patient attacker measuring response latency can still distinguish 'new email' (slow, email sent) from 'already known' (fast) — a partial enumeration oracle that the constant response body was meant to close. Separately, the admin-notification path queries every superadmin/admin email and sends to all of them; that is internal, but it means a flood of new-email requests (within the 5/min budget, sustained) becomes an email-bomb against the admin inboxes.",
+      "reproducer": "POST /api/team/request-access with email A (never seen) and email B (an existing team member), several times each, measuring latency. Requests for A consistently take longer (extra INSERT + admin lookup + SMTP). The timing delta reveals which emails are already team members despite the identical 200 body.",
+      "recommendedFix": "Equalize the observable work: perform the admin-notification email send on a fire-and-forget basis (do not await it before responding) so the response latency is the same whether or not an email goes out — e.g. `void sendAdminNotification(...).catch(...)` and return `{success:true}` immediately after the insert. This also removes SMTP latency from the request path entirely. The 5/min/IP limit already caps the admin-email-bomb vector; optionally add a global (non-IP) daily cap on signup_requests inserts.",
+      "regressionRisk": "low",
+      "category": "pre-existing"
+    },
+    {
+      "id": "SEC-009",
+      "severity": "low",
+      "title": "drive/stream accepts Referer-only auth, allowing any logged-in app page to be used as a hot-link proxy oracle",
+      "file": "src/app/api/drive/stream/route.ts",
+      "lines": "41-73, 94-100",
+      "description": "drive/stream's checkAuth (added by c09439b SEC-003) accepts EITHER a same-origin Referer OR a valid Bearer token. The Referer branch exists because <img>/<video> tags cannot send Authorization headers — a reasonable tradeoff. But Referer is attacker-influenceable in some contexts and entirely absent under strict Referrer-Policy. The route's fileId regex `/^[\\w-]+$/` (line 80) accepts any Drive file id of any length, and the handler then fetches `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media` with the service account token. So any request carrying a Referer of https://smm.ten80ten.com (trivially forgeable by a non-browser client, since Referer is just a header) can stream the bytes of ANY Drive file the service account can see — not just files belonging to this workspace. There is no check that the fileId belongs to a media_assets row in the caller's workspace. Impact is bounded because the service account's Drive scope is presumably limited to the app's shared drive, and the c09439b fix did raise the bar from the prior CORS:* anonymous state — hence low, not medium — but it remains an unscoped object-read proxy.",
+      "reproducer": "`curl -H 'Referer: https://smm.ten80ten.com/' 'https://smm.ten80ten.com/api/drive/stream?id=<any-drive-file-id-the-service-account-can-read>'`. checkAuth's refOk branch passes on the spoofed Referer, the route streams the file. No Supabase session and no proof the file belongs to the caller's workspace are required.",
+      "recommendedFix": "Tighten the fileId regex to the same `^[a-zA-Z0-9_-]{20,80}$` shape used by drive/finalize (SEC-002) so junk ids are rejected. For real authorization, before streaming, look up the fileId in `media_assets` (drive_file_id column) scoped to the baseline workspace and 404 if absent — this ensures the proxy only serves files the app actually tracks. The Referer fallback can stay for <img>/<video> ergonomics, but pairing it with a workspace-membership check on the file closes the unscoped-read gap.",
+      "regressionRisk": "medium",
+      "category": "pre-existing"
+    },
+    {
+      "id": "SEC-010",
+      "severity": "low",
+      "title": "team_members role lookup uses ilike(email) which treats SQL wildcards in the JWT email as patterns",
+      "file": "src/lib/auth/require.ts",
+      "lines": "167-172",
+      "description": "requireBearerTeamRole resolves the caller's role with `admin.from('team_members').select('role').ilike('email', email)` (line 170). `email` comes from the verified Supabase JWT (`user.email`), so it is not raw attacker input — but `ilike` interprets `%` and `_` as wildcards. If an account were ever provisioned with an email containing those characters (legal in the local-part of an address per RFC 5321, e.g. `a_b@x.com` or a deliberately crafted `%@x.com`), the lookup could match a DIFFERENT team_members row and return that row's role. The same `ilike(email)` pattern recurs in workspace/provision (line 55), admin/backfill-media (line 33), and the notification routes' caller-resolution. Because emails are normally wildcard-free and JWT-sourced, real-world exploitability is low, but role resolution should be an exact match, not a pattern match.",
+      "reproducer": "Provision a team_member whose email local-part contains `_` (a valid email character), e.g. `john_doe@x.com`. requireBearerTeamRole's `ilike('email','john_doe@x.com')` treats `_` as 'any single character' and would also match `johnXdoe@x.com` if such a row existed, potentially returning the wrong role. A crafted `%@example.com` account would match every example.com member.",
+      "recommendedFix": "Use `.eq('email', email)` instead of `.ilike('email', email)` for role/identity resolution, since the email is already lowercased before the call. Apply across require.ts line 170, workspace/provision line 55, admin/backfill-media line 33, and the notification routes (callerEmail lookups). If case-insensitive matching is genuinely needed, store and compare a normalized lowercase email column with `.eq`, never `ilike`.",
+      "regressionRisk": "low",
+      "category": "pre-existing"
+    },
+    {
+      "id": "SEC-011",
+      "severity": "low",
+      "title": "Verbose Supabase/internal error messages returned to clients in multiple API routes",
+      "file": "src/app/api/publish-jobs/route.ts",
+      "lines": "109, 124, 142, 148",
+      "description": "Several routes return raw Supabase error strings or internal exception messages directly in the JSON response body. publish-jobs/route.ts returns `postError.message`, `membershipError.message`, `jobError.message`, and the catch-all `message` verbatim (lines 109/124/142/148). ai/studio/access PUT returns `getErr.message` / `upErr.message` (lines 115, 129). ai/studio routes return `error.message` from PostgREST throughout. workspace/provision's catch returns `message` (line 100). These leak database column names, constraint names, RPC signatures, and PostgREST internals to any authenticated caller, which aids an attacker mapping the schema and crafting follow-on injection/IDOR attempts. The c09439b pass DID fix this for drive/proxy-upload (line 165 slices to 200 chars and logs the raw error server-side) and approve-request (line 175 slices), showing the intended pattern — but it was not applied uniformly.",
+      "reproducer": "As an authenticated non-admin, POST /api/publish-jobs with a postId for a post in the wrong stage, or trigger any Supabase error — the response body contains the raw PostgREST/Postgres error text (table names, constraint identifiers).",
+      "recommendedFix": "Adopt the proxy-upload/approve-request pattern everywhere: log the full error server-side via console.error, and return a generic client message ('Could not create publish job', 'Update failed', etc.) with the raw `.message` either omitted or truncated to ~120 chars. Apply to publish-jobs (4 sites), ai/studio/access PUT, ai/studio/rows + rows/[id] + jobs/[id] + cancel-job (the errorResponse(500, error.message) calls), and workspace/provision's catch.",
+      "regressionRisk": "low",
+      "category": "pre-existing"
+    },
+    {
+      "id": "SEC-012",
+      "severity": "low",
+      "title": "No Content-Security-Policy header; X-Frame-Options DENY is the only clickjacking/XSS-mitigation header",
+      "file": "next.config.ts",
+      "lines": "18-29",
+      "description": "next.config.ts sets X-Content-Type-Options, X-Frame-Options: DENY, Referrer-Policy, and Permissions-Policy on every route, but deliberately omits Content-Security-Policy (comment on lines 20-21: 'CSP intentionally omitted — too brittle for an app that streams arbitrary Google Drive media'). The app currently has no dangerouslySetInnerHTML and escapes email HTML via esc(), so the immediate XSS surface is small — hence low severity. But with no CSP, any future reflected/stored XSS (e.g. an unescaped field rendered into the DOM) executes with full privileges, and there is no defense-in-depth restricting where scripts, connect-src, or frame-src can point. The 'arbitrary Drive media' concern is overstated: media is served same-origin through /api/drive/stream, so `img-src 'self'` plus an explicit Supabase storage host would cover it without needing a wildcard.",
+      "reproducer": "Inspect response headers from any page — no Content-Security-Policy is present. A stored XSS payload (if one is ever introduced via a comment, post title, brand-kit field rendered without escaping) would run unrestricted.",
+      "recommendedFix": "Add a moderate CSP to the `/:path*` headers block. A workable starting policy: `default-src 'self'; img-src 'self' data: https://*.supabase.co https://lh3.googleusercontent.com; media-src 'self'; connect-src 'self' https://*.supabase.co; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-ancestors 'none'; base-uri 'self'`. Roll it out in Report-Only mode first (`Content-Security-Policy-Report-Only`) to catch breakage, then enforce. Since media is proxied same-origin, no wildcard img/media source is actually required.",
+      "regressionRisk": "medium",
+      "category": "pre-existing"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "tool_name": "Read",
+  "tool_input_preview": "{\"file_path\":\"/Users/ace/Documents/CURSOR MAIN/ten80ten-smm-portal/src/components/pages/settings-page.tsx\"}",
+  "error": "File content (38170 tokens) exceeds maximum allowed tokens (25000). Use offset and limit parameters to read specific portions of the file, or search for specific content instead of reading the whole file.",
+  "timestamp": "2026-05-20T12:56:21.034Z",
+  "retry_count": 1
+}
