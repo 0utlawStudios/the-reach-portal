@@ -108,6 +108,13 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+const POSTS_SELECT =
+  "id, title, stage, platforms, thumbnail_url, scheduled_date, caption, notes, asset_source, created_by, created_at, updated_at";
+const MEDIA_SELECT = "id, url, drive_file_id, post_id, added_by";
+const AUDIT_SELECT = "id, entity_id, entity_type, action, actor_user_id, actor_role, metadata, created_at";
+const COMMENT_SELECT = "id, post_id";
+const TEAM_MEMBER_SELECT = "id, name, email, role, status, avatar_url, phone, joined_at";
+
 // ─── Helpers ───
 
 async function timedFetch(url: string, opts?: RequestInit & { timeout?: number }): Promise<{ ok: boolean; status: number; ms: number; body?: string }> {
@@ -154,11 +161,11 @@ export async function GET(req: Request) {
 
   try {
     const [pRes, mRes, aRes, cRes] = await Promise.all([
-      admin.from("posts").select("*"),
-      admin.from("media_assets").select("*"),
+      admin.from("posts").select(POSTS_SELECT),
+      admin.from("media_assets").select(MEDIA_SELECT),
       // SEC-007: audit metrics read from audit_log_v2, the table the app writes to.
-      admin.from("audit_log_v2").select("*").order("created_at", { ascending: false }).limit(5000),
-      admin.from("post_comments").select("*"),
+      admin.from("audit_log_v2").select(AUDIT_SELECT).order("created_at", { ascending: false }).limit(1000),
+      admin.from("post_comments").select(COMMENT_SELECT),
     ]);
     allPosts = (pRes.data || []) as PostRow[];
     allMedia = (mRes.data || []) as MediaRow[];
@@ -291,7 +298,7 @@ export async function GET(req: Request) {
       // Anon should NOT be able to read posts
       const { data: anonPosts, error: postsErr } = await anonClient.from("posts").select("id").limit(1);
       // Anon should NOT be able to read audit logs
-      const { data: anonAudit, error: auditErr } = await anonClient.from("post_audit_logs").select("id").limit(1);
+      const { data: anonAudit, error: auditErr } = await anonClient.from("audit_log_v2").select("id").limit(1);
 
       const issues: string[] = [];
       if (!anonErr && anonMembers && anonMembers.length > 0) issues.push("CRITICAL: Anon can read team_members emails");
@@ -314,7 +321,7 @@ export async function GET(req: Request) {
     if (authError) throw authError;
     authUsers = (authData?.users || []) as AuthUser[];
 
-    const { data: members } = await admin.from("team_members").select("*");
+    const { data: members } = await admin.from("team_members").select(TEAM_MEMBER_SELECT);
     allMembers = (members || []) as TeamMemberRow[];
     const memberEmails = new Set(allMembers.map((m) => m.email?.toLowerCase()));
     const authEmails = new Set(authUsers.map((u) => u.email?.toLowerCase()).filter(Boolean));
@@ -375,9 +382,9 @@ export async function GET(req: Request) {
   // ═══ 9. TABLE STATS ═══
   const tableCounts: Record<string, number> = {};
   try {
-    const tables = ["posts", "team_members", "post_audit_logs", "media_assets", "post_comments", "signup_requests"];
+    const tables = ["posts", "team_members", "audit_log_v2", "media_assets", "post_comments", "signup_requests"];
     for (const t of tables) {
-      const { count, error } = await admin.from(t).select("*", { count: "exact", head: true });
+      const { count, error } = await admin.from(t).select("id", { count: "exact", head: true });
       tableCounts[t] = error ? -1 : (count || 0);
     }
     const failing = Object.entries(tableCounts).filter(([, c]) => c === -1).map(([t]) => t);
@@ -728,7 +735,7 @@ export async function GET(req: Request) {
 
   // ═══ 22. TABLE LATENCY ═══
   try {
-    const latencyTables = ["posts", "team_members", "post_audit_logs"];
+    const latencyTables = ["posts", "team_members", "audit_log_v2"];
     const latencies: Record<string, number> = {};
     for (const t of latencyTables) {
       const s = Date.now();

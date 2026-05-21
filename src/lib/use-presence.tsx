@@ -4,8 +4,8 @@
 //   1. AUDIT TRIGGER (server-side, automatic):
 //      Every record_audit_event() insert fires sync_presence_from_audit() in
 //      Postgres. Pure server path — works even if every browser is closed.
-//   2. CLIENT 60s HEARTBEAT (this file):
-//      While the tab is visible, calls touch_my_presence(activity) every 60s.
+//   2. CLIENT 5m HEARTBEAT (this file):
+//      While the tab is visible, calls touch_my_presence(activity) every 5m.
 //   3. ROUTE-CHANGE PING (this file):
 //      Every Next.js pathname change calls touch_my_presence_throttled(),
 //      which throttles to 60s server-side. Acts as the "every authenticated
@@ -103,12 +103,11 @@ const isSupabaseConfigured = !!(
 const ACTIVE_FOR_MS = 5 * 60 * 1000; // 5 min
 const IDLE_FOR_MS = 15 * 60 * 1000; // 15 min → away
 const ACTIVITY_BROADCAST_THROTTLE_MS = 10 * 1000;
-const HEARTBEAT_MS = 60 * 1000;
+const HEARTBEAT_MS = 5 * 60 * 1000;
 const FLAP_GUARD_MS = 5 * 1000;
-// PERF-011: dropped from 60s → 5min. Presence dot is driven by the realtime
-// channel; the DB summary only needs to backfill "last seen" labels, which are
-// already minute-resolution on the wire.
-const SUMMARY_REFRESH_MS = 5 * 60 * 1000;
+// Presence dot is driven by the realtime channel; the DB summary only backs
+// "last seen" labels, so refreshing it every 15 minutes is enough.
+const SUMMARY_REFRESH_MS = 15 * 60 * 1000;
 const DEPARTURE_COOLDOWN_MS = 5 * 60 * 1000; // dedupe rapid-fire pagehide / iframe nav events
 
 const ACTIVITY_EVENTS: Array<keyof DocumentEventMap | keyof WindowEventMap> = [
@@ -246,7 +245,7 @@ export function PresenceProvider({
     };
   }, [isAuthenticated, myEmail, broadcastStatusIfNeeded]);
 
-  // ── 60s heartbeat (path 2) + status decay watcher ──
+  // ── 5-minute DB heartbeat (path 2) + status decay watcher ──
   useEffect(() => {
     if (!isAuthenticated || !myEmail) return;
     const tick = () => {
@@ -316,8 +315,8 @@ export function PresenceProvider({
     window.addEventListener("pagehide", departure);
     // NOTE: previously also listened on document "freeze" event. Removed
     // 2026-05-20 — Chrome's freeze fires repeatedly when a backgrounded tab
-    // cycles through freeze/wake (waking caused by the 60s heartbeat tick),
-    // creating ~1,440 beacon calls per stuck tab per day. pagehide covers
+    // cycles through freeze/wake (previously waking on the heartbeat tick),
+    // creating beacon spam per stuck tab. pagehide covers
     // BFCache entry on both iOS Safari and Chrome; freeze is redundant.
 
     return () => {

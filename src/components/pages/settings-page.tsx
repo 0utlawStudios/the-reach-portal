@@ -24,7 +24,7 @@ import { PlatformIcon } from "@/components/platform-icons";
 import {
   Database, Key, Bell, Palette, HardDrive, ExternalLink, Globe, Clock,
   Shield, Download, Sun, Moon, Mail,
-  Smartphone, Calendar, BarChart3, Zap, Link2, Webhook, FileText,
+  Smartphone, BarChart3, Zap, Link2, Webhook, FileText,
   UserPlus, ShieldCheck, Pencil, Eye, Crown, X, Send, Megaphone, Users, Settings as SettingsIcon,
   Camera, Save, Upload, Trash2, RefreshCw, Sparkles, Loader2, Lock, Unlock, Inbox,
 } from "lucide-react";
@@ -285,7 +285,13 @@ export function SettingsPage() {
   useEffect(() => {
     if (!workspaceId) return;
     supabase.from("workspaces").select("timezone").eq("id", workspaceId).maybeSingle()
-      .then(({ data }) => { if (data?.timezone) setWorkspaceTz(data.timezone); });
+      .then(({ data, error }) => {
+        if (error) {
+          console.warn("[settings] workspace timezone load failed:", error.message);
+          return;
+        }
+        if (data?.timezone) setWorkspaceTz(data.timezone);
+      });
   }, [workspaceId]);
 
   const activeMembers = useMemo(() => members.filter((m) => m.status === "active"), [members]);
@@ -440,7 +446,11 @@ export function SettingsPage() {
                   const newTz = e.target.value;
                   setWorkspaceTz(newTz);
                   if (workspaceId) {
-                    await supabase.from("workspaces").update({ timezone: newTz }).eq("id", workspaceId);
+                    const { error } = await supabase.from("workspaces").update({ timezone: newTz }).eq("id", workspaceId);
+                    if (error) {
+                      addToast("Timezone update failed. Try again.", "error");
+                      return;
+                    }
                     addToast("Timezone updated", "success");
                   }
                 }}
@@ -452,16 +462,6 @@ export function SettingsPage() {
                 <option value="America/New_York">Eastern Time (ET)</option>
                 <option value="UTC">UTC</option>
               </select>
-            </SettingRow>
-            {/* UX-013: not yet wired to persistence — disabled with a Coming
-                Soon badge so users are not misled into thinking it saved. */}
-            <SettingRow icon={Calendar} label="Week starts on" desc="First day of the week in calendar">
-              <div className="flex items-center gap-2">
-                <select disabled className="h-8 px-3 rounded-lg bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-[11px] text-gray-400 dark:text-gray-500 outline-none cursor-not-allowed opacity-60">
-                  <option>Monday</option><option>Sunday</option>
-                </select>
-                <ComingSoonBadge />
-              </div>
             </SettingRow>
           </Section>
 
@@ -1336,7 +1336,7 @@ function StudioAccessPanel({ addToast }: { addToast: (msg: string, kind?: "info"
     return () => window.removeEventListener("keydown", onKey);
   }, [showOpenAllDialog]);
 
-  const reload = async () => {
+  const reload = useCallback(async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const headers: Record<string, string> = {};
@@ -1351,8 +1351,8 @@ function StudioAccessPanel({ addToast }: { addToast: (msg: string, kind?: "info"
     } finally {
       setLoading(false);
     }
-  };
-  useEffect(() => { reload(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+  }, [addToast]);
+  useEffect(() => { void reload(); }, [reload]);
 
   const save = async (next: string[], mode: "set" | "clear") => {
     setSaving(true);

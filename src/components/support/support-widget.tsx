@@ -1,9 +1,10 @@
 "use client";
 
 // Featherweight Support Center shell. Mounted on every authenticated page but
-// ships almost nothing — just the small trigger square and the useSupport
-// hook that feeds its unread dot. The heavy panel (framer-motion, the ticket
-// form, the conversation view) lives in support-panel.tsx and is code-split:
+// ships almost nothing — just the small trigger square. Support data and
+// Realtime stay cold until the user opens it or arrives through a support
+// deep link. The heavy panel (framer-motion, the ticket form, the
+// conversation view) lives in support-panel.tsx and is code-split:
 // it loads only when the widget is first opened. The trigger hover/focus-
 // prefetches that chunk so the first open feels instant.
 
@@ -37,12 +38,13 @@ export function SupportWidget() {
   const { isAuthenticated, currentUser } = useAuth();
   const { navigateToSupport } = useNavigation();
   const isSuperadmin = (currentUser.role || "").toLowerCase() === "superadmin";
-  const support = useSupport("own");
 
   // Captured once, before the effect below strips the param from the URL.
   const [deepLinkId] = useState<string | null>(() => deepLinkThreadId());
   const [open, setOpen] = useState<boolean>(() => deepLinkId !== null && !isSuperadmin);
   const deepLinkHandled = useRef(false);
+  const supportEnabled = !isSuperadmin && (open || Boolean(deepLinkId));
+  const support = useSupport("own", { enabled: supportEnabled, realtime: supportEnabled });
 
   // Deep link: /?support=<threadId>. Strip the param; end users open the
   // widget straight to the thread, the superadmin is routed to the Settings

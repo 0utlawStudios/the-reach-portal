@@ -97,7 +97,7 @@ export async function requireStudioWriter(req: NextRequest): Promise<AiAuthCtx |
     const allowlist = await loadStudioAllowlist(sb, workspaceId);
     if (!isEmailAllowed(team.email, allowlist)) {
       return NextResponse.json(
-        { error: "Creator Studio access is restricted. Ask an admin to add you in Settings." },
+        { error: "Creator Studio access is restricted. Ask a developer in chat or create a support ticket." },
         { status: 403 },
       );
     }

@@ -240,23 +240,31 @@ export function StudioPage() {
 
   useEffect(() => {
     let cancelled = false;
-    async function load() {
+    let timer: ReturnType<typeof setInterval> | null = null;
+    async function loadSpend() {
       try {
         const cap = Number(process.env.NEXT_PUBLIC_OPENAI_DAILY_CAP_USD);
         if (Number.isFinite(cap) && cap > 0) setDailyCap(cap);
       } catch { /* ignore */ }
+      if (accessState !== "ok") return;
       try {
-        const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-        const { data, error } = await supabase.from("ai_generation_jobs").select("cost_usd").gte("created_at", since);
-        if (!cancelled && !error && data) {
-          const sum = data.reduce((acc, row) => acc + Number(row.cost_usd || 0), 0);
-          setSpendUsd(Math.round(sum * 100) / 100);
+        const res = await authedFetch("/api/ai/studio/spend");
+        const json = await res.json().catch(() => ({}));
+        if (!cancelled && res.ok && json.data) {
+          const spent = Number(json.data.spend_today_usd);
+          const cap = Number(json.data.daily_cap_usd);
+          if (Number.isFinite(spent)) setSpendUsd(Math.round(spent * 100) / 100);
+          if (Number.isFinite(cap) && cap > 0) setDailyCap(cap);
         }
       } catch { /* fall through */ }
     }
-    load();
-    return () => { cancelled = true; };
-  }, [rows]);
+    void loadSpend();
+    if (accessState === "ok") timer = setInterval(loadSpend, 5 * 60 * 1000);
+    return () => {
+      cancelled = true;
+      if (timer) clearInterval(timer);
+    };
+  }, [accessState]);
 
   // Tracks tmp rows that failed to save so we don't spam the user with the
   // same toast on every keystroke; we retry on the next debounce instead.

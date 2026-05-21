@@ -109,6 +109,16 @@ async function uploadFiles(files: File[], token: string): Promise<AttachmentClai
 
 export type SupportScope = "own" | "all";
 
+export interface UseSupportOptions {
+  /**
+   * Keep closed, global widgets from opening REST + Realtime work on every
+   * authenticated page. Imperative methods still work once the caller enables
+   * the hook.
+   */
+  enabled?: boolean;
+  realtime?: boolean;
+}
+
 export interface UseSupport {
   threads: SupportThread[];
   loading: boolean;
@@ -127,9 +137,11 @@ export interface UseSupport {
   startChatWith: (email: string) => Promise<SupportThread>;
 }
 
-export function useSupport(scope: SupportScope = "own"): UseSupport {
+export function useSupport(scope: SupportScope = "own", options: UseSupportOptions = {}): UseSupport {
   const { accessToken, provisionResult } = useAuth();
   const workspaceId = provisionResult?.workspaceId || null;
+  const enabled = options.enabled ?? true;
+  const realtimeEnabled = options.realtime ?? enabled;
 
   const [threads, setThreads] = useState<SupportThread[]>([]);
   const [loading, setLoading] = useState(false);
@@ -313,20 +325,21 @@ export function useSupport(scope: SupportScope = "own"): UseSupport {
   );
 
   // Initial load — deferred to browser idle so the support feature never sits
-  // in the first-paint critical path. The widget loads closed; its data waits.
+  // in the first-paint critical path. The floating widget passes enabled=false
+  // while closed, so support never opens REST/Realtime work just for an unread dot.
   useEffect(() => {
-    if (!accessToken || loadedRef.current) return;
+    if (!enabled || !accessToken || loadedRef.current) return;
     return onIdle(() => {
       if (!loadedRef.current) void refresh();
     });
-  }, [accessToken, refresh]);
+  }, [enabled, accessToken, refresh]);
 
   // Realtime: thread + message changes for this workspace. RLS narrows the
   // stream to rows the caller may see (own threads, or all for a superadmin).
   // The subscription opens at idle, not on mount — a websocket handshake has
   // no place in the first-paint critical path.
   useEffect(() => {
-    if (!workspaceId || !accessToken) return;
+    if (!realtimeEnabled || !workspaceId || !accessToken) return;
     let channel: ReturnType<typeof supabase.channel> | null = null;
     const cancelIdle = onIdle(() => {
       channel = supabase
@@ -359,7 +372,7 @@ export function useSupport(scope: SupportScope = "own"): UseSupport {
       cancelIdle();
       if (channel) void supabase.removeChannel(channel);
     };
-  }, [workspaceId, accessToken, scope, upsertThread]);
+  }, [realtimeEnabled, workspaceId, accessToken, scope, upsertThread]);
 
   const unreadCount = useMemo(
     () =>

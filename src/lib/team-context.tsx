@@ -91,6 +91,8 @@ function dbToMember(row: TeamMemberRow): TeamMember {
 }
 
 const DEFAULT_MEMBERS: TeamMember[] = [];
+const TEAM_MEMBER_SELECT =
+  "id, name, email, phone, role, secondary_role, status, joined_at, created_at, updated_at, avatar_url";
 
 export function TeamProvider({ children }: { children: ReactNode }) {
   const { addToast } = useToast();
@@ -109,7 +111,10 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       return;
     }
     try {
-      const { data, error } = await supabase.from("team_members").select("*").order("joined_at");
+      const { data, error } = await supabase
+        .from("team_members")
+        .select(TEAM_MEMBER_SELECT)
+        .order("joined_at");
       if (error) {
         console.error("[team] load failed:", error.message);
         // With Supabase configured, stale localStorage is worse than an empty
@@ -197,15 +202,22 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       // DATA-007: mirror the pipeline-context.createCard rollback pattern.
       // On insert failure (RLS, duplicate email, etc.), strip the optimistic
       // row and toast the error so the UI never carries a phantom invite.
-      supabase.from("team_members").insert({ name, email, role, status: "pending" }).select().single().then(({ data, error }) => {
-        if (error) {
-          console.error("[team] inviteMember sync failed:", error.message);
-          setMembers((prev) => prev.filter((m) => m.id !== tempId));
-          addToast(`Invite failed: ${error.message}. Member was not added.`, "error");
-          return;
-        }
-        if (data) setMembers((prev) => prev.map((m) => m.id === tempId ? { ...m, id: data.id } : m));
-      });
+      supabase
+        .from("team_members")
+        .insert({ name, email, role, status: "pending" })
+        .select(TEAM_MEMBER_SELECT)
+        .single()
+        .then(({ data, error }) => {
+          if (error) {
+            console.error("[team] inviteMember sync failed:", error.message);
+            setMembers((prev) => prev.filter((m) => m.id !== tempId));
+            addToast(`Invite failed: ${error.message}. Member was not added.`, "error");
+            return;
+          }
+          if (data) {
+            setMembers((prev) => prev.map((m) => m.id === tempId ? { ...m, id: data.id } : m));
+          }
+        });
     }
   }, [useDb, addToast]);
 
