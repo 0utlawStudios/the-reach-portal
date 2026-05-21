@@ -11,9 +11,11 @@ const CALENDAR_SRC = readFileSync(join(process.cwd(), "src/components/pages/cale
 const DASHBOARD_SRC = readFileSync(join(process.cwd(), "src/components/pages/dashboard-page.tsx"), "utf8");
 const SUPPORT_WIDGET_SRC = readFileSync(join(process.cwd(), "src/components/support/support-widget.tsx"), "utf8");
 const SUPPORT_ALERT_SRC = readFileSync(join(process.cwd(), "src/lib/support/use-support-alert.ts"), "utf8");
+const TEAM_CONTEXT_SRC = readFileSync(join(process.cwd(), "src/lib/team-context.tsx"), "utf8");
 const PRESENCE_SRC = readFileSync(join(process.cwd(), "src/lib/use-presence.tsx"), "utf8");
 const IO_MIGRATION_SRC = readFileSync(join(process.cwd(), "supabase/migrations/0030_supabase_io_hardening.sql"), "utf8");
 const SUPPORT_ALERT_MIGRATION_SRC = readFileSync(join(process.cwd(), "supabase/migrations/0031_support_alert_indexes.sql"), "utf8");
+const TEAM_REALTIME_TRIM_MIGRATION_SRC = readFileSync(join(process.cwd(), "supabase/migrations/0032_trim_team_members_realtime.sql"), "utf8");
 
 describe("invite setup flow hardening", () => {
   it("activates invitations through the server route, not a client-side team_members update", () => {
@@ -60,8 +62,15 @@ describe("Supabase IO hardening", () => {
   it("keeps the support sidebar alert lightweight and indexed", () => {
     expect(SUPPORT_ALERT_SRC).toContain("/api/support/alert");
     expect(SUPPORT_ALERT_SRC).toContain("90 * 1000");
+    expect(SUPPORT_ALERT_SRC).not.toMatch(/\.on\(\s*["']postgres_changes/);
     expect(SUPPORT_ALERT_MIGRATION_SRC).toContain("support_threads_admin_unread_idx");
     expect(SUPPORT_ALERT_MIGRATION_SRC).toContain("support_threads_admin_untouched_open_ticket_idx");
+  });
+
+  it("keeps team freshness off permanent Realtime polling", () => {
+    expect(TEAM_CONTEXT_SRC).toContain("const TEAM_REFRESH_MS = 5 * 60 * 1000");
+    expect(TEAM_CONTEXT_SRC).not.toContain("team-realtime");
+    expect(TEAM_REALTIME_TRIM_MIGRATION_SRC).toContain("ALTER PUBLICATION supabase_realtime DROP TABLE public.team_members");
   });
 });
 

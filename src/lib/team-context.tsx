@@ -93,6 +93,7 @@ function dbToMember(row: TeamMemberRow): TeamMember {
 const DEFAULT_MEMBERS: TeamMember[] = [];
 const TEAM_MEMBER_SELECT =
   "id, name, email, phone, role, secondary_role, status, joined_at, created_at, updated_at, avatar_url";
+const TEAM_REFRESH_MS = 5 * 60 * 1000;
 
 export function TeamProvider({ children }: { children: ReactNode }) {
   const { addToast } = useToast();
@@ -155,26 +156,30 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     refreshPendingRequests();
   }, [refreshPendingRequests]);
 
-  // ─── Realtime subscription for team changes ───
+  // ─── Low-cost freshness for team changes ───
+  // Team membership changes are rare and every local mutation already calls
+  // refreshMembers(). A permanent postgres_changes subscription costs a
+  // Realtime polling slot in every authenticated browser tab, which showed up
+  // as the dominant production query family in Supabase Observability.
+  // Refresh on focus/visibility and a slow visible-tab interval instead.
   useEffect(() => {
     if (!useDb) return;
-    const channel = supabase
-      .channel("team-realtime")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "team_members" }, (payload) => {
-        const member = dbToMember(payload.new as TeamMemberRow);
-        setMembers((prev) => prev.some((m) => m.id === member.id) ? prev : [...prev, member]);
-      })
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "team_members" }, (payload) => {
-        const updated = dbToMember(payload.new as TeamMemberRow);
-        setMembers((prev) => prev.map((m) => m.id === updated.id ? updated : m));
-      })
-      .on("postgres_changes", { event: "DELETE", schema: "public", table: "team_members" }, (payload) => {
-        const deletedId = (payload.old as Partial<TeamMemberRow>).id;
-        if (deletedId) setMembers((prev) => prev.filter((m) => m.id !== deletedId));
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [useDb]);
+    const refreshIfVisible = () => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      void refreshMembers();
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refreshMembers();
+    };
+    window.addEventListener("focus", refreshIfVisible);
+    document.addEventListener("visibilitychange", onVisible);
+    const interval = window.setInterval(refreshIfVisible, TEAM_REFRESH_MS);
+    return () => {
+      window.removeEventListener("focus", refreshIfVisible);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.clearInterval(interval);
+    };
+  }, [useDb, refreshMembers]);
 
   // PERF-015: 500ms debounce — saveState fires synchronous JSON.stringify on
   // the whole team list. A realtime sync burst (5+ INSERT/UPDATE events in

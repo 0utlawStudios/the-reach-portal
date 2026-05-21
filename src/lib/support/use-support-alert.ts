@@ -1,11 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth-context";
-import type { SupportThreadRow } from "./types";
 
 export const SUPPORT_ALERT_REFRESH_EVENT = "support-alert-refresh";
+const SUPPORT_ALERT_POLL_MS = 90 * 1000;
 
 function emitSupportAlertRefresh() {
   if (typeof window === "undefined") return;
@@ -14,13 +13,6 @@ function emitSupportAlertRefresh() {
 
 export function refreshSupportAlert() {
   emitSupportAlertRefresh();
-}
-
-function rowNeedsAttention(row: Partial<SupportThreadRow>): boolean {
-  return Boolean(
-    row.unread_for_admin ||
-      (row.kind === "ticket" && row.status === "open" && !row.admin_last_read_at),
-  );
 }
 
 function onIdle(cb: () => void): () => void {
@@ -38,8 +30,7 @@ function onIdle(cb: () => void): () => void {
 }
 
 export function useSupportAlert(enabled: boolean) {
-  const { accessToken, provisionResult } = useAuth();
-  const workspaceId = provisionResult?.workspaceId || null;
+  const { accessToken } = useAuth();
   const [hasAlert, setHasAlert] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -72,7 +63,9 @@ export function useSupportAlert(enabled: boolean) {
     window.addEventListener(SUPPORT_ALERT_REFRESH_EVENT, onRefresh);
     window.addEventListener("focus", onRefresh);
     document.addEventListener("visibilitychange", onVisible);
-    const interval = window.setInterval(() => void refresh(), 90 * 1000);
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") void refresh();
+    }, SUPPORT_ALERT_POLL_MS);
     return () => {
       window.removeEventListener(SUPPORT_ALERT_REFRESH_EVENT, onRefresh);
       window.removeEventListener("focus", onRefresh);
@@ -81,33 +74,9 @@ export function useSupportAlert(enabled: boolean) {
     };
   }, [accessToken, enabled, refresh]);
 
-  useEffect(() => {
-    if (!enabled || !workspaceId || !accessToken) return;
-    let channel: ReturnType<typeof supabase.channel> | null = null;
-    const cancelIdle = onIdle(() => {
-      channel = supabase
-        .channel(`support-alert-${workspaceId}`)
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "support_threads", filter: `workspace_id=eq.${workspaceId}` },
-          (payload) => {
-            if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
-              const row = payload.new as SupportThreadRow;
-              if (rowNeedsAttention(row)) {
-                setHasAlert(true);
-                return;
-              }
-            }
-            void refresh();
-          },
-        )
-        .subscribe();
-    });
-    return () => {
-      cancelIdle();
-      if (channel) void supabase.removeChannel(channel);
-    };
-  }, [accessToken, enabled, refresh, workspaceId]);
-
+  // Intentionally no postgres_changes subscription here. The sidebar dot is a
+  // tiny alert, not a live inbox, so it uses one indexed API check on focus,
+  // on local support mutations, and at a visible-tab cadence. This keeps the
+  // always-mounted sidebar from adding a permanent Realtime polling stream.
   return { hasAlert: enabled ? hasAlert : false, refresh };
 }
