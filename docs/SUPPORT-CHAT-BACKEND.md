@@ -302,6 +302,8 @@ Behavior:
 - Rate limit with scope `support:start-chat`, 30 starts per hour.
 - Uses `resolve_workspace_member(workspace_id, email)` RPC from migration `0029_support_member_lookup.sql`.
 - The target must be an active user in the same workspace.
+- If a legacy active `team_members` row has an Auth user but is missing `workspace_members`, the route self-heals by upserting active workspace access before opening the chat.
+- Pending invites are never self-healed; they still cannot receive chat until setup is complete.
 - Cannot start a chat with self.
 - Creates or reuses the target user's single chat thread.
 - Returns the thread; the first admin message is sent through `/api/support/threads/[id]/messages`.
@@ -555,6 +557,19 @@ If Disk IO warnings return, check:
 ### Data Retention
 
 There is currently no automatic deletion policy for support threads, messages, or attachments. Threads and messages are durable records. Attachments remain in the private bucket until explicitly deleted or a future retention job is added.
+
+### Invite And Workspace Membership Integrity
+
+On 2026-05-21, Alex Nicholson's `team_members` and Auth records were active, but his `workspace_members` row was missing. That made `/api/support/admin/start-chat` report that his account was not activated. A one-time production repair upserted his active workspace membership, and a full team audit then showed:
+
+- 8 team members.
+- 8 Auth users.
+- 8 workspace members.
+- No active team members missing Auth/workspace access.
+- No pending invites with Auth users.
+- No pending invites with active workspace access.
+
+The start-chat route now self-heals that exact legacy active-member gap, while still rejecting pending invites.
 
 ### Failure Modes
 

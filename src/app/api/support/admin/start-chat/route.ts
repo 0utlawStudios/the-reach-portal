@@ -22,6 +22,54 @@ import type { SupportThreadRow } from "@/lib/support/types";
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
+type AdminClient = ReturnType<typeof getSupportAdminClient>;
+
+async function findAuthUserByEmail(admin: AdminClient, email: string) {
+  let page = 1;
+  const perPage = 100;
+  while (true) {
+    const { data: { users }, error } = await admin.auth.admin.listUsers({ page, perPage });
+    if (error) throw new Error(`Auth lookup failed: ${error.message}`);
+    if (!users || users.length === 0) return null;
+    const found = users.find((u) => u.email?.toLowerCase() === email);
+    if (found) return found;
+    if (users.length < perPage) return null;
+    page++;
+  }
+}
+
+async function selfHealActiveWorkspaceMember(
+  admin: AdminClient,
+  workspaceId: string,
+  email: string,
+): Promise<string | null> {
+  const { data: member, error: memberErr } = await admin
+    .from("team_members")
+    .select("role, status")
+    .eq("email", email)
+    .maybeSingle();
+  if (memberErr) throw new Error(`Team member lookup failed: ${memberErr.message}`);
+  const role = (member?.role as string | undefined)?.toLowerCase();
+  if (member?.status !== "active" || !role) return null;
+
+  const authUser = await findAuthUserByEmail(admin, email);
+  if (!authUser?.id) return null;
+
+  const { error: upsertErr } = await admin
+    .from("workspace_members")
+    .upsert(
+      {
+        workspace_id: workspaceId,
+        user_id: authUser.id,
+        role,
+        status: "active",
+      },
+      { onConflict: "workspace_id,user_id" },
+    );
+  if (upsertErr) throw new Error(`Workspace member repair failed: ${upsertErr.message}`);
+  return authUser.id;
+}
+
 export async function POST(request: NextRequest) {
   const adminAuth = await requireBearerTeamRole(request, ["superadmin"]);
   if (adminAuth instanceof NextResponse) return adminAuth;
@@ -51,7 +99,7 @@ export async function POST(request: NextRequest) {
 
   // Resolve the recipient to an auth user id — only if they are an active
   // member of THIS workspace. Cross-workspace recipients resolve to null.
-  const { data: targetUserId, error: resolveErr } = await admin.rpc("resolve_workspace_member", {
+  const { data: resolvedUserId, error: resolveErr } = await admin.rpc("resolve_workspace_member", {
     p_workspace_id: workspaceId,
     p_email: email,
   });
@@ -59,6 +107,16 @@ export async function POST(request: NextRequest) {
     console.error("[support/start-chat] resolve failed:", resolveErr.message);
     return NextResponse.json({ error: "Could not start the chat. Please try again." }, { status: 500 });
   }
+  let targetUserId = resolvedUserId;
+  if (!targetUserId || typeof targetUserId !== "string") {
+    try {
+      targetUserId = await selfHealActiveWorkspaceMember(admin, workspaceId, email);
+    } catch (err) {
+      console.error("[support/start-chat] workspace repair failed:", err);
+      return NextResponse.json({ error: "Could not verify workspace access. Please try again." }, { status: 500 });
+    }
+  }
+
   if (!targetUserId || typeof targetUserId !== "string") {
     return NextResponse.json(
       { error: "That teammate has not activated their account yet, so they cannot receive a message." },
