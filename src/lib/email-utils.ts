@@ -326,7 +326,7 @@ export function buildSupportTicketEmailHtml(params: {
   </div>
   ${attachmentBlock}
   <div style="text-align:center;margin:8px 0 4px;">${ctaButton("Open in Support Inbox", threadUrl)}</div>
-  <p style="color:#9ca3af;font-size:11px;text-align:center;margin:18px 0 0;">Reply from the Support Inbox tab in Settings.</p>
+  <p style="color:#9ca3af;font-size:11px;text-align:center;margin:18px 0 0;">Reply from the Support Inbox in the main sidebar.</p>
 </div>`);
 }
 

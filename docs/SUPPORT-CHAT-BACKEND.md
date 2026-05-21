@@ -18,6 +18,8 @@ The chat feature and Support Inbox are backed by:
 
 Telegram is not the chat backend. Email is not the chat backend. They are notification channels only. All conversation state lives in Supabase Postgres and is written through server-side Next.js API routes.
 
+The Support Inbox UI is a superadmin-only page in the main left sidebar. It is intentionally not embedded in Settings. The sidebar alert dot is backed by a tiny attention-check endpoint, not by loading the full inbox.
+
 ## Backend Stack
 
 | Layer | Implementation | Purpose |
@@ -63,8 +65,12 @@ Important indexes:
 - `support_threads_owner_idx` on `(created_by, last_message_at desc)`
 - `support_threads_ws_idx` on `(workspace_id, status, last_message_at desc)`
 - `support_threads_one_chat_per_user` unique partial index on `(workspace_id, created_by)` where `kind = 'chat'`
+- `support_threads_admin_unread_idx` partial index for superadmin unread-alert checks
+- `support_threads_admin_untouched_open_ticket_idx` partial index for new open-ticket alert checks
 
 The unique partial index is critical. It guarantees one live-chat thread per user per workspace and prevents duplicate chats during create/create races.
+
+The alert indexes live in `supabase/migrations/0031_support_alert_indexes.sql`. They keep the small sidebar dot from scanning `support_threads`.
 
 ### `support_messages`
 
@@ -105,7 +111,7 @@ To let another role operate the Support Inbox in the future, update all three pl
 
 - RLS role array in `0027_support_center.sql`
 - API role gates using `requireBearerTeamRole(..., ["superadmin"])`
-- UI visibility for the Settings support tab
+- UI visibility for the main-sidebar Support Inbox route
 
 ## API Routes
 
@@ -155,6 +161,20 @@ Behavior:
 - Requires `superadmin`.
 - Resolves the superadmin's workspace.
 - Returns up to 500 workspace threads ordered by `last_message_at desc`.
+
+### `GET /api/support/alert`
+
+Purpose:
+
+- Lightweight superadmin-only sidebar dot check.
+
+Behavior:
+
+- Requires `superadmin`.
+- Resolves the superadmin's workspace.
+- Returns `{ hasAlert: true }` when there is an unread admin-side thread or an untouched open ticket.
+- Uses the partial indexes in migration `0031_support_alert_indexes.sql`.
+- Does not return thread content or load the full Support Inbox.
 
 ### `POST /api/support/threads`
 
@@ -355,11 +375,27 @@ File:
 
 Behavior:
 
-- Rendered inside Settings for superadmin.
+- Rendered as a superadmin-only main-sidebar page.
 - Lists tickets and chat threads.
 - Supports filters by kind and status.
 - Supports direct thread selection, replies, status changes, refresh, and start-chat.
 - Uses `RecipientPicker` to choose a teammate for admin-initiated chat.
+
+### Sidebar Alert Dot
+
+Files:
+
+- `src/lib/support/use-support-alert.ts`
+- `src/app/api/support/alert/route.ts`
+- `supabase/migrations/0031_support_alert_indexes.sql`
+
+Behavior:
+
+- Visible only on the superadmin Support Inbox sidebar item.
+- Shows a small pulsing dot when `/api/support/alert` reports an unread admin thread or untouched open ticket.
+- Clears after `markRead()` or status changes by dispatching `support-alert-refresh`.
+- Uses a tiny indexed API check, plus a single `support_threads` realtime listener for immediate new-alert state.
+- Falls back to focus/visibility refresh and a 90-second safety refresh.
 
 ## Attachment Flow
 
@@ -401,6 +437,14 @@ Admin notifications:
 - User message on existing ticket/chat: Telegram ping only.
 - Telegram uses an inline "Open in portal" button pointed at `/?support=<threadId>`.
 - Telegram is one-way only. There is no inbound Telegram webhook.
+
+Operational diagnostic on 2026-05-21:
+
+- Configured portal bot returned username `SMMEngineBot` from Telegram `getMe`.
+- Configured admin chat resolved to a private chat labeled `Ace`.
+- Telegram `getWebhookInfo` returned no webhook URL.
+- A direct diagnostic `sendMessage` to the configured chat succeeded.
+- If a phone is watching `ContentEngine_bot`, that is not the bot currently configured in this portal environment.
 
 User notifications:
 
@@ -487,6 +531,7 @@ Support-specific migrations:
 - `0028_support_read_receipts.sql`: read-receipt timestamps and one-chat-per-user unique index.
 - `0029_support_member_lookup.sql`: workspace-scoped RPC for admin start-chat recipient resolution.
 - `0030_supabase_io_hardening.sql`: removes legacy `post_audit_logs` from Realtime and hardens related Supabase IO paths.
+- `0031_support_alert_indexes.sql`: partial indexes for the superadmin sidebar alert dot.
 
 ## Operational Notes
 

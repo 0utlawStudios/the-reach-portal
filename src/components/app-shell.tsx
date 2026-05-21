@@ -25,11 +25,14 @@ import { StudioPage } from "./pages/studio-page";
 import { RevisionModal } from "./revision-modal";
 import { KickbackModal } from "./kickback-modal";
 import { SupportWidget } from "./support/support-widget";
+import { SupportInbox } from "./support/support-inbox";
+import { useSupportAlert } from "@/lib/support/use-support-alert";
 import {
   CalendarDays,
   ChevronLeft,
   Eye,
   FolderOpen,
+  Inbox,
   Kanban,
   LayoutDashboard,
   Loader2,
@@ -45,6 +48,8 @@ import {
 
 function PageContent() {
   const { currentPage } = useNavigation();
+  const { currentUser } = useAuth();
+  const isSuperadmin = (currentUser.role || "").toLowerCase() === "superadmin";
   return (
     <div className="flex-1 min-h-0 overflow-y-auto">
       {currentPage === "dashboard" && <DashboardPage />}
@@ -54,7 +59,20 @@ function PageContent() {
       {currentPage === "preview" && <PostPreviewPage />}
       {currentPage === "media" && <MediaPage />}
       {currentPage === "brandkit" && <BrandKitPage />}
+      {currentPage === "support" && (isSuperadmin ? <SupportInboxPage /> : <DashboardPage />)}
       {(currentPage === "team" || currentPage === "settings") && <SettingsPage />}
+    </div>
+  );
+}
+
+function SupportInboxPage() {
+  return (
+    <div className="mx-auto w-full max-w-[1180px] px-3 py-4 sm:px-5 sm:py-5 lg:px-6">
+      <div className="mb-4">
+        <h1 className="text-[18px] font-bold tracking-[-0.02em] text-gray-900 dark:text-white">Support Inbox</h1>
+        <p className="mt-0.5 text-[13px] text-gray-400">Tickets and live chat from the workspace</p>
+      </div>
+      <SupportInbox />
     </div>
   );
 }
@@ -108,6 +126,8 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
   const { currentUser } = useAuth();
   const studioRoles = ["superadmin", "admin", "owner", "creative_director", "social_media_specialist"];
   const inStudioRole = studioRoles.includes((currentUser.role || "").toLowerCase());
+  const isSuperadmin = (currentUser.role || "").toLowerCase() === "superadmin";
+  const supportAlert = useSupportAlert(isSuperadmin);
 
   // Email allowlist gate. Studio access is a two-layer check: role AND (allowlist absent OR email in list).
   // We fetch the live allowlist from /api/ai/studio/access so admins can adjust who sees the link
@@ -171,6 +191,7 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
     { id: "preview", label: "Post Preview", icon: <Eye className="w-4 h-4" />, section: "publish" },
     { id: "media", label: "Media Library", icon: <FolderOpen className="w-4 h-4" />, section: "publish" },
     { id: "brandkit", label: "Brand Kit", icon: <Palette className="w-4 h-4" />, section: "publish" },
+    ...(isSuperadmin ? [{ id: "support", label: "Support Inbox", icon: <Inbox className="w-4 h-4" />, section: "manage", alert: supportAlert.hasAlert }] : []),
     { id: "settings", label: "Settings", icon: <Settings className="w-4 h-4" />, section: "manage" },
   ];
 
@@ -222,7 +243,7 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
                     const active = currentPage === item.id;
                     return (
                       <button key={item.id} onClick={() => handleNav(item.id)}
-                        className={`w-full flex items-center gap-2.5 rounded-lg transition-all duration-150 cursor-pointer ${expanded ? "px-2.5 py-[8px]" : "justify-center px-0 py-2"} ${
+                        className={`relative w-full flex items-center gap-2.5 rounded-lg transition-all duration-150 cursor-pointer ${expanded ? "px-2.5 py-[8px]" : "justify-center px-0 py-2"} ${
                           active
                             ? "bg-orange-50 dark:bg-orange-500/10 text-orange-700 dark:text-orange-400 font-semibold"
                             : "text-gray-500 dark:text-gray-500 hover:text-gray-800 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/[0.03]"
@@ -230,6 +251,12 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
                         title={!expanded ? item.label : undefined}>
                         <span className={`shrink-0 ${active ? "text-orange-600 dark:text-orange-400" : "text-gray-400 dark:text-gray-500"}`}>{item.icon}</span>
                         {expanded && <span className="text-[13px] truncate">{item.label}</span>}
+                        {"alert" in item && item.alert && (
+                          <span
+                            aria-hidden="true"
+                            className={`${expanded ? "ml-auto" : "absolute right-1.5 top-1.5"} h-1.5 w-1.5 rounded-full bg-orange-400/80 shadow-[0_0_0_2px_rgba(251,146,60,0.14)] animate-pulse`}
+                          />
+                        )}
                       </button>
                     );
                   })}

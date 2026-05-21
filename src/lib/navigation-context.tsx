@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef, ReactNode } from "react";
 import { loadState, saveState } from "./persistence";
 
-export type Page = "dashboard" | "pipeline" | "calendar" | "preview" | "team" | "media" | "settings" | "brandkit" | "studio";
+export type Page = "dashboard" | "pipeline" | "calendar" | "preview" | "team" | "media" | "settings" | "brandkit" | "studio" | "support";
 
 interface NavigationContextType {
   currentPage: Page;
@@ -52,11 +52,11 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
 
   const clearPendingPost = useCallback(() => { setPendingOpenPostId(null); }, []);
 
-  // Deep link: route the superadmin to Settings → Support Inbox at a thread.
+  // Deep link: route the superadmin to the standalone Support Inbox at a thread.
   const navigateToSupport = useCallback((threadId: string) => {
     setPendingSupportThreadId(threadId);
-    setCurrentPage("settings");
-    saveState(PAGE_KEY, "settings");
+    setCurrentPage("support");
+    saveState(PAGE_KEY, "support");
   }, []);
 
   const clearPendingSupport = useCallback(() => { setPendingSupportThreadId(null); }, []);

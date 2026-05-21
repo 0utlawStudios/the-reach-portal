@@ -1,8 +1,8 @@
 "use client";
 
 // Admin Support Inbox — every ticket and chat in the workspace. Rendered as a
-// superadmin-only tab inside Settings. Two-pane on desktop, list/detail on
-// mobile. Reuses ThreadView for the conversation and reply composer.
+// superadmin-only page from the main sidebar. Two-pane on desktop, list/detail
+// on mobile. Reuses ThreadView for the conversation and reply composer.
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { Inbox, RefreshCw, Loader2 } from "lucide-react";

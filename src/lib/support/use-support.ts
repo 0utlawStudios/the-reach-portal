@@ -11,6 +11,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth-context";
+import { refreshSupportAlert } from "./use-support-alert";
 import { rowToThread, rowToMessage } from "./types";
 import type {
   SupportThread,
@@ -158,6 +159,7 @@ export function useSupport(scope: SupportScope = "own", options: UseSupportOptio
       const path = scope === "all" ? "/api/support/threads?scope=all" : "/api/support/threads";
       const { threads: list } = await apiFetch<{ threads: SupportThread[] }>(path, accessToken);
       setThreads(list);
+      if (scope === "all") refreshSupportAlert();
       loadedRef.current = true;
     } catch (err) {
       console.error("[support] refresh failed:", err);
@@ -243,6 +245,7 @@ export function useSupport(scope: SupportScope = "own", options: UseSupportOptio
       if (!accessToken) return;
       try {
         await apiFetch(`/api/support/threads/${threadId}/read`, accessToken, { method: "POST" });
+        refreshSupportAlert();
       } catch (err) {
         console.error("[support] markRead failed:", err);
       }
@@ -259,6 +262,7 @@ export function useSupport(scope: SupportScope = "own", options: UseSupportOptio
         { method: "PATCH", body: { status } },
       );
       upsertThread(thread);
+      refreshSupportAlert();
     },
     [accessToken, upsertThread],
   );

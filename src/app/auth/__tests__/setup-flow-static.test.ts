@@ -3,13 +3,17 @@ import { readFileSync } from "fs";
 import { join } from "path";
 
 const SETUP_SRC = readFileSync(join(process.cwd(), "src/app/auth/setup/page.tsx"), "utf8");
+const APP_SHELL_SRC = readFileSync(join(process.cwd(), "src/components/app-shell.tsx"), "utf8");
+const NAVIGATION_SRC = readFileSync(join(process.cwd(), "src/lib/navigation-context.tsx"), "utf8");
 const STUDIO_SRC = readFileSync(join(process.cwd(), "src/components/pages/studio-page.tsx"), "utf8");
 const SETTINGS_SRC = readFileSync(join(process.cwd(), "src/components/pages/settings-page.tsx"), "utf8");
 const CALENDAR_SRC = readFileSync(join(process.cwd(), "src/components/pages/calendar-page.tsx"), "utf8");
 const DASHBOARD_SRC = readFileSync(join(process.cwd(), "src/components/pages/dashboard-page.tsx"), "utf8");
 const SUPPORT_WIDGET_SRC = readFileSync(join(process.cwd(), "src/components/support/support-widget.tsx"), "utf8");
+const SUPPORT_ALERT_SRC = readFileSync(join(process.cwd(), "src/lib/support/use-support-alert.ts"), "utf8");
 const PRESENCE_SRC = readFileSync(join(process.cwd(), "src/lib/use-presence.tsx"), "utf8");
 const IO_MIGRATION_SRC = readFileSync(join(process.cwd(), "supabase/migrations/0030_supabase_io_hardening.sql"), "utf8");
+const SUPPORT_ALERT_MIGRATION_SRC = readFileSync(join(process.cwd(), "supabase/migrations/0031_support_alert_indexes.sql"), "utf8");
 
 describe("invite setup flow hardening", () => {
   it("activates invitations through the server route, not a client-side team_members update", () => {
@@ -51,6 +55,24 @@ describe("Supabase IO hardening", () => {
     expect(IO_MIGRATION_SRC).toContain("team_members_lower_email_idx");
     expect(IO_MIGRATION_SRC).toContain("public.is_active_workspace_member(workspace_id, NULL)");
     expect(IO_MIGRATION_SRC).toContain("ALTER PUBLICATION supabase_realtime DROP TABLE public.post_audit_logs");
+  });
+
+  it("keeps the support sidebar alert lightweight and indexed", () => {
+    expect(SUPPORT_ALERT_SRC).toContain("/api/support/alert");
+    expect(SUPPORT_ALERT_SRC).toContain("90 * 1000");
+    expect(SUPPORT_ALERT_MIGRATION_SRC).toContain("support_threads_admin_unread_idx");
+    expect(SUPPORT_ALERT_MIGRATION_SRC).toContain("support_threads_admin_untouched_open_ticket_idx");
+  });
+});
+
+describe("Support Inbox navigation", () => {
+  it("moves the Support Inbox out of Settings and into a superadmin-only sidebar page", () => {
+    expect(NAVIGATION_SRC).toContain('"support"');
+    expect(NAVIGATION_SRC).toContain('setCurrentPage("support")');
+    expect(APP_SHELL_SRC).toContain('id: "support"');
+    expect(APP_SHELL_SRC).toContain("isSuperadmin ? <SupportInboxPage /> : <DashboardPage />");
+    expect(SETTINGS_SRC).not.toContain("SupportInbox");
+    expect(SETTINGS_SRC).not.toContain("Support Inbox");
   });
 });
 

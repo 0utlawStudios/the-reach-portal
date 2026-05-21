@@ -1,9 +1,9 @@
 "use client";
 
-import { RawImage } from "@/components/raw-image";
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { AvatarCropModal } from "@/components/avatar-crop-modal";
+import { OptimizedAvatar } from "@/components/optimized-avatar";
 import { useTheme } from "@/lib/theme-context";
 import { useTeam, UserRole, TeamMember } from "@/lib/team-context";
 import { useToast } from "@/lib/toast-context";
@@ -26,10 +26,8 @@ import {
   Shield, Download, Sun, Moon, Mail,
   Smartphone, BarChart3, Zap, Link2, Webhook, FileText,
   UserPlus, ShieldCheck, Pencil, Eye, Crown, X, Send, Megaphone, Users, Settings as SettingsIcon,
-  Camera, Save, Upload, Trash2, RefreshCw, Sparkles, Loader2, Lock, Unlock, Inbox,
+  Camera, Save, Upload, Trash2, RefreshCw, Sparkles, Loader2, Lock, Unlock,
 } from "lucide-react";
-import { useNavigation } from "@/lib/navigation-context";
-import { SupportInbox } from "@/components/support/support-inbox";
 
 const roleConfig: Record<UserRole, { label: string; icon: React.ReactNode; color: string }> = {
   superadmin: { label: "Super Admin", icon: <Crown className="w-3 h-3" />, color: "text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20" },
@@ -87,7 +85,7 @@ function EditProfileModal({
 
     if (useDb) {
       const path = `${member.id}-${Date.now()}.jpg`;
-      const { error } = await supabase.storage.from("avatars").upload(path, croppedBlob, { upsert: true, contentType: "image/jpeg" });
+      const { error } = await supabase.storage.from("avatars").upload(path, croppedBlob, { upsert: true, contentType: "image/jpeg", cacheControl: "31536000" });
       if (!error) {
         const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
         setAvatarUrl(urlData.publicUrl);
@@ -137,13 +135,15 @@ function EditProfileModal({
             <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarSelect} className="hidden" />
             <div className="flex justify-center">
               <div className="relative group">
-                {avatarUrl ? (
-                  <RawImage src={avatarUrl} alt={name} className="w-20 h-20 rounded-full object-cover" />
-                ) : (
-                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-[22px] font-bold text-white">
-                    {name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
-                  </div>
-                )}
+                <OptimizedAvatar
+                  src={avatarUrl}
+                  name={name}
+                  width={80}
+                  height={80}
+                  eager
+                  className="w-20 h-20 rounded-full object-cover"
+                  fallbackClassName="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-[22px] font-bold text-white"
+                />
                 <button disabled={!canManageTeam} onClick={() => fileInputRef.current?.click()} className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer disabled:cursor-not-allowed">
                   {uploading ? (
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -259,16 +259,13 @@ export function SettingsPage() {
   const { currentUser } = useAuth();
   const { addToast } = useToast();
   const { workspaceId } = usePipeline();
-  const { pendingSupportThreadId } = useNavigation();
   const [workspaceTz, setWorkspaceTz] = useState("America/Chicago");
   const currentMember = members.find((m) => m.email === currentUser.email);
   const isAdmin = currentMember?.role === "superadmin" || currentMember?.role === "admin";
   const isSuperadmin = currentMember?.role === "superadmin";
   const canViewAudit = isAdmin || currentMember?.role === "approver" || currentMember?.role === "creative_director";
   const { getStatus } = usePresence(currentUser.email, workspaceId);
-  const [activeTab, setActiveTab] = useState<"general" | "team" | "audit" | "themes" | "support">(
-    () => (pendingSupportThreadId ? "support" : "general"),
-  );
+  const [activeTab, setActiveTab] = useState<"general" | "team" | "audit" | "themes">("general");
   const [auditLogs, setAuditLogs] = useState<AuditEntry[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
@@ -407,7 +404,6 @@ export function SettingsPage() {
           { id: "team" as const, label: "Team Members", icon: <Users className="w-3.5 h-3.5" />, badge: pendingRequests.length > 0 ? pendingRequests.length : undefined },
           { id: "themes" as const, label: "Themes", icon: <Palette className="w-3.5 h-3.5" /> },
           ...(canViewAudit ? [{ id: "audit" as const, label: "Audit Logs", icon: <FileText className="w-3.5 h-3.5" /> }] : []),
-          ...(isSuperadmin ? [{ id: "support" as const, label: "Support Inbox", icon: <Inbox className="w-3.5 h-3.5" /> }] : []),
         ].map((tab) => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
             className={`flex items-center gap-1.5 px-4 py-2.5 text-[12px] font-medium border-b-2 -mb-px transition-colors cursor-pointer ${activeTab === tab.id ? "border-blue-600 text-blue-700 dark:text-blue-400" : "border-transparent text-gray-400 hover:text-gray-600"}`}>
@@ -424,8 +420,6 @@ export function SettingsPage() {
         </div>
       ) : activeTab === "audit" ? (
         <AuditLogTab auditLogs={auditLogs} auditLoading={auditLoading} setAuditLogs={setAuditLogs} setAuditLoading={setAuditLoading} />
-      ) : activeTab === "support" ? (
-        <SupportInbox />
       ) : activeTab === "general" ? (
         <div className="space-y-4">
           <Section title="Workspace" icon={<Globe className="w-3.5 h-3.5 text-blue-500" />}>
@@ -618,13 +612,15 @@ export function SettingsPage() {
                     <button key={member.id} onClick={canEditMember ? () => setEditingMember(member) : undefined}
                       className={`w-full flex items-start gap-3 px-4 py-3.5 transition-colors text-left ${canEditMember ? "hover:bg-slate-50 dark:hover:bg-white/[0.02] cursor-pointer" : "cursor-default"} ${i > 0 ? "border-t border-gray-50 dark:border-white/[0.03]" : ""}`}>
                       <div className="relative shrink-0 mt-0.5">
-                        {member.avatar ? (
-                          <RawImage src={member.avatar} alt={member.name} className="w-9 h-9 rounded-full object-cover" />
-                        ) : (
-                          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-[11px] font-bold text-white">
-                            {member.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
-                          </div>
-                        )}
+                        <OptimizedAvatar
+                          src={member.avatar}
+                          name={member.name}
+                          width={36}
+                          height={36}
+                          eager={i < 6}
+                          className="w-9 h-9 rounded-full object-cover"
+                          fallbackClassName="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-[11px] font-bold text-white"
+                        />
                         <PresenceDot status={getStatus(member.email)} />
                       </div>
                       <div className="flex-1 min-w-0">

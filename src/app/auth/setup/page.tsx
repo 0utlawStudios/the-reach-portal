@@ -146,7 +146,7 @@ export default function SetupPasswordPage() {
     if (avatarFile && user?.email) {
       const ext = avatarFile.name.split(".").pop() || "jpg";
       const path = `${user.email.replace(/[^a-z0-9]/gi, "_")}-${Date.now()}.${ext}`;
-      const { error: uploadErr } = await supabase.storage.from("avatars").upload(path, avatarFile, { upsert: true });
+      const { error: uploadErr } = await supabase.storage.from("avatars").upload(path, avatarFile, { upsert: true, cacheControl: "31536000" });
       if (uploadErr) {
         setError("Failed to upload photo. Please try again.");
         setLoading(false);
