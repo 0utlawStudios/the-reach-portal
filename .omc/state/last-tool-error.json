@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd \\\"/Users/ace/Documents/CURSOR MAIN/ten80ten-smm-portal\\\" && grep -rn \\\"workspace_id\\\" \\\"src/app/api/support/threads/\\\\[id\\\\]/route.ts\\\"\",\"description\":\"Check workspace_id in thread deta...",
-  "error": "Exit code 2\nugrep: warning: src/app/api/support/threads/\\[id\\]/route.ts: No such file or directory",
-  "timestamp": "2026-05-20T16:43:02.726Z",
-  "retry_count": 1
-}
