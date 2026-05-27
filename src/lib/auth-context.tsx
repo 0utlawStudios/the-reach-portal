@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, useMemo, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef, ReactNode } from "react";
 import { supabase } from "./supabaseClient";
 import { saveState } from "./persistence";
 
@@ -121,6 +121,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [provisionStatus, setProvisionStatus] = useState<ProvisionStatus>("unknown");
   const [provisionMessage, setProvisionMessage] = useState<string | null>(null);
 
+  // Tracks the email we've already fully provisioned for in this browser
+  // session. Used to suppress redundant "Checking workspace access" flickers
+  // when Supabase re-emits SIGNED_IN / INITIAL_SESSION on tab focus (its
+  // built-in visibilitychange handler does this on every tab return, and
+  // also when a sibling tab rotates the refresh token via the cross-tab
+  // lock). For the same identity these events carry no new information,
+  // so we keep the dashboard mounted and just refresh the access token.
+  const provisionedEmailRef = useRef<string | null>(null);
+
   // Check for existing Supabase session on mount
   useEffect(() => {
     async function init() {
@@ -143,6 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setProvisionResult(provisioned.result);
           setProvisionStatus(provisioned.status);
           setProvisionMessage(provisioned.message);
+          if (provisioned.status === "active") provisionedEmailRef.current = email;
         }
       } catch (err) {
         console.error("[auth] init failed:", err);
@@ -156,14 +166,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Re-running buildProfile + enrichFromTeamMembers on every refresh cost a
     // round-trip and forced a currentUser identity change (cascade re-renders).
     // For TOKEN_REFRESHED, just bump accessToken and leave currentUser alone.
-    // Re-enrich only when the identity actually changed.
+    //
+    // Same-user re-emit guard: Supabase auth-js attaches its own
+    // `visibilitychange` listener (GoTrueClient `_onVisibilityChanged`) that
+    // re-emits SIGNED_IN / INITIAL_SESSION every time the tab returns to the
+    // foreground, and also fires when a sibling tab rotates the refresh token
+    // via the cross-tab lock. Treating those as full sign-ins flashed the
+    // "Checking workspace access" gate on every tab switch. We now only run
+    // the heavy path when the identity actually changed.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
-        if (_event === "TOKEN_REFRESHED") {
+        const email = session.user.email || "";
+        const isReEmitForSameUser =
+          _event === "TOKEN_REFRESHED" ||
+          (provisionedEmailRef.current !== null && email === provisionedEmailRef.current);
+        if (isReEmitForSameUser) {
           setAccessToken(session.access_token);
           return;
         }
-        const email = session.user.email || "";
         const meta = session.user.user_metadata || {};
         const profile = buildProfile(email, meta);
         setCurrentUser(profile);
@@ -189,6 +209,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setProvisionResult(provisioned.result);
           setProvisionStatus(provisioned.status);
           setProvisionMessage(provisioned.message);
+          if (provisioned.status === "active") provisionedEmailRef.current = email;
         }).catch(() => {});
       } else {
         setIsAuthenticated(false);
@@ -197,6 +218,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProvisionResult(null);
         setProvisionStatus("unknown");
         setProvisionMessage(null);
+        provisionedEmailRef.current = null;
       }
     });
 
@@ -225,6 +247,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProvisionResult(provisioned.result);
     setProvisionStatus(provisioned.status);
     setProvisionMessage(provisioned.message);
+    // Mark this identity as already-provisioned so the SIGNED_IN re-emit
+    // that fires immediately after signInWithPassword is treated as a no-op
+    // and does not flash the "Checking workspace access" gate.
+    if (provisioned.status === "active") provisionedEmailRef.current = userEmail;
     // Reset navigation to dashboard on fresh login
     saveState("nav_page", "dashboard");
     return null;
@@ -240,6 +266,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProvisionResult(null);
     setProvisionStatus("unknown");
     setProvisionMessage(null);
+    provisionedEmailRef.current = null;
   }, []);
 
   const updateCurrentUserAvatar = useCallback((avatar: string | undefined) => {
