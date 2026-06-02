@@ -164,12 +164,12 @@ export function BrandKitPage() {
     <div className="w-full h-full overflow-y-auto">
       {/* ─── Hero Header with subtle gradient ─── */}
       <div className="relative px-4 sm:px-8 pt-8 pb-0">
-        <div className="absolute inset-0 bg-gradient-to-b from-orange-50/40 via-transparent to-transparent dark:from-orange-500/[0.03] dark:via-transparent pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#E1DFD5] via-transparent to-transparent dark:from-orange-500/[0.03] dark:via-transparent pointer-events-none" />
         <div className="relative flex items-start justify-between mb-2">
           <div>
             <div className="flex items-center gap-3 mb-1.5">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-orange-500 to-yellow-600 flex items-center justify-center shadow-lg shadow-orange-500/20">
-                <BookOpen className="w-4.5 h-4.5 text-white" />
+              <div className="w-9 h-9 rounded-xl border border-[#6C655A]/25 bg-[#E1DFD5] flex items-center justify-center shadow-[0_8px_24px_rgba(108,101,90,0.18),inset_0_1px_0_rgba(255,255,255,0.45)]">
+                <BookOpen className="w-4.5 h-4.5 text-[#975428]" />
               </div>
               <h1 className="text-[24px] font-extrabold text-slate-900 dark:text-white tracking-[-0.04em]">Brand Playbook</h1>
             </div>
@@ -423,7 +423,7 @@ export function BrandKitPage() {
                   { name: "Sand Wordmark", desc: "Reversed — Stone backgrounds", bg: "bg-[#6C655A]", color: "text-[#E1DFD5]", file: "/the-reach-wordmark-sand.svg" },
                   { name: "Stone Wordmark", desc: "Quiet — Sand backgrounds", bg: "bg-[#E1DFD5] border border-[#6C655A]/20", color: "text-[#6C655A]", file: "/the-reach-wordmark-stone.svg" },
                 ].map((a) => (
-                  <div key={a.name} className="bg-white dark:bg-[#151518] rounded-2xl border border-gray-200 dark:border-white/[0.06] overflow-hidden shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
+                  <div key={a.name} className="bg-white dark:bg-[#151518] rounded-2xl border border-gray-200 dark:border-white/[0.06] overflow-hidden shadow-[0_1px_2px_rgba(108,101,90,0.12),0_16px_34px_rgba(108,101,90,0.16)] hover:shadow-[0_2px_4px_rgba(108,101,90,0.14),0_22px_44px_rgba(108,101,90,0.2)] hover:-translate-y-0.5 transition-all duration-300">
                     <div className={`${a.bg} h-36 flex items-center justify-center`}>
                       <ReachWordmark className={`h-5 w-[224px] ${a.color}`} />
                     </div>
@@ -521,23 +521,23 @@ export function BrandKitPage() {
             </Section>
 
             <Section icon={<Eye className="w-4 h-4 text-yellow-600" />} title="Approval Chain" sub="Every post follows this workflow before going live">
-              <div className="bg-white dark:bg-[#151518] rounded-2xl border border-gray-200 dark:border-white/[0.06] p-7 shadow-sm">
+              <div className="bg-white dark:bg-[#151518] rounded-2xl border border-gray-200 dark:border-white/[0.06] p-7 shadow-[0_1px_2px_rgba(108,101,90,0.12),0_18px_38px_rgba(108,101,90,0.16)]">
                 <div className="flex flex-wrap items-center gap-2 justify-center">
                   {[
-                    { step: "1", label: "VA Creates Draft", role: "Virtual Assistant", color: "from-orange-500 to-yellow-500" },
-                    { step: "2", label: "Lead SM Reviews", role: "Social Media Specialist", color: "from-yellow-500 to-orange-400" },
-                    { step: "3", label: "Approver Reviews", role: "Designated Approver", color: "from-orange-600 to-red-500" },
-                    { step: "4", label: "Post Goes Live", role: "Auto-Publish", color: "from-yellow-600 to-orange-500" },
+                    { step: "1", label: "VA Creates Draft", role: "Virtual Assistant", bg: "bg-[#975428]", text: "text-[#E1DFD5]" },
+                    { step: "2", label: "Lead SM Reviews", role: "Social Media Specialist", bg: "bg-[#5A656C]", text: "text-[#E1DFD5]" },
+                    { step: "3", label: "Approver Reviews", role: "Designated Approver", bg: "bg-[#6C655A]", text: "text-[#E1DFD5]" },
+                    { step: "4", label: "Post Goes Live", role: "Auto-Publish", bg: "bg-[#975428]", text: "text-[#E1DFD5]" },
                   ].map((s, i) => (
                     <div key={s.step} className="flex items-center gap-2">
-                      <div className="flex items-center gap-3 bg-slate-50 dark:bg-white/[0.03] border border-gray-200 dark:border-white/[0.06] rounded-xl px-5 py-3.5">
-                        <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${s.color} text-white flex items-center justify-center text-[13px] font-bold shadow-sm`}>{s.step}</div>
+                      <div className="flex items-center gap-3 bg-slate-50 dark:bg-white/[0.03] border border-gray-200 dark:border-white/[0.06] rounded-xl px-5 py-3.5 shadow-[0_1px_2px_rgba(108,101,90,0.12),0_8px_18px_rgba(108,101,90,0.12)]">
+                        <div className={`w-9 h-9 rounded-full ${s.bg} ${s.text} flex items-center justify-center text-[13px] font-bold shadow-[0_6px_14px_rgba(108,101,90,0.2)]`}>{s.step}</div>
                         <div>
                           <p className="text-[12px] font-semibold text-slate-800 dark:text-gray-200">{s.label}</p>
                           <p className="text-[10px] text-gray-400">{s.role}</p>
                         </div>
                       </div>
-                      {i < 3 && <ArrowRight className="w-4 h-4 text-orange-300 dark:text-orange-500/30 shrink-0" />}
+                      {i < 3 && <ArrowRight className="w-4 h-4 text-[#975428]/70 dark:text-orange-500/30 shrink-0" />}
                     </div>
                   ))}
                 </div>

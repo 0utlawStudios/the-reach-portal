@@ -26,7 +26,7 @@ const darkCardGradients = [
 
 // Luxury card wrapper
 const Card = ({ children, className = "", onClick, idx = 0 }: { children: React.ReactNode; className?: string; onClick?: () => void; idx?: number }) => (
-  <div onClick={onClick} className={`card-premium bg-white dark:bg-[#131316] rounded-xl sm:rounded-2xl border border-gray-100/80 dark:border-white/[0.06] p-3 sm:p-4 xl:p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_6px_24px_rgba(0,0,0,0.03)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.2),0_6px_24px_rgba(0,0,0,0.15)] transition-all duration-300 ${onClick ? "cursor-pointer hover:shadow-[0_2px_8px_rgba(0,0,0,0.06),0_12px_40px_rgba(0,0,0,0.05)] dark:hover:shadow-[0_2px_8px_rgba(0,0,0,0.3),0_12px_40px_rgba(0,0,0,0.2)] hover:border-gray-200 dark:hover:border-white/[0.1]" : ""} ${className}`} style={{ '--card-gradient': darkCardGradients[idx % darkCardGradients.length] } as React.CSSProperties}>
+  <div onClick={onClick} className={`card-premium h-full bg-white dark:bg-[#131316] rounded-xl sm:rounded-2xl border border-gray-100/80 dark:border-white/[0.06] p-3 sm:p-4 xl:p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_6px_24px_rgba(0,0,0,0.03)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.2),0_6px_24px_rgba(0,0,0,0.15)] transition-all duration-300 ${onClick ? "cursor-pointer hover:shadow-[0_2px_8px_rgba(0,0,0,0.06),0_12px_40px_rgba(0,0,0,0.05)] dark:hover:shadow-[0_2px_8px_rgba(0,0,0,0.3),0_12px_40px_rgba(0,0,0,0.2)] hover:border-gray-200 dark:hover:border-white/[0.1]" : ""} ${className}`} style={{ '--card-gradient': darkCardGradients[idx % darkCardGradients.length] } as React.CSSProperties}>
     {children}
   </div>
 );
@@ -133,10 +133,10 @@ export function DashboardPage() {
 
   return (
     <div ref={containerRef} className={`h-full w-full overflow-y-auto bg-[#ecedf2] dark:bg-[#09090b] ${needsScroll ? "" : "sm:overflow-hidden"}`}>
-      <div ref={innerRef} className="p-2 sm:p-4 lg:p-5 space-y-2 sm:space-y-3" style={scale < 1 ? { transform: `scale(${scale})`, transformOrigin: 'top left', width: `${100 / scale}%` } : undefined}>
+      <div ref={innerRef} className="flex min-h-full flex-col gap-2 p-2 sm:gap-3 sm:p-4 lg:p-5" style={scale < 1 ? { transform: `scale(${scale})`, transformOrigin: 'top left', width: `${100 / scale}%` } : undefined}>
 
       {/* ═══ Welcome Banner ═══ */}
-      <div className="card-premium relative bg-white dark:bg-[#131316] rounded-xl sm:rounded-2xl border border-gray-100/80 dark:border-white/[0.06] p-3 sm:p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_6px_24px_rgba(0,0,0,0.03)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.2),0_6px_24px_rgba(0,0,0,0.15)] overflow-hidden" style={{ '--card-gradient': darkCardGradients[6] } as React.CSSProperties}>
+      <div className="card-premium relative shrink-0 bg-white dark:bg-[#131316] rounded-xl sm:rounded-2xl border border-gray-100/80 dark:border-white/[0.06] p-3 sm:p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_6px_24px_rgba(0,0,0,0.03)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.2),0_6px_24px_rgba(0,0,0,0.15)] overflow-hidden" style={{ '--card-gradient': darkCardGradients[6] } as React.CSSProperties}>
         <div className="absolute inset-0 bg-gradient-to-r from-orange-50/80 via-orange-50/20 to-transparent dark:from-orange-500/[0.03] dark:via-transparent pointer-events-none" />
         <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3 sm:gap-4">
@@ -160,7 +160,7 @@ export function DashboardPage() {
             </div>
           </div>
           {pendingApproval > 0 && (
-            <button onClick={() => navigate("pipeline")} className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white text-[12px] font-semibold shadow-lg shadow-orange-500/20 cursor-pointer transition-all duration-300 shrink-0 hover:shadow-orange-500/30">
+            <button onClick={() => navigate("pipeline")} className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-[#975428]/20 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 !text-[#E1DFD5] text-[12px] font-semibold shadow-lg shadow-orange-500/20 cursor-pointer transition-all duration-300 shrink-0 hover:shadow-orange-500/30">
               Review Posts <ArrowRight className="w-3.5 h-3.5" />
             </button>
           )}
@@ -168,7 +168,7 @@ export function DashboardPage() {
       </div>
 
       {/* ═══ Row 1: Funnel + Scorecard + Platforms ═══ */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-2 sm:gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-2 sm:gap-3 lg:min-h-0 lg:flex-[0.95]">
 
         {/* Content Funnel */}
         <Card idx={0} className="md:col-span-1 lg:col-span-5 flex flex-col">
@@ -250,7 +250,7 @@ export function DashboardPage() {
       </div>
 
       {/* ═══ Row 2: Upcoming + Calendar + Published ═══ */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-2 sm:gap-3">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-2 sm:gap-3 lg:min-h-0 lg:flex-[1.2]">
 
         {/* Upcoming */}
         <Card idx={3} className="lg:col-span-5 flex flex-col">

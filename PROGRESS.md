@@ -1,9 +1,21 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: 4da63b8 Reach light-theme contrast and persisted theme defaults
-Next: Push the Drive/media-library wiring hardening slice, then build the client manual.
+Last pushed SHA: 870f7b8 Reach dashboard and Brand Playbook polish
+Next: Build the client manual, then run the final production QA swarm.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
+
+Reach dashboard / Brand Playbook visual slice notes:
+
+- Confirmed the prior Drive/media hardening commit `78482ac` passed GitHub CI.
+- Changed the dashboard page from fixed-content stacking to a height-aware flex layout so large desktop screens do not leave a dead band below the dashboard cards.
+- Made dashboard card wrappers fill their row height and kept the welcome banner as a fixed-height header, so the funnel, scorecard, platform split, calendar, upcoming, and archive panels use the available viewport.
+- Added explicit high-contrast Reach Sand text color to the `Review Posts` CTA so it remains visible in light mode without relying on hover.
+- Renamed the mobile/top-bar pipeline title to `Content Pipeline` to match the sidebar label.
+- Improved Brand Playbook hierarchy: header icon, logo asset cards, and approval-chain panels now use stronger Reach Sand/Stone elevation instead of low-contrast flat panels.
+- Reworked the approval-chain step badges to use the Reach palette directly: Sun, Water, Stone, and Sand text. No new brand hex values were introduced.
+- Verified `npm run typecheck` passed.
+- Verified `npm run lint` passed with only the repo's existing warnings in untouched `src/lib/ai/worker.ts` and `src/lib/pipeline-context.tsx`.
 
 Drive / Media Library wiring hardening slice notes:
 
