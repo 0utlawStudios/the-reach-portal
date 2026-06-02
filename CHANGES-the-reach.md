@@ -2,6 +2,8 @@
 
 ## Edited
 
+- Support Inbox chat access: fixed the server role helper to query `workspace_members.workspace_id` instead of the non-existent `workspace_members.id` column, so superadmins/admins with active workspace access can open and mark support conversations read.
+- Support schema test coverage: updated support helper tests to match the real Reach `workspace_members` schema shape.
 - Client manual cost comparison: added the zero separate portal subscription positioning and competitor savings math for Later and Hootsuite under "Why this portal beats generic tools for The Reach."
 - Manual competitor savings: documented approximate annual savings of `$495`, `$990`, and `$3,564` against relevant paid competitor baselines, with caveats for taxes/add-ons/future pricing changes.
 - Button contrast hardening: verified the live Reach site uses Sand `#E1DFD5`, Stone `#6C655A`, and Sun `#975428`, then added central upload/dropzone button rules so labels/icons remain visible before hover.
@@ -58,6 +60,8 @@
 
 ## Verification
 
+- Support Inbox root cause reproduced on production before the fix: thread list returned the Hanes chat, but thread detail and read receipt routes returned `404`; live schema verification confirmed `workspace_members.id` does not exist and `workspace_members.workspace_id` does.
+- Support Inbox fix passed focused support helper/API tests, `npm run typecheck`, `npm run lint` with only existing warnings, `npm test` with 26 files / 231 tests, and `npm run build`.
 - Client manual cost/savings update passed HTML structural validation and old-brand/off-brand scan; Later pricing and Hootsuite plans/pricing sources were rechecked before editing.
 - Button contrast/demo-health slice passed `npm run typecheck`, `npm run lint` with only existing warnings, `npm test` with 26 files / 231 tests, and `npm run build`.
 - Invite setup recovery passed focused auth/setup/provision tests, `npm run typecheck`, `npm run lint`, `npm test` with 26 files / 230 tests, `npm run build`, GitHub CI for SHA `ce84600`, and Vercel production deployment `dpl_6wSf2NKMEJyUQE47kcauTDvpgsUr`.

@@ -132,7 +132,7 @@ describe("getTeamRole", () => {
   it("returns a lowercased role only for an active team member with active workspace access", async () => {
     const admin = makeAdmin({
       team_members: { data: { role: "SuperAdmin", status: "active" } },
-      workspace_members: { data: { id: "wm1" } },
+      workspace_members: { data: { workspace_id: "00000000-0000-0000-0000-000000000001" } },
     });
     await expect(getTeamRole(admin, "OWNER@EXAMPLE.COM", "u1")).resolves.toBe("superadmin");
   });
@@ -140,7 +140,7 @@ describe("getTeamRole", () => {
   it("rejects inactive or pending team rows", async () => {
     const admin = makeAdmin({
       team_members: { data: { role: "superadmin", status: "pending" } },
-      workspace_members: { data: { id: "wm1" } },
+      workspace_members: { data: { workspace_id: "00000000-0000-0000-0000-000000000001" } },
     });
     await expect(getTeamRole(admin, "owner@example.com", "u1")).resolves.toBeNull();
   });

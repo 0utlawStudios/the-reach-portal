@@ -1,9 +1,18 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: a368921 fix: harden reach button contrast and demo health
-Next: Verify Vercel production, then clean Settings notification labels and remove Notion integration entry.
+Last completed pushed SHA before current slice: 30ab7f8 fix: harden reach button contrast and demo health
+Next: Push the Support Inbox schema/access fix, wait for Vercel production, then re-run the production support detail/read checks against the live Hanes chat thread.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
+
+Support Inbox schema/access root-fix slice notes:
+
+- Reproduced the live production failure with an authenticated Aldridge session: `/api/support/threads?scope=all` returned the Hanes live chat thread, but `/api/support/threads/bd7d3d91-6823-4713-9e18-3304e59e66d6` and `/read` returned `404`.
+- Verified the live Reach schema root cause: `workspace_members.id` does not exist, while `workspace_members.workspace_id` does exist.
+- Patched `getTeamRole()` to select `workspace_id` from `workspace_members`, matching the live schema and the already-working `requireBearerTeamRole()` helper.
+- Updated support helper tests so the mock workspace membership shape matches the real Reach schema.
+- Kept this slice out of Settings, branding, and pipeline code. `src/lib/pipeline-context.tsx` remains untouched.
+- Verification passed locally: focused support helper/API tests, `npm run typecheck`, `npm run lint` with only existing warnings, `npm test` with 26 files / 231 tests, and `npm run build`.
 
 Reach button contrast / demo-health slice notes:
 

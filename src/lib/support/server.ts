@@ -113,7 +113,7 @@ export async function getTeamRole(admin: SupabaseClient, email: string, userId?:
   if (userId) {
     const { data: workspaceMember } = await admin
       .from("workspace_members")
-      .select("id")
+      .select("workspace_id")
       .eq("user_id", userId)
       .eq("status", "active")
       .limit(1)
