@@ -11,6 +11,7 @@ interface ThemeContextType {
 }
 
 const ThemeContext = createContext<ThemeContextType | null>(null);
+const STORAGE_KEY = "reach_theme_preference";
 
 function isSupabaseConfigured(): boolean {
   return !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
@@ -18,10 +19,10 @@ function isSupabaseConfigured(): boolean {
 
 export function ThemeProvider({ children, email }: { children: ReactNode; email?: string }) {
   const [theme, setTheme] = useState<Theme>(() => {
-    // Use localStorage as immediate fallback (prevents flash)
+    // Default to Reach light mode unless this app has an explicit saved preference.
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("pt_theme") as Theme | null;
-      if (saved) return saved;
+      const saved = localStorage.getItem(STORAGE_KEY) as Theme | null;
+      if (saved === "light" || saved === "dark") return saved;
     }
     return "light";
   });
@@ -39,8 +40,10 @@ export function ThemeProvider({ children, email }: { children: ReactNode; email?
       .then(({ data }) => {
         if (!cancelled && data?.theme_preference) {
           const pref = data.theme_preference as Theme;
-          setTheme(pref);
-          localStorage.setItem("pt_theme", pref);
+          if (pref === "light" || pref === "dark") {
+            setTheme(pref);
+            localStorage.setItem(STORAGE_KEY, pref);
+          }
         }
       });
 
@@ -54,7 +57,7 @@ export function ThemeProvider({ children, email }: { children: ReactNode; email?
   const toggleTheme = useCallback(() => {
     setTheme((t) => {
       const next = t === "light" ? "dark" : "light";
-      localStorage.setItem("pt_theme", next);
+      localStorage.setItem(STORAGE_KEY, next);
 
       // Persist to Supabase per-user if email is available
       if (email && isSupabaseConfigured()) {

@@ -11,7 +11,7 @@ interface ThemeEngineCtx {
 
 const Ctx = createContext<ThemeEngineCtx>({ theme: "default", setTheme: () => {} });
 
-const STORAGE_KEY = "t10_design_theme";
+const STORAGE_KEY = "reach_design_theme";
 const THEMES: DesignTheme[] = ["default", "glass", "clay", "liquid", "brutalism"];
 
 function loadInitialTheme(): DesignTheme {

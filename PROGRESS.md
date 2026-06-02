@@ -1,9 +1,21 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: f1bb745 demo pipeline data readiness
-Next: Push the Support Inbox hardening slice, then fix light-theme contrast/elevation and persisted theme defaults.
-Blockers: None for the current demo-data slice. `supabase status`/local DB diff still require Docker if needed.
+Last pushed SHA: d2d6d51 support access hardening
+Next: Push the Reach light-theme contrast and persisted theme-default slice, then continue Drive/media-library hardening.
+Blockers: None. `supabase status`/local DB diff still require Docker if needed.
+
+Reach light-theme / design polish slice notes:
+
+- Changed theme localStorage keys to Reach-specific keys so old Ten80Ten/browser state cannot force dark mode or decorative design themes in the Reach app.
+- Kept Reach light mode as the default unless this app has an explicit saved preference or Supabase `team_members.theme_preference` returns a valid `light`/`dark` value.
+- Reworked the central Reach light-theme token layer so page background, card surfaces, input surfaces, borders, muted text, and shadows have visible hierarchy instead of flattening to one Sand color.
+- Preserved brand colors from the guidelines only: Sand, Stone, Sun, and Water. No invented brand hex values were introduced.
+- Improved Create Post and Settings readability through central input/textarea/select/dashed-upload styles: stronger Stone borders, darker inset cream fields, visible placeholders, and Sun focus rings.
+- Scoped card elevation to real card/panel surfaces so small Brand Kit icons and badges do not become oversized glowing cards.
+- Mapped blue/indigo action buttons to Reach Water and orange/yellow action buttons to Reach Sun while preserving high-contrast light text for primary actions like Review Posts, Create Post, invite, support, and media upload.
+- Verified `npm run typecheck` passed.
+- Verified `npm run lint` passed with only the repo's existing warnings in untouched `src/lib/ai/worker.ts` and `src/lib/pipeline-context.tsx`.
 
 Support Inbox / last-seen hardening slice notes:
 

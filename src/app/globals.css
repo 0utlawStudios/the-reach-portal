@@ -53,23 +53,35 @@
   --reach-stone: #6C655A;
   --reach-water: #5A656C;
   --reach-sun: #975428;
-  --background: #E1DFD5;
+  --reach-page: color-mix(in srgb, #E1DFD5 84%, #6C655A 16%);
+  --reach-surface: #E1DFD5;
+  --reach-field: color-mix(in srgb, #E1DFD5 86%, #6C655A 14%);
+  --reach-field-hover: color-mix(in srgb, #E1DFD5 80%, #6C655A 20%);
+  --reach-border: color-mix(in srgb, #6C655A 32%, transparent);
+  --reach-border-strong: color-mix(in srgb, #6C655A 48%, transparent);
+  --reach-light-text: color-mix(in srgb, #E1DFD5 88%, white 12%);
+  --reach-sun-deep: color-mix(in srgb, #975428 82%, #6C655A 18%);
+  --reach-water-deep: color-mix(in srgb, #5A656C 80%, #6C655A 20%);
+  --reach-text-muted: color-mix(in srgb, #6C655A 80%, #E1DFD5);
+  --reach-text-soft: color-mix(in srgb, #6C655A 58%, #E1DFD5);
+  --reach-shadow: 0 1px 2px rgb(108 101 90 / 0.14), 0 14px 34px rgb(108 101 90 / 0.16), inset 0 1px 0 rgb(225 223 213 / 0.72);
+  --background: var(--reach-page);
   --foreground: #6C655A;
-  --card: #E1DFD5;
+  --card: var(--reach-surface);
   --card-foreground: #6C655A;
-  --popover: #E1DFD5;
+  --popover: var(--reach-surface);
   --popover-foreground: #6C655A;
   --primary: #975428;
   --primary-foreground: #E1DFD5;
   --secondary: #5A656C;
   --secondary-foreground: #E1DFD5;
-  --muted: #E1DFD5;
+  --muted: var(--reach-field);
   --muted-foreground: #6C655A;
   --accent: #975428;
   --accent-foreground: #E1DFD5;
   --destructive: oklch(0.58 0.22 25);
-  --border: color-mix(in srgb, #6C655A 22%, transparent);
-  --input: color-mix(in srgb, #6C655A 22%, transparent);
+  --border: var(--reach-border);
+  --input: var(--reach-border-strong);
   --ring: #975428;
   --chart-1: #975428;
   --chart-2: #5A656C;
@@ -83,7 +95,7 @@
   --sidebar-primary-foreground: #E1DFD5;
   --sidebar-accent: #975428;
   --sidebar-accent-foreground: #E1DFD5;
-  --sidebar-border: color-mix(in srgb, #6C655A 22%, transparent);
+  --sidebar-border: var(--reach-border);
   --sidebar-ring: #975428;
 }
 
@@ -104,12 +116,20 @@
 
 @layer utilities {
   html:not(.dark) :where(body) {
-    background: var(--reach-sand) !important;
+    background: var(--reach-page) !important;
     color: var(--reach-stone);
   }
 
-  html:not(.dark) :where(.bg-white, .bg-\[\#fafbfc\], .bg-\[\#ecedf2\], .bg-gray-50, .bg-slate-50, .bg-slate-100) {
-    background-color: var(--reach-sand) !important;
+  html:not(.dark) :where(.bg-\[\#E1DFD5\], .bg-\[\#fafbfc\], .bg-\[\#ecedf2\]) {
+    background-color: var(--reach-page) !important;
+  }
+
+  html:not(.dark) :where(.bg-white) {
+    background-color: var(--reach-surface) !important;
+  }
+
+  html:not(.dark) :where(.bg-gray-50, .bg-gray-100, .bg-slate-50, .bg-slate-100, .bg-\[\#f7f5ef\]) {
+    background-color: var(--reach-field) !important;
   }
 
   html:not(.dark) :where(.bg-slate-900, .bg-gray-900, .bg-zinc-900) {
@@ -117,27 +137,101 @@
   }
 
   html:not(.dark) :where(.text-white) {
-    color: var(--reach-sand) !important;
+    color: var(--reach-light-text) !important;
   }
 
   html:not(.dark) :where(.text-slate-900, .text-slate-800, .text-gray-900, .text-gray-800, .text-gray-700) {
     color: var(--reach-stone) !important;
   }
 
+  html:not(.dark) :where(.text-gray-300, .text-gray-400) {
+    color: var(--reach-text-soft) !important;
+  }
+
+  html:not(.dark) :where(.text-gray-500, .text-gray-600) {
+    color: var(--reach-text-muted) !important;
+  }
+
+  html:not(.dark) :where(.text-blue-400, .text-blue-500, .text-blue-600, .text-blue-700, .text-indigo-500, .text-indigo-600, .text-indigo-700) {
+    color: var(--reach-water) !important;
+  }
+
   html:not(.dark) :where(.text-orange-400, .text-orange-500, .text-orange-600, .text-orange-700, .text-yellow-600, .text-yellow-700) {
     color: var(--reach-sun) !important;
   }
 
+  html:not(.dark) :where(.bg-blue-50, .bg-blue-100, .bg-indigo-50, .bg-indigo-100) {
+    background-color: color-mix(in srgb, var(--reach-sand) 86%, var(--reach-water) 14%) !important;
+  }
+
+  html:not(.dark) :where(.bg-blue-500, .bg-blue-600, .bg-blue-700, .bg-indigo-500, .bg-indigo-600, .bg-indigo-700) {
+    background-color: var(--reach-water) !important;
+    color: var(--reach-light-text) !important;
+  }
+
   html:not(.dark) :where(.bg-orange-400, .bg-orange-500, .bg-orange-600, .bg-orange-700, .bg-yellow-500, .bg-yellow-600) {
     background-color: var(--reach-sun) !important;
+    color: var(--reach-light-text) !important;
   }
 
   html:not(.dark) :where(.bg-orange-50, .bg-orange-100, .bg-yellow-50, .bg-yellow-100) {
     background-color: color-mix(in srgb, var(--reach-sand) 86%, var(--reach-sun) 14%) !important;
   }
 
-  html:not(.dark) :where(.border-orange-200, .border-orange-500, .border-yellow-200, .border-yellow-500) {
+  html:not(.dark) :where(.from-blue-500, .from-blue-600, .from-blue-700, .from-indigo-500, .from-indigo-600, .from-indigo-700) {
+    --tw-gradient-from: var(--reach-water) var(--tw-gradient-from-position);
+    --tw-gradient-to: rgb(90 101 108 / 0) var(--tw-gradient-to-position);
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+    color: var(--reach-light-text) !important;
+  }
+
+  html:not(.dark) :where(.to-blue-500, .to-blue-600, .to-blue-700, .to-indigo-500, .to-indigo-600, .to-indigo-700) {
+    --tw-gradient-to: var(--reach-water-deep) var(--tw-gradient-to-position);
+    color: var(--reach-light-text) !important;
+  }
+
+  html:not(.dark) :where(.border-gray-50, .border-gray-100, .border-gray-200, .border-gray-300, .border-slate-100, .border-slate-200, .border-gray-100\/60, .border-gray-100\/80, .border-gray-200\/40, .border-gray-200\/60, .border-gray-200\/80) {
+    border-color: var(--reach-border) !important;
+  }
+
+  html:not(.dark) :where(.border-dashed) {
+    border-color: var(--reach-border-strong) !important;
+    background-color: color-mix(in srgb, var(--reach-sand) 90%, var(--reach-stone) 10%) !important;
+  }
+
+  html:not(.dark) :where(.border-blue-200, .border-blue-300, .border-blue-500, .border-indigo-200, .border-indigo-500, .hover\:border-blue-300:hover) {
+    border-color: color-mix(in srgb, var(--reach-water) 48%, transparent) !important;
+  }
+
+  html:not(.dark) :where(.border-orange-200, .border-orange-300, .border-orange-500, .border-yellow-200, .border-yellow-500, .hover\:border-orange-300:hover) {
     border-color: color-mix(in srgb, var(--reach-sun) 42%, transparent) !important;
+  }
+
+  html:not(.dark) :where(input:not([type="checkbox"]):not([type="radio"]), textarea, select) {
+    background-color: var(--reach-field) !important;
+    border-color: var(--reach-border-strong) !important;
+    color: var(--reach-stone) !important;
+    box-shadow: inset 0 1px 2px rgb(108 101 90 / 0.08), 0 1px 0 rgb(225 223 213 / 0.45) !important;
+  }
+
+  html:not(.dark) :where(input:not([type="checkbox"]):not([type="radio"]):focus, textarea:focus, select:focus, input:not([type="checkbox"]):not([type="radio"]):focus-visible, textarea:focus-visible, select:focus-visible) {
+    border-color: var(--reach-sun) !important;
+    box-shadow: 0 0 0 3px rgb(151 84 40 / 0.18), inset 0 1px 2px rgb(108 101 90 / 0.08) !important;
+  }
+
+  html:not(.dark) :where(input, textarea)::placeholder {
+    color: var(--reach-text-soft) !important;
+    opacity: 0.9;
+  }
+
+  html:not(.dark) :where(.card-premium, .rounded-2xl.bg-white, .rounded-xl.bg-white, .fixed .bg-white.shadow-2xl) {
+    border-color: var(--reach-border) !important;
+    box-shadow: var(--reach-shadow) !important;
+  }
+
+  html:not(.dark) :where(.rounded-2xl.bg-white.shadow-sm, .rounded-xl.bg-white.shadow-sm) {
+    border-color: var(--reach-border) !important;
+    box-shadow: 0 1px 2px rgb(108 101 90 / 0.12), 0 8px 22px rgb(108 101 90 / 0.12), inset 0 1px 0 rgb(225 223 213 / 0.68) !important;
   }
 
   html:not(.dark) :where(.from-orange-50, .from-yellow-50) {
@@ -150,6 +244,7 @@
     --tw-gradient-from: var(--reach-sun) var(--tw-gradient-from-position);
     --tw-gradient-to: rgb(151 84 40 / 0) var(--tw-gradient-to-position);
     --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+    color: var(--reach-light-text) !important;
   }
 
   html:not(.dark) :where(.to-orange-50, .to-yellow-50, .to-orange-100, .to-yellow-100) {
@@ -157,7 +252,8 @@
   }
 
   html:not(.dark) :where(.to-orange-500, .to-orange-600, .to-orange-700, .to-yellow-600) {
-    --tw-gradient-to: var(--reach-sun) var(--tw-gradient-to-position);
+    --tw-gradient-to: var(--reach-sun-deep) var(--tw-gradient-to-position);
+    color: var(--reach-light-text) !important;
   }
 }
 
