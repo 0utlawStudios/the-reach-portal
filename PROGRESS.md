@@ -2,8 +2,16 @@
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
 Last pushed SHA: 42c9c29 data/auth cleanup and hardening
-Next: Push the visual/pipeline/keep-alive slice, verify Vercel production deployment, then continue Support Inbox/last-seen and Drive/media-library hardening.
-Blockers: None for the current visual/pipeline/keep-alive slice. `supabase status`/local DB diff still require Docker if needed.
+Next: Push the demo-data slice, then continue Support Inbox/last-seen and Drive/media-library hardening.
+Blockers: None for the current demo-data slice. `supabase status`/local DB diff still require Docker if needed.
+
+Demo-data slice notes:
+
+- Added migration `0034_reach_demo_posts_ready.sql` and applied it to linked Reach Supabase project `gxmpmdhmxyfqusdzcemt`.
+- Filled seeded dummy cards only with required demo fields: scheduled date/time, caption, asset source, source vault design link, raw file entry, creator, and all checklist items checked.
+- Converted three seeded archive rows into `Demo Archive Post 1-3` dated May 2026 so the Archive view has demoable posted content under the app's existing "posted before current week" rule.
+- Renamed the remaining seeded archive rows to `Sample Posted Content 3-5`, leaving five current-week posted cards for the dashboard's Recently Published panel.
+- Live Supabase verification after migration: 24 demo cards total, stage counts are 4 ideas / 4 awaiting approval / 4 revision needed / 4 approved scheduled / 8 posted, archive count is 3, current posted count is 5, and missing required demo fields count is 0.
 
 Visual, pipeline, and keep-alive slice notes:
 
