@@ -9,6 +9,7 @@ import { consume } from "@/lib/rate-limit";
 import {
   getSupportAdminClient,
   resolveWorkspaceId,
+  resolveActiveSupportWorkspace,
   resolveUserName,
   parseAttachmentClaims,
   buildAttachmentsFromClaims,
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
     const adminAuth = await requireBearerTeamRole(request, ["superadmin"]);
     if (adminAuth instanceof NextResponse) return adminAuth;
     const admin = getSupportAdminClient();
-    const workspaceId = await resolveWorkspaceId(admin, adminAuth.user.id);
+    const workspaceId = adminAuth.workspaceId || await resolveWorkspaceId(admin, adminAuth.user.id);
     const { data, error } = await admin
       .from("support_threads")
       .select("*")
@@ -52,7 +53,9 @@ export async function GET(request: NextRequest) {
   const auth = await requireBearerUser(request);
   if (auth instanceof NextResponse) return auth;
   const admin = getSupportAdminClient();
-  const workspaceId = await resolveWorkspaceId(admin, auth.user.id);
+  const email = (auth.user.email ?? "").toLowerCase();
+  const workspaceId = await resolveActiveSupportWorkspace(admin, auth.user.id, email);
+  if (!workspaceId) return NextResponse.json({ error: "No active workspace access" }, { status: 403 });
   const { data, error } = await admin
     .from("support_threads")
     .select("*")
@@ -101,8 +104,9 @@ export async function POST(request: NextRequest) {
   }
 
   const admin = getSupportAdminClient();
-  const workspaceId = await resolveWorkspaceId(admin, auth.user.id);
   const email = (auth.user.email ?? "").toLowerCase();
+  const workspaceId = await resolveActiveSupportWorkspace(admin, auth.user.id, email);
+  if (!workspaceId) return NextResponse.json({ error: "No active workspace access" }, { status: 403 });
   const name = await resolveUserName(admin, email);
 
   let attachments: SupportAttachment[] = [];

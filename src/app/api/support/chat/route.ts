@@ -10,7 +10,7 @@ import { requireBearerUser } from "@/lib/auth/require";
 import { consume } from "@/lib/rate-limit";
 import {
   getSupportAdminClient,
-  resolveWorkspaceId,
+  resolveActiveSupportWorkspace,
   resolveUserName,
   findChatThread,
   getOrCreateChatThread,
@@ -38,7 +38,9 @@ export async function GET(request: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   const admin = getSupportAdminClient();
-  const workspaceId = await resolveWorkspaceId(admin, auth.user.id);
+  const email = (auth.user.email ?? "").toLowerCase();
+  const workspaceId = await resolveActiveSupportWorkspace(admin, auth.user.id, email);
+  if (!workspaceId) return NextResponse.json({ error: "No active workspace access" }, { status: 403 });
   const thread = await findChatThread(admin, auth.user.id, workspaceId);
   if (!thread) return NextResponse.json({ thread: null, messages: [] });
 
@@ -87,8 +89,9 @@ export async function POST(request: NextRequest) {
   }
 
   const admin = getSupportAdminClient();
-  const workspaceId = await resolveWorkspaceId(admin, auth.user.id);
   const email = (auth.user.email ?? "").toLowerCase();
+  const workspaceId = await resolveActiveSupportWorkspace(admin, auth.user.id, email);
+  if (!workspaceId) return NextResponse.json({ error: "No active workspace access" }, { status: 403 });
   const name = await resolveUserName(admin, email);
 
   let thread: SupportThreadRow;

@@ -65,6 +65,39 @@ export async function resolveWorkspaceId(admin: SupabaseClient, userId: string):
   return (data?.workspace_id as string | undefined) || BASELINE_WORKSPACE_ID;
 }
 
+/**
+ * Strict support access for user-facing support routes.
+ * A valid Auth session is not enough: the caller must be an active workspace
+ * member and have an active team profile whose email matches Auth.
+ */
+export async function resolveActiveSupportWorkspace(
+  admin: SupabaseClient,
+  userId: string,
+  email: string,
+): Promise<string | null> {
+  const lower = (email || "").toLowerCase();
+  if (!userId || !lower) return null;
+
+  const { data: workspaceMember } = await admin
+    .from("workspace_members")
+    .select("workspace_id")
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .limit(1)
+    .maybeSingle();
+  const workspaceId = workspaceMember?.workspace_id as string | undefined;
+  if (!workspaceId) return null;
+
+  const { data: teamMember } = await admin
+    .from("team_members")
+    .select("status")
+    .eq("email", lower)
+    .maybeSingle();
+  if ((teamMember as { status?: string } | null)?.status !== "active") return null;
+
+  return workspaceId;
+}
+
 /** The caller's active team role (lowercased), or null. Used to detect the superadmin. */
 export async function getTeamRole(admin: SupabaseClient, email: string, userId?: string): Promise<string | null> {
   const lower = (email || "").toLowerCase();

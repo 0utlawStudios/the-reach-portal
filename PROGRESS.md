@@ -1,9 +1,17 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: c9003d3 Reach profile/role sync hardening
-Next: Verify Vercel production for this SHA, then continue support/revision/media hardening.
+Last pushed SHA: pending Reach support access hardening
+Next: Push this slice, verify Vercel production, then continue revision/media/realtime hardening.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
+
+Reach support access hardening slice notes:
+
+- Added `resolveActiveSupportWorkspace()` for user-facing support APIs. It requires both active `workspace_members` access and an active `team_members` row matching the Auth email.
+- Hardened `/api/support/threads` user list/create, `/api/support/chat` read/send, and `/api/support/uploads` signed-upload minting to return `403` instead of falling back to the baseline workspace for pending/orphan Auth sessions.
+- Kept superadmin support inbox behavior intact; `scope=all` remains gated by `requireBearerTeamRole(["superadmin"])` and uses the verified workspace id from the auth helper.
+- Added focused coverage proving ticket list/create, chat read/send, and upload URL minting are blocked before write helpers run when the Auth user lacks active support access.
+- Verification passed: focused support tests, `npm run typecheck`, `npm run lint` with the repo's existing two warnings, production `npm run build`, and full `npm run preflight` with 25 files / 224 tests.
 
 Reach profile / role sync hardening slice notes:
 

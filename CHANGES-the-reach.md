@@ -10,6 +10,7 @@
 - Profile/role sync hardening: added `POST /api/team/update-member` so Settings profile edits run through server-side reconciliation instead of direct browser writes.
 - Workspace role alignment: active member role changes now update both `team_members.role` and `workspace_members.role`, and the route rolls back team edits if workspace/Auth reconciliation fails.
 - Auth metadata alignment: profile saves update matching Supabase Auth user metadata for name, phone, avatar, and role so setup, presence, and profile enrichment stay consistent.
+- Support access hardening: ticket list/create, live chat read/send, and support upload URL minting now require active workspace membership plus an active team profile instead of falling back to the baseline workspace for any valid Auth session.
 - Git/repo binding: reset `origin` to `https://github.com/0utlawStudios/the-reach-portal.git` and pushed `main`.
 - Supabase binding: linked the project to ref `gxmpmdhmxyfqusdzcemt`, applied all migrations `0000` through `0032`, kept baseline workspace `00000000-0000-0000-0000-000000000001`, created private `ai-assets`, and enabled Realtime for `posts` and `content_plan_rows`.
 - Supabase hosted Auth: set `site_url` and redirect allow-list to `https://thereach.ten80ten.com`, disabled public signup, set SMTP sender name/subjects/templates to The Reach, and kept invite/recovery routes on `/auth/confirm`.
@@ -40,6 +41,8 @@
 - Full `npm run preflight` passed after the email-change/action-button slice: 23 test files, 215 tests, lint, typecheck, and production build.
 - Focused profile/role tests passed: active role workspace sync, superadmin edit blocking, workspace failure rollback, missing active Auth rejection, and pending invite metadata update.
 - Full `npm run preflight` passed after the profile/role sync slice: 24 test files, 220 tests, lint, typecheck, and production build.
+- Focused support access tests passed: ticket list/create, chat read/send, and upload URL minting return `403` before write helpers when the Auth user lacks active support access.
+- Full `npm run preflight` passed after the support hardening slice: 25 test files, 224 tests, lint, typecheck, and production build.
 - `npm run preflight` passed.
 - Full test suite passed: 21 files, 202 tests.
 - Focused forgot-password tests passed for existing Auth reset, active team-member setup recovery, partial Auth-user retry, and unknown-email anti-enumeration.
