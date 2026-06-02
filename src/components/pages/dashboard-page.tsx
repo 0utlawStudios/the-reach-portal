@@ -64,12 +64,17 @@ export function DashboardPage() {
         setNeedsScroll(false);
         return;
       }
-      // UX-008: clamp the computed scale with a 0.8 floor so content never
-      // shrinks unboundedly on short windows.
       const raw = Math.min(el.clientHeight / inner.scrollHeight, 1);
+      if (raw < 0.92) {
+        setScale(1);
+        setNeedsScroll(true);
+        return;
+      }
+      // UX-008: for near-fit desktop windows, scale gently. For genuinely
+      // short windows, scroll instead of clipping content behind the footer.
       const s = Math.max(raw, 0.8);
       setScale(prev => Math.abs(prev - s) > 0.003 ? s : prev);
-      setNeedsScroll(raw < 0.8);
+      setNeedsScroll(false);
     };
     fit();
     const ro = new ResizeObserver(fit);
