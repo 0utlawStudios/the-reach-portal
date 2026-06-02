@@ -2,8 +2,18 @@
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
 Last pushed SHA: 64dd5b8 fix: harden reach action button contrast
-Next: Continue the production-readiness audit backlog: Settings surface cleanup and remaining brand/UI hardening as separate scoped slices.
+Next: Push Settings status cleanup and Brand Playbook card elevation, then verify CI/Vercel production.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
+
+Settings / Brand Playbook UI cleanup slice notes:
+
+- Removed the Notion integration card from Settings; no user-facing Notion integration remains in the visible integrations list.
+- Updated Settings system rows so real wired systems are marked Active/Monitored instead of Coming Soon: auto-publish, email notifications, post reminders, and team activity.
+- Left Analytics tracking as Coming Soon because this slice did not find a real analytics persistence/reporting feature behind that row.
+- Verified Settings `Hashtag sets` and `Caption templates` Manage buttons already route to Brand Kit Copy Hub with exact `hashtags` / `captions` focus targets; no route change was needed.
+- Added central `reach-copy-card` styling for Brand Playbook copy blocks so Business Essentials, Hashtag Banks, Proven Hooks, CTAs, and Caption Templates render on a lighter elevated surface with stronger Reach Stone borders and shadows.
+- Used existing Reach tokens only: Sand, Stone, Sun, and token mixes with existing white surface treatment. No new brand hex values were introduced.
+- Verification passed: `git diff --check`, `npm run typecheck`, `npm run lint` with only existing warnings, and `npm run build`.
 
 Reach command-button contrast slice notes:
 

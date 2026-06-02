@@ -308,6 +308,14 @@ function ConnectedBadge() {
   );
 }
 
+function ActiveBadge({ label = "Active" }: { label?: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-500/20">
+      <CheckCircle className="w-3 h-3" />{label}
+    </span>
+  );
+}
+
 function ComingSoonBadge() {
   return (
     <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-gradient-to-r from-gray-100 to-gray-50 dark:from-white/[0.06] dark:to-white/[0.03] text-gray-400 dark:text-gray-500 border border-gray-200/60 dark:border-white/[0.06]">
@@ -541,20 +549,20 @@ export function SettingsPage() {
             ))}
           </Section>
 
-          {/* UX-013: the toggles below are not yet wired to persistence —
-              disabled with a Coming Soon badge so flipping one does not
-              mislead the user into thinking a setting was saved. */}
+          {/* UX-013: disabled toggles show system status only. Rows backed by
+              real routes/workers are marked active; unwired preferences remain
+              Coming Soon so the UI does not imply a saved per-user setting. */}
           <Section title="Publishing" icon={<Zap className="w-3.5 h-3.5 text-amber-500" />}>
-            <SettingRow icon={Clock} label="Auto-publish" desc="Publish approved posts at scheduled time"><div className="flex items-center gap-2"><ComingSoonBadge /><Toggle disabled /></div></SettingRow>
+            <SettingRow icon={Clock} label="Auto-publish" desc="n8n claims approved posts at scheduled time"><div className="flex items-center gap-2"><ActiveBadge /><Toggle defaultOn disabled /></div></SettingRow>
             <SettingRow icon={BarChart3} label="Analytics tracking" desc="Track engagement after publishing"><div className="flex items-center gap-2"><ComingSoonBadge /><Toggle defaultOn disabled /></div></SettingRow>
             <SettingRow icon={FileText} label="Hashtag sets" desc="Reusable hashtag groups"><Button size="sm" variant="outline" onClick={() => openBrandKitCopy("hashtags")} className="h-7 text-[10px] rounded-lg px-3 cursor-pointer">Manage</Button></SettingRow>
             <SettingRow icon={Smartphone} label="Caption templates" desc="Saved caption formats"><Button size="sm" variant="outline" onClick={() => openBrandKitCopy("captions")} className="h-7 text-[10px] rounded-lg px-3 cursor-pointer">Manage</Button></SettingRow>
           </Section>
 
           <Section title="Notifications" icon={<Bell className="w-3.5 h-3.5 text-violet-500" />}>
-            <SettingRow icon={Mail} label="Email notifications" desc="Alerts for approvals and status changes"><div className="flex items-center gap-2"><ComingSoonBadge /><Toggle defaultOn disabled /></div></SettingRow>
-            <SettingRow icon={Bell} label="Post reminders" desc="Notify 1 hour before scheduled post"><div className="flex items-center gap-2"><ComingSoonBadge /><Toggle defaultOn disabled /></div></SettingRow>
-            <SettingRow icon={Shield} label="Team activity" desc="When team members move posts or @mention"><div className="flex items-center gap-2"><ComingSoonBadge /><Toggle disabled /></div></SettingRow>
+            <SettingRow icon={Mail} label="Email notifications" desc="Approval, revision, invite, mention, and support emails are active"><div className="flex items-center gap-2"><ActiveBadge /><Toggle defaultOn disabled /></div></SettingRow>
+            <SettingRow icon={Bell} label="Post reminders" desc="Publishing queue and health checks monitor scheduled posts"><div className="flex items-center gap-2"><ActiveBadge label="Monitored" /><Toggle defaultOn disabled /></div></SettingRow>
+            <SettingRow icon={Shield} label="Team activity" desc="Stage moves, audit logs, and @mentions are tracked"><div className="flex items-center gap-2"><ActiveBadge /><Toggle defaultOn disabled /></div></SettingRow>
           </Section>
 
           {isAdmin && (
@@ -819,22 +827,6 @@ const INTEGRATIONS = [
       features: ["Resumable Uploads", "Video Streaming Proxy", "Automatic Subfolders", "Public File Serving", "60TB Storage"],
       tables: ["thumbnails/", "raw-files/", "media-library/"],
       lastSync: "On-demand — per upload",
-    },
-  },
-  {
-    id: "notion",
-    name: "Notion",
-    desc: "Sync content ideas and briefs",
-    icon: ExternalLink,
-    iconBg: "bg-gray-50 dark:bg-white/[0.04]",
-    iconColor: "text-gray-500 dark:text-gray-400",
-    status: "coming_soon" as const,
-    details: {
-      version: "Notion API v1",
-      region: "—",
-      features: ["Content Brief Sync", "Idea Database Import", "Two-way Sync", "Template Library"],
-      tables: [],
-      lastSync: "Not connected",
     },
   },
   {

@@ -807,6 +807,29 @@ html:not(.dark) [role="button"].border-dashed :where(span, p, svg) {
   stroke: currentColor !important;
 }
 
+html:not(.dark) .reach-copy-card {
+  background-color: color-mix(in srgb, var(--reach-sand) 68%, white 32%) !important;
+  border-color: color-mix(in srgb, var(--reach-stone) 38%, transparent) !important;
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 0.52) inset,
+    0 12px 26px rgb(108 101 90 / 0.14),
+    0 1px 2px rgb(108 101 90 / 0.16) !important;
+}
+
+html:not(.dark) .reach-copy-card:hover,
+html:not(.dark) .reach-copy-card:focus-visible {
+  background-color: color-mix(in srgb, var(--reach-sand) 60%, white 40%) !important;
+  border-color: color-mix(in srgb, var(--reach-sun) 54%, transparent) !important;
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 0.62) inset,
+    0 18px 34px rgb(108 101 90 / 0.18),
+    0 2px 4px rgb(108 101 90 / 0.16) !important;
+}
+
+html:not(.dark) .reach-copy-card :where(p, svg) {
+  color: var(--reach-stone) !important;
+}
+
 /* Dashboard pulse animation */
 @keyframes pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
