@@ -83,6 +83,9 @@ export async function POST(request: NextRequest) {
     if (!["pending", "active"].includes(String(member.status))) {
       return NextResponse.json({ error: "Invitation is not active" }, { status: 403 });
     }
+    if (!avatarUrl && !member.avatar_url) {
+      return NextResponse.json({ error: "Profile photo is required" }, { status: 400 });
+    }
 
     const memberUpdates: Record<string, unknown> = {
       status: "active",

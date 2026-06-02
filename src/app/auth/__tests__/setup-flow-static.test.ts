@@ -34,10 +34,12 @@ describe("invite setup flow hardening", () => {
     expect(APP_SHELL_SRC).toContain('window.location.href = "/auth/setup"');
   });
 
-  it("does not let avatar upload failure block workspace activation", () => {
-    expect(SETUP_SRC).toContain("avatar storage hiccup must not leave");
-    expect(SETUP_SRC).toContain("Photo upload failed, but your workspace access will still be activated.");
-    expect(SETUP_SRC).not.toMatch(/avatarFile\s*&&\s*password\.length/);
+  it("requires a profile photo while still allowing setup retry from the existing session", () => {
+    expect(SETUP_SRC).toContain("Please add a profile photo.");
+    expect(SETUP_SRC).toContain("Failed to upload photo. Please try again.");
+    expect(SETUP_SRC).toContain("The page can resume from an existing");
+    expect(SETUP_SRC).toContain("const canSubmit = ready && !loading");
+    expect(SETUP_SRC).not.toContain("Photo upload failed, but your workspace access will still be activated.");
   });
 });
 

@@ -26,7 +26,6 @@ export default function SetupPasswordPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [success, setSuccess] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("");
@@ -94,7 +93,7 @@ export default function SetupPasswordPage() {
     initSession();
   }, []);
 
-  const isValid = firstName.trim() && lastName.trim() && whatsapp.trim() && password.length >= 8 && password === confirm;
+  const canSubmit = ready && !loading;
 
   const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -119,10 +118,33 @@ export default function SetupPasswordPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isValid || loading || !ready) return;
+    if (!canSubmit) return;
+    if (!avatarFile) {
+      setError("Please add a profile photo.");
+      return;
+    }
+    if (!firstName.trim()) {
+      setError("First name is required.");
+      return;
+    }
+    if (!lastName.trim()) {
+      setError("Last name is required.");
+      return;
+    }
+    if (!whatsapp.trim()) {
+      setError("WhatsApp number is required.");
+      return;
+    }
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+    if (password !== confirm) {
+      setError("Passwords do not match.");
+      return;
+    }
     setLoading(true);
     setError("");
-    setNotice("");
 
     const fullName = `${firstName.trim()} ${lastName.trim()}`;
     const cleanPhone = whatsapp.trim().replace(/[^0-9+]/g, "");
@@ -158,20 +180,21 @@ export default function SetupPasswordPage() {
       return;
     }
 
-    // Upload avatar. This is intentionally non-blocking for activation: an
-    // avatar storage hiccup must not leave a confirmed invite user stranded as
-    // pending with no workspace membership.
+    // Upload avatar before activation. The page can resume from an existing
+    // session, so upload failure no longer strands the user; they can retry
+    // setup with the same consumed invite session.
     let avatarUrl: string | null = null;
     if (avatarFile && user?.email) {
       const ext = avatarFile.name.split(".").pop() || "jpg";
       const path = `${user.email.replace(/[^a-z0-9]/gi, "_")}-${Date.now()}.${ext}`;
       const { error: uploadErr } = await supabase.storage.from("avatars").upload(path, avatarFile, { upsert: true, cacheControl: "31536000" });
       if (uploadErr) {
-        setNotice("Photo upload failed, but your workspace access will still be activated.");
-      } else {
-        const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
-        avatarUrl = urlData.publicUrl;
+        setError("Failed to upload photo. Please try again.");
+        setLoading(false);
+        return;
       }
+      const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
+      avatarUrl = urlData.publicUrl;
     }
 
     const activation = await fetch("/api/auth/complete-setup", {
@@ -250,16 +273,9 @@ export default function SetupPasswordPage() {
                 <p className="text-[11px] text-red-700 dark:text-red-400">{error}</p>
               </div>
             )}
-            {notice && (
-              <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-500/5 border border-amber-200 dark:border-amber-500/20 rounded-xl p-3">
-                <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                <p className="text-[11px] text-amber-700 dark:text-amber-300">{notice}</p>
-              </div>
-            )}
-
             {/* Profile Photo */}
             <div className="flex flex-col items-center gap-2">
-              <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Profile Photo <span className="text-gray-300 dark:text-gray-600">Optional</span></label>
+              <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Profile Photo <span className="text-red-400">*</span></label>
               <label className="cursor-pointer group p-1.5">
                 <input type="file" accept="image/*" onChange={handleAvatarSelect} className="hidden" />
                 <div className="w-24 h-24 sm:w-20 sm:h-20 rounded-full border-2 border-dashed border-gray-300 dark:border-white/[0.12] group-hover:border-[#975428] dark:group-hover:border-[#975428] transition-colors flex items-center justify-center overflow-hidden bg-gray-50 dark:bg-white/[0.04]">
@@ -318,7 +334,7 @@ export default function SetupPasswordPage() {
               {confirm.length > 0 && password !== confirm && <p className="text-[10px] text-red-500">Passwords don&apos;t match</p>}
             </div>
 
-            <button type="submit" disabled={!isValid || loading} className="w-full h-11 rounded-xl bg-[#975428] hover:bg-[#7f4421] text-white text-[13px] font-bold shadow-lg shadow-[#975428]/20 disabled:opacity-40 transition-all cursor-pointer flex items-center justify-center gap-2">
+            <button type="submit" disabled={!canSubmit} className="w-full h-11 rounded-xl bg-[#975428] hover:bg-[#7f4421] text-white text-[13px] font-bold shadow-lg shadow-[#975428]/20 disabled:opacity-40 transition-all cursor-pointer flex items-center justify-center gap-2">
               {loading ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Setting up...</> : "Create Account & Enter Dashboard"}
             </button>
           </form>

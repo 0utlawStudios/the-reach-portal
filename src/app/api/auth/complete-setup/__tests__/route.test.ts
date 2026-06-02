@@ -148,8 +148,25 @@ describe("POST /api/auth/complete-setup", () => {
     expect(res.status).toBe(403);
   });
 
-  it("rejects unsafe avatar URLs but still activates the invite", async () => {
+  it("requires a safe profile photo before activation when no avatar exists", async () => {
     const res = await POST(makeRequest({ name: "Ace Creatives", avatarUrl: "javascript:alert(1)" }));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("Profile photo is required");
+    expect(operations.some((op) => op.table === "workspace_members" && op.method === "upsert")).toBe(false);
+  });
+
+  it("allows setup without a new avatar when the member already has a profile photo", async () => {
+    tableResults.team_members.maybeSingle = {
+      data: {
+        id: "member-1",
+        role: "social_media_specialist",
+        status: "pending",
+        avatar_url: "https://test.supabase.co/storage/v1/object/public/avatars/existing.png",
+      },
+      error: null,
+    };
+    const res = await POST(makeRequest({ name: "Ace Creatives" }));
     expect(res.status).toBe(200);
     const teamUpdate = operations.find((op) => op.table === "team_members" && op.method === "update");
     expect(teamUpdate?.payload).not.toHaveProperty("avatar_url");
