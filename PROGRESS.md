@@ -1,9 +1,20 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: 3321f40 docs: record dashboard production verification
-Next: Push team/invite production cleanup record, then continue settings/profile polish, pipeline realtime QA, and full production QA.
+Last pushed SHA: 1b57a08 fix: lift brand playbook copy cards
+Next: Continue production QA backlog: Settings/Profile polish, pipeline realtime QA, Support Inbox/chat regression checks, and full production QA.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
+
+Brand Playbook copy-card elevation slice notes:
+
+- Treated the latest Brand Playbook screenshot as an additional visual QA task, not a redirect from the active production-readiness work.
+- Root issue: copy cards were still mostly Sand-on-Sand, so Business Essentials, Hashtag Banks, Proven Hooks, CTAs, and Caption Templates blended into the page background.
+- Added central Reach-token-derived raised-surface variables for light mode; no new brand hex values were introduced.
+- Updated the shared `reach-copy-card` surface to render lighter, with stronger Stone border separation and deeper layered elevation.
+- Added a `reach-copy-icon` hook so the copy icon chip has visible contrast inside the lighter card and Sun-tinted hover behavior.
+- Kept the change scoped to `src/app/globals.css` and `src/components/copy-block.tsx`; no data, auth, support, Drive, pipeline, or Supabase behavior changed.
+- Verification passed: `git diff --check`, `npm run typecheck`, `npm run lint` with only existing warnings, and `npm run build`.
+- Pushed functional commit `1b57a08` to `origin/main`; GitHub/Vercel deployment checks are being monitored.
 
 Settings / Brand Playbook UI cleanup slice notes:
 

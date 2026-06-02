@@ -2,6 +2,7 @@
 
 ## Edited
 
+- Brand Playbook copy-card elevation: lightened the shared copy-block surface, strengthened Stone borders/shadows, and made the copy icon chip readable so the cards pop from the Sand page background.
 - Settings status cleanup: removed the Notion integration card, marked real wired systems as Active/Monitored, and kept Analytics tracking as Coming Soon because no real analytics feature was verified behind that row.
 - Brand Playbook card elevation: added a central `reach-copy-card` surface so copy blocks render lighter with stronger Reach Stone borders and more visible elevation in light mode.
 - Pipeline drag handle: restored the Ten80Ten card drag contract by moving dnd-kit listeners back to a real visible handle button instead of the whole card/decorative handle pattern.
@@ -68,6 +69,7 @@
 
 ## Verification
 
+- Brand Playbook copy-card elevation passed `git diff --check`, `npm run typecheck`, `npm run lint` with only existing warnings, and `npm run build`; functional commit `1b57a08` was pushed to `origin/main`.
 - Settings/Brand Playbook UI cleanup passed `git diff --check`, `npm run typecheck`, `npm run lint` with only existing warnings, and `npm run build`; Settings hashtag/caption Manage buttons were verified to already route to the Brand Kit Copy Hub focus targets.
 - Settings/Brand Playbook UI cleanup was pushed as `e658660`; GitHub CI passed and Vercel production deployment `dpl_FnJETeprE7sE3U7f72kbmqz8NccL` is ready on `https://thereach.ten80ten.com`.
 - Pipeline drag-handle fix verified live data completeness for all Reach demo posts, passed focused iron-law/static tests, `npm run typecheck`, `npm run lint` with only existing warnings, full `npm test` with 26 files / 232 tests, and `npm run build`.
