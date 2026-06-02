@@ -2,6 +2,8 @@
 
 ## Edited
 
+- Drawer revision workflow: the inline asset-review drawer revision action now calls the existing `submitKickback()` pipeline contract instead of manually writing notes, moving stage, and firing notification routes separately.
+- Revision consistency: drawer revision requests now reuse the pipeline-layer persistence, rollback, audit, mention notification, and revision notification behavior that already protects board drag kickbacks.
 - Action-button contrast hardening: strengthened central Reach action/secondary button rules so Review Posts, Invite, Send Invite, Resend, profile save/upload, and other marked command buttons remain readable in light mode, saved design-theme modes, and disabled states.
 - Button palette: derived deeper Sun/Stone and Water/Stone action gradients from the approved Reach brand tokens and kept labels/icons on a high-contrast Sand-tinted foreground.
 - Action-button readability: added final Reach action classes after the design-mode overrides and applied them to the dashboard Review Posts CTA plus Settings Invite, Send Invite, Approve, Resend, profile save, and profile upload controls.
@@ -39,6 +41,7 @@
 
 ## Verification
 
+- Drawer revision slice passed focused iron-law static coverage, `npm run lint`, `npm run typecheck`, `npm test` with 25 files / 225 tests, and `npm run build`.
 - Action-button contrast slice passed `npm run lint`, `npm run typecheck`, `npm test` with 25 files / 224 tests, and `npm run build`; generated production CSS contains the strengthened `reach-action-button` and `reach-secondary-action` rules.
 - Focused email-change tests passed: active self-change, duplicate rejection, active non-self rejection, pending invite regeneration, and Auth rollback on DB failure.
 - Full `npm run preflight` passed after the email-change/action-button slice: 23 test files, 215 tests, lint, typecheck, and production build.

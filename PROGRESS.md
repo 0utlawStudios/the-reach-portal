@@ -1,9 +1,17 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: 91ba74b Reach action button contrast hardening
-Next: Verify CI/Vercel production for this SHA, then continue revision/media/realtime hardening.
+Last pushed SHA: 188c1db Reach drawer revision flow hardening
+Next: Verify CI/Vercel production for this SHA, then continue media/realtime/Drive hardening.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
+
+Reach drawer revision flow hardening slice notes:
+
+- Rebound the inline drawer "Submit Revision Request" action to the existing `submitKickback()` pipeline contract instead of manually appending notes, moving stage, and firing notification routes.
+- Kept the drawer UI intact while moving persistence, rollback, audit, mention notifications, and revision notifications back under the guarded pipeline path.
+- Removed the drawer-side split-write notification path that could produce mismatched notes/stage/email behavior if one operation succeeded and another failed.
+- Added an iron-law static regression test proving drawer revision submits call `submitKickback()` and do not reintroduce manual `updateCard(...notes)` + `moveCard(...revision_needed)` + revision-email writes.
+- Verification passed: focused iron-law test, `npm run lint` with only existing warnings, `npm run typecheck`, `npm test` with 25 files / 225 tests, and production `npm run build`.
 
 Reach action button contrast hardening slice notes:
 
