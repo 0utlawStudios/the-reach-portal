@@ -1,9 +1,19 @@
 # The Reach Clone Progress
 
-Phase: DONE - forgot-password clone recovery bridge deployed and verified
-Last SHA: d0a4af7 auth fix commit; latest docs commit records deployment state
-Next: `aldridge@ten80ten.com` must open the setup email and complete `/auth/setup`; that will activate the baseline `workspace_members` row.
-Blockers: None for the forgot-password fix. `supabase db diff --linked` and `supabase status` cannot run locally because Docker is not running. `supabase db push --dry-run --include-all --yes` previously reported the remote database is up to date.
+Phase: IN PROGRESS - production-readiness QA and Reach polish
+Last pushed SHA before this slice: d0a4af7 auth fix commit; latest docs commit records deployment state
+Next: Brand shell/Brand Kit polish from the Reach PDF/site, Settings routing, drag affordance, Support Inbox/last-seen audit, and Drive/media-library hardening.
+Blockers: None for the current data/auth slice. `supabase status`/local DB diff still require Docker if needed.
+
+Production-readiness data/auth slice notes:
+
+- Added migration `0033_reach_production_data_cleanup.sql` and applied it to linked Reach Supabase project `gxmpmdhmxyfqusdzcemt`.
+- The migration keeps future resets clone-clean by deleting old Ten80Ten default team members, keeping `aldridge@ten80ten.com` as active `superadmin`, cleaning old sample media owner names, setting Brand Kit website data to `www.thereach.travel`, and rebasing all seeded sample cards to June 2026.
+- Live Supabase verification after migration: team has only `aldridge@ten80ten.com`, stale media owner count is 0, 24 sample posts exist, non-June sample count is 0, date range is 2026-06-01 through 2026-06-19, and Brand Kit website is `www.thereach.travel`.
+- Hardened bearer team-admin checks to require both active `workspace_members` access and an active `team_members` profile before admin routes can proceed.
+- Hardened `/api/team/remove-member` so `memberId` and `memberEmail` must resolve to the same row before workspace/auth cleanup, preventing stale UI payloads from deleting the wrong user.
+- Renamed the offline team cache key to `reach_team_members` so old Ten80Ten localStorage cannot rehydrate a Reach team list if Supabase is unavailable.
+- Verification passed: `npx vitest run src/lib/auth/__tests__/require.test.ts src/app/api/team/remove-member/__tests__/route.test.ts` with 7 tests passing.
 
 Forgot-password/auth-user clone fix notes:
 

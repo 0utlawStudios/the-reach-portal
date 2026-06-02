@@ -149,7 +149,7 @@ export async function requireBearerUser(
 export async function requireBearerTeamRole(
   req: NextRequest,
   allowedRoles?: ReadonlyArray<string>,
-): Promise<{ user: User; email: string; role: string } | NextResponse> {
+): Promise<{ user: User; email: string; role: string; workspaceId: string } | NextResponse> {
   const result = await requireBearerUser(req);
   if (result instanceof NextResponse) return result;
   const { user } = result;
@@ -164,21 +164,42 @@ export async function requireBearerTeamRole(
     const admin = createClient(url, serviceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
+    const { data: workspaceMember, error: workspaceError } = await admin
+      .from("workspace_members")
+      .select("workspace_id, role, status")
+      .eq("user_id", user.id)
+      .eq("status", "active")
+      .limit(1)
+      .maybeSingle();
+
+    if (workspaceError || !workspaceMember) {
+      return forbidden("No active workspace membership");
+    }
+
     // SEC-010: `.eq` not `.ilike` — the email is already lowercased above,
     // and `.ilike` would treat `%`/`_` in a crafted email as SQL wildcards.
-    const { data } = await admin
+    const { data: teamMember, error: teamError } = await admin
       .from("team_members")
-      .select("role")
+      .select("role, status")
       .eq("email", email)
       .maybeSingle();
-    const role = (data?.role as string) || "";
+    if (teamError || !teamMember || teamMember.status !== "active") {
+      return forbidden("No active team profile");
+    }
+
+    const role = (workspaceMember.role as string) || (teamMember.role as string) || "";
     const allowed = allowedRoles
       ? new Set(allowedRoles.map((r) => r.toLowerCase()))
       : TEAM_ADMIN_ROLES;
     if (!role || !allowed.has(role.toLowerCase())) {
       return forbidden(`Role '${role || "none"}' not allowed`);
     }
-    return { user, email, role };
+    return {
+      user,
+      email,
+      role,
+      workspaceId: workspaceMember.workspace_id as string,
+    };
   } catch {
     return forbidden("Role check failed");
   }

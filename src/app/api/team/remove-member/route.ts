@@ -50,13 +50,30 @@ export async function POST(request: NextRequest) {
 
     const memberEmail = body.memberEmail.trim().toLowerCase();
 
+    const admin = getAdminClient();
+    const { data: targetMember, error: targetErr } = await admin
+      .from("team_members")
+      .select("id, email")
+      .eq("id", body.memberId)
+      .maybeSingle();
+    if (targetErr) {
+      throw new Error(`Team member lookup failed: ${targetErr.message}`);
+    }
+    if (!targetMember) {
+      return NextResponse.json({ error: "Member not found" }, { status: 404 });
+    }
+
+    const targetEmail = String(targetMember.email || "").trim().toLowerCase();
+    if (targetEmail !== memberEmail) {
+      return NextResponse.json({ error: "Member id/email mismatch" }, { status: 409 });
+    }
+
     // ─── Guard against self-removal (no one can lock themselves out) ───
-    if (memberEmail === actorEmail) {
+    if (targetEmail === actorEmail) {
       return NextResponse.json({ error: "You cannot remove yourself" }, { status: 400 });
     }
 
-    const admin = getAdminClient();
-    const authUser = await findAuthUserByEmail(admin, memberEmail);
+    const authUser = await findAuthUserByEmail(admin, targetEmail);
 
     // Remove active/pending workspace access before removing the profile row.
     // This makes the revoke immediate even if the auth user cleanup has to be
@@ -77,17 +94,10 @@ export async function POST(request: NextRequest) {
     const { error: teamDeleteErr } = await admin
       .from("team_members")
       .delete()
-      .eq("id", body.memberId);
+      .eq("id", body.memberId)
+      .eq("email", targetEmail);
     if (teamDeleteErr) {
       throw new Error(`Team profile cleanup failed: ${teamDeleteErr.message}`);
-    }
-
-    const { error: emailDeleteErr } = await admin
-      .from("team_members")
-      .delete()
-      .eq("email", memberEmail);
-    if (emailDeleteErr) {
-      throw new Error(`Team email cleanup failed: ${emailDeleteErr.message}`);
     }
 
     let authDeleted = false;
@@ -105,7 +115,7 @@ export async function POST(request: NextRequest) {
         p_entity_type: "team",
         p_action: "member_removed",
         p_entity_id: null,
-        p_metadata: { user_name: actorEmail, details: `Removed ${memberEmail} from team, workspace access, and auth` },
+        p_metadata: { user_name: actorEmail, details: `Removed ${targetEmail} from team, workspace access, and auth` },
       });
     } catch { /* best-effort */ }
 
