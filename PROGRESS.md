@@ -1,9 +1,20 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: cc88c58 Reach Drive upload policy hardening
-Next: Verify CI/Vercel production for this SHA, then continue media tracking/realtime/keep-alive hardening.
+Last pushed SHA: 98fb3c8 Reach realtime contract migration
+Next: Verify CI/Vercel production for this SHA, then continue media tracking and final production QA.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
+
+Reach realtime / keep-alive proof slice notes:
+
+- Added migration `0035_reach_realtime_contract.sql` to repo-proof the Realtime contract for `posts` and `content_plan_rows`.
+- Applied migration `0035` to linked Reach Supabase project `gxmpmdhmxyfqusdzcemt` with `supabase db push --linked --include-all`.
+- Verified live `supabase_realtime` publication contains `public.posts` and `public.content_plan_rows`.
+- Verified live `posts` and `content_plan_rows` both use `REPLICA IDENTITY FULL`, so update/delete realtime payloads carry complete row data.
+- Confirmed keep-alive schedule is every 2 days in both `vercel.json` and `.github/workflows/supabase-keep-alive.yml`.
+- Production keep-alive returned HTTP 200 with counts: 1 workspace, 24 posts, 6 media assets, 32 audit events.
+- Production deep-check returned HTTP 200: 40 total checks, 34 pass, 6 warnings, 0 failures, grade `NEEDS ATTENTION`.
+- `supabase migration list --linked` hung after applying `0035`; direct SQL and the successful `db push` verified the live state, and the hung CLI process was killed.
 
 Reach Drive upload policy hardening slice notes:
 

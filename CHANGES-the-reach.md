@@ -2,6 +2,8 @@
 
 ## Edited
 
+- Realtime contract: added migration `0035_reach_realtime_contract.sql` to guarantee `posts` and `content_plan_rows` are in `supabase_realtime` and use `REPLICA IDENTITY FULL`.
+- Keep-alive proof: verified the production two-day keep-alive schedule in both Vercel cron and GitHub Actions, and verified the production keep-alive/deep-check endpoints with the configured health secret.
 - Drive upload policy: added a shared Drive media policy for valid folders, active-team upload roles, allowed image/video MIME types, MIME normalization, and the 250 MB media size limit.
 - Drive resumable upload hardening: `/api/drive/upload` now rejects unsupported MIME types and oversize files before creating Google resumable upload sessions, matching the proxy upload path.
 - Drive client upload hardening: `uploadToDrive()` now rejects unsupported/oversize files before starting proxy or direct-to-Google resumable upload work.
@@ -44,6 +46,7 @@
 
 ## Verification
 
+- Realtime/keep-alive slice applied migration `0035` to Supabase project `gxmpmdhmxyfqusdzcemt`; direct SQL verified `posts` and `content_plan_rows` publication plus full replica identity, keep-alive returned HTTP 200, and deep-check returned HTTP 200 with 0 failures.
 - Drive upload policy slice passed focused Drive route tests, `npm run lint`, `npm run typecheck`, `npm test` with 26 files / 228 tests, and `npm run build`.
 - Drawer revision slice passed focused iron-law static coverage, `npm run lint`, `npm run typecheck`, `npm test` with 25 files / 225 tests, and `npm run build`.
 - Action-button contrast slice passed `npm run lint`, `npm run typecheck`, `npm test` with 25 files / 224 tests, and `npm run build`; generated production CSS contains the strengthened `reach-action-button` and `reach-secondary-action` rules.
