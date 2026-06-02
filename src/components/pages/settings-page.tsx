@@ -530,7 +530,7 @@ export function SettingsPage() {
           <div className="flex items-center justify-between">
             <p className="text-[13px] text-gray-500 dark:text-gray-400">{activeMembers.length} members with workspace access</p>
             {isAdmin && (
-              <Button size="sm" onClick={() => setShowInvite(!showInvite)} className="h-8 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-[11px] font-medium cursor-pointer shadow-sm">
+              <Button size="sm" onClick={() => setShowInvite(!showInvite)} className="h-8 rounded-lg bg-[#5A656C] hover:bg-[#4f5a61] !text-[#E1DFD5] text-[11px] font-medium cursor-pointer shadow-sm shadow-[#5A656C]/20">
                 <UserPlus className="w-3.5 h-3.5 mr-1.5" />Invite
               </Button>
             )}
@@ -552,8 +552,8 @@ export function SettingsPage() {
                 <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value as UserRole)} className="h-9 px-3 rounded-lg bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-[12px] text-gray-600 dark:text-gray-300 outline-none cursor-pointer flex-1">
                   <option value="social_media_specialist">Social Media Specialist</option><option value="video_editor">Video Editor</option><option value="graphic_designer">Graphic Designer</option><option value="approver">Approver</option><option value="creative_director">Creative Director</option><option value="admin">Admin</option>
                 </select>
-                <Button type="submit" size="sm" disabled={inviting || !inviteEmail.trim() || !inviteName.trim()} className="h-9 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-[12px] px-5 cursor-pointer shadow-sm disabled:opacity-40">
-                  {inviting ? <span className="flex items-center gap-1.5"><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Sending...</span> : <><Send className="w-3 h-3 mr-1.5" />Send Invite</>}
+                <Button type="submit" size="sm" disabled={inviting || !inviteEmail.trim() || !inviteName.trim()} className="h-9 rounded-lg bg-[#5A656C] hover:bg-[#4f5a61] !text-[#E1DFD5] text-[12px] px-5 cursor-pointer shadow-sm shadow-[#5A656C]/20 disabled:opacity-70">
+                  {inviting ? <span className="flex items-center gap-1.5"><span className="w-3 h-3 border-2 border-[#E1DFD5]/30 border-t-[#E1DFD5] rounded-full animate-spin" />Sending...</span> : <><Send className="w-3 h-3 mr-1.5" />Send Invite</>}
                 </Button>
               </div>
             </form>
@@ -678,9 +678,9 @@ export function SettingsPage() {
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
                         <button disabled={resendingInvite === member.id} onClick={() => handleResendInvite(member)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 text-[11px] font-medium hover:bg-orange-100 dark:hover:bg-orange-500/20 transition-colors cursor-pointer border border-orange-200 dark:border-orange-500/20 disabled:opacity-40">
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#975428] dark:bg-orange-500/10 !text-[#E1DFD5] dark:text-orange-400 text-[11px] font-semibold hover:bg-[#7f4421] dark:hover:bg-orange-500/20 transition-colors cursor-pointer border border-[#975428]/30 dark:border-orange-500/20 disabled:opacity-70 shadow-sm shadow-[#975428]/15">
                           {resendingInvite === member.id ? (
-                            <span className="w-3 h-3 border-2 border-orange-300 border-t-orange-600 rounded-full animate-spin" />
+                            <span className="w-3 h-3 border-2 border-[#E1DFD5]/30 border-t-[#E1DFD5] rounded-full animate-spin" />
                           ) : (
                             <RefreshCw className="w-3 h-3" />
                           )}

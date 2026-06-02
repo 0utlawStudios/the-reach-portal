@@ -1,9 +1,19 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: eadf83a Reach client manual
-Next: Audit unreadable non-hover buttons across invite/send-invite/resend/support/settings/modal actions, then run the final production QA swarm.
+Last pushed SHA: 9c5e53a Reach action-button readability
+Next: Run the final production QA swarm.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
+
+Reach action-button readability slice notes:
+
+- Added a central light-theme action-button rule so primary colored/gradient buttons keep Reach Sand text and icons before hover, including old blue/indigo/orange/yellow class paths still used around the app.
+- Kept disabled primary buttons readable by reducing the disabled opacity floor to `0.68` for colored action buttons instead of washing labels into the Sand background.
+- Hardened the Settings team Invite and Send Invite buttons directly to Reach Water backgrounds with Reach Sand labels.
+- Hardened pending invite Resend buttons directly to Reach Sun backgrounds with Reach Sand labels and readable loading spinner borders.
+- No invite/reinvite/team/auth logic changed; this is visual readability only.
+- Verified `npm run typecheck` passed.
+- Verified `npm run lint` passed with only the repo's existing warnings in untouched `src/lib/ai/worker.ts` and `src/lib/pipeline-context.tsx`.
 
 Reach client manual slice notes:
 
