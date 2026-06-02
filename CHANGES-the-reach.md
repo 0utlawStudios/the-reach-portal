@@ -69,6 +69,7 @@
 - Settings/Brand Playbook UI cleanup passed `git diff --check`, `npm run typecheck`, `npm run lint` with only existing warnings, and `npm run build`; Settings hashtag/caption Manage buttons were verified to already route to the Brand Kit Copy Hub focus targets.
 - Settings/Brand Playbook UI cleanup was pushed as `e658660`; GitHub CI passed and Vercel production deployment `dpl_FnJETeprE7sE3U7f72kbmqz8NccL` is ready on `https://thereach.ten80ten.com`.
 - Pipeline drag-handle fix verified live data completeness for all Reach demo posts, passed focused iron-law/static tests, `npm run typecheck`, `npm run lint` with only existing warnings, full `npm test` with 26 files / 232 tests, and `npm run build`.
+- Pipeline drag-handle fix was pushed as `a17861a`; GitHub CI passed and Vercel production deployment `dpl_5DUQkRveJqhjnFmctSLA7v81eFdd` is ready on `https://thereach.ten80ten.com`.
 - Command-button contrast slice passed `git diff --check`, `npm run typecheck`, `npm run lint` with only existing warnings, and `npm run build`.
 - Command-button contrast slice was pushed as `64dd5b8`; GitHub CI passed and Vercel production deployment `dpl_6rwRBoBCpcyM6bUj2Wg8p9pu7Q3n` is ready on `https://thereach.ten80ten.com`.
 - Support Inbox root cause reproduced on production before the fix: thread list returned the Hanes chat, but thread detail and read receipt routes returned `404`; live schema verification confirmed `workspace_members.id` does not exist and `workspace_members.workspace_id` does.

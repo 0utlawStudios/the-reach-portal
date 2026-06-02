@@ -1,8 +1,8 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: 98a47f7 docs: record settings brand production verification
-Next: Push pipeline drag-handle root fix, then verify CI/Vercel production.
+Last pushed SHA: a17861a fix: restore pipeline drag handle
+Next: Continue production-readiness backlog from the latest user additions: dashboard fit, team/invite cleanup, settings/profile polish, and full production QA.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
 
 Settings / Brand Playbook UI cleanup slice notes:
@@ -26,6 +26,8 @@ Pipeline drag-handle root-fix slice notes:
 - Left `src/lib/pipeline-context.tsx` untouched; no persistence, RLS, audit, or stage transition contract changes were made.
 - Added a static regression test that fails if the drag handle stops being a real listener button or becomes a `pointer-events-none` decoration again.
 - Verification passed: focused iron-law/static tests, `npm run typecheck`, `npm run lint` with only existing warnings, full `npm test` with 26 files / 232 tests, and `npm run build`.
+- Pushed commit `a17861a` to `origin/main`; GitHub CI passed lint, typecheck, tests, and build.
+- Vercel production deployment `dpl_5DUQkRveJqhjnFmctSLA7v81eFdd` is ready and aliased to `https://thereach.ten80ten.com`.
 
 Reach command-button contrast slice notes:
 
