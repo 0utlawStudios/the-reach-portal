@@ -1,8 +1,8 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: pending Reach email-change/action-button slice
-Next: Push this slice, verify Vercel production, then continue the QA hardening queue.
+Last pushed SHA: 745f0a0 Reach email-change/action-button hardening
+Next: Verify Vercel production for this SHA, then continue the QA hardening queue.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
 
 Reach email-change / action-button hardening slice notes:
