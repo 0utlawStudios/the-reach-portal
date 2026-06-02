@@ -2,7 +2,7 @@
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
 Last pushed SHA: d82c490 fix: repair support thread access
-Next: Continue the production-readiness audit backlog: support chat send/new-conversation flow, Settings surface cleanup, button contrast sweep, and remaining brand/UI hardening as separate scoped slices.
+Next: Continue the production-readiness audit backlog: Settings surface cleanup, button contrast sweep, and remaining brand/UI hardening as separate scoped slices.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
 
 Support Inbox schema/access root-fix slice notes:
@@ -16,6 +16,7 @@ Support Inbox schema/access root-fix slice notes:
 - Pushed commit `d82c490` to `origin/main`; GitHub CI passed lint, typecheck, tests, and build.
 - Vercel production deployment `dpl_AFz3i9e4T7TEh55L2ngmLbv88ZMz` is ready and aliased to `https://thereach.ten80ten.com`.
 - Production verification after deploy passed for the same Hanes chat thread: support list returned HTTP 200 with the target thread, detail returned HTTP 200 with 0 messages, and read receipt returned HTTP 200.
+- Production full chat-flow verification passed after deploy: admin start-chat with `hanes@ten80ten.com` returned HTTP 200 using the existing thread, Hanes load-chat returned HTTP 200, Hanes send-chat returned HTTP 200 with message `97d422a2-b3cd-489b-a725-e5dcfe0e2d45`, admin reload returned HTTP 200 and saw that message, and admin read returned HTTP 200.
 
 Reach button contrast / demo-health slice notes:
 

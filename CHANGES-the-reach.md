@@ -64,6 +64,7 @@
 - Support Inbox fix passed focused support helper/API tests, `npm run typecheck`, `npm run lint` with only existing warnings, `npm test` with 26 files / 231 tests, and `npm run build`.
 - Support Inbox fix was pushed as `d82c490`; GitHub CI passed and Vercel production deployment `dpl_AFz3i9e4T7TEh55L2ngmLbv88ZMz` is ready on `https://thereach.ten80ten.com`.
 - Production support verification passed after deployment for the same Hanes chat thread: thread list HTTP 200 with the target thread, thread detail HTTP 200 with 0 messages, and read receipt HTTP 200.
+- Production support chat-flow verification also passed: admin start-chat with Hanes HTTP 200, Hanes load-chat HTTP 200, Hanes send-chat HTTP 200 with message `97d422a2-b3cd-489b-a725-e5dcfe0e2d45`, admin reload saw the message, and admin read HTTP 200.
 - Client manual cost/savings update passed HTML structural validation and old-brand/off-brand scan; Later pricing and Hootsuite plans/pricing sources were rechecked before editing.
 - Button contrast/demo-health slice passed `npm run typecheck`, `npm run lint` with only existing warnings, `npm test` with 26 files / 231 tests, and `npm run build`.
 - Invite setup recovery passed focused auth/setup/provision tests, `npm run typecheck`, `npm run lint`, `npm test` with 26 files / 230 tests, `npm run build`, GitHub CI for SHA `ce84600`, and Vercel production deployment `dpl_6wSf2NKMEJyUQE47kcauTDvpgsUr`.
