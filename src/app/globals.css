@@ -59,7 +59,18 @@
   --reach-field-hover: color-mix(in srgb, #E1DFD5 80%, #6C655A 20%);
   --reach-border: color-mix(in srgb, #6C655A 32%, transparent);
   --reach-border-strong: color-mix(in srgb, #6C655A 48%, transparent);
-  --reach-light-text: color-mix(in srgb, #E1DFD5 88%, white 12%);
+  --reach-light-text: color-mix(in srgb, #E1DFD5 78%, white 22%);
+  --reach-action-fg: color-mix(in srgb, #E1DFD5 74%, white 26%);
+  --reach-action-bg: linear-gradient(
+    135deg,
+    color-mix(in srgb, #975428 82%, black 18%) 0%,
+    color-mix(in srgb, #6C655A 74%, black 26%) 100%
+  );
+  --reach-secondary-action-bg: linear-gradient(
+    135deg,
+    color-mix(in srgb, #5A656C 86%, black 14%) 0%,
+    color-mix(in srgb, #6C655A 76%, black 24%) 100%
+  );
   --reach-sun-deep: color-mix(in srgb, #975428 82%, #6C655A 18%);
   --reach-water-deep: color-mix(in srgb, #5A656C 80%, #6C655A 20%);
   --reach-text-muted: color-mix(in srgb, #6C655A 80%, #E1DFD5);
@@ -687,11 +698,18 @@ html.dark:not([data-design]) .card-premium {
    light theme/design-mode overrides. */
 html:not(.dark) button.reach-action-button,
 html:not(.dark) a.reach-action-button,
-html:not(.dark) [role="button"].reach-action-button {
-  background: linear-gradient(135deg, var(--reach-sun) 0%, var(--reach-stone) 100%) !important;
+html:not(.dark) [role="button"].reach-action-button,
+html:not(.dark)[data-design] button.reach-action-button,
+html:not(.dark)[data-design] a.reach-action-button,
+html:not(.dark)[data-design] [role="button"].reach-action-button {
+  position: relative !important;
+  z-index: 1 !important;
+  background-color: var(--reach-sun) !important;
+  background-image: var(--reach-action-bg) !important;
   border: 1px solid color-mix(in srgb, var(--reach-sun) 58%, transparent) !important;
-  color: color-mix(in srgb, var(--reach-sand) 92%, white 8%) !important;
-  text-shadow: 0 1px 1px rgb(79 73 63 / 0.28) !important;
+  color: var(--reach-action-fg) !important;
+  -webkit-text-fill-color: var(--reach-action-fg) !important;
+  text-shadow: 0 1px 1px rgb(20 18 15 / 0.36) !important;
   box-shadow:
     0 1px 0 rgb(225 223 213 / 0.42) inset,
     0 8px 20px rgb(151 84 40 / 0.2),
@@ -702,11 +720,18 @@ html:not(.dark) [role="button"].reach-action-button {
 
 html:not(.dark) button.reach-secondary-action,
 html:not(.dark) a.reach-secondary-action,
-html:not(.dark) [role="button"].reach-secondary-action {
-  background: linear-gradient(135deg, var(--reach-water) 0%, var(--reach-stone) 100%) !important;
+html:not(.dark) [role="button"].reach-secondary-action,
+html:not(.dark)[data-design] button.reach-secondary-action,
+html:not(.dark)[data-design] a.reach-secondary-action,
+html:not(.dark)[data-design] [role="button"].reach-secondary-action {
+  position: relative !important;
+  z-index: 1 !important;
+  background-color: var(--reach-water) !important;
+  background-image: var(--reach-secondary-action-bg) !important;
   border: 1px solid color-mix(in srgb, var(--reach-water) 58%, transparent) !important;
-  color: color-mix(in srgb, var(--reach-sand) 92%, white 8%) !important;
-  text-shadow: 0 1px 1px rgb(79 73 63 / 0.28) !important;
+  color: var(--reach-action-fg) !important;
+  -webkit-text-fill-color: var(--reach-action-fg) !important;
+  text-shadow: 0 1px 1px rgb(20 18 15 / 0.36) !important;
   box-shadow:
     0 1px 0 rgb(225 223 213 / 0.38) inset,
     0 8px 20px rgb(90 101 108 / 0.18),
@@ -717,13 +742,14 @@ html:not(.dark) [role="button"].reach-secondary-action {
 
 html:not(.dark) button.reach-action-button:disabled,
 html:not(.dark) button.reach-secondary-action:disabled {
-  opacity: 0.72 !important;
-  filter: saturate(0.82) !important;
+  opacity: 0.96 !important;
+  filter: saturate(0.88) contrast(0.96) !important;
 }
 
 html:not(.dark) :where(.reach-action-button, .reach-secondary-action) :where(span, p, svg),
 html:not(.dark) :where(.reach-action-button, .reach-secondary-action) svg {
   color: currentColor !important;
+  -webkit-text-fill-color: currentColor !important;
   stroke: currentColor !important;
 }
 
