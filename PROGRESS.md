@@ -1,9 +1,17 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: db17589 Client manual cost savings comparison
-Next: Record manual update docs, then continue final production QA.
+Last pushed SHA: 71bad5e docs: record profile-photo setup hardening
+Next: User can delete/reinvite no-photo test users; continue final production QA and remaining Reach polish.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
+
+Reach invite/setup photo-required slice notes:
+
+- Patched `/auth/setup` to match the Ten80Ten setup contract more closely: users can click the setup button, but missing profile photo now produces the explicit error `Please add a profile photo.` instead of allowing activation.
+- Patched `/api/auth/complete-setup` so the server refuses workspace activation when the member has no existing avatar and no newly uploaded safe avatar URL.
+- Preserved setup recovery from an already-consumed invite session, so pending users who clicked an invite link once can still open Complete Setup and finish correctly.
+- Existing active users without photos should be deleted/reinvited now that production has the stricter setup guard live.
+- Verification passed: focused auth/setup route tests, `npm run typecheck`, `npm run lint` with only existing warnings, `npm test` with 26 files / 231 tests, `npm run build`, GitHub CI green, and Vercel production ready on `thereach.ten80ten.com`.
 
 Reach client manual cost/savings slice notes:
 
