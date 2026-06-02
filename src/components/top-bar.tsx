@@ -10,7 +10,6 @@ import { Sun, Moon, User, Settings, LogOut, ChevronDown, Menu } from "lucide-rea
 const PAGE_TITLES: Record<string, string> = {
   dashboard: "Dashboard",
   pipeline: "The Reach",
-  studio: "Creator Studio",
   calendar: "Calendar",
   preview: "Post Preview",
   media: "Media Library",

@@ -3,7 +3,6 @@
 import { RawImage } from "@/components/raw-image";
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { supabase } from "@/lib/supabaseClient";
 import { NavigationProvider, useNavigation } from "@/lib/navigation-context";
 import { PipelineProvider } from "@/lib/pipeline-context";
 import { TeamProvider, useTeam } from "@/lib/team-context";
@@ -21,7 +20,6 @@ import { CalendarPage } from "./pages/calendar-page";
 import { MediaPage } from "./pages/media-page";
 import { SettingsPage } from "./pages/settings-page";
 import { BrandKitPage } from "./pages/brand-kit-page";
-import { StudioPage } from "./pages/studio-page";
 import { RevisionModal } from "./revision-modal";
 import { KickbackModal } from "./kickback-modal";
 import { SupportWidget } from "./support/support-widget";
@@ -43,7 +41,6 @@ import {
   Plus,
   RefreshCw,
   Settings,
-  Sparkles,
 } from "lucide-react";
 
 function PageContent() {
@@ -54,7 +51,6 @@ function PageContent() {
     <div className="flex-1 min-h-0 overflow-y-auto">
       {currentPage === "dashboard" && <DashboardPage />}
       {currentPage === "pipeline" && <KanbanBoard />}
-      {currentPage === "studio" && <StudioPage />}
       {currentPage === "calendar" && <CalendarPage />}
       {currentPage === "preview" && <PostPreviewPage />}
       {currentPage === "media" && <MediaPage />}
@@ -124,43 +120,8 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
 }) {
   const { currentPage, navigate, sidebarCollapsed, sidebarPinned, setSidebarCollapsed, togglePin } = useNavigation();
   const { currentUser } = useAuth();
-  const studioRoles = ["superadmin", "admin", "owner", "creative_director", "social_media_specialist"];
-  const inStudioRole = studioRoles.includes((currentUser.role || "").toLowerCase());
   const isSuperadmin = (currentUser.role || "").toLowerCase() === "superadmin";
   const supportAlert = useSupportAlert(isSuperadmin);
-
-  // Email allowlist gate. Studio access is a two-layer check: role AND (allowlist absent OR email in list).
-  // We fetch the live allowlist from /api/ai/studio/access so admins can adjust who sees the link
-  // without redeploying. Hidden until we've confirmed — fail-closed prevents flashing the link
-  // for users who don't have access.
-  const [studioAccessConfirmed, setStudioAccessConfirmed] = useState(false);
-  const [studioAccessAllowed, setStudioAccessAllowed] = useState(false);
-  useEffect(() => {
-    if (!inStudioRole) {
-      setStudioAccessConfirmed(true);
-      setStudioAccessAllowed(false);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const { data } = await supabase.auth.getSession();
-        const token = data.session?.access_token;
-        if (!token) return;
-        const res = await fetch("/api/ai/studio/access", { headers: { Authorization: `Bearer ${token}` } });
-        const json = await res.json();
-        if (cancelled) return;
-        setStudioAccessAllowed(Boolean(json.data?.allowed));
-      } catch {
-        if (!cancelled) setStudioAccessAllowed(false);
-      } finally {
-        if (!cancelled) setStudioAccessConfirmed(true);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [inStudioRole]);
-
-  const canAccessStudio = inStudioRole && studioAccessConfirmed && studioAccessAllowed;
   const hoverExpandRef = useRef(false);
 
   // Desktop hover handlers
@@ -179,14 +140,9 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
     closeMobile();
   };
 
-  // Studio is shown to ALL signed-in users; the page itself renders a
-  // greyed-out read-only preview with an "ask admin for access" banner when
-  // canAccessStudio is false. See studio-page.tsx denied state for details.
-  void canAccessStudio;
   const NAV_ITEMS = [
     { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" />, section: "plan" },
     { id: "pipeline", label: "The Reach", icon: <Kanban className="w-4 h-4" />, section: "plan" },
-    { id: "studio", label: "Creator Studio", icon: <Sparkles className="w-4 h-4" />, section: "plan" },
     { id: "calendar", label: "Content Calendar", icon: <CalendarDays className="w-4 h-4" />, section: "plan" },
     { id: "preview", label: "Post Preview", icon: <Eye className="w-4 h-4" />, section: "publish" },
     { id: "media", label: "Media Library", icon: <FolderOpen className="w-4 h-4" />, section: "publish" },

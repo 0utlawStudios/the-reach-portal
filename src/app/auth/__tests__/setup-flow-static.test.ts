@@ -5,7 +5,6 @@ import { join } from "path";
 const SETUP_SRC = readFileSync(join(process.cwd(), "src/app/auth/setup/page.tsx"), "utf8");
 const APP_SHELL_SRC = readFileSync(join(process.cwd(), "src/components/app-shell.tsx"), "utf8");
 const NAVIGATION_SRC = readFileSync(join(process.cwd(), "src/lib/navigation-context.tsx"), "utf8");
-const STUDIO_SRC = readFileSync(join(process.cwd(), "src/components/pages/studio-page.tsx"), "utf8");
 const SETTINGS_SRC = readFileSync(join(process.cwd(), "src/components/pages/settings-page.tsx"), "utf8");
 const CALENDAR_SRC = readFileSync(join(process.cwd(), "src/components/pages/calendar-page.tsx"), "utf8");
 const DASHBOARD_SRC = readFileSync(join(process.cwd(), "src/components/pages/dashboard-page.tsx"), "utf8");
@@ -26,18 +25,6 @@ describe("invite setup flow hardening", () => {
   it("keeps the user session after setup so workspace provisioning can refresh immediately", () => {
     expect(SETUP_SRC).not.toMatch(/auth\.signOut\s*\(/);
     expect(SETUP_SRC).toMatch(/window\.location\.replace\(\s*["']\/["']\s*\)/);
-  });
-});
-
-describe("Creator Studio default row count", () => {
-  it("does not pad the planner with a long placeholder sheet", () => {
-    expect(STUDIO_SRC).not.toMatch(/14\s*-\s*have/);
-    expect(STUDIO_SRC).toMatch(/fetched\.length\s*>\s*0\s*\?\s*fetched\s*:\s*\[makeBlankRow\(0\)\]/);
-  });
-
-  it("loads daily spend through the server API instead of direct client RLS reads", () => {
-    expect(STUDIO_SRC).toContain("/api/ai/studio/spend");
-    expect(STUDIO_SRC).not.toMatch(/from\(\s*["']ai_generation_jobs["']\s*\)\.select\(\s*["']cost_usd/);
   });
 });
 
@@ -82,6 +69,20 @@ describe("Support Inbox navigation", () => {
     expect(APP_SHELL_SRC).toContain("isSuperadmin ? <SupportInboxPage /> : <DashboardPage />");
     expect(SETTINGS_SRC).not.toContain("SupportInbox");
     expect(SETTINGS_SRC).not.toContain("Support Inbox");
+  });
+});
+
+const removedGenerationLabel = ["Creator", "Studio"].join(" ");
+const removedGenerationPage = ["Studio", "Page"].join("");
+const removedGenerationEndpoint = ["/api/ai", "studio"].join("/");
+
+describe("AI generation surface removal", () => {
+  it("keeps the removed generation surface out of portal navigation and settings UI", () => {
+    expect(NAVIGATION_SRC).not.toContain('"studio"');
+    expect(APP_SHELL_SRC).not.toContain(removedGenerationPage);
+    expect(APP_SHELL_SRC).not.toContain(removedGenerationLabel);
+    expect(SETTINGS_SRC).not.toContain(removedGenerationLabel);
+    expect(SETTINGS_SRC).not.toContain(removedGenerationEndpoint);
   });
 });
 

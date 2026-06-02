@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef, ReactNode } from "react";
 import { loadState, saveState } from "./persistence";
 
-export type Page = "dashboard" | "pipeline" | "calendar" | "preview" | "team" | "media" | "settings" | "brandkit" | "studio" | "support";
+export type Page = "dashboard" | "pipeline" | "calendar" | "preview" | "team" | "media" | "settings" | "brandkit" | "support";
 
 interface NavigationContextType {
   currentPage: Page;
@@ -28,7 +28,10 @@ const SIDEBAR_KEY = "nav_sidebar";
 const PIN_KEY = "nav_sidebar_pinned";
 
 export function NavigationProvider({ children }: { children: ReactNode }) {
-  const [currentPage, setCurrentPage] = useState<Page>(() => loadState<Page>(PAGE_KEY, "dashboard"));
+  const [currentPage, setCurrentPage] = useState<Page>(() => {
+    const saved = loadState<string>(PAGE_KEY, "dashboard");
+    return isPage(saved) ? saved : "dashboard";
+  });
   const [sidebarCollapsed, setSidebarCollapsedState] = useState(() => loadState<boolean>(PIN_KEY, false) ? false : loadState<boolean>(SIDEBAR_KEY, false));
   const [sidebarPinned, setSidebarPinned] = useState(() => loadState<boolean>(PIN_KEY, false));
   const [pendingOpenPostId, setPendingOpenPostId] = useState<string | null>(null);
@@ -92,6 +95,10 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
   );
 
   return <NavigationContext.Provider value={value}>{children}</NavigationContext.Provider>;
+}
+
+function isPage(value: string): value is Page {
+  return ["dashboard", "pipeline", "calendar", "preview", "team", "media", "settings", "brandkit", "support"].includes(value);
 }
 
 export function useNavigation() {

@@ -2,7 +2,7 @@
 //
 // Worker route invoked by:
 //  1. Vercel cron — Vercel sends `Authorization: Bearer <CRON_SECRET>`.
-//  2. The /api/ai/studio/generate-row endpoint — header x-trigger-secret.
+//  2. Internal AI queue triggers — header x-trigger-secret.
 //
 // Both paths are verified by shared secret. Pulls up to 3 queued jobs,
 // runs them serially (one OpenAI image call at a time keeps us under rate

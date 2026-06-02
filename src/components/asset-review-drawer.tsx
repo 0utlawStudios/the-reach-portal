@@ -16,7 +16,6 @@ import {
   Upload, FolderOpen, Link2, FileText, History, Image as ImageIcon,
   FileVideo, Paperclip, AlertCircle, Maximize2, Sparkles, Star,
 } from "lucide-react";
-import { useNavigation } from "@/lib/navigation-context";
 import { PlatformIcon } from "./platform-icons";
 import { MentionTextarea } from "./mention-textarea";
 import { RichComment } from "./rich-comment";
@@ -38,7 +37,6 @@ type DrawerTab = "content" | "vault" | "audit";
 
 export function AssetReviewDrawer() {
   const { selectedCard, isDrawerOpen, isEditingOnOpen, closeDrawer, moveCard, requestReapproval, updateCard, deleteCard, workspaceId } = usePipeline();
-  const { navigate } = useNavigation();
   const { addToast } = useToast();
   const { currentUser } = useAuth();
   const { members } = useTeam();
@@ -583,14 +581,6 @@ export function AssetReviewDrawer() {
                       </span>
                     )}
                   </div>
-                  {selectedCard.planRowId && (
-                    <button
-                      onClick={() => navigate("studio")}
-                      className="text-[10px] text-violet-600 dark:text-violet-400 hover:underline inline-flex items-center gap-1"
-                    >
-                      View plan row <ExternalLink className="w-3 h-3" />
-                    </button>
-                  )}
                 </div>
                 {typeof selectedCard.qualityScore === "number" && (
                   <div className="flex items-center gap-1.5 text-[10.5px] text-gray-700 dark:text-gray-300">

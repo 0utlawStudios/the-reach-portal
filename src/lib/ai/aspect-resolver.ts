@@ -1,4 +1,4 @@
-// Deterministic aspect-ratio resolution for Creator Studio output.
+// Deterministic aspect-ratio resolution for AI-generated output.
 //
 // Why pure & re-runnable: aspect ratios are factual platform constraints,
 // not creative decisions. The client uses this to render the preview chip;

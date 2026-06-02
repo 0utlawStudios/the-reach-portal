@@ -1,4 +1,4 @@
-// Shared types for the Creator Studio AI pipeline.
+// Shared types for the AI generation pipeline.
 // Server-only consumers should import these directly; client-only consumers
 // should only touch the row/plan shapes here (no OpenAI specifics).
 
