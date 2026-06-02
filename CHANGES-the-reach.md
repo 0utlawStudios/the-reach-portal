@@ -2,6 +2,8 @@
 
 ## Edited
 
+- Client manual cost comparison: added the zero separate portal subscription positioning and competitor savings math for Later and Hootsuite under "Why this portal beats generic tools for The Reach."
+- Manual competitor savings: documented approximate annual savings of `$495`, `$990`, and `$3,564` against relevant paid competitor baselines, with caveats for taxes/add-ons/future pricing changes.
 - Invite setup recovery: pending invite users now get a `Complete Setup` action, and `/auth/setup` can resume from an existing Supabase session if the invite token hash was already consumed.
 - Invite activation hardening: avatar upload during setup is non-blocking, so storage upload failure cannot leave a confirmed invite user pending without workspace access.
 - Live invite repair: confirmed pending invite sessions for Hanes and Shahannie were promoted to active team/workspace access; Christer remains pending because his invite is unconfirmed and unused.
@@ -51,6 +53,7 @@
 
 ## Verification
 
+- Client manual cost/savings update passed HTML structural validation and old-brand/off-brand scan; Later pricing and Hootsuite plans/pricing sources were rechecked before editing.
 - Invite setup recovery passed focused auth/setup/provision tests, `npm run typecheck`, `npm run lint`, `npm test` with 26 files / 230 tests, `npm run build`, GitHub CI for SHA `ce84600`, and Vercel production deployment `dpl_6wSf2NKMEJyUQE47kcauTDvpgsUr`.
 - Live Supabase verification confirms `hanes@ten80ten.com` and `shang.ten80ten@gmail.com` are active team members with active baseline workspace access.
 - Media Library usage slice passed `npm run typecheck`, `npm run lint`, `npm test` with 26 files / 228 tests, and `npm run build`.

@@ -1,9 +1,17 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: ce84600 Invite setup recovery
-Next: Record invite repair docs, then continue final production QA.
+Last pushed SHA: db17589 Client manual cost savings comparison
+Next: Record manual update docs, then continue final production QA.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
+
+Reach client manual cost/savings slice notes:
+
+- Updated `docs/THE-REACH-SMM-CLIENT-MANUAL.html` with a dedicated cost comparison under "Why this portal beats generic tools for The Reach."
+- Added the key positioning: The Reach portal is `$0/month` separate software cost because it is included in the full social media package.
+- Added current competitor cost examples and annual savings math: Later Growth for 3 users `$495/year`, Later Scale `$990/year`, and Hootsuite 3-user starting baseline approximately `$3,564/year`.
+- Added caveat that savings estimates exclude taxes, ad spend, payment processing changes, add-ons, and future competitor pricing changes.
+- Verification passed: HTML structural check, off-brand scan, and source review against current Later pricing and Hootsuite plans/pricing pages.
 
 Reach invite/setup recovery slice notes:
 
