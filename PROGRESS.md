@@ -1,8 +1,8 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last completed pushed SHA before current slice: 30ab7f8 fix: harden reach button contrast and demo health
-Next: Push the Support Inbox schema/access fix, wait for Vercel production, then re-run the production support detail/read checks against the live Hanes chat thread.
+Last pushed SHA: d82c490 fix: repair support thread access
+Next: Continue the production-readiness audit backlog: support chat send/new-conversation flow, Settings surface cleanup, button contrast sweep, and remaining brand/UI hardening as separate scoped slices.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
 
 Support Inbox schema/access root-fix slice notes:
@@ -13,6 +13,9 @@ Support Inbox schema/access root-fix slice notes:
 - Updated support helper tests so the mock workspace membership shape matches the real Reach schema.
 - Kept this slice out of Settings, branding, and pipeline code. `src/lib/pipeline-context.tsx` remains untouched.
 - Verification passed locally: focused support helper/API tests, `npm run typecheck`, `npm run lint` with only existing warnings, `npm test` with 26 files / 231 tests, and `npm run build`.
+- Pushed commit `d82c490` to `origin/main`; GitHub CI passed lint, typecheck, tests, and build.
+- Vercel production deployment `dpl_AFz3i9e4T7TEh55L2ngmLbv88ZMz` is ready and aliased to `https://thereach.ten80ten.com`.
+- Production verification after deploy passed for the same Hanes chat thread: support list returned HTTP 200 with the target thread, detail returned HTTP 200 with 0 messages, and read receipt returned HTTP 200.
 
 Reach button contrast / demo-health slice notes:
 
