@@ -1,7 +1,7 @@
 # The Reach Clone Progress
 
 Phase: AUTH FIX - forgot-password clone recovery bridge committed
-Last SHA: af95bdb
+Last SHA: d0a4af7 auth fix commit
 Next: Push the forgot-password fix, wait for Vercel production deployment, trigger `aldridge@ten80ten.com` self-service setup email, then verify Auth user/workspace activation path.
 Blockers: None for the forgot-password fix. `supabase db diff --linked` and `supabase status` cannot run locally because Docker is not running. `supabase db push --dry-run --include-all --yes` previously reported the remote database is up to date.
 
