@@ -26,6 +26,19 @@ describe("invite setup flow hardening", () => {
     expect(SETUP_SRC).not.toMatch(/auth\.signOut\s*\(/);
     expect(SETUP_SRC).toMatch(/window\.location\.replace\(\s*["']\/["']\s*\)/);
   });
+
+  it("lets interrupted invite setup resume from an existing session", () => {
+    expect(SETUP_SRC).toContain("setup was");
+    expect(SETUP_SRC).toContain("supabase.auth.getSession()");
+    expect(APP_SHELL_SRC).toContain("Complete Setup");
+    expect(APP_SHELL_SRC).toContain('window.location.href = "/auth/setup"');
+  });
+
+  it("does not let avatar upload failure block workspace activation", () => {
+    expect(SETUP_SRC).toContain("avatar storage hiccup must not leave");
+    expect(SETUP_SRC).toContain("Photo upload failed, but your workspace access will still be activated.");
+    expect(SETUP_SRC).not.toMatch(/avatarFile\s*&&\s*password\.length/);
+  });
 });
 
 describe("Supabase IO hardening", () => {

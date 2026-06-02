@@ -305,12 +305,21 @@ export function AppShell() {
           </p>
           {provisionStatus !== "unknown" && (
             <div className="flex gap-2 mt-5">
-              <button
-                onClick={() => window.location.reload()}
-                className="flex-1 h-10 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-[12px] font-semibold flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />Refresh
-              </button>
+              {provisionStatus === "pending" ? (
+                <button
+                  onClick={() => { window.location.href = "/auth/setup"; }}
+                  className="flex-1 h-10 rounded-lg bg-[#975428] hover:bg-[#7f4521] text-[#E1DFD5] text-[12px] font-semibold flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  Complete Setup
+                </button>
+              ) : (
+                <button
+                  onClick={() => window.location.reload()}
+                  className="flex-1 h-10 rounded-lg bg-[#975428] hover:bg-[#7f4521] text-[#E1DFD5] text-[12px] font-semibold flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />Refresh
+                </button>
+              )}
               <button
                 onClick={logout}
                 className="flex-1 h-10 rounded-lg border border-white/[0.08] text-gray-300 hover:bg-white/[0.04] text-[12px] font-semibold cursor-pointer"

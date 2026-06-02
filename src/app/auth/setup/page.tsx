@@ -26,6 +26,7 @@ export default function SetupPasswordPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [success, setSuccess] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("");
@@ -46,9 +47,22 @@ export default function SetupPasswordPage() {
         window.history.replaceState({}, "", window.location.pathname);
       }
 
+      const supabase = getSupabase();
+
+      const hydrateInviteProfile = (email: string, meta: Record<string, unknown>) => {
+        setInviteEmail(email || (typeof meta.email === "string" ? meta.email : ""));
+        setInviteRole(typeof meta.role === "string" ? meta.role : "");
+        const name = typeof meta.name === "string" ? meta.name : "";
+        if (name.includes(" ")) {
+          setFirstName(name.split(" ")[0]);
+          setLastName(name.split(" ").slice(1).join(" "));
+        } else {
+          setFirstName(name);
+        }
+      };
+
       if (accessToken) {
         // Establish a proper Supabase session
-        const supabase = getSupabase();
         const { error: sessionErr } = await supabase.auth.setSession({
           access_token: accessToken,
           refresh_token: refreshToken || "",
@@ -62,23 +76,25 @@ export default function SetupPasswordPage() {
         // Extract invite metadata from JWT
         try {
           const payload = JSON.parse(atob(accessToken.split(".")[1]));
-          const meta = payload.user_metadata || {};
-          setInviteEmail(payload.email || meta.email || "");
-          setInviteRole(meta.role || "");
-          const name = meta.name || "";
-          if (name.includes(" ")) {
-            setFirstName(name.split(" ")[0]);
-            setLastName(name.split(" ").slice(1).join(" "));
-          } else {
-            setFirstName(name);
-          }
+          hydrateInviteProfile(payload.email || "", payload.user_metadata || {});
         } catch { /* ignore */ }
+        return;
+      }
+
+      // Recovery path: if the invite link was already consumed but setup was
+      // interrupted, Supabase may still have a valid session. Let the user
+      // resume activation instead of trapping them behind the pending-access
+      // gate with only Refresh / Sign Out.
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        hydrateInviteProfile(session.user.email || "", session.user.user_metadata || {});
+        setReady(true);
       }
     }
     initSession();
   }, []);
 
-  const isValid = firstName.trim() && lastName.trim() && whatsapp.trim() && avatarFile && password.length >= 8 && password === confirm;
+  const isValid = firstName.trim() && lastName.trim() && whatsapp.trim() && password.length >= 8 && password === confirm;
 
   const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -106,6 +122,7 @@ export default function SetupPasswordPage() {
     if (!isValid || loading || !ready) return;
     setLoading(true);
     setError("");
+    setNotice("");
 
     const fullName = `${firstName.trim()} ${lastName.trim()}`;
     const cleanPhone = whatsapp.trim().replace(/[^0-9+]/g, "");
@@ -141,19 +158,20 @@ export default function SetupPasswordPage() {
       return;
     }
 
-    // Upload avatar
+    // Upload avatar. This is intentionally non-blocking for activation: an
+    // avatar storage hiccup must not leave a confirmed invite user stranded as
+    // pending with no workspace membership.
     let avatarUrl: string | null = null;
     if (avatarFile && user?.email) {
       const ext = avatarFile.name.split(".").pop() || "jpg";
       const path = `${user.email.replace(/[^a-z0-9]/gi, "_")}-${Date.now()}.${ext}`;
       const { error: uploadErr } = await supabase.storage.from("avatars").upload(path, avatarFile, { upsert: true, cacheControl: "31536000" });
       if (uploadErr) {
-        setError("Failed to upload photo. Please try again.");
-        setLoading(false);
-        return;
+        setNotice("Photo upload failed, but your workspace access will still be activated.");
+      } else {
+        const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
+        avatarUrl = urlData.publicUrl;
       }
-      const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
-      avatarUrl = urlData.publicUrl;
     }
 
     const activation = await fetch("/api/auth/complete-setup", {
@@ -232,10 +250,16 @@ export default function SetupPasswordPage() {
                 <p className="text-[11px] text-red-700 dark:text-red-400">{error}</p>
               </div>
             )}
+            {notice && (
+              <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-500/5 border border-amber-200 dark:border-amber-500/20 rounded-xl p-3">
+                <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                <p className="text-[11px] text-amber-700 dark:text-amber-300">{notice}</p>
+              </div>
+            )}
 
             {/* Profile Photo */}
             <div className="flex flex-col items-center gap-2">
-              <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Profile Photo <span className="text-red-400">*</span></label>
+              <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Profile Photo <span className="text-gray-300 dark:text-gray-600">Optional</span></label>
               <label className="cursor-pointer group p-1.5">
                 <input type="file" accept="image/*" onChange={handleAvatarSelect} className="hidden" />
                 <div className="w-24 h-24 sm:w-20 sm:h-20 rounded-full border-2 border-dashed border-gray-300 dark:border-white/[0.12] group-hover:border-[#975428] dark:group-hover:border-[#975428] transition-colors flex items-center justify-center overflow-hidden bg-gray-50 dark:bg-white/[0.04]">
