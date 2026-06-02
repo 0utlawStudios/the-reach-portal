@@ -1,9 +1,17 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: 188c1db Reach drawer revision flow hardening
-Next: Verify CI/Vercel production for this SHA, then continue media/realtime/Drive hardening.
+Last pushed SHA: cc88c58 Reach Drive upload policy hardening
+Next: Verify CI/Vercel production for this SHA, then continue media tracking/realtime/keep-alive hardening.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
+
+Reach Drive upload policy hardening slice notes:
+
+- Added shared Drive media policy constants for valid folders, allowed active-team roles, allowed image/video MIME types, MIME normalization, and the 250 MB media size ceiling.
+- Applied the same folder, role, MIME, and size policy to both `/api/drive/proxy-upload` and `/api/drive/upload`, closing the resumable-upload gap where unsupported file types could still mint Google upload sessions.
+- Updated the client Drive upload helper to normalize MIME types and reject unsupported/oversize files before starting proxy or resumable upload work.
+- Added route tests proving unsupported MIME types and oversize files return `415`/`413` before `ensureSubfolder()` or `createResumableUploadSession()` can run.
+- Verification passed: focused Drive route tests, `npm run lint` with only existing warnings, `npm run typecheck`, `npm test` with 26 files / 228 tests, and production `npm run build`.
 
 Reach drawer revision flow hardening slice notes:
 

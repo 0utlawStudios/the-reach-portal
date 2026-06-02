@@ -2,6 +2,9 @@
 
 ## Edited
 
+- Drive upload policy: added a shared Drive media policy for valid folders, active-team upload roles, allowed image/video MIME types, MIME normalization, and the 250 MB media size limit.
+- Drive resumable upload hardening: `/api/drive/upload` now rejects unsupported MIME types and oversize files before creating Google resumable upload sessions, matching the proxy upload path.
+- Drive client upload hardening: `uploadToDrive()` now rejects unsupported/oversize files before starting proxy or direct-to-Google resumable upload work.
 - Drawer revision workflow: the inline asset-review drawer revision action now calls the existing `submitKickback()` pipeline contract instead of manually writing notes, moving stage, and firing notification routes separately.
 - Revision consistency: drawer revision requests now reuse the pipeline-layer persistence, rollback, audit, mention notification, and revision notification behavior that already protects board drag kickbacks.
 - Action-button contrast hardening: strengthened central Reach action/secondary button rules so Review Posts, Invite, Send Invite, Resend, profile save/upload, and other marked command buttons remain readable in light mode, saved design-theme modes, and disabled states.
@@ -41,6 +44,7 @@
 
 ## Verification
 
+- Drive upload policy slice passed focused Drive route tests, `npm run lint`, `npm run typecheck`, `npm test` with 26 files / 228 tests, and `npm run build`.
 - Drawer revision slice passed focused iron-law static coverage, `npm run lint`, `npm run typecheck`, `npm test` with 25 files / 225 tests, and `npm run build`.
 - Action-button contrast slice passed `npm run lint`, `npm run typecheck`, `npm test` with 25 files / 224 tests, and `npm run build`; generated production CSS contains the strengthened `reach-action-button` and `reach-secondary-action` rules.
 - Focused email-change tests passed: active self-change, duplicate rejection, active non-self rejection, pending invite regeneration, and Auth rollback on DB failure.
