@@ -1,6 +1,7 @@
 -- 0005_role_enum_reconcile.sql
 -- Adds missing values to the user_role enum so the DB accepts the role strings
--- the app already writes (superadmin, approver, creative_director, editor, viewer).
+-- the app already writes (superadmin, approver, creative_director, editor, viewer,
+-- social_media_specialist, video_editor, graphic_designer).
 -- Idempotent: ADD VALUE IF NOT EXISTS never errors if the value already exists.
 -- Part of Workstream C (C4) of the security remediation.
 --
@@ -13,3 +14,6 @@ alter type user_role add value if not exists 'approver';
 alter type user_role add value if not exists 'creative_director';
 alter type user_role add value if not exists 'editor';
 alter type user_role add value if not exists 'viewer';
+alter type user_role add value if not exists 'social_media_specialist';
+alter type user_role add value if not exists 'video_editor';
+alter type user_role add value if not exists 'graphic_designer';

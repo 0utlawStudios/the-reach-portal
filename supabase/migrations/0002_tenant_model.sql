@@ -14,10 +14,9 @@ create table if not exists workspaces (
 );
 
 -- role uses the existing user_role enum directly so every value the app
--- already supports (owner, admin, superadmin, approver, creative_director,
--- editor, viewer, social_media_specialist, video_editor, graphic_designer,
--- specialist, technician, and any future additions) is automatically valid
--- without schema churn.
+-- already supports at baseline is automatically valid without schema churn.
+-- Later role values are added in 0005_role_enum_reconcile.sql, so this
+-- migration must not reference them before they exist on a fresh database.
 create table if not exists workspace_members (
   workspace_id uuid not null references workspaces(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -56,7 +55,9 @@ create policy "workspace_members_read" on workspace_members
     )
   );
 
--- Admin-class roles can update membership rows in their workspace.
+-- Admin-class roles available in the baseline enum can update membership rows
+-- in their workspace. Later hardening migrations expand this after 0005 adds
+-- the additional role enum values.
 drop policy if exists "workspace_members_write" on workspace_members;
 create policy "workspace_members_write" on workspace_members
   for all using (
@@ -64,13 +65,13 @@ create policy "workspace_members_write" on workspace_members
       select workspace_id from workspace_members
       where user_id = auth.uid()
         and status = 'active'
-        and role in ('superadmin','admin')
+        and role in ('owner','admin')
     )
   ) with check (
     workspace_id in (
       select workspace_id from workspace_members
       where user_id = auth.uid()
         and status = 'active'
-        and role in ('superadmin','admin')
+        and role in ('owner','admin')
     )
   );
