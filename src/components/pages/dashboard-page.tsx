@@ -160,7 +160,7 @@ export function DashboardPage() {
             </div>
           </div>
           {pendingApproval > 0 && (
-            <button onClick={() => navigate("pipeline")} className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-[#975428]/20 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 !text-[#E1DFD5] text-[12px] font-semibold shadow-lg shadow-orange-500/20 cursor-pointer transition-all duration-300 shrink-0 hover:shadow-orange-500/30">
+            <button onClick={() => navigate("pipeline")} className="reach-action-button flex items-center gap-2 px-5 py-2.5 rounded-xl text-[12px] font-semibold cursor-pointer transition-all duration-300 shrink-0 hover:translate-y-[-1px]">
               Review Posts <ArrowRight className="w-3.5 h-3.5" />
             </button>
           )}

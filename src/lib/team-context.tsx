@@ -63,7 +63,6 @@ type TeamMemberRow = {
 
 type TeamMemberUpdate = {
   name?: string;
-  email?: string;
   role?: UserRole;
   secondary_role?: string;
   status?: InviteStatus;
@@ -274,7 +273,6 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     if (useDb) {
       const dbUpdates: TeamMemberUpdate = {};
       if (updates.name !== undefined) dbUpdates.name = updates.name;
-      if (updates.email !== undefined) dbUpdates.email = updates.email;
       if (updates.role !== undefined) dbUpdates.role = updates.role;
       if (updates.secondaryRole !== undefined) dbUpdates.secondary_role = updates.secondaryRole;
       if (updates.status !== undefined) dbUpdates.status = updates.status;

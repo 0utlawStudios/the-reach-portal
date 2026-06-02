@@ -1,9 +1,21 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: 5b651f5 Reach action-button readability
-Next: Run the final production QA swarm.
+Last pushed SHA: pending Reach email-change/action-button slice
+Next: Push this slice, verify Vercel production, then continue the QA hardening queue.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
+
+Reach email-change / action-button hardening slice notes:
+
+- Added final Reach action-button classes after design-mode CSS overrides so primary and secondary command buttons keep readable Reach Sand labels/icons before hover.
+- Applied the explicit action classes to the dashboard `Review Posts` CTA, Settings Invite/Send Invite/Approve/Resend controls, and Settings profile save/upload controls.
+- Added `POST /api/team/change-email` with service-role reconciliation across Supabase Auth, `team_members`, `support_threads.created_by_email`, post/media creator labels, and audit logging.
+- Active users can change only their own sign-in email; the route preserves the Auth user id and returns `requiresSignIn` so the client signs out for a fresh Supabase session.
+- Pending invite emails can be corrected by admins; the route creates a fresh pending Auth user, generates a new `/auth/confirm?...type=invite` link, invalidates the old pending Auth user, and carries updated pending invite name/role metadata.
+- Removed `email` from the generic `updateMember` DB update path so future profile edits cannot drift `team_members.email` away from Supabase Auth.
+- Settings now lets any active user open their own row to change sign-in email without granting self role edits; active non-self email edits are blocked to avoid breaking another live session.
+- Added focused route coverage for active self-change, duplicate rejection, active non-self rejection, pending invite regeneration, and Auth rollback on DB failure.
+- Verification passed: focused auth/team tests, `npm run typecheck`, `npm run lint` with the repo's existing two warnings, production `npm run build`, and full `npm run preflight` with 23 files / 215 tests.
 
 Reach action-button readability slice notes:
 

@@ -683,6 +683,50 @@ html.dark:not([data-design]) .card-premium {
   background: var(--card-gradient);
 }
 
+/* Production Reach action controls: keep command buttons readable across
+   light theme/design-mode overrides. */
+html:not(.dark) button.reach-action-button,
+html:not(.dark) a.reach-action-button,
+html:not(.dark) [role="button"].reach-action-button {
+  background: linear-gradient(135deg, var(--reach-sun) 0%, var(--reach-stone) 100%) !important;
+  border: 1px solid color-mix(in srgb, var(--reach-sun) 58%, transparent) !important;
+  color: color-mix(in srgb, var(--reach-sand) 92%, white 8%) !important;
+  text-shadow: 0 1px 1px rgb(79 73 63 / 0.28) !important;
+  box-shadow:
+    0 1px 0 rgb(225 223 213 / 0.42) inset,
+    0 8px 20px rgb(151 84 40 / 0.2),
+    0 1px 2px rgb(108 101 90 / 0.16) !important;
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+html:not(.dark) button.reach-secondary-action,
+html:not(.dark) a.reach-secondary-action,
+html:not(.dark) [role="button"].reach-secondary-action {
+  background: linear-gradient(135deg, var(--reach-water) 0%, var(--reach-stone) 100%) !important;
+  border: 1px solid color-mix(in srgb, var(--reach-water) 58%, transparent) !important;
+  color: color-mix(in srgb, var(--reach-sand) 92%, white 8%) !important;
+  text-shadow: 0 1px 1px rgb(79 73 63 / 0.28) !important;
+  box-shadow:
+    0 1px 0 rgb(225 223 213 / 0.38) inset,
+    0 8px 20px rgb(90 101 108 / 0.18),
+    0 1px 2px rgb(108 101 90 / 0.16) !important;
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+html:not(.dark) button.reach-action-button:disabled,
+html:not(.dark) button.reach-secondary-action:disabled {
+  opacity: 0.72 !important;
+  filter: saturate(0.82) !important;
+}
+
+html:not(.dark) :where(.reach-action-button, .reach-secondary-action) :where(span, p, svg),
+html:not(.dark) :where(.reach-action-button, .reach-secondary-action) svg {
+  color: currentColor !important;
+  stroke: currentColor !important;
+}
+
 /* Dashboard pulse animation */
 @keyframes pulse {
   0%, 100% { opacity: 1; transform: scale(1); }

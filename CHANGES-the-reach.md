@@ -2,6 +2,11 @@
 
 ## Edited
 
+- Action-button readability: added final Reach action classes after the design-mode overrides and applied them to the dashboard Review Posts CTA plus Settings Invite, Send Invite, Approve, Resend, profile save, and profile upload controls.
+- Email-change feature: added `POST /api/team/change-email` so active users can safely change their own Supabase Auth email and pending invite emails can be corrected by admins with fresh invite links.
+- Email identity reconciliation: the new route updates Supabase Auth, `team_members.email`, support thread reply email, creator display labels where old email was stored, and audit logs together; active self-changes sign out for a fresh Supabase session.
+- Team update hardening: removed generic direct `team_members.email` writes from `updateMember`, preventing future Auth/team profile drift.
+- Settings Team UI: users can open their own team row to change sign-in email without gaining role-edit access; active non-self email changes are blocked and pending invite changes regenerate invite metadata.
 - Git/repo binding: reset `origin` to `https://github.com/0utlawStudios/the-reach-portal.git` and pushed `main`.
 - Supabase binding: linked the project to ref `gxmpmdhmxyfqusdzcemt`, applied all migrations `0000` through `0032`, kept baseline workspace `00000000-0000-0000-0000-000000000001`, created private `ai-assets`, and enabled Realtime for `posts` and `content_plan_rows`.
 - Supabase hosted Auth: set `site_url` and redirect allow-list to `https://thereach.ten80ten.com`, disabled public signup, set SMTP sender name/subjects/templates to The Reach, and kept invite/recovery routes on `/auth/confirm`.
@@ -28,6 +33,8 @@
 
 ## Verification
 
+- Focused email-change tests passed: active self-change, duplicate rejection, active non-self rejection, pending invite regeneration, and Auth rollback on DB failure.
+- Full `npm run preflight` passed after the email-change/action-button slice: 23 test files, 215 tests, lint, typecheck, and production build.
 - `npm run preflight` passed.
 - Full test suite passed: 21 files, 202 tests.
 - Focused forgot-password tests passed for existing Auth reset, active team-member setup recovery, partial Auth-user retry, and unknown-email anti-enumeration.

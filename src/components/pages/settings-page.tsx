@@ -47,16 +47,18 @@ function EditProfileModal({
   onDelete,
   canDelete,
   canManageTeam,
+  canEditProfile,
 }: {
   member: TeamMember;
   onClose: () => void;
   onDelete?: () => void;
   canDelete?: boolean;
   canManageTeam: boolean;
+  canEditProfile: boolean;
 }) {
-  const { updateMember } = useTeam();
+  const { updateMember, refreshMembers } = useTeam();
   const { addToast } = useToast();
-  const { currentUser, updateCurrentUserAvatar } = useAuth();
+  const { currentUser, updateCurrentUserAvatar, logout } = useAuth();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [name, setName] = useState(member.name);
   const [email, setEmail] = useState(member.email);
@@ -64,13 +66,19 @@ function EditProfileModal({
   const [role, setRole] = useState<UserRole>(member.role);
   const [avatarUrl, setAvatarUrl] = useState(member.avatar || "");
   const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Avatar crop flow
   const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
+  const isSelf = member.email.toLowerCase() === currentUser.email.toLowerCase();
+  const normalizedEmail = email.trim().toLowerCase();
+  const emailChanged = normalizedEmail !== member.email.toLowerCase();
+  const canChangeEmail = isSelf || (canManageTeam && member.status === "pending" && member.role !== "superadmin");
   const canEditRole = canManageTeam && member.role !== "superadmin";
+  const canSave = (canEditProfile || canManageTeam || (emailChanged && canChangeEmail)) && !saving;
 
   const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!canManageTeam) return;
+    if (!canEditProfile && !canManageTeam) return;
     const file = e.target.files?.[0];
     if (!file) return;
     const src = URL.createObjectURL(file);
@@ -101,25 +109,76 @@ function EditProfileModal({
     setUploading(false);
   };
 
-  const handleSave = () => {
-    if (!canManageTeam) return;
+  const handleSave = async () => {
+    if (!canSave) return;
+    if (!name.trim()) {
+      addToast("Name is required.", "error");
+      return;
+    }
+    if (emailChanged && !/^[^\s@\r\n]+@[^\s@\r\n]+\.[^\s@\r\n]+$/.test(normalizedEmail)) {
+      addToast("Enter a valid email address.", "error");
+      return;
+    }
+    setSaving(true);
     const roleChanged = canEditRole && role !== member.role;
-    const updates: Partial<TeamMember> = {
-      name,
-      email,
-      phone: phone || undefined,
-      avatar: avatarUrl || undefined,
-    };
-    if (canEditRole) updates.role = role;
-    updateMember(member.id, updates);
-    if (member.email === currentUser.email) {
-      updateCurrentUserAvatar(avatarUrl || undefined);
+    try {
+      if (emailChanged) {
+        if (!canChangeEmail) {
+          addToast("Active members must change their own email while signed in.", "error");
+          return;
+        }
+        const { data: { session } } = await supabase.auth.getSession();
+        const headers: HeadersInit = { "Content-Type": "application/json" };
+        if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+        const res = await fetch("/api/team/change-email", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ memberId: member.id, newEmail: normalizedEmail, name: name.trim(), role }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          addToast(data.error || "Email change failed.", "error");
+          return;
+        }
+        if (data.emailSent) {
+          addToast(`Invite email updated and sent to ${normalizedEmail}`, "success");
+        } else if (data.inviteUrl) {
+          await navigator.clipboard.writeText(data.inviteUrl);
+          addToast("Invite email updated. New invite link copied.", "info");
+        } else {
+          addToast(data.message || "Email updated.", "success");
+        }
+      }
+
+      if (canManageTeam) {
+        const updates: Partial<TeamMember> = {
+          name: name.trim(),
+          phone: phone || undefined,
+          avatar: avatarUrl || undefined,
+        };
+        if (canEditRole) updates.role = role;
+        updateMember(member.id, updates);
+        if (roleChanged) {
+          logAudit("system", currentUser.name, "role_changed", `Changed ${name}'s role from ${member.role} to ${role}`);
+        }
+      }
+      if (isSelf) {
+        updateCurrentUserAvatar(avatarUrl || undefined);
+      }
+      await refreshMembers();
+      if (emailChanged && isSelf) {
+        addToast("Email changed. Sign back in with the new email.", "success");
+        onClose();
+        await logout();
+        return;
+      }
+      addToast(`Profile updated for ${name.trim()}`, "success");
+      onClose();
+    } catch {
+      addToast("Network error. Profile was not updated.", "error");
+    } finally {
+      setSaving(false);
     }
-    if (roleChanged) {
-      logAudit("system", currentUser.name, "role_changed", `Changed ${name}'s role from ${member.role} to ${role}`);
-    }
-    addToast(`Profile updated for ${name}`, "success");
-    onClose();
   };
 
   return (
@@ -152,7 +211,7 @@ function EditProfileModal({
                     <Camera className="w-5 h-5 text-white" />
                   )}
                 </button>
-                <button disabled={!canManageTeam} onClick={() => fileInputRef.current?.click()} className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-blue-600 border-2 border-white dark:border-[#151518] flex items-center justify-center cursor-pointer hover:bg-blue-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50">
+                <button disabled={!canManageTeam} onClick={() => fileInputRef.current?.click()} className="reach-secondary-action absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-2 border-white dark:border-[#151518] flex items-center justify-center cursor-pointer transition-colors disabled:cursor-not-allowed disabled:opacity-50">
                   <Upload className="w-3 h-3 text-white" />
                 </button>
               </div>
@@ -166,8 +225,15 @@ function EditProfileModal({
 
             {/* Email */}
             <div className="space-y-1">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.08em]">Email</label>
-              <Input disabled={!canManageTeam} type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="h-9 bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[13px] text-gray-800 dark:text-gray-200" />
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.08em]">Sign-in Email</label>
+              <Input disabled={!canChangeEmail || saving} type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="h-9 bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] rounded-lg text-[13px] text-gray-800 dark:text-gray-200" />
+              <p className="text-[10px] text-gray-400 dark:text-gray-500">
+                {isSelf
+                  ? "Changing this signs you out so Supabase can issue a fresh session."
+                  : member.status === "pending"
+                    ? "Pending invite changes generate a fresh invite link."
+                    : "Active members must change their own email while signed in."}
+              </p>
             </div>
 
             {/* Phone */}
@@ -195,8 +261,8 @@ function EditProfileModal({
             {/* Actions */}
             <div className="flex gap-2 pt-2">
               <Button variant="outline" onClick={onClose} className="flex-1 h-9 rounded-lg text-[12px]">Cancel</Button>
-              <Button disabled={!canManageTeam} onClick={handleSave} className="flex-1 h-9 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-[12px] shadow-sm disabled:opacity-40">
-                <Save className="w-3.5 h-3.5 mr-1.5" />Save Changes
+              <Button disabled={!canSave} onClick={handleSave} className="reach-secondary-action flex-1 h-9 rounded-lg text-[12px] shadow-sm disabled:opacity-40">
+                {saving ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1.5" />}Save Changes
               </Button>
             </div>
 
@@ -530,7 +596,7 @@ export function SettingsPage() {
           <div className="flex items-center justify-between">
             <p className="text-[13px] text-gray-500 dark:text-gray-400">{activeMembers.length} members with workspace access</p>
             {isAdmin && (
-              <Button size="sm" onClick={() => setShowInvite(!showInvite)} className="h-8 rounded-lg bg-[#5A656C] hover:bg-[#4f5a61] !text-[#E1DFD5] text-[11px] font-medium cursor-pointer shadow-sm shadow-[#5A656C]/20">
+              <Button size="sm" onClick={() => setShowInvite(!showInvite)} className="reach-secondary-action h-8 rounded-lg text-[11px] font-medium cursor-pointer">
                 <UserPlus className="w-3.5 h-3.5 mr-1.5" />Invite
               </Button>
             )}
@@ -552,7 +618,7 @@ export function SettingsPage() {
                 <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value as UserRole)} className="h-9 px-3 rounded-lg bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-[12px] text-gray-600 dark:text-gray-300 outline-none cursor-pointer flex-1">
                   <option value="social_media_specialist">Social Media Specialist</option><option value="video_editor">Video Editor</option><option value="graphic_designer">Graphic Designer</option><option value="approver">Approver</option><option value="creative_director">Creative Director</option><option value="admin">Admin</option>
                 </select>
-                <Button type="submit" size="sm" disabled={inviting || !inviteEmail.trim() || !inviteName.trim()} className="h-9 rounded-lg bg-[#5A656C] hover:bg-[#4f5a61] !text-[#E1DFD5] text-[12px] px-5 cursor-pointer shadow-sm shadow-[#5A656C]/20 disabled:opacity-70">
+                <Button type="submit" size="sm" disabled={inviting || !inviteEmail.trim() || !inviteName.trim()} className="reach-secondary-action h-9 rounded-lg text-[12px] px-5 cursor-pointer disabled:opacity-70">
                   {inviting ? <span className="flex items-center gap-1.5"><span className="w-3 h-3 border-2 border-[#E1DFD5]/30 border-t-[#E1DFD5] rounded-full animate-spin" />Sending...</span> : <><Send className="w-3 h-3 mr-1.5" />Send Invite</>}
                 </Button>
               </div>
@@ -585,7 +651,7 @@ export function SettingsPage() {
                             Reject
                           </button>
                           <button disabled={approving === req.id} onClick={() => handleApprove(req.id, "approve", "social_media_specialist")}
-                            className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-medium shadow-sm cursor-pointer transition-colors disabled:opacity-40">
+                          className="reach-secondary-action px-3 py-1.5 rounded-lg text-[10px] font-medium cursor-pointer transition-colors disabled:opacity-40">
                             {approving === req.id ? "..." : "Approve"}
                           </button>
                         </div>
@@ -604,7 +670,7 @@ export function SettingsPage() {
               <div className="bg-white dark:bg-[#151518] rounded-2xl border border-gray-100 dark:border-white/[0.06] overflow-hidden shadow-sm">
                 {activeMembers.map((member, i) => {
                   const role = roleConfig[member.role];
-                  const canEditMember = isAdmin && (member.role !== "superadmin" || isSuperadmin);
+                  const canEditMember = member.email === currentUser.email || (isAdmin && (member.role !== "superadmin" || isSuperadmin));
                   return (
                     <button key={member.id} onClick={canEditMember ? () => setEditingMember(member) : undefined}
                       className={`w-full flex items-start gap-3 px-4 py-3.5 transition-colors text-left ${canEditMember ? "hover:bg-slate-50 dark:hover:bg-white/[0.02] cursor-pointer" : "cursor-default"} ${i > 0 ? "border-t border-gray-50 dark:border-white/[0.03]" : ""}`}>
@@ -678,7 +744,7 @@ export function SettingsPage() {
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
                         <button disabled={resendingInvite === member.id} onClick={() => handleResendInvite(member)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#975428] dark:bg-orange-500/10 !text-[#E1DFD5] dark:text-orange-400 text-[11px] font-semibold hover:bg-[#7f4421] dark:hover:bg-orange-500/20 transition-colors cursor-pointer border border-[#975428]/30 dark:border-orange-500/20 disabled:opacity-70 shadow-sm shadow-[#975428]/15">
+                          className="reach-action-button flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer disabled:opacity-70">
                           {resendingInvite === member.id ? (
                             <span className="w-3 h-3 border-2 border-[#E1DFD5]/30 border-t-[#E1DFD5] rounded-full animate-spin" />
                           ) : (
@@ -702,6 +768,7 @@ export function SettingsPage() {
           member={editingMember}
           onClose={() => setEditingMember(null)}
           canManageTeam={isAdmin}
+          canEditProfile={isAdmin}
           canDelete={
             editingMember.role !== "superadmin" &&
             (currentUser.email !== editingMember.email) &&
