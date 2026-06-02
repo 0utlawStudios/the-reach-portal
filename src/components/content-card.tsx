@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect, useMemo, useRef } from "react";
+import { memo, useMemo } from "react";
 import { RawImage } from "@/components/raw-image";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -18,7 +18,6 @@ interface Props {
 
 function ContentCardInner({ card, isDragOverlay, stageColor }: Props) {
   const { selectCard, selectCardForEditing } = usePipeline();
-  const suppressClickRef = useRef(false);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: card.id,
     data: { card },
@@ -32,17 +31,6 @@ function ContentCardInner({ card, isDragOverlay, stageColor }: Props) {
     transform: CSS.Transform.toString(transform),
     transition,
   };
-
-  useEffect(() => {
-    if (isDragging) {
-      suppressClickRef.current = true;
-      return;
-    }
-    const timer = window.setTimeout(() => {
-      suppressClickRef.current = false;
-    }, 120);
-    return () => window.clearTimeout(timer);
-  }, [isDragging]);
 
   // PERF-006: single useMemo collapses six per-render derivations into one pass.
   const derived = useMemo(() => {
@@ -70,7 +58,7 @@ function ContentCardInner({ card, isDragOverlay, stageColor }: Props) {
       {/* Colored top accent bar */}
       <div className="h-[3px] w-full" style={{ backgroundColor: overdue ? "#dc2626" : (stageColor || "#3b82f6") }} />
       <div className="relative h-[76px] w-full overflow-hidden bg-gray-50 dark:bg-white/[0.03]">
-        <RawImage src={card.thumbnailUrl} alt={card.title} className="w-full h-full object-cover" />
+        <RawImage src={card.thumbnailUrl} alt={card.title} className="w-full h-full object-cover" draggable={false} />
         <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded bg-black/50 backdrop-blur-sm text-white text-[9px] font-medium capitalize flex items-center gap-1">
           {card.contentType}
           {card.contentType === "carousel" && (card.sourceVault?.rawFiles?.length || 0) > 1 && (
@@ -175,27 +163,22 @@ function ContentCardInner({ card, isDragOverlay, stageColor }: Props) {
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
-      onClick={(e) => {
-        if (isDragging || suppressClickRef.current) {
-          e.preventDefault();
-          e.stopPropagation();
-          return;
-        }
-        selectCard(card);
-      }}
-      className={`group relative rounded-xl overflow-hidden cursor-grab active:cursor-grabbing bg-white dark:bg-[#151518] border hover:shadow-md transition-all duration-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)] touch-none ${isDragging ? "opacity-20 scale-[0.97]" : "hover:-translate-y-0.5"} ${overdue ? "border-red-300 dark:border-red-500/30 shadow-red-100 dark:shadow-red-500/5" : "border-gray-200/80 dark:border-white/[0.06] hover:border-gray-300 dark:hover:border-white/[0.12]"}`}
+      onClick={() => !isDragging && selectCard(card)}
+      className={`group relative rounded-xl overflow-hidden cursor-pointer bg-white dark:bg-[#151518] border hover:shadow-md transition-all duration-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${isDragging ? "opacity-20 scale-[0.97]" : "hover:-translate-y-0.5"} ${overdue ? "border-red-300 dark:border-red-500/30 shadow-red-100 dark:shadow-red-500/5" : "border-gray-200/80 dark:border-white/[0.06] hover:border-gray-300 dark:hover:border-white/[0.12]"}`}
     >
-      {/* UX-012: visible drag affordance; the whole card is draggable. */}
-      <div
-        aria-hidden="true"
-        className="absolute top-1 left-1 z-10 flex h-11 w-11 items-center justify-center rounded-md text-[#E1DFD5] pointer-events-none"
+      {/* UX-012: Ten80Ten drag contract — drag starts from a real handle. */}
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        onClick={(e) => e.stopPropagation()}
+        aria-label="Drag card"
+        className="absolute top-1 left-1 z-10 flex h-11 w-11 items-center justify-center rounded-md text-[#E1DFD5] opacity-100 cursor-grab active:cursor-grabbing transition-opacity duration-200 touch-none"
       >
         <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[#6C655A]/80 backdrop-blur-sm ring-1 ring-[#E1DFD5]/35 hover:bg-[#6C655A] transition-colors duration-200">
           <GripVertical className="w-3 h-3" />
         </span>
-      </div>
+      </button>
       {cardContent}
     </div>
   );

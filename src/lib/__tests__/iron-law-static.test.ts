@@ -18,6 +18,7 @@ import { resolveLoadedCards, type PostRow } from "../pipeline-context";
 const PIPELINE_PATH = join(process.cwd(), "src/lib/pipeline-context.tsx");
 const PIPELINE_SRC = readFileSync(PIPELINE_PATH, "utf8");
 const ASSET_DRAWER_SRC = readFileSync(join(process.cwd(), "src/components/asset-review-drawer.tsx"), "utf8");
+const CONTENT_CARD_SRC = readFileSync(join(process.cwd(), "src/components/content-card.tsx"), "utf8");
 const AUDIT_SRC = readFileSync(join(process.cwd(), "src/lib/audit.ts"), "utf8");
 
 /** Recursively collect every *.ts / *.tsx file under a directory. */
@@ -191,6 +192,21 @@ describe("iron-law guards in audit.ts", () => {
       /from\(['"]post_audit_logs['"]\)\.(insert|update|delete|upsert)/,
     );
     expect(AUDIT_SRC).toMatch(/rpc\(['"]record_audit_event['"]/);
+  });
+});
+
+describe("pipeline drag handle contract", () => {
+  it("keeps the Ten80Ten drag handle as a real listener button", () => {
+    const handleMatch = CONTENT_CARD_SRC.match(
+      /<button[\s\S]{0,500}aria-label="Drag card"[\s\S]{0,500}>\s*<span/,
+    );
+    expect(handleMatch).not.toBeNull();
+    const handle = handleMatch![0];
+    expect(handle).toMatch(/\{\.\.\.attributes\}/);
+    expect(handle).toMatch(/\{\.\.\.listeners\}/);
+    expect(handle).not.toMatch(/pointer-events-none/);
+    expect(CONTENT_CARD_SRC).not.toMatch(/visible drag affordance; the whole card is draggable/i);
+    expect(CONTENT_CARD_SRC).toMatch(/draggable=\{false\}/);
   });
 });
 

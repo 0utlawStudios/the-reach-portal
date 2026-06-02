@@ -1,8 +1,8 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: e658660 fix: clean settings status and brand cards
-Next: Continue production-readiness backlog from the latest user additions: pipeline drag/realtime, dashboard fit, team/invite cleanup, and full production QA.
+Last pushed SHA: 98a47f7 docs: record settings brand production verification
+Next: Push pipeline drag-handle root fix, then verify CI/Vercel production.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
 
 Settings / Brand Playbook UI cleanup slice notes:
@@ -16,6 +16,16 @@ Settings / Brand Playbook UI cleanup slice notes:
 - Verification passed: `git diff --check`, `npm run typecheck`, `npm run lint` with only existing warnings, and `npm run build`.
 - Pushed commit `e658660` to `origin/main`; GitHub CI passed lint, typecheck, tests, and build.
 - Vercel production deployment `dpl_FnJETeprE7sE3U7f72kbmqz8NccL` is ready and aliased to `https://thereach.ten80ten.com`.
+
+Pipeline drag-handle root-fix slice notes:
+
+- Verified live Reach demo posts have all drag gate fields populated: schedule date/time, thumbnail, source vault raw files, caption, asset source, design link, and checked checklist.
+- Compared Reach against the Ten80Ten mothership files. `kanban-board.tsx` and `pipeline-column.tsx` are effectively aligned; the meaningful drift was `content-card.tsx`.
+- Restored the Ten80Ten drag contract: the dnd-kit `attributes` and `listeners` are back on a real `button` handle with `aria-label="Drag card"` instead of a pointer-events-disabled decorative handle.
+- Kept card body click behavior for opening the drawer and disabled native image dragging on card thumbnails so browser image drag cannot steal the gesture.
+- Left `src/lib/pipeline-context.tsx` untouched; no persistence, RLS, audit, or stage transition contract changes were made.
+- Added a static regression test that fails if the drag handle stops being a real listener button or becomes a `pointer-events-none` decoration again.
+- Verification passed: focused iron-law/static tests, `npm run typecheck`, `npm run lint` with only existing warnings, full `npm test` with 26 files / 232 tests, and `npm run build`.
 
 Reach command-button contrast slice notes:
 
