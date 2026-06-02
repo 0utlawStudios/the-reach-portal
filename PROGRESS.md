@@ -1,7 +1,7 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: 1b57a08 fix: lift brand playbook copy cards
+Last pushed SHA: 67cb69d docs: record brand playbook card polish
 Next: Continue production QA backlog: Settings/Profile polish, pipeline realtime QA, Support Inbox/chat regression checks, and full production QA.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
 
@@ -14,7 +14,8 @@ Brand Playbook copy-card elevation slice notes:
 - Added a `reach-copy-icon` hook so the copy icon chip has visible contrast inside the lighter card and Sun-tinted hover behavior.
 - Kept the change scoped to `src/app/globals.css` and `src/components/copy-block.tsx`; no data, auth, support, Drive, pipeline, or Supabase behavior changed.
 - Verification passed: `git diff --check`, `npm run typecheck`, `npm run lint` with only existing warnings, and `npm run build`.
-- Pushed functional commit `1b57a08` to `origin/main`; GitHub/Vercel deployment checks are being monitored.
+- Pushed functional commit `1b57a08` and tracking commit `67cb69d` to `origin/main`; GitHub CI passed for the latest tree.
+- Vercel production is ready, and a live CSS bundle check against `https://thereach.ten80ten.com` confirmed the deployed app includes `--reach-raised-surface`, `--reach-raised-surface-hover`, `reach-copy-card`, and `reach-copy-icon`.
 
 Settings / Brand Playbook UI cleanup slice notes:
 
