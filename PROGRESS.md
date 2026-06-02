@@ -1,8 +1,8 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: pending Reach support access hardening
-Next: Push this slice, verify Vercel production, then continue revision/media/realtime hardening.
+Last pushed SHA: d0d881f Reach support access hardening
+Next: Verify Vercel production for this SHA, then continue revision/media/realtime hardening.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
 
 Reach support access hardening slice notes:
