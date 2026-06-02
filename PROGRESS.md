@@ -1,9 +1,18 @@
 # The Reach Clone Progress
 
-Phase: Phase 2 slice 5 complete - auth/domain/env hardening for The Reach
-Last SHA: c1ef747
-Next: Push the auth/domain/env hardening slice, run final preflight, deploy production to Vercel, rerun production health where the domain allows it, and write `CHANGES-the-reach.md`.
-Blockers: Production `https://thereach.ten80ten.com` is not reachable yet because Vercel still reports domain ownership verification required/no access under `0utlawstudios-projects`. `supabase db diff --linked` and `supabase status` cannot run locally because Docker is not running. `supabase db push --dry-run --include-all --yes` previously reported the remote database is up to date.
+Phase: Phase 2 deployment complete except custom-domain ownership
+Last SHA: 61011f1
+Next: Commit/push `CHANGES-the-reach.md` and this progress update, then retry Vercel domain ownership/alias after the dashboard releases or verifies `thereach.ten80ten.com`.
+Blockers: Production custom domain `https://thereach.ten80ten.com` is not reachable yet because Vercel still reports `domain_not_owned` / no access under `0utlawstudios-projects`, even though public DNS now shows the CNAME and `_vercel.ten80ten.com` TXT verification record. The Vercel-generated deployment URLs return 401 because project SSO protection is `all_except_custom_domains`; custom domains should bypass it once verified. `supabase db diff --linked` and `supabase status` cannot run locally because Docker is not running. `supabase db push --dry-run --include-all --yes` previously reported the remote database is up to date.
+
+Deployment/final verification notes:
+
+- `npm run preflight` passed after the auth/domain/env slice.
+- Production Vercel deploy succeeded: `dpl_4GnfnPjwsjKFgrTR7AZhqV4n1u5g`, ready at `https://the-reach-portal-9bz0k25l0-0utlawstudios-projects.vercel.app`, aliased to `https://the-reach-portal-0utlawstudios-projects.vercel.app`.
+- Vercel generated URLs return 401 before the app because the team has SSO deployment protection enabled for non-custom domains.
+- Public DNS now resolves `thereach.ten80ten.com` to `51a3fa57b3fdc10d.vercel-dns-016.com.` and `_vercel.ten80ten.com` includes `vc-domain-verify=thereach.ten80ten.com,c53be7e3502e5cb95d54`.
+- `vercel domains inspect thereach.ten80ten.com`, `vercel alias set ... thereach.ten80ten.com`, and `vercel domains add thereach.ten80ten.com --force` still fail with no access / `domain_not_owned`.
+- `CHANGES-the-reach.md` written with edited vs untouched surfaces and the remaining domain blocker.
 
 Auth/domain/env hardening slice notes:
 
