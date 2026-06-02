@@ -1,8 +1,8 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: 64dd5b8 fix: harden reach action button contrast
-Next: Push Settings status cleanup and Brand Playbook card elevation, then verify CI/Vercel production.
+Last pushed SHA: e658660 fix: clean settings status and brand cards
+Next: Continue production-readiness backlog from the latest user additions: pipeline drag/realtime, dashboard fit, team/invite cleanup, and full production QA.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
 
 Settings / Brand Playbook UI cleanup slice notes:
@@ -14,6 +14,8 @@ Settings / Brand Playbook UI cleanup slice notes:
 - Added central `reach-copy-card` styling for Brand Playbook copy blocks so Business Essentials, Hashtag Banks, Proven Hooks, CTAs, and Caption Templates render on a lighter elevated surface with stronger Reach Stone borders and shadows.
 - Used existing Reach tokens only: Sand, Stone, Sun, and token mixes with existing white surface treatment. No new brand hex values were introduced.
 - Verification passed: `git diff --check`, `npm run typecheck`, `npm run lint` with only existing warnings, and `npm run build`.
+- Pushed commit `e658660` to `origin/main`; GitHub CI passed lint, typecheck, tests, and build.
+- Vercel production deployment `dpl_FnJETeprE7sE3U7f72kbmqz8NccL` is ready and aliased to `https://thereach.ten80ten.com`.
 
 Reach command-button contrast slice notes:
 
