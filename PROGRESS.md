@@ -1,9 +1,18 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: 71bad5e docs: record profile-photo setup hardening
-Next: User can delete/reinvite no-photo test users; continue final production QA and remaining Reach polish.
+Last pushed SHA: a368921 fix: harden reach button contrast and demo health
+Next: Verify Vercel production, then clean Settings notification labels and remove Notion integration entry.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
+
+Reach button contrast / demo-health slice notes:
+
+- Verified the live Reach site tokens against `https://thereach.travel/`: Sand `#E1DFD5`, Stone `#6C655A`, Sun `#975428`, and the site interaction pattern `hover:bg-sun` with `hover:text-sand`.
+- Added central light-theme dashed-upload button rules so upload/dropzone controls use visible Stone/Sun text, stronger Stone/Sun borders, and elevated Sand surfaces instead of cream-on-cream labels.
+- Marked Media Library upload buttons and the Media Picker "Use This Asset" button with `reach-action-button` so primary upload/select commands remain readable before hover and while disabled.
+- Added migration `0036_reach_demo_health_cleanup.sql` and applied it to the linked Reach Supabase project. Seeded demo posts now use `Aldridge Dagos` as creator and have no future `created_at` timestamps.
+- Updated deep-check pipeline flow analysis so future-dated draft/revision cards are treated as valid planned work, because the Create Post contract captures schedule fields before approval.
+- Verification passed locally: `npm run typecheck`, `npm run lint` with only existing warnings, `npm test` with 26 files / 231 tests, and `npm run build`.
 
 Reach invite/setup photo-required slice notes:
 

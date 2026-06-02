@@ -577,8 +577,9 @@ export async function GET(req: Request) {
       p.updated_at && p.updated_at < fourteenDaysAgo
     );
 
-    // Future-dated but in wrong stage
-    const futureWrongStage = posts.filter((p) =>
+    // Planned drafts/revisions are valid in this app because Create Post captures
+    // schedule fields before a card reaches approval.
+    const futureDraftTargets = posts.filter((p) =>
       p.scheduled_date && p.scheduled_date >= todayStr &&
       (p.stage === "ideas" || p.stage === "revision_needed")
     );
@@ -586,12 +587,11 @@ export async function GET(req: Request) {
     const issues: string[] = [];
     if (overdue.length > 0) issues.push(`${overdue.length} overdue scheduled post(s)`);
     if (stuck.length > 0) issues.push(`${stuck.length} post(s) stuck in ideas/revision >14 days`);
-    if (futureWrongStage.length > 0) issues.push(`${futureWrongStage.length} future-dated post(s) in wrong stage`);
     if (bottleneck && bottleneck[1] > 10) issues.push(`Pipeline bottleneck: ${bottleneck[1]} posts in "${bottleneck[0]}"`);
 
     checks["15_pipeline_flow"] = issues.length > 0
-      ? warn(issues.join("; "), { stages, overdue: overdue.length, stuck: stuck.length, bottleneck: bottleneck ? { stage: bottleneck[0], count: bottleneck[1] } : null })
-      : pass(`Pipeline healthy — ${posts.length} total posts`, { stages, bottleneck: bottleneck ? { stage: bottleneck[0], count: bottleneck[1] } : null });
+      ? warn(issues.join("; "), { stages, overdue: overdue.length, stuck: stuck.length, futureDraftTargets: futureDraftTargets.length, bottleneck: bottleneck ? { stage: bottleneck[0], count: bottleneck[1] } : null })
+      : pass(`Pipeline healthy — ${posts.length} total posts`, { stages, futureDraftTargets: futureDraftTargets.length, bottleneck: bottleneck ? { stage: bottleneck[0], count: bottleneck[1] } : null });
   } catch (e: unknown) {
     checks["15_pipeline_flow"] = fail(`Pipeline analysis error: ${errorMessage(e)}`);
   }

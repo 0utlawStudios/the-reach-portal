@@ -384,7 +384,7 @@ export function MediaPicker({ open, onClose, onSelect, folder = "raw-files", car
 
                   {/* Select button */}
                   <button onClick={() => { onSelect({ url: selectedAsset.url, fileId: selectedAsset.fileId, name: selectedAsset.name, mimeType: selectedAsset.type === "video" ? "video/mp4" : "image/jpeg" }); onClose(); }}
-                    className="w-full h-10 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-[13px] font-semibold shadow-sm cursor-pointer transition-colors">
+                    className="reach-action-button w-full h-10 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-[13px] font-semibold shadow-sm cursor-pointer transition-colors">
                     Use This Asset
                   </button>
                 </div>

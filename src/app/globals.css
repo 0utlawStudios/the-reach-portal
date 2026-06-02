@@ -753,6 +753,45 @@ html:not(.dark) :where(.reach-action-button, .reach-secondary-action) svg {
   stroke: currentColor !important;
 }
 
+html:not(.dark) button.border-dashed,
+html:not(.dark) [role="button"].border-dashed,
+html:not(.dark)[data-design] button.border-dashed,
+html:not(.dark)[data-design] [role="button"].border-dashed {
+  background-color: color-mix(in srgb, var(--reach-sand) 88%, var(--reach-stone) 12%) !important;
+  border-color: color-mix(in srgb, var(--reach-stone) 46%, transparent) !important;
+  color: var(--reach-stone) !important;
+  -webkit-text-fill-color: var(--reach-stone) !important;
+  text-shadow: none !important;
+  box-shadow:
+    0 1px 0 rgb(225 223 213 / 0.6) inset,
+    0 8px 18px rgb(108 101 90 / 0.12),
+    0 1px 2px rgb(108 101 90 / 0.14) !important;
+  opacity: 1 !important;
+}
+
+html:not(.dark) button.border-dashed:hover,
+html:not(.dark) [role="button"].border-dashed:hover {
+  background-color: color-mix(in srgb, var(--reach-sand) 82%, var(--reach-sun) 18%) !important;
+  border-color: color-mix(in srgb, var(--reach-sun) 64%, transparent) !important;
+  color: var(--reach-sun) !important;
+  -webkit-text-fill-color: var(--reach-sun) !important;
+}
+
+html:not(.dark) button.border-dashed:disabled,
+html:not(.dark) [role="button"].border-dashed[aria-disabled="true"] {
+  opacity: 0.82 !important;
+  color: color-mix(in srgb, var(--reach-stone) 82%, var(--reach-sand) 18%) !important;
+  -webkit-text-fill-color: color-mix(in srgb, var(--reach-stone) 82%, var(--reach-sand) 18%) !important;
+  filter: none !important;
+}
+
+html:not(.dark) button.border-dashed :where(span, p, svg),
+html:not(.dark) [role="button"].border-dashed :where(span, p, svg) {
+  color: currentColor !important;
+  -webkit-text-fill-color: currentColor !important;
+  stroke: currentColor !important;
+}
+
 /* Dashboard pulse animation */
 @keyframes pulse {
   0%, 100% { opacity: 1; transform: scale(1); }

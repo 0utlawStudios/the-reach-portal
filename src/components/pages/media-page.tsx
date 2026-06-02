@@ -320,7 +320,7 @@ export function MediaPage() {
           ))}
         </div>
         <input ref={fileInputRef} type="file" multiple accept="image/*,video/*" onChange={handleUpload} className="hidden" />
-        <button disabled={uploading} onClick={() => fileInputRef.current?.click()} className="hidden md:flex mt-2 w-full items-center justify-center gap-2 h-9 rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white text-[11px] font-medium cursor-pointer shadow-sm transition-all duration-200 disabled:opacity-40">
+        <button disabled={uploading} onClick={() => fileInputRef.current?.click()} className="reach-action-button hidden md:flex mt-2 w-full items-center justify-center gap-2 h-9 rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white text-[11px] font-medium cursor-pointer shadow-sm transition-all duration-200 disabled:opacity-40">
           <Upload className="w-3.5 h-3.5" />{uploading ? "Uploading..." : "Upload Files"}
         </button>
       </div>
@@ -368,7 +368,7 @@ export function MediaPage() {
 
           <span className="ml-auto text-[10px] text-gray-400 hidden sm:block">{filteredMedia.length} files</span>
           {/* Mobile upload */}
-          <button disabled={uploading} onClick={() => fileInputRef.current?.click()} className="md:hidden p-2 rounded-lg bg-orange-500 text-white cursor-pointer disabled:opacity-40"><Upload className="w-4 h-4" /></button>
+          <button disabled={uploading} onClick={() => fileInputRef.current?.click()} className="reach-action-button md:hidden p-2 rounded-lg bg-orange-500 text-white cursor-pointer disabled:opacity-40"><Upload className="w-4 h-4" /></button>
         </div>
 
         {/* Upload progress */}

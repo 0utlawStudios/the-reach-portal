@@ -4,6 +4,10 @@
 
 - Client manual cost comparison: added the zero separate portal subscription positioning and competitor savings math for Later and Hootsuite under "Why this portal beats generic tools for The Reach."
 - Manual competitor savings: documented approximate annual savings of `$495`, `$990`, and `$3,564` against relevant paid competitor baselines, with caveats for taxes/add-ons/future pricing changes.
+- Button contrast hardening: verified the live Reach site uses Sand `#E1DFD5`, Stone `#6C655A`, and Sun `#975428`, then added central upload/dropzone button rules so labels/icons remain visible before hover.
+- Media Library actions: marked upload/select command buttons with `reach-action-button` so Media Library `Upload Files`, mobile upload, and Media Picker `Use This Asset` stay readable in light mode and disabled states.
+- Demo health cleanup: added and applied migration `0036_reach_demo_health_cleanup.sql` so seeded demo posts use `Aldridge Dagos` as creator and have no future `created_at` timestamps.
+- Deep health pipeline analysis: future-dated idea/revision cards are now reported as planned draft targets instead of warnings, matching the app requirement that demo cards carry schedule fields before approval.
 - Invite setup recovery: pending invite users now get a `Complete Setup` action, and `/auth/setup` can resume from an existing Supabase session if the invite token hash was already consumed.
 - Invite activation hardening: setup now requires a profile photo before workspace activation; clicking setup without a photo shows `Please add a profile photo.` and the server rejects no-avatar activation.
 - Invite recovery guard: users with an already-consumed invite session can still complete setup, but only if they upload a profile photo or already have one stored on their member profile.
@@ -55,6 +59,7 @@
 ## Verification
 
 - Client manual cost/savings update passed HTML structural validation and old-brand/off-brand scan; Later pricing and Hootsuite plans/pricing sources were rechecked before editing.
+- Button contrast/demo-health slice passed `npm run typecheck`, `npm run lint` with only existing warnings, `npm test` with 26 files / 231 tests, and `npm run build`.
 - Invite setup recovery passed focused auth/setup/provision tests, `npm run typecheck`, `npm run lint`, `npm test` with 26 files / 230 tests, `npm run build`, GitHub CI for SHA `ce84600`, and Vercel production deployment `dpl_6wSf2NKMEJyUQE47kcauTDvpgsUr`.
 - Profile-photo setup hardening passed focused auth/setup route tests, `npm run typecheck`, `npm run lint`, `npm test` with 26 files / 231 tests, `npm run build`, GitHub CI for SHA `1748079`, and Vercel production deployment `dpl_CPa3EDKR5EHFLiSa7p4Es1yNk6x1`.
 - Media Library usage slice passed `npm run typecheck`, `npm run lint`, `npm test` with 26 files / 228 tests, and `npm run build`.
