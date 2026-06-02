@@ -49,6 +49,10 @@
 }
 
 :root {
+  --reach-sand: #E1DFD5;
+  --reach-stone: #6C655A;
+  --reach-water: #5A656C;
+  --reach-sun: #975428;
   --background: #E1DFD5;
   --foreground: #6C655A;
   --card: #E1DFD5;
@@ -95,6 +99,65 @@
   }
   html {
     @apply font-sans;
+  }
+}
+
+@layer utilities {
+  html:not(.dark) :where(body) {
+    background: var(--reach-sand) !important;
+    color: var(--reach-stone);
+  }
+
+  html:not(.dark) :where(.bg-white, .bg-\[\#fafbfc\], .bg-\[\#ecedf2\], .bg-gray-50, .bg-slate-50, .bg-slate-100) {
+    background-color: var(--reach-sand) !important;
+  }
+
+  html:not(.dark) :where(.bg-slate-900, .bg-gray-900, .bg-zinc-900) {
+    background-color: var(--reach-stone) !important;
+  }
+
+  html:not(.dark) :where(.text-white) {
+    color: var(--reach-sand) !important;
+  }
+
+  html:not(.dark) :where(.text-slate-900, .text-slate-800, .text-gray-900, .text-gray-800, .text-gray-700) {
+    color: var(--reach-stone) !important;
+  }
+
+  html:not(.dark) :where(.text-orange-400, .text-orange-500, .text-orange-600, .text-orange-700, .text-yellow-600, .text-yellow-700) {
+    color: var(--reach-sun) !important;
+  }
+
+  html:not(.dark) :where(.bg-orange-400, .bg-orange-500, .bg-orange-600, .bg-orange-700, .bg-yellow-500, .bg-yellow-600) {
+    background-color: var(--reach-sun) !important;
+  }
+
+  html:not(.dark) :where(.bg-orange-50, .bg-orange-100, .bg-yellow-50, .bg-yellow-100) {
+    background-color: color-mix(in srgb, var(--reach-sand) 86%, var(--reach-sun) 14%) !important;
+  }
+
+  html:not(.dark) :where(.border-orange-200, .border-orange-500, .border-yellow-200, .border-yellow-500) {
+    border-color: color-mix(in srgb, var(--reach-sun) 42%, transparent) !important;
+  }
+
+  html:not(.dark) :where(.from-orange-50, .from-yellow-50) {
+    --tw-gradient-from: color-mix(in srgb, var(--reach-sand) 86%, var(--reach-sun) 14%) var(--tw-gradient-from-position);
+    --tw-gradient-to: color-mix(in srgb, var(--reach-sand) 86%, transparent) var(--tw-gradient-to-position);
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+  }
+
+  html:not(.dark) :where(.from-orange-100, .from-yellow-100, .from-orange-500, .from-yellow-500, .from-yellow-600) {
+    --tw-gradient-from: var(--reach-sun) var(--tw-gradient-from-position);
+    --tw-gradient-to: rgb(151 84 40 / 0) var(--tw-gradient-to-position);
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+  }
+
+  html:not(.dark) :where(.to-orange-50, .to-yellow-50, .to-orange-100, .to-yellow-100) {
+    --tw-gradient-to: var(--reach-sand) var(--tw-gradient-to-position);
+  }
+
+  html:not(.dark) :where(.to-orange-500, .to-orange-600, .to-orange-700, .to-yellow-600) {
+    --tw-gradient-to: var(--reach-sun) var(--tw-gradient-to-position);
   }
 }
 

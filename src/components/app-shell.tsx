@@ -1,7 +1,7 @@
 "use client";
 
-import { RawImage } from "@/components/raw-image";
 import { useState, useEffect, useRef } from "react";
+import { ReachWordmark } from "@/components/reach-wordmark";
 import { useAuth } from "@/lib/auth-context";
 import { NavigationProvider, useNavigation } from "@/lib/navigation-context";
 import { PipelineProvider } from "@/lib/pipeline-context";
@@ -88,13 +88,13 @@ function DashboardLayout() {
         <PipelineProvider>
           <TeamProvider>
             <AvatarSync />
-            <div className="h-dvh flex bg-[#fafbfc] dark:bg-[#0a0a0a] overflow-hidden">
+            <div className="h-dvh flex bg-[#E1DFD5] dark:bg-[#0a0a0a] overflow-hidden">
               <Sidebar onCreatePost={() => setCreateOpen(true)} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
               <main className="flex-1 flex flex-col min-w-0">
                 <TopBar onMenuClick={() => setMobileOpen(true)} />
                 <PageContent />
-                <div className="h-8 flex items-center justify-center border-t border-gray-100 dark:border-white/[0.04] bg-white dark:bg-[#111] shrink-0">
-                  <p className="text-[10px] text-gray-400 dark:text-gray-600">The Reach &copy; 2026</p>
+                <div className="h-8 flex items-center justify-center border-t border-[#6C655A]/15 dark:border-white/[0.04] bg-[#E1DFD5] dark:bg-[#111] shrink-0">
+                  <p className="text-[10px] text-[#6C655A]/70 dark:text-gray-600">The Reach &copy; 2026</p>
                 </div>
               </main>
               <AssetReviewDrawer />
@@ -142,7 +142,7 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
 
   const NAV_ITEMS = [
     { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" />, section: "plan" },
-    { id: "pipeline", label: "The Reach", icon: <Kanban className="w-4 h-4" />, section: "plan" },
+    { id: "pipeline", label: "Content Pipeline", icon: <Kanban className="w-4 h-4" />, section: "plan" },
     { id: "calendar", label: "Content Calendar", icon: <CalendarDays className="w-4 h-4" />, section: "plan" },
     { id: "preview", label: "Post Preview", icon: <Eye className="w-4 h-4" />, section: "publish" },
     { id: "media", label: "Media Library", icon: <FolderOpen className="w-4 h-4" />, section: "publish" },
@@ -163,9 +163,13 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
       <>
         {/* Logo */}
         <div className="relative flex items-center justify-center h-[60px] px-4 shrink-0">
-          <RawImage src="/the-reach-logo.png" alt="The Reach" className={`${expanded ? "w-[48px]" : "w-7"} h-auto object-contain`} />
+          {expanded ? (
+            <ReachWordmark className="h-[13px] w-[150px] text-[#E1DFD5]" />
+          ) : (
+            <span className="font-heading text-[17px] font-semibold text-[#E1DFD5] tracking-[0.22em]" aria-label="The Reach">R</span>
+          )}
           {isMobile && (
-            <button className="absolute right-3 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-400 cursor-pointer" onClick={closeMobile}>
+            <button className="absolute right-3 p-1.5 rounded-lg hover:bg-[#E1DFD5]/[0.10] dark:hover:bg-white/[0.06] text-[#E1DFD5]/[0.70] cursor-pointer" onClick={closeMobile}>
               <ChevronLeft className="w-4 h-4" />
             </button>
           )}
@@ -174,13 +178,13 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
         {/* Create */}
         {expanded ? (
           <div className="px-3 pt-1 pb-2">
-            <button onClick={() => { onCreatePost(); if (isMobile) closeMobile(); }} className="w-full flex items-center justify-center gap-2 h-[36px] rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white text-[12px] font-semibold transition-all duration-150 cursor-pointer shadow-sm shadow-orange-500/20">
+            <button onClick={() => { onCreatePost(); if (isMobile) closeMobile(); }} className="w-full flex items-center justify-center gap-2 h-[36px] rounded-lg bg-[#975428] hover:bg-[#975428]/90 text-[#E1DFD5] text-[12px] font-semibold transition-all duration-150 cursor-pointer shadow-sm shadow-[#975428]/20">
               <Plus className="w-3.5 h-3.5" />Create Post
             </button>
           </div>
         ) : (
           <div className="px-2 pt-1 pb-2">
-            <button onClick={onCreatePost} className="w-full flex items-center justify-center h-[36px] rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 text-white transition-colors cursor-pointer shadow-sm shadow-orange-500/20" title="Create Post">
+            <button onClick={onCreatePost} className="w-full flex items-center justify-center h-[36px] rounded-lg bg-[#975428] text-[#E1DFD5] transition-colors cursor-pointer shadow-sm shadow-[#975428]/20" title="Create Post">
               <Plus className="w-4 h-4" />
             </button>
           </div>
@@ -192,8 +196,8 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
             const items = NAV_ITEMS.filter((n) => n.section === section.key);
             return (
               <div key={section.key}>
-                {expanded && <p className="px-2.5 mb-1.5 text-[9px] font-bold text-gray-400/60 dark:text-gray-600 tracking-[0.1em] uppercase">{section.label}</p>}
-                {!expanded && <div className="w-5 mx-auto mb-2 border-t border-gray-100 dark:border-white/[0.06]" />}
+                {expanded && <p className="px-2.5 mb-1.5 text-[9px] font-bold text-[#E1DFD5]/[0.50] dark:text-gray-600 tracking-[0.1em] uppercase">{section.label}</p>}
+                {!expanded && <div className="w-5 mx-auto mb-2 border-t border-[#E1DFD5]/[0.15] dark:border-white/[0.06]" />}
                 <div className="space-y-0.5">
                   {items.map((item) => {
                     const active = currentPage === item.id;
@@ -201,16 +205,16 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
                       <button key={item.id} onClick={() => handleNav(item.id)}
                         className={`relative w-full flex items-center gap-2.5 rounded-lg transition-all duration-150 cursor-pointer ${expanded ? "px-2.5 py-[8px]" : "justify-center px-0 py-2"} ${
                           active
-                            ? "bg-orange-50 dark:bg-orange-500/10 text-orange-700 dark:text-orange-400 font-semibold"
-                            : "text-gray-500 dark:text-gray-500 hover:text-gray-800 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/[0.03]"
+                            ? "bg-[#E1DFD5]/[0.14] dark:bg-orange-500/10 text-[#E1DFD5] dark:text-orange-400 font-semibold"
+                            : "text-[#E1DFD5]/[0.65] dark:text-gray-500 hover:text-[#E1DFD5] dark:hover:text-gray-300 hover:bg-[#E1DFD5]/[0.08] dark:hover:bg-white/[0.03]"
                         }`}
                         title={!expanded ? item.label : undefined}>
-                        <span className={`shrink-0 ${active ? "text-orange-600 dark:text-orange-400" : "text-gray-400 dark:text-gray-500"}`}>{item.icon}</span>
+                        <span className={`shrink-0 ${active ? "text-[#E1DFD5] dark:text-orange-400" : "text-[#E1DFD5]/[0.55] dark:text-gray-500"}`}>{item.icon}</span>
                         {expanded && <span className="text-[13px] truncate">{item.label}</span>}
                         {"alert" in item && item.alert && (
                           <span
                             aria-hidden="true"
-                            className={`${expanded ? "ml-auto" : "absolute right-1.5 top-1.5"} h-1.5 w-1.5 rounded-full bg-orange-400/80 shadow-[0_0_0_2px_rgba(251,146,60,0.14)] animate-pulse`}
+                            className={`${expanded ? "ml-auto" : "absolute right-1.5 top-1.5"} h-1.5 w-1.5 rounded-full bg-[#975428] shadow-[0_0_0_2px_rgba(151,84,40,0.18)] animate-pulse`}
                           />
                         )}
                       </button>
@@ -224,8 +228,8 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
 
         {/* Pin (desktop only) */}
         {!isMobile && (
-          <div className="px-3 py-3 shrink-0 border-t border-gray-100 dark:border-white/[0.04]">
-            <button onClick={togglePin} className={`w-full flex items-center gap-2 rounded-lg px-2.5 py-[7px] transition-all duration-150 cursor-pointer ${sidebarPinned ? "text-orange-500 bg-orange-50 dark:bg-orange-500/10 hover:bg-orange-100 dark:hover:bg-orange-500/15" : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/[0.03]"}`}>
+          <div className="px-3 py-3 shrink-0 border-t border-[#E1DFD5]/[0.15] dark:border-white/[0.04]">
+            <button onClick={togglePin} className={`w-full flex items-center gap-2 rounded-lg px-2.5 py-[7px] transition-all duration-150 cursor-pointer ${sidebarPinned ? "text-[#E1DFD5] bg-[#E1DFD5]/[0.12] dark:bg-orange-500/10 hover:bg-[#E1DFD5]/[0.16] dark:hover:bg-orange-500/15" : "text-[#E1DFD5]/[0.55] hover:text-[#E1DFD5] dark:hover:text-gray-300 hover:bg-[#E1DFD5]/[0.08] dark:hover:bg-white/[0.03]"}`}>
               {!expanded ? (
                 <Pin className="w-4 h-4 mx-auto" />
               ) : sidebarPinned ? (
@@ -248,7 +252,7 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
       )}
 
       {/* Mobile sidebar */}
-      <aside className={`md:hidden fixed inset-y-0 left-0 z-40 w-[270px] bg-white dark:bg-[#0c0c0f] shadow-2xl flex flex-col transition-transform duration-250 ease-out ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}>
+      <aside className={`md:hidden fixed inset-y-0 left-0 z-40 w-[270px] bg-[#6C655A] dark:bg-[#0c0c0f] shadow-2xl flex flex-col transition-transform duration-250 ease-out ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}>
         {sidebarContent(true)}
       </aside>
 
@@ -256,7 +260,7 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
       <aside
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className={`hidden md:flex h-dvh flex-col bg-white dark:bg-[#0c0c0f] shrink-0 overflow-hidden transition-[width] duration-200 ease-out shadow-[1px_0_0_rgba(0,0,0,0.04)] dark:shadow-[1px_0_0_rgba(255,255,255,0.04)] ${sidebarCollapsed ? "w-[56px]" : "w-[230px]"}`}
+        className={`hidden md:flex h-dvh flex-col bg-[#6C655A] dark:bg-[#0c0c0f] shrink-0 overflow-hidden transition-[width] duration-200 ease-out shadow-[1px_0_0_rgba(108,101,90,0.28)] dark:shadow-[1px_0_0_rgba(255,255,255,0.04)] ${sidebarCollapsed ? "w-[56px]" : "w-[230px]"}`}
       >
         {sidebarContent(false)}
       </aside>

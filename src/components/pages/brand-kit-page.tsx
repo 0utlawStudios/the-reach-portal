@@ -1,7 +1,7 @@
 "use client";
 
-import { RawImage } from "@/components/raw-image";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { ReachWordmark } from "@/components/reach-wordmark";
 import { CopyBlock, ColorSwatch } from "@/components/copy-block";
 import { useToast } from "@/lib/toast-context";
 import { useAuth } from "@/lib/auth-context";
@@ -67,11 +67,40 @@ const useSupabase = !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_
 export function BrandKitPage() {
   const { addToast } = useToast();
   const { currentUser } = useAuth();
-  const [activeTab, setActiveTab] = useState<Tab>("copy");
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    if (typeof window === "undefined") return "copy";
+    const requestedTab = window.sessionStorage.getItem("reach_brandkit_tab");
+    return requestedTab === "strategy" || requestedTab === "visual" || requestedTab === "guardrails" || requestedTab === "copy"
+      ? requestedTab
+      : "copy";
+  });
+  const [focusTarget, setFocusTarget] = useState<"hashtags" | "captions" | null>(() => {
+    if (typeof window === "undefined") return null;
+    const requestedFocus = window.sessionStorage.getItem("reach_brandkit_focus");
+    return requestedFocus === "hashtags" || requestedFocus === "captions" ? requestedFocus : null;
+  });
+  const hashtagRef = useRef<HTMLDivElement>(null);
+  const captionsRef = useRef<HTMLDivElement>(null);
   const [data, setData] = useState<PlaybookData>(DEFAULT_DATA);
   const [editMode, setEditMode] = useState(false);
   const [editData, setEditData] = useState<PlaybookData>(DEFAULT_DATA);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (activeTab !== "copy" || !focusTarget) return;
+    const target = focusTarget === "hashtags" ? hashtagRef.current : captionsRef.current;
+    const timer = window.setTimeout(() => {
+      target?.scrollIntoView({ behavior: "smooth", block: "start" });
+      setFocusTarget(null);
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [activeTab, focusTarget]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.sessionStorage.removeItem("reach_brandkit_tab");
+    window.sessionStorage.removeItem("reach_brandkit_focus");
+  }, []);
 
   useEffect(() => {
     if (!useSupabase) return;
@@ -205,26 +234,28 @@ export function BrandKitPage() {
               </div>
             </Section>
 
-            <Section icon={<Hash className="w-4 h-4 text-yellow-600" />} title="Hashtag Banks" sub="Click any block to copy the full set">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {(["hashtagCore", "hashtagSeasonal", "hashtagEngagement", "hashtagCommercial"] as const).map((key) => {
-                  const config: Record<string, { label: string; accent: string }> = {
-                    hashtagCore: { label: "Core / Brand", accent: "border-l-orange-500" },
-                    hashtagSeasonal: { label: "Seasonal / Promo", accent: "border-l-yellow-500" },
-                    hashtagEngagement: { label: "Engagement / Reach", accent: "border-l-orange-400" },
-                    hashtagCommercial: { label: "Commercial / B2B", accent: "border-l-yellow-600" },
-                  };
-                  const { label, accent } = config[key];
-                  return editMode ? (
-                    <EditField key={key} label={label} value={editData[key]} onChange={(v) => updateField(key, v)} multiline />
-                  ) : (
-                    <div key={key} className={`border-l-[3px] ${accent} pl-0`}>
-                      <CopyBlock label={label} text={d[key]} mono />
-                    </div>
-                  );
-                })}
-              </div>
-            </Section>
+            <div ref={hashtagRef} className="scroll-mt-6">
+              <Section icon={<Hash className="w-4 h-4 text-yellow-600" />} title="Hashtag Banks" sub="Click any block to copy the full set">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {(["hashtagCore", "hashtagSeasonal", "hashtagEngagement", "hashtagCommercial"] as const).map((key) => {
+                    const config: Record<string, { label: string; accent: string }> = {
+                      hashtagCore: { label: "Core / Brand", accent: "border-l-orange-500" },
+                      hashtagSeasonal: { label: "Seasonal / Promo", accent: "border-l-yellow-500" },
+                      hashtagEngagement: { label: "Engagement / Reach", accent: "border-l-orange-400" },
+                      hashtagCommercial: { label: "Commercial / B2B", accent: "border-l-yellow-600" },
+                    };
+                    const { label, accent } = config[key];
+                    return editMode ? (
+                      <EditField key={key} label={label} value={editData[key]} onChange={(v) => updateField(key, v)} multiline />
+                    ) : (
+                      <div key={key} className={`border-l-[3px] ${accent} pl-0`}>
+                        <CopyBlock label={label} text={d[key]} mono />
+                      </div>
+                    );
+                  })}
+                </div>
+              </Section>
+            </div>
 
             <Section icon={<Zap className="w-4 h-4 text-orange-500" />} title="Proven Hooks" sub="High-performing opening lines — click to copy">
               <div className="space-y-3">
@@ -251,6 +282,29 @@ export function BrandKitPage() {
                 ))}
               </div>
             </Section>
+
+            <div ref={captionsRef} className="scroll-mt-6">
+              <Section icon={<BookOpen className="w-4 h-4 text-orange-500" />} title="Caption Templates" sub="Reusable formats for polished Reach captions">
+                <div className="space-y-3">
+                  {[
+                    {
+                      label: "Hotel Feature",
+                      text: "Open with the feeling of the stay. Name the design detail or service moment. Explain why it changes the destination. Close with a planning question.",
+                    },
+                    {
+                      label: "Destination Note",
+                      text: "Lead with a point of view. Add one grounded detail from the place. Connect it to timing, access, or ease. End with The Reach CTA.",
+                    },
+                    {
+                      label: "Full-Service Planning",
+                      text: "Start with the travel friction. Show what The Reach handles: research, access, booking, transfers, tours, and perks. Close with where the client wants to go next.",
+                    },
+                  ].map((template) => (
+                    <CopyBlock key={template.label} label={template.label} text={template.text} />
+                  ))}
+                </div>
+              </Section>
+            </div>
           </div>
         )}
 
@@ -362,20 +416,20 @@ export function BrandKitPage() {
               </div>
             </Section>
 
-            <Section icon={<Download className="w-4 h-4 text-orange-500" />} title="Logo Assets" sub="Approved logo variants for all applications">
+            <Section icon={<Download className="w-4 h-4 text-orange-500" />} title="Logo Assets" sub="Approved site wordmark variants for all applications">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 {[
-                  { name: "Primary Logo", desc: "Full color — light backgrounds", bg: "bg-white border border-gray-200 dark:border-white/[0.06]" },
-                  { name: "Light Logo", desc: "Inverted — dark backgrounds", bg: "bg-slate-900 dark:bg-slate-800" },
-                  { name: "Favicon / Mark", desc: "Square — profile pictures", bg: "bg-slate-100 dark:bg-white/[0.06]" },
+                  { name: "Sun Wordmark", desc: "Primary — Sand backgrounds", bg: "bg-[#E1DFD5] border border-[#6C655A]/20", color: "text-[#975428]", file: "/the-reach-wordmark.svg" },
+                  { name: "Sand Wordmark", desc: "Reversed — Stone backgrounds", bg: "bg-[#6C655A]", color: "text-[#E1DFD5]", file: "/the-reach-wordmark-sand.svg" },
+                  { name: "Stone Wordmark", desc: "Quiet — Sand backgrounds", bg: "bg-[#E1DFD5] border border-[#6C655A]/20", color: "text-[#6C655A]", file: "/the-reach-wordmark-stone.svg" },
                 ].map((a) => (
                   <div key={a.name} className="bg-white dark:bg-[#151518] rounded-2xl border border-gray-200 dark:border-white/[0.06] overflow-hidden shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
                     <div className={`${a.bg} h-36 flex items-center justify-center`}>
-                      <RawImage src="/the-reach-logo.png" alt={a.name} className="h-14 object-contain" style={a.name === "Light Logo" ? { filter: "brightness(0) invert(1)" } : {}} />
+                      <ReachWordmark className={`h-5 w-[224px] ${a.color}`} />
                     </div>
                     <div className="p-5 flex items-center justify-between border-t border-gray-100 dark:border-white/[0.06]">
                       <div><p className="text-[13px] font-semibold text-slate-800 dark:text-gray-200">{a.name}</p><p className="text-[11px] text-gray-400 mt-0.5">{a.desc}</p></div>
-                      <button className="p-2.5 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-500/10 text-gray-400 hover:text-orange-500 cursor-pointer transition-all"><Download className="w-4 h-4" /></button>
+                      <a href={a.file} download className="p-2.5 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-500/10 text-gray-400 hover:text-orange-500 cursor-pointer transition-all" aria-label={`Download ${a.name}`}><Download className="w-4 h-4" /></a>
                     </div>
                   </div>
                 ))}

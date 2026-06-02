@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useMemo } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
 import { RawImage } from "@/components/raw-image";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -18,6 +18,7 @@ interface Props {
 
 function ContentCardInner({ card, isDragOverlay, stageColor }: Props) {
   const { selectCard, selectCardForEditing } = usePipeline();
+  const suppressClickRef = useRef(false);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: card.id,
     data: { card },
@@ -31,6 +32,17 @@ function ContentCardInner({ card, isDragOverlay, stageColor }: Props) {
     transform: CSS.Transform.toString(transform),
     transition,
   };
+
+  useEffect(() => {
+    if (isDragging) {
+      suppressClickRef.current = true;
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      suppressClickRef.current = false;
+    }, 120);
+    return () => window.clearTimeout(timer);
+  }, [isDragging]);
 
   // PERF-006: single useMemo collapses six per-render derivations into one pass.
   const derived = useMemo(() => {
@@ -88,6 +100,7 @@ function ContentCardInner({ card, isDragOverlay, stageColor }: Props) {
                     href={liveUrl}
                     target="_blank"
                     rel="noopener noreferrer"
+                    onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => e.stopPropagation()}
                     title={`Open live post on ${platform}`}
                     className="hover:opacity-75 transition-opacity"
@@ -119,6 +132,7 @@ function ContentCardInner({ card, isDragOverlay, stageColor }: Props) {
         </div>
         <div className="flex items-center justify-between">
           <button
+            onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => { e.stopPropagation(); selectCardForEditing(card); }}
             className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md cursor-pointer hover:ring-1 hover:ring-orange-300 transition-all ${
               card.scheduledDate
@@ -161,25 +175,27 @@ function ContentCardInner({ card, isDragOverlay, stageColor }: Props) {
     <div
       ref={setNodeRef}
       style={style}
-      onClick={() => !isDragging && selectCard(card)}
-      className={`group relative rounded-xl overflow-hidden cursor-pointer bg-white dark:bg-[#151518] border hover:shadow-md transition-all duration-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${isDragging ? "opacity-20 scale-[0.97]" : "hover:-translate-y-0.5"} ${overdue ? "border-red-300 dark:border-red-500/30 shadow-red-100 dark:shadow-red-500/5" : "border-gray-200/80 dark:border-white/[0.06] hover:border-gray-300 dark:hover:border-white/[0.12]"}`}
+      {...attributes}
+      {...listeners}
+      onClick={(e) => {
+        if (isDragging || suppressClickRef.current) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+        selectCard(card);
+      }}
+      className={`group relative rounded-xl overflow-hidden cursor-grab active:cursor-grabbing bg-white dark:bg-[#151518] border hover:shadow-md transition-all duration-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)] touch-none ${isDragging ? "opacity-20 scale-[0.97]" : "hover:-translate-y-0.5"} ${overdue ? "border-red-300 dark:border-red-500/30 shadow-red-100 dark:shadow-red-500/5" : "border-gray-200/80 dark:border-white/[0.06] hover:border-gray-300 dark:hover:border-white/[0.12]"}`}
     >
-      {/* UX-012: explicit drag handle. Listeners now live on this button only,
-          so the rest of the card is a clean click surface.
-          UX-001: visible on touch (no hover), hover-only on desktop; 44x44 hit
-          area via padding while the grip icon stays visually small. */}
-      <button
-        type="button"
-        {...attributes}
-        {...listeners}
-        onClick={(e) => e.stopPropagation()}
-        aria-label="Drag card"
-        className="absolute top-1 left-1 z-10 flex h-11 w-11 items-center justify-center rounded-md text-white/80 hover:text-white opacity-100 md:opacity-0 md:group-hover:opacity-100 focus:opacity-100 cursor-grab active:cursor-grabbing transition-opacity duration-200 touch-none"
+      {/* UX-012: visible drag affordance; the whole card is draggable. */}
+      <div
+        aria-hidden="true"
+        className="absolute top-1 left-1 z-10 flex h-11 w-11 items-center justify-center rounded-md text-[#E1DFD5] pointer-events-none"
       >
-        <span className="flex h-6 w-6 items-center justify-center rounded-md bg-black/40 backdrop-blur-sm hover:bg-black/60 transition-colors duration-200">
+        <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[#6C655A]/80 backdrop-blur-sm ring-1 ring-[#E1DFD5]/35 hover:bg-[#6C655A] transition-colors duration-200">
           <GripVertical className="w-3 h-3" />
         </span>
-      </button>
+      </div>
       {cardContent}
     </div>
   );

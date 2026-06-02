@@ -118,8 +118,8 @@ export function KanbanBoard() {
     [members, currentUser.email]
   );
   const userIsApprover = useMemo(
-    () => currentMember ? isApprover(currentMember.role) : false,
-    [currentMember]
+    () => isApprover(currentMember?.role || currentUser.role || ""),
+    [currentMember, currentUser.role]
   );
 
   // CST week window (Sun-Sat)

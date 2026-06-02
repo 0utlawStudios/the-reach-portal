@@ -1,9 +1,23 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA before this slice: d0a4af7 auth fix commit; latest docs commit records deployment state
-Next: Brand shell/Brand Kit polish from the Reach PDF/site, Settings routing, drag affordance, Support Inbox/last-seen audit, and Drive/media-library hardening.
-Blockers: None for the current data/auth slice. `supabase status`/local DB diff still require Docker if needed.
+Last pushed SHA: 42c9c29 data/auth cleanup and hardening
+Next: Push the visual/pipeline/keep-alive slice, verify Vercel production deployment, then continue Support Inbox/last-seen and Drive/media-library hardening.
+Blockers: None for the current visual/pipeline/keep-alive slice. `supabase status`/local DB diff still require Docker if needed.
+
+Visual, pipeline, and keep-alive slice notes:
+
+- Replaced the sidebar square logo with the single-line Reach wordmark pulled from `thereach.travel`; the collapsed sidebar uses a small text mark instead of the square logo.
+- Changed the sidebar pipeline nav label from `The Reach` to `Content Pipeline`.
+- Added a central Reach light-theme palette layer so white app surfaces resolve to Reach Sand `#E1DFD5`, primary text resolves to Stone `#6C655A`, and orange/yellow accents resolve to Reach Sun `#975428`.
+- Updated the Brand Kit logo assets section to show downloadable wordmark variants from the Reach site asset: Sun, Sand, and Stone.
+- Wired Settings `Hashtag sets` and `Caption templates` buttons into the Brand Kit Copy Hub with direct section focus instead of coming-soon toasts.
+- Restored pipeline drag behavior to a whole-card drag model with protected child controls, while keeping the visible grip handle as an affordance.
+- Kept `src/lib/pipeline-context.tsx` untouched; existing Ten80Ten realtime post subscriptions and revision/kickback rules remain authoritative.
+- Added `/api/health/keep-alive`, a secret-gated read-only Supabase keep-alive probe for `workspaces`, `posts`, `media_assets`, and `audit_log_v2`.
+- Added both Vercel cron config and a GitHub Actions scheduled workflow to ping the live keep-alive endpoint every two days.
+- Set the GitHub Actions `HEALTH_CHECK_SECRET` repository secret from `.env.local` without printing the secret.
+- Verification passed: `npm run lint` with the repo's existing two warnings, `npm run typecheck`, `npm test` with 22 files / 207 tests, and `npm run build`.
 
 Production-readiness data/auth slice notes:
 

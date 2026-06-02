@@ -8,6 +8,7 @@ import { useTheme } from "@/lib/theme-context";
 import { useTeam, UserRole, TeamMember } from "@/lib/team-context";
 import { useToast } from "@/lib/toast-context";
 import { useAuth } from "@/lib/auth-context";
+import { useNavigation } from "@/lib/navigation-context";
 import { usePresence } from "@/lib/use-presence";
 import { PresenceDot } from "@/components/presence-dot";
 import { PresenceLabel } from "@/components/presence-label";
@@ -257,6 +258,7 @@ export function SettingsPage() {
   const { theme, toggleTheme } = useTheme();
   const { members, removeMember, pendingRequests, refreshPendingRequests } = useTeam();
   const { currentUser } = useAuth();
+  const { navigate } = useNavigation();
   const { addToast } = useToast();
   const { workspaceId } = usePipeline();
   const [workspaceTz, setWorkspaceTz] = useState("America/Chicago");
@@ -293,6 +295,13 @@ export function SettingsPage() {
 
   const activeMembers = useMemo(() => members.filter((m) => m.status === "active"), [members]);
   const pendingMembers = useMemo(() => members.filter((m) => m.status === "pending"), [members]);
+  const openBrandKitCopy = useCallback((focus: "hashtags" | "captions") => {
+    if (typeof window !== "undefined") {
+      window.sessionStorage.setItem("reach_brandkit_tab", "copy");
+      window.sessionStorage.setItem("reach_brandkit_focus", focus);
+    }
+    navigate("brandkit");
+  }, [navigate]);
 
   const handleApprove = async (reqId: string, action: "approve" | "reject", role = "social_media_specialist") => {
     setApproving(reqId);
@@ -475,8 +484,8 @@ export function SettingsPage() {
           <Section title="Publishing" icon={<Zap className="w-3.5 h-3.5 text-amber-500" />}>
             <SettingRow icon={Clock} label="Auto-publish" desc="Publish approved posts at scheduled time"><div className="flex items-center gap-2"><ComingSoonBadge /><Toggle disabled /></div></SettingRow>
             <SettingRow icon={BarChart3} label="Analytics tracking" desc="Track engagement after publishing"><div className="flex items-center gap-2"><ComingSoonBadge /><Toggle defaultOn disabled /></div></SettingRow>
-            <SettingRow icon={FileText} label="Hashtag sets" desc="Reusable hashtag groups"><Button size="sm" variant="outline" onClick={() => addToast("Hashtag set management coming soon", "info")} className="h-7 text-[10px] rounded-lg px-3 cursor-pointer">Manage</Button></SettingRow>
-            <SettingRow icon={Smartphone} label="Caption templates" desc="Saved caption formats"><Button size="sm" variant="outline" onClick={() => addToast("Caption templates coming soon", "info")} className="h-7 text-[10px] rounded-lg px-3 cursor-pointer">Manage</Button></SettingRow>
+            <SettingRow icon={FileText} label="Hashtag sets" desc="Reusable hashtag groups"><Button size="sm" variant="outline" onClick={() => openBrandKitCopy("hashtags")} className="h-7 text-[10px] rounded-lg px-3 cursor-pointer">Manage</Button></SettingRow>
+            <SettingRow icon={Smartphone} label="Caption templates" desc="Saved caption formats"><Button size="sm" variant="outline" onClick={() => openBrandKitCopy("captions")} className="h-7 text-[10px] rounded-lg px-3 cursor-pointer">Manage</Button></SettingRow>
           </Section>
 
           <Section title="Notifications" icon={<Bell className="w-3.5 h-3.5 text-violet-500" />}>
