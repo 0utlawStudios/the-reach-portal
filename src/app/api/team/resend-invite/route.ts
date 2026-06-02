@@ -34,12 +34,13 @@ export async function POST(request: NextRequest) {
     const actorEmail = ctx.email;
 
     const body = await request.json();
-    const { email, name, role } = body;
+    const { email } = body;
 
-    if (!email || !name || !role) {
+    if (!email) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
-    if (!/^[^\s@\r\n]+@[^\s@\r\n]+\.[^\s@\r\n]+$/.test(email)) {
+    const normalizedEmail = String(email).trim().toLowerCase();
+    if (!/^[^\s@\r\n]+@[^\s@\r\n]+\.[^\s@\r\n]+$/.test(normalizedEmail)) {
       return NextResponse.json({ error: "Invalid email address" }, { status: 400 });
     }
 
@@ -48,8 +49,8 @@ export async function POST(request: NextRequest) {
     // Verify member exists and is pending
     const { data: member } = await admin
       .from("team_members")
-      .select("id, status")
-      .eq("email", email.trim().toLowerCase())
+      .select("id, name, role, status")
+      .eq("email", normalizedEmail)
       .single();
 
     if (!member) {
@@ -58,20 +59,35 @@ export async function POST(request: NextRequest) {
     if (member.status !== "pending") {
       return NextResponse.json({ error: "Member already active" }, { status: 409 });
     }
+    if (!member.name || !member.role) {
+      return NextResponse.json({ error: "Pending member profile is incomplete" }, { status: 409 });
+    }
 
     // Delete old auth user
-    const existingAuthUser = await findAuthUserByEmail(admin, email);
+    const existingAuthUser = await findAuthUserByEmail(admin, normalizedEmail);
     if (existingAuthUser) {
-      await admin.auth.admin.deleteUser(existingAuthUser.id);
+      const { error: workspaceCleanupErr } = await admin
+        .from("workspace_members")
+        .delete()
+        .eq("user_id", existingAuthUser.id);
+      if (workspaceCleanupErr) {
+        console.error("[resend-invite] workspace cleanup failed:", workspaceCleanupErr.message);
+        return NextResponse.json({ error: "Failed to clean up previous workspace access" }, { status: 500 });
+      }
+      const { error: authDeleteErr } = await admin.auth.admin.deleteUser(existingAuthUser.id);
+      if (authDeleteErr) {
+        console.error("[resend-invite] auth cleanup failed:", authDeleteErr.message);
+        return NextResponse.json({ error: "Failed to clean up previous auth account" }, { status: 500 });
+      }
     }
 
     // Create fresh auth user
     const tempPassword = crypto.randomUUID() + "!Aa1";
     const { data: authData, error: createErr } = await admin.auth.admin.createUser({
-      email: email.trim().toLowerCase(),
+      email: normalizedEmail,
       password: tempPassword,
       email_confirm: false,
-      user_metadata: { name, role },
+      user_metadata: { name: member.name, role: member.role },
     });
 
     if (createErr) {
@@ -81,8 +97,8 @@ export async function POST(request: NextRequest) {
     // Generate new invite link
     const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
       type: "invite",
-      email: email.trim().toLowerCase(),
-      options: { data: { name, role } },
+      email: normalizedEmail,
+      options: { data: { name: member.name, role: member.role } },
     });
 
     if (linkErr || !linkData?.properties?.hashed_token) {
@@ -104,9 +120,9 @@ export async function POST(request: NextRequest) {
         const transporter = getTransporter();
         await transporter.sendMail({
           from: getFromAddress(),
-          to: email.trim().toLowerCase(),
+          to: normalizedEmail,
           subject: `You're invited to join The Reach`,
-          html: buildInviteEmailHtml(name, role, confirmUrl),
+          html: buildInviteEmailHtml(member.name, member.role, confirmUrl),
         });
         emailSent = true;
       } catch (err: unknown) {
@@ -120,7 +136,7 @@ export async function POST(request: NextRequest) {
         p_entity_type: "team",
         p_action: "invite_resent",
         p_entity_id: null,
-        p_metadata: { user_name: actorEmail, details: `Resent invite to ${name} (${email})` },
+        p_metadata: { user_name: actorEmail, details: `Resent invite to ${member.name} (${normalizedEmail})` },
       });
     } catch { /* best-effort */ }
 
@@ -128,7 +144,7 @@ export async function POST(request: NextRequest) {
       success: true,
       emailSent,
       inviteUrl: emailSent ? undefined : confirmUrl,
-      message: emailSent ? `Invite resent to ${email}` : "Email failed — invite link generated",
+      message: emailSent ? `Invite resent to ${normalizedEmail}` : "Email failed — invite link generated",
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";

@@ -55,7 +55,7 @@ export default function ForgotPasswordPage() {
               <p className="text-[14px] text-gray-500 dark:text-gray-400 leading-relaxed">
                 If an account exists for <strong className="text-gray-700 dark:text-gray-300">{email}</strong>, we&apos;ve sent a password reset link.
               </p>
-              <Link href="/" className="inline-flex items-center gap-2 text-[13px] text-[#f59e0b] hover:text-orange-600 font-semibold transition-colors">
+              <Link href="/" className="inline-flex items-center gap-2 text-[13px] text-[#975428] hover:text-[#6C655A] font-semibold transition-colors">
                 <ArrowLeft className="w-4 h-4" />Back to login
               </Link>
             </div>
@@ -95,7 +95,7 @@ export default function ForgotPasswordPage() {
                     value={email}
                     onChange={(e) => { setEmail(e.target.value); setError(""); }}
                     autoComplete="email"
-                    className="w-full h-[52px] pl-11 pr-4 rounded-xl bg-slate-50/80 dark:bg-white/[0.04] border border-gray-200/70 dark:border-white/[0.08] text-[14px] text-gray-900 dark:text-gray-100 placeholder:text-gray-300 dark:placeholder:text-gray-600 outline-none focus:bg-white dark:focus:bg-white/[0.06] focus:border-[#f59e0b] focus:ring-2 focus:ring-[#f59e0b]/15 transition-all"
+                    className="w-full h-[52px] pl-11 pr-4 rounded-xl bg-[#f7f5ef] dark:bg-white/[0.04] border border-gray-200/70 dark:border-white/[0.08] text-[14px] text-gray-900 dark:text-gray-100 placeholder:text-gray-300 dark:placeholder:text-gray-600 outline-none focus:bg-white dark:focus:bg-white/[0.06] focus:border-[#975428] focus:ring-2 focus:ring-[#975428]/15 transition-all"
                     autoFocus
                   />
                 </div>
@@ -112,7 +112,7 @@ export default function ForgotPasswordPage() {
                 <button
                   type="submit"
                   disabled={!isValid || loading}
-                  className="w-full h-[52px] rounded-xl bg-[#f59e0b] hover:bg-orange-500 active:bg-orange-600 hover:-translate-y-0.5 text-white text-[14px] font-bold shadow-lg shadow-[#f59e0b]/25 hover:shadow-xl hover:shadow-[#f59e0b]/30 disabled:opacity-40 disabled:shadow-none disabled:hover:translate-y-0 cursor-pointer transition-all duration-200 flex items-center justify-center gap-2"
+                  className="w-full h-[52px] rounded-xl bg-[#975428] hover:bg-[#7f4421] active:bg-[#6f3b1d] hover:-translate-y-0.5 text-white text-[14px] font-bold shadow-lg shadow-[#975428]/25 hover:shadow-xl hover:shadow-[#975428]/30 disabled:opacity-40 disabled:shadow-none disabled:hover:translate-y-0 cursor-pointer transition-all duration-200 flex items-center justify-center gap-2"
                 >
                   {loading ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : "Send Reset Link"}
                 </button>
@@ -121,13 +121,13 @@ export default function ForgotPasswordPage() {
 
             <motion.p className="text-center text-[12px] text-gray-400 mt-6" variants={fadeUp}>
               Remember your password?{" "}
-              <Link href="/" className="text-[#f59e0b] hover:text-orange-600 font-semibold transition-colors">Sign in</Link>
+              <Link href="/" className="text-[#975428] hover:text-[#6C655A] font-semibold transition-colors">Sign in</Link>
             </motion.p>
           </motion.div>
         </div>
 
         <motion.div className="px-8 pb-5 lg:px-14" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}>
-          <p className="text-[10px] text-slate-300/60 dark:text-slate-700 text-center">Developed by Aldridge</p>
+          <p className="text-[10px] text-[#6C655A]/35 dark:text-[#E1DFD5]/25 text-center">Developed by Aldridge</p>
         </motion.div>
       </div>
 
@@ -139,12 +139,12 @@ export default function ForgotPasswordPage() {
 
 function RightPanel() {
   return (
-    <div className="hidden lg:flex relative overflow-hidden bg-gradient-to-br from-slate-950 via-[#0f172a] to-black">
+    <div className="hidden lg:flex relative overflow-hidden bg-gradient-to-br from-[#6C655A] via-[#5A656C] to-[#2f302d]">
       {/* Gradient Mesh */}
       <div className="absolute inset-0">
-        <div className="absolute top-[-12%] right-[-8%] w-[700px] h-[700px] rounded-full" style={{ background: "radial-gradient(circle, rgba(245,158,11,0.14), transparent 60%)" }} />
-        <div className="absolute bottom-[-18%] left-[-12%] w-[800px] h-[800px] rounded-full" style={{ background: "radial-gradient(circle, rgba(249,115,22,0.07), transparent 55%)" }} />
-        <div className="absolute top-[40%] left-[45%] w-[500px] h-[500px] rounded-full" style={{ background: "radial-gradient(circle, rgba(59,130,246,0.035), transparent 55%)" }} />
+        <div className="absolute top-[-12%] right-[-8%] w-[700px] h-[700px] rounded-full" style={{ background: "radial-gradient(circle, rgba(151,84,40,0.14), transparent 60%)" }} />
+        <div className="absolute bottom-[-18%] left-[-12%] w-[800px] h-[800px] rounded-full" style={{ background: "radial-gradient(circle, rgba(225,223,213,0.07), transparent 55%)" }} />
+        <div className="absolute top-[40%] left-[45%] w-[500px] h-[500px] rounded-full" style={{ background: "radial-gradient(circle, rgba(90,101,108,0.10), transparent 55%)" }} />
       </div>
 
       {/* Dot grid */}
@@ -159,8 +159,8 @@ function RightPanel() {
           className="absolute top-[18%] right-[10%] backdrop-blur-xl bg-white/[0.06] border border-white/[0.08] rounded-2xl p-5 shadow-2xl"
         >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
-              <KeyRound className="w-5 h-5 text-amber-400" />
+            <div className="w-10 h-10 rounded-xl bg-[#975428]/15 flex items-center justify-center">
+              <KeyRound className="w-5 h-5 text-[#975428]" />
             </div>
             <div>
               <p className="text-[11px] text-white/50 font-medium">Password Security</p>

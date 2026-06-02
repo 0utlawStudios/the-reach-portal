@@ -95,7 +95,7 @@ export default function ResetPasswordPage() {
               <p className="text-[14px] text-gray-500 dark:text-gray-400 leading-relaxed">
                 Your password has been reset successfully. Redirecting...
               </p>
-              <div className="w-8 h-8 mx-auto border-3 border-gray-200 border-t-orange-500 rounded-full animate-spin" />
+              <div className="w-8 h-8 mx-auto border-3 border-gray-200 border-t-[#975428] rounded-full animate-spin" />
             </div>
           </div>
         </div>
@@ -133,14 +133,14 @@ export default function ResetPasswordPage() {
                     value={password}
                     onChange={(e) => { setPassword(e.target.value); setError(""); }}
                     autoComplete="new-password"
-                    className="w-full h-[52px] pl-11 pr-11 rounded-xl bg-slate-50/80 dark:bg-white/[0.04] border border-gray-200/70 dark:border-white/[0.08] text-[14px] text-gray-900 dark:text-gray-100 placeholder:text-gray-300 dark:placeholder:text-gray-600 outline-none focus:bg-white dark:focus:bg-white/[0.06] focus:border-[#f59e0b] focus:ring-2 focus:ring-[#f59e0b]/15 transition-all"
+                    className="w-full h-[52px] pl-11 pr-11 rounded-xl bg-[#f7f5ef] dark:bg-white/[0.04] border border-gray-200/70 dark:border-white/[0.08] text-[14px] text-gray-900 dark:text-gray-100 placeholder:text-gray-300 dark:placeholder:text-gray-600 outline-none focus:bg-white dark:focus:bg-white/[0.06] focus:border-[#975428] focus:ring-2 focus:ring-[#975428]/15 transition-all"
                     autoFocus
                   />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 dark:text-gray-600 hover:text-gray-500 cursor-pointer transition-colors">
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-                {password.length > 0 && password.length < 8 && <p className="text-[10px] text-amber-500">Must be at least 8 characters</p>}
+                {password.length > 0 && password.length < 8 && <p className="text-[10px] text-[#975428]">Must be at least 8 characters</p>}
               </motion.div>
 
               {/* Confirm */}
@@ -154,7 +154,7 @@ export default function ResetPasswordPage() {
                     value={confirm}
                     onChange={(e) => { setConfirm(e.target.value); setError(""); }}
                     autoComplete="new-password"
-                    className="w-full h-[52px] pl-11 pr-4 rounded-xl bg-slate-50/80 dark:bg-white/[0.04] border border-gray-200/70 dark:border-white/[0.08] text-[14px] text-gray-900 dark:text-gray-100 placeholder:text-gray-300 dark:placeholder:text-gray-600 outline-none focus:bg-white dark:focus:bg-white/[0.06] focus:border-[#f59e0b] focus:ring-2 focus:ring-[#f59e0b]/15 transition-all"
+                    className="w-full h-[52px] pl-11 pr-4 rounded-xl bg-[#f7f5ef] dark:bg-white/[0.04] border border-gray-200/70 dark:border-white/[0.08] text-[14px] text-gray-900 dark:text-gray-100 placeholder:text-gray-300 dark:placeholder:text-gray-600 outline-none focus:bg-white dark:focus:bg-white/[0.06] focus:border-[#975428] focus:ring-2 focus:ring-[#975428]/15 transition-all"
                   />
                 </div>
                 {confirm.length > 0 && password !== confirm && <p className="text-[10px] text-red-500">Passwords don&apos;t match</p>}
@@ -171,7 +171,7 @@ export default function ResetPasswordPage() {
                 <button
                   type="submit"
                   disabled={!isValid || loading}
-                  className="w-full h-[52px] rounded-xl bg-[#f59e0b] hover:bg-orange-500 active:bg-orange-600 hover:-translate-y-0.5 text-white text-[14px] font-bold shadow-lg shadow-[#f59e0b]/25 hover:shadow-xl hover:shadow-[#f59e0b]/30 disabled:opacity-40 disabled:shadow-none disabled:hover:translate-y-0 cursor-pointer transition-all duration-200 flex items-center justify-center gap-2"
+                  className="w-full h-[52px] rounded-xl bg-[#975428] hover:bg-[#7f4421] active:bg-[#6f3b1d] hover:-translate-y-0.5 text-white text-[14px] font-bold shadow-lg shadow-[#975428]/25 hover:shadow-xl hover:shadow-[#975428]/30 disabled:opacity-40 disabled:shadow-none disabled:hover:translate-y-0 cursor-pointer transition-all duration-200 flex items-center justify-center gap-2"
                 >
                   {loading ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : "Reset Password"}
                 </button>
@@ -179,7 +179,7 @@ export default function ResetPasswordPage() {
             </form>
 
             <motion.p className="text-center text-[12px] text-gray-400 mt-6" variants={fadeUp}>
-              <Link href="/" className="inline-flex items-center gap-1.5 text-[#f59e0b] hover:text-orange-600 font-semibold transition-colors">
+              <Link href="/" className="inline-flex items-center gap-1.5 text-[#975428] hover:text-[#6C655A] font-semibold transition-colors">
                 <ArrowLeft className="w-3.5 h-3.5" />Back to login
               </Link>
             </motion.p>
@@ -187,7 +187,7 @@ export default function ResetPasswordPage() {
         </div>
 
         <motion.div className="px-8 pb-5 lg:px-14" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}>
-          <p className="text-[10px] text-slate-300/60 dark:text-slate-700 text-center">Developed by Aldridge</p>
+          <p className="text-[10px] text-[#6C655A]/35 dark:text-[#E1DFD5]/25 text-center">Developed by Aldridge</p>
         </motion.div>
       </div>
 
@@ -199,10 +199,10 @@ export default function ResetPasswordPage() {
 
 function RightPanel() {
   return (
-    <div className="hidden lg:flex relative overflow-hidden bg-gradient-to-br from-slate-950 via-[#0f172a] to-black">
+    <div className="hidden lg:flex relative overflow-hidden bg-gradient-to-br from-[#6C655A] via-[#5A656C] to-[#2f302d]">
       <div className="absolute inset-0">
-        <div className="absolute top-[-12%] right-[-8%] w-[700px] h-[700px] rounded-full" style={{ background: "radial-gradient(circle, rgba(245,158,11,0.14), transparent 60%)" }} />
-        <div className="absolute bottom-[-18%] left-[-12%] w-[800px] h-[800px] rounded-full" style={{ background: "radial-gradient(circle, rgba(249,115,22,0.07), transparent 55%)" }} />
+        <div className="absolute top-[-12%] right-[-8%] w-[700px] h-[700px] rounded-full" style={{ background: "radial-gradient(circle, rgba(151,84,40,0.14), transparent 60%)" }} />
+        <div className="absolute bottom-[-18%] left-[-12%] w-[800px] h-[800px] rounded-full" style={{ background: "radial-gradient(circle, rgba(225,223,213,0.07), transparent 55%)" }} />
       </div>
       <div className="absolute inset-0 opacity-[0.025]" style={{ backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.5) 1px, transparent 1px)", backgroundSize: "40px 40px" }} />
       <div className="absolute inset-0 z-[1]">

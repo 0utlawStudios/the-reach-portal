@@ -77,18 +77,18 @@ function wrapEmail(content: string) {
   return `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-<div style="max-width:540px;margin:40px auto;border-radius:16px;overflow:hidden;background:#ffffff;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+<body style="margin:0;padding:0;background:#E1DFD5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+<div style="max-width:540px;margin:40px auto;border-radius:16px;overflow:hidden;background:#ffffff;box-shadow:0 2px 12px rgba(108,101,90,0.16);">
 ${content}
-<div style="padding:24px 32px;text-align:center;background:#fafafa;border-top:1px solid #f0f0f0;">
-  <p style="color:#999;font-size:11px;margin:0;">The Reach</p>
+<div style="padding:24px 32px;text-align:center;background:#f7f5ef;border-top:1px solid rgba(108,101,90,0.14);">
+  <p style="color:#6C655A;font-size:11px;margin:0;">The Reach</p>
 </div>
 </div>
 </body>
 </html>`;
 }
 
-function ctaButton(label: string, url: string, gradient = "background:linear-gradient(135deg,#ea580c,#f59e0b);") {
+function ctaButton(label: string, url: string, gradient = "background:linear-gradient(135deg,#975428,#6C655A);") {
   return `<a href="${esc(url)}" style="display:inline-block;${gradient}color:#fff;text-decoration:none;padding:16px 48px;border-radius:12px;font-size:15px;font-weight:800;letter-spacing:0.02em;">${esc(label)}</a>`;
 }
 
@@ -98,7 +98,7 @@ function formatRole(role: string): string {
 }
 
 function roleBadge(role: string) {
-  return `<span style="display:inline-block;background:#f59e0b15;color:#ea580c;padding:6px 16px;border-radius:8px;font-size:13px;font-weight:700;border:1px solid #f59e0b33;">${esc(formatRole(role))}</span>`;
+  return `<span style="display:inline-block;background:#97542815;color:#975428;padding:6px 16px;border-radius:8px;font-size:13px;font-weight:700;border:1px solid #97542833;">${esc(formatRole(role))}</span>`;
 }
 
 // ─── Template 1: Invite Email ───
@@ -106,7 +106,7 @@ function roleBadge(role: string) {
 export function buildInviteEmailHtml(name: string, role: string, confirmUrl: string) {
   const logoUrl = `${getSiteUrl()}/the-reach-logo.png`;
   return wrapEmail(`
-<div style="background:linear-gradient(135deg,#ea580c,#f59e0b);padding:32px;text-align:center;">
+<div style="background:linear-gradient(135deg,#975428,#6C655A);padding:32px;text-align:center;">
   <img src="${logoUrl}" alt="The Reach" width="52" height="52" style="display:block;margin:0 auto 16px;border-radius:14px;background:rgba(255,255,255,0.2);padding:8px;" />
   <h1 style="color:#fff;font-size:22px;font-weight:800;margin:0;">You're Invited!</h1>
   <p style="color:rgba(255,255,255,0.8);font-size:13px;margin:8px 0 0;">Join The Reach team</p>
@@ -146,7 +146,7 @@ export function buildApprovalEmailHtml(name: string, role: string, confirmUrl: s
 export function buildPasswordResetEmailHtml(confirmUrl: string) {
   const logoUrl = `${getSiteUrl()}/the-reach-logo.png`;
   return wrapEmail(`
-<div style="background:linear-gradient(135deg,#d97706,#f59e0b);padding:32px;text-align:center;">
+<div style="background:linear-gradient(135deg,#975428,#6C655A);padding:32px;text-align:center;">
   <img src="${logoUrl}" alt="The Reach" width="52" height="52" style="display:block;margin:0 auto 16px;border-radius:14px;background:rgba(255,255,255,0.2);padding:8px;" />
   <h1 style="color:#fff;font-size:22px;font-weight:800;margin:0;">Reset Your Password</h1>
   <p style="color:rgba(255,255,255,0.8);font-size:13px;margin:8px 0 0;">The Reach</p>
@@ -154,7 +154,7 @@ export function buildPasswordResetEmailHtml(confirmUrl: string) {
 <div style="background:#fff;padding:32px;">
   <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 16px;">We received a request to reset your password for The Reach.</p>
   <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 24px;">Click the button below to choose a new password.</p>
-  <div style="text-align:center;margin:28px 0;">${ctaButton("RESET PASSWORD", confirmUrl, "background:linear-gradient(135deg,#d97706,#f59e0b);")}</div>
+  <div style="text-align:center;margin:28px 0;">${ctaButton("RESET PASSWORD", confirmUrl)}</div>
   <p style="color:#9ca3af;font-size:11px;text-align:center;margin:20px 0 0;">This link expires in 1 hour. If you didn't request this, ignore this email.</p>
 </div>`);
 }
@@ -164,7 +164,7 @@ export function buildPasswordResetEmailHtml(confirmUrl: string) {
 export function buildRevisionEmailHtml(postTitle: string, revisionNote: string, requestedBy: string, siteUrl: string) {
   const logoUrl = `${getSiteUrl()}/the-reach-logo.png`;
   return wrapEmail(`
-<div style="background:linear-gradient(135deg,#dc2626,#ea580c);padding:32px;text-align:center;">
+<div style="background:linear-gradient(135deg,#dc2626,#975428);padding:32px;text-align:center;">
   <img src="${logoUrl}" alt="The Reach" width="52" height="52" style="display:block;margin:0 auto 16px;border-radius:14px;background:rgba(255,255,255,0.2);padding:8px;" />
   <h1 style="color:#fff;font-size:22px;font-weight:800;margin:0;">Revision Requested</h1>
   <p style="color:rgba(255,255,255,0.8);font-size:13px;margin:8px 0 0;">Your post has been sent back for fixes</p>
@@ -176,7 +176,7 @@ export function buildRevisionEmailHtml(postTitle: string, revisionNote: string, 
     <p style="color:#6b7280;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 6px;">What needs to be fixed</p>
     <p style="color:#374151;font-size:14px;line-height:1.6;margin:0;white-space:pre-wrap;">${esc(revisionNote)}</p>
   </div>
-  <div style="text-align:center;margin:28px 0;">${ctaButton("View in The Reach", siteUrl, "background:linear-gradient(135deg,#dc2626,#ea580c);")}</div>
+  <div style="text-align:center;margin:28px 0;">${ctaButton("View in The Reach", siteUrl, "background:linear-gradient(135deg,#dc2626,#975428);")}</div>
   <p style="color:#9ca3af;font-size:11px;text-align:center;margin:20px 0 0;">Log in to make your changes and resubmit for approval.</p>
 </div>`);
 }
@@ -277,7 +277,7 @@ export function buildAdminNotificationHtml(requester: { name: string; email: str
 
   return wrapEmail(`
 <div style="background:#0a0a0e;padding:28px 32px;">
-  <p style="color:#f59e0b;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin:0;">New Access Request</p>
+  <p style="color:#975428;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin:0;">New Access Request</p>
 </div>
 <div style="background:#fff;padding:32px;">
   <p style="color:#111;font-size:15px;line-height:1.6;margin:0 0 16px;"><strong>${esc(requester.name)}</strong> is requesting access to the portal.</p>
@@ -314,13 +314,13 @@ export function buildSupportTicketEmailHtml(params: {
 
   return wrapEmail(`
 <div style="background:#0a0a0e;padding:28px 32px;">
-  <p style="color:#f59e0b;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin:0;">New Support Ticket</p>
+  <p style="color:#975428;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin:0;">New Support Ticket</p>
   <p style="color:#fff;font-size:18px;font-weight:800;margin:6px 0 0;">#${esc(shortCode)} &middot; ${esc(category)}</p>
 </div>
 <div style="background:#fff;padding:32px;">
   <p style="color:#111;font-size:15px;line-height:1.6;margin:0 0 4px;"><strong>${esc(userName)}</strong> reported an issue.</p>
   <p style="color:#6b7280;font-size:13px;margin:0 0 20px;">${esc(userEmail)}</p>
-  <div style="background:#f9fafb;border-left:3px solid #ea580c;padding:14px 18px;border-radius:0 10px 10px 0;margin:0 0 24px;">
+  <div style="background:#f9fafb;border-left:3px solid #975428;padding:14px 18px;border-radius:0 10px 10px 0;margin:0 0 24px;">
     <p style="color:#6b7280;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 6px;">The issue</p>
     <p style="color:#374151;font-size:14px;line-height:1.6;margin:0;white-space:pre-wrap;">${esc(body)}</p>
   </div>
@@ -341,7 +341,7 @@ export function buildSupportReplyEmailHtml(params: {
   const { userName, shortCode, replyPreview, threadUrl } = params;
   const logoUrl = `${getSiteUrl()}/the-reach-logo.png`;
   return wrapEmail(`
-<div style="background:linear-gradient(135deg,#ea580c,#f59e0b);padding:32px;text-align:center;">
+<div style="background:linear-gradient(135deg,#975428,#6C655A);padding:32px;text-align:center;">
   <img src="${logoUrl}" alt="The Reach" width="52" height="52" style="display:block;margin:0 auto 16px;border-radius:14px;background:rgba(255,255,255,0.2);padding:8px;" />
   <h1 style="color:#fff;font-size:22px;font-weight:800;margin:0;">You have a reply</h1>
   <p style="color:rgba(255,255,255,0.8);font-size:13px;margin:8px 0 0;">Support request #${esc(shortCode)}</p>
@@ -349,7 +349,7 @@ export function buildSupportReplyEmailHtml(params: {
 <div style="background:#fff;padding:32px;">
   <p style="color:#111;font-size:15px;line-height:1.6;margin:0 0 16px;">Hi <strong>${esc(userName)}</strong>,</p>
   <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 16px;">Our tech team replied to your support request:</p>
-  <div style="background:#f9fafb;border-left:3px solid #ea580c;padding:14px 18px;border-radius:0 10px 10px 0;margin:0 0 24px;">
+  <div style="background:#f9fafb;border-left:3px solid #975428;padding:14px 18px;border-radius:0 10px 10px 0;margin:0 0 24px;">
     <p style="color:#374151;font-size:14px;line-height:1.6;margin:0;white-space:pre-wrap;">${esc(replyPreview)}</p>
   </div>
   <div style="text-align:center;margin:8px 0 4px;">${ctaButton("View the reply", threadUrl)}</div>

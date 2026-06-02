@@ -99,7 +99,7 @@ export default function SetupPasswordPage() {
     setCropImageSrc(null);
   };
 
-  const inputClass = "w-full h-11 px-3 rounded-xl bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-[13px] text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 dark:focus:ring-orange-500/10 transition-all";
+  const inputClass = "w-full h-11 px-3 rounded-xl bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-[13px] text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none focus:border-[#975428] focus:ring-2 focus:ring-[#975428]/15 dark:focus:ring-[#975428]/15 transition-all";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -189,7 +189,7 @@ export default function SetupPasswordPage() {
           </div>
           <h1 className="text-[20px] font-bold text-gray-900 dark:text-white">You&apos;re all set!</h1>
           <p className="text-[13px] text-gray-500 dark:text-gray-400">Account created. Opening your workspace...</p>
-          <div className="w-8 h-8 mx-auto border-3 border-gray-200 border-t-orange-500 rounded-full animate-spin" />
+          <div className="w-8 h-8 mx-auto border-3 border-gray-200 border-t-[#975428] rounded-full animate-spin" />
         </div>
       </div>
     );
@@ -201,7 +201,7 @@ export default function SetupPasswordPage() {
         <div className="bg-white dark:bg-[#131316] rounded-2xl border border-gray-200/80 dark:border-white/[0.06] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_6px_24px_rgba(0,0,0,0.03)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.2),0_6px_24px_rgba(0,0,0,0.15)] overflow-hidden">
 
           {/* Header */}
-          <div className="bg-gradient-to-r from-orange-500 to-orange-600 px-7 py-6">
+          <div className="bg-gradient-to-r from-[#975428] to-[#6C655A] px-7 py-6">
             <div className="flex items-center gap-4">
               <RawImage src="/the-reach-logo.png" alt="The Reach" className="w-10 h-10 rounded-xl object-contain bg-white/20 backdrop-blur-sm p-1.5" />
               <div>
@@ -214,7 +214,7 @@ export default function SetupPasswordPage() {
           {/* Invite info badge */}
           {(inviteEmail || inviteRole) && (
             <div className="mx-6 mt-5 flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/[0.05]">
-              <Shield className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+              <Shield className="w-3.5 h-3.5 text-[#975428] shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
                   Invited as <span className="font-semibold text-gray-700 dark:text-gray-300 capitalize">{inviteRole || "team member"}</span>
@@ -238,11 +238,11 @@ export default function SetupPasswordPage() {
               <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Profile Photo <span className="text-red-400">*</span></label>
               <label className="cursor-pointer group p-1.5">
                 <input type="file" accept="image/*" onChange={handleAvatarSelect} className="hidden" />
-                <div className="w-24 h-24 sm:w-20 sm:h-20 rounded-full border-2 border-dashed border-gray-300 dark:border-white/[0.12] group-hover:border-orange-400 dark:group-hover:border-orange-500 transition-colors flex items-center justify-center overflow-hidden bg-gray-50 dark:bg-white/[0.04]">
+                <div className="w-24 h-24 sm:w-20 sm:h-20 rounded-full border-2 border-dashed border-gray-300 dark:border-white/[0.12] group-hover:border-[#975428] dark:group-hover:border-[#975428] transition-colors flex items-center justify-center overflow-hidden bg-gray-50 dark:bg-white/[0.04]">
                   {avatarPreview ? (
                     <RawImage src={avatarPreview} alt="Preview" className="w-full h-full object-cover" />
                   ) : (
-                    <Camera className="w-6 h-6 text-gray-300 dark:text-gray-600 group-hover:text-orange-400 transition-colors" />
+                    <Camera className="w-6 h-6 text-gray-300 dark:text-gray-600 group-hover:text-[#975428] transition-colors" />
                   )}
                 </div>
               </label>
@@ -284,7 +284,7 @@ export default function SetupPasswordPage() {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-              {password.length > 0 && password.length < 8 && <p className="text-[10px] text-amber-500">Must be at least 8 characters</p>}
+              {password.length > 0 && password.length < 8 && <p className="text-[10px] text-[#975428]">Must be at least 8 characters</p>}
             </div>
 
             {/* Confirm */}
@@ -294,7 +294,7 @@ export default function SetupPasswordPage() {
               {confirm.length > 0 && password !== confirm && <p className="text-[10px] text-red-500">Passwords don&apos;t match</p>}
             </div>
 
-            <button type="submit" disabled={!isValid || loading} className="w-full h-11 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-[13px] font-bold shadow-lg shadow-orange-500/20 disabled:opacity-40 transition-all cursor-pointer flex items-center justify-center gap-2">
+            <button type="submit" disabled={!isValid || loading} className="w-full h-11 rounded-xl bg-[#975428] hover:bg-[#7f4421] text-white text-[13px] font-bold shadow-lg shadow-[#975428]/20 disabled:opacity-40 transition-all cursor-pointer flex items-center justify-center gap-2">
               {loading ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Setting up...</> : "Create Account & Enter Dashboard"}
             </button>
           </form>

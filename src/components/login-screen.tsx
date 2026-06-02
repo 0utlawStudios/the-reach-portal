@@ -91,7 +91,7 @@ export function LoginScreen() {
                     value={email}
                     onChange={(e) => { setEmail(e.target.value); setError(""); }}
                     autoComplete="email"
-                    className="w-full h-12 pl-11 pr-4 rounded-xl bg-slate-50 dark:bg-white/[0.04] border border-gray-200/80 dark:border-white/[0.08] text-[14px] text-gray-900 dark:text-gray-100 placeholder:text-gray-300 dark:placeholder:text-gray-600 outline-none focus:bg-white dark:focus:bg-white/[0.06] focus:border-[#f59e0b] focus:ring-2 focus:ring-[#f59e0b]/20 transition-all"
+                    className="w-full h-12 pl-11 pr-4 rounded-xl bg-[#f7f5ef] dark:bg-white/[0.04] border border-gray-200/80 dark:border-white/[0.08] text-[14px] text-gray-900 dark:text-gray-100 placeholder:text-gray-300 dark:placeholder:text-gray-600 outline-none focus:bg-white dark:focus:bg-white/[0.06] focus:border-[#975428] focus:ring-2 focus:ring-[#975428]/20 transition-all"
                     autoFocus
                   />
                 </div>
@@ -101,7 +101,7 @@ export function LoginScreen() {
               <motion.div className="space-y-1.5" {...fadeUp(0.14)}>
                 <div className="flex items-center justify-between">
                   <label className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-[0.1em]">Password</label>
-                  <Link href="/auth/forgot-password" className="text-[10px] font-semibold text-[#f59e0b] hover:text-orange-600 transition-colors">Forgot password?</Link>
+                  <Link href="/auth/forgot-password" className="text-[10px] font-semibold text-[#975428] hover:text-[#6C655A] transition-colors">Forgot password?</Link>
                 </div>
                 <div className="relative">
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300 dark:text-gray-600" />
@@ -111,7 +111,7 @@ export function LoginScreen() {
                     value={password}
                     onChange={(e) => { setPassword(e.target.value); setError(""); }}
                     autoComplete="current-password"
-                    className="w-full h-12 pl-11 pr-11 rounded-xl bg-slate-50 dark:bg-white/[0.04] border border-gray-200/80 dark:border-white/[0.08] text-[14px] text-gray-900 dark:text-gray-100 placeholder:text-gray-300 dark:placeholder:text-gray-600 outline-none focus:bg-white dark:focus:bg-white/[0.06] focus:border-[#f59e0b] focus:ring-2 focus:ring-[#f59e0b]/20 transition-all"
+                    className="w-full h-12 pl-11 pr-11 rounded-xl bg-[#f7f5ef] dark:bg-white/[0.04] border border-gray-200/80 dark:border-white/[0.08] text-[14px] text-gray-900 dark:text-gray-100 placeholder:text-gray-300 dark:placeholder:text-gray-600 outline-none focus:bg-white dark:focus:bg-white/[0.06] focus:border-[#975428] focus:ring-2 focus:ring-[#975428]/20 transition-all"
                   />
                   <button
                     type="button"
@@ -142,7 +142,7 @@ export function LoginScreen() {
                 <button
                   type="submit"
                   disabled={!email.trim() || !password.trim() || isLoading}
-                  className="w-full h-12 rounded-xl bg-[#f59e0b] hover:bg-orange-500 active:bg-orange-600 hover:-translate-y-0.5 text-white text-[14px] font-bold shadow-lg shadow-[#f59e0b]/25 hover:shadow-xl hover:shadow-[#f59e0b]/30 disabled:opacity-40 disabled:shadow-none disabled:hover:translate-y-0 cursor-pointer transition-all duration-200 flex items-center justify-center gap-2"
+                  className="w-full h-12 rounded-xl bg-[#975428] hover:bg-[#7f4421] active:bg-[#6f3b1d] hover:-translate-y-0.5 text-white text-[14px] font-bold shadow-lg shadow-[#975428]/25 hover:shadow-xl hover:shadow-[#975428]/30 disabled:opacity-40 disabled:shadow-none disabled:hover:translate-y-0 cursor-pointer transition-all duration-200 flex items-center justify-center gap-2"
                 >
                   {isLoading ? (
                     <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -156,28 +156,28 @@ export function LoginScreen() {
             {/* Request Access */}
             <motion.p className="text-center text-[12px] text-gray-400 mt-6" {...fadeUp(0.26)}>
               Don&apos;t have an account?{" "}
-              <a href="/request-access" className="text-[#f59e0b] hover:text-orange-600 font-semibold transition-colors">Request Access</a>
+              <a href="/request-access" className="text-[#975428] hover:text-[#6C655A] font-semibold transition-colors">Request Access</a>
             </motion.p>
           </div>
         </div>
 
         {/* Footer */}
         <motion.div className="px-8 pb-5 lg:px-14" {...fadeUp(0.4)}>
-          <p className="text-[10px] text-slate-300/60 dark:text-slate-700 text-center">Developed by Aldridge</p>
+          <p className="text-[10px] text-[#6C655A]/35 dark:text-[#E1DFD5]/25 text-center">Developed by Aldridge</p>
         </motion.div>
       </div>
 
       {/* ═══════════════════════════════════════════════
           RIGHT: Brand Canvas (hidden on mobile)
           ═══════════════════════════════════════════════ */}
-      <div className="hidden lg:flex relative overflow-hidden bg-gradient-to-br from-slate-950 via-[#0f172a] to-black">
+      <div className="hidden lg:flex relative overflow-hidden bg-gradient-to-br from-[#6C655A] via-[#5A656C] to-[#2f302d]">
 
         {/* ── Gradient Mesh ── */}
         <div className="absolute inset-0">
-          <div className="absolute top-[-12%] right-[-8%] w-[700px] h-[700px] rounded-full" style={{ background: "radial-gradient(circle, rgba(245,158,11,0.14), transparent 60%)" }} />
-          <div className="absolute bottom-[-18%] left-[-12%] w-[800px] h-[800px] rounded-full" style={{ background: "radial-gradient(circle, rgba(249,115,22,0.07), transparent 55%)" }} />
-          <div className="absolute top-[40%] left-[45%] w-[500px] h-[500px] rounded-full" style={{ background: "radial-gradient(circle, rgba(59,130,246,0.035), transparent 55%)" }} />
-          <div className="absolute bottom-[8%] right-[8%] w-[350px] h-[350px] rounded-full" style={{ background: "radial-gradient(circle, rgba(245,158,11,0.05), transparent 50%)" }} />
+          <div className="absolute top-[-12%] right-[-8%] w-[700px] h-[700px] rounded-full" style={{ background: "radial-gradient(circle, rgba(151,84,40,0.14), transparent 60%)" }} />
+          <div className="absolute bottom-[-18%] left-[-12%] w-[800px] h-[800px] rounded-full" style={{ background: "radial-gradient(circle, rgba(225,223,213,0.07), transparent 55%)" }} />
+          <div className="absolute top-[40%] left-[45%] w-[500px] h-[500px] rounded-full" style={{ background: "radial-gradient(circle, rgba(90,101,108,0.10), transparent 55%)" }} />
+          <div className="absolute bottom-[8%] right-[8%] w-[350px] h-[350px] rounded-full" style={{ background: "radial-gradient(circle, rgba(151,84,40,0.05), transparent 50%)" }} />
         </div>
 
         {/* ── Dot grid ── */}
@@ -194,7 +194,7 @@ export function LoginScreen() {
           >
             <div className="flex items-center justify-between mb-3">
               <span className="text-[10px] font-semibold text-white/40 uppercase tracking-[0.1em]">Engagement</span>
-              <BarChart3 className="w-3.5 h-3.5 text-[#f59e0b]/60" />
+              <BarChart3 className="w-3.5 h-3.5 text-[#975428]/60" />
             </div>
             <p className="text-[28px] font-extrabold text-white tracking-[-0.03em]">24.8%</p>
             <div className="flex items-center gap-1.5 mt-1.5">
@@ -204,8 +204,8 @@ export function LoginScreen() {
             {/* Mini bar chart */}
             <div className="flex items-end gap-1 mt-4 h-[28px]">
               {[35, 50, 40, 65, 55, 80, 70, 90, 75, 95].map((h, i) => (
-                <div key={i} className="flex-1 rounded-sm bg-[#f59e0b]/20" style={{ height: `${h}%` }}>
-                  <div className="w-full rounded-sm bg-[#f59e0b]/60" style={{ height: `${Math.min(100, h + 15)}%` }} />
+                <div key={i} className="flex-1 rounded-sm bg-[#975428]/20" style={{ height: `${h}%` }}>
+                  <div className="w-full rounded-sm bg-[#975428]/60" style={{ height: `${Math.min(100, h + 15)}%` }} />
                 </div>
               ))}
             </div>
@@ -220,12 +220,12 @@ export function LoginScreen() {
           >
             <div className="flex items-center justify-between mb-3">
               <span className="text-[10px] font-semibold text-white/40 uppercase tracking-[0.1em]">The Reach</span>
-              <Zap className="w-3.5 h-3.5 text-[#f59e0b]/60" />
+              <Zap className="w-3.5 h-3.5 text-[#975428]/60" />
             </div>
             <div className="space-y-2.5">
               {[
                 { label: "Ideas", count: 12, color: "bg-sky-400" },
-                { label: "In Review", count: 8, color: "bg-[#f59e0b]" },
+                { label: "In Review", count: 8, color: "bg-[#975428]" },
                 { label: "Approved", count: 5, color: "bg-emerald-400" },
                 { label: "Published", count: 31, color: "bg-violet-400" },
               ].map((s) => (
@@ -252,7 +252,7 @@ export function LoginScreen() {
               <Send className="w-3.5 h-3.5 text-emerald-400/60" />
             </div>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#f59e0b]/20 to-orange-500/10 border border-white/[0.06] flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#975428]/20 to-[#E1DFD5]/10 border border-white/[0.06] flex items-center justify-center">
                 <RawImage src="/the-reach-logo.png" alt="" className="w-6 h-6 object-contain" />
               </div>
               <div className="flex-1 min-w-0">
@@ -285,7 +285,7 @@ export function LoginScreen() {
 
             <div className="flex items-center gap-8 mt-10 pb-2">
               {[
-                { label: "The Reach", color: "bg-[#f59e0b]" },
+                { label: "The Reach", color: "bg-[#975428]" },
                 { label: "Approvals", color: "bg-emerald-400" },
                 { label: "Scheduling", color: "bg-sky-400" },
                 { label: "Publishing", color: "bg-violet-400" },

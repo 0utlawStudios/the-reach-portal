@@ -17,7 +17,7 @@ export default function RequestAccessPage() {
 
   const isValid = name.trim() && email.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-  const inputClass = "w-full h-11 px-3 rounded-xl bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-[13px] text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 dark:focus:ring-orange-500/10 transition-all";
+  const inputClass = "w-full h-11 px-3 rounded-xl bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-[13px] text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none focus:border-[#975428] focus:ring-2 focus:ring-[#975428]/15 dark:focus:ring-[#975428]/15 transition-all";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,7 +61,7 @@ export default function RequestAccessPage() {
           <p className="text-[14px] text-gray-500 dark:text-gray-400 leading-relaxed">
             Your access request has been sent to the team admin. You&apos;ll receive an email once your account is approved.
           </p>
-          <Link href="/" className="inline-flex items-center gap-2 text-[13px] text-orange-500 hover:text-orange-600 font-semibold transition-colors">
+          <Link href="/" className="inline-flex items-center gap-2 text-[13px] text-[#975428] hover:text-[#6C655A] font-semibold transition-colors">
             <ArrowLeft className="w-4 h-4" />Back to login
           </Link>
         </div>
@@ -139,12 +139,12 @@ export default function RequestAccessPage() {
               </div>
             </div>
 
-            <button type="submit" disabled={!isValid || loading} className="w-full h-11 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-[13px] font-bold shadow-lg shadow-orange-500/20 disabled:opacity-40 transition-all cursor-pointer flex items-center justify-center gap-2">
+            <button type="submit" disabled={!isValid || loading} className="w-full h-11 rounded-xl bg-[#975428] hover:bg-[#7f4421] text-white text-[13px] font-bold shadow-lg shadow-[#975428]/20 disabled:opacity-40 transition-all cursor-pointer flex items-center justify-center gap-2">
               {loading ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Submitting...</> : "Submit Request"}
             </button>
 
             <p className="text-center text-[12px] text-gray-400">
-              Already have an account? <Link href="/" className="text-orange-500 hover:text-orange-600 font-semibold transition-colors">Sign in</Link>
+              Already have an account? <Link href="/" className="text-[#975428] hover:text-[#6C655A] font-semibold transition-colors">Sign in</Link>
             </p>
           </form>
         </div>
