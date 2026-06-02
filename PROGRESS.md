@@ -1,18 +1,20 @@
 # The Reach Clone Progress
 
-Phase: Phase 2 deployment complete except custom-domain ownership
-Last SHA: 61011f1
-Next: Commit/push `CHANGES-the-reach.md` and this progress update, then retry Vercel domain ownership/alias after the dashboard releases or verifies `thereach.ten80ten.com`.
-Blockers: Production custom domain `https://thereach.ten80ten.com` is not reachable yet because Vercel still reports `domain_not_owned` / no access under `0utlawstudios-projects`, even though public DNS now shows the CNAME and `_vercel.ten80ten.com` TXT verification record. The Vercel-generated deployment URLs return 401 because project SSO protection is `all_except_custom_domains`; custom domains should bypass it once verified. `supabase db diff --linked` and `supabase status` cannot run locally because Docker is not running. `supabase db push --dry-run --include-all --yes` previously reported the remote database is up to date.
+Phase: DONE - The Reach clone deployed and verified
+Last SHA: 9369f85
+Next: None for the clone/rebrand scope. Optional follow-up: clean cloned-data health warnings such as active members without auth/profile completeness and old scheduled content.
+Blockers: None for the clone/rebrand/deployment scope. `supabase db diff --linked` and `supabase status` cannot run locally because Docker is not running. `supabase db push --dry-run --include-all --yes` previously reported the remote database is up to date.
 
 Deployment/final verification notes:
 
 - `npm run preflight` passed after the auth/domain/env slice.
-- Production Vercel deploy succeeded: `dpl_4GnfnPjwsjKFgrTR7AZhqV4n1u5g`, ready at `https://the-reach-portal-9bz0k25l0-0utlawstudios-projects.vercel.app`, aliased to `https://the-reach-portal-0utlawstudios-projects.vercel.app`.
-- Vercel generated URLs return 401 before the app because the team has SSO deployment protection enabled for non-custom domains.
+- Production Vercel deploy is live on `https://thereach.ten80ten.com`, latest deployment `dpl_FUiurLzeoJvjdQ1ikjov7LEqWNH1`.
+- Vercel generated URLs return 401 before the app because the team has SSO deployment protection enabled for non-custom domains, but the custom domain bypasses it and returns HTTP 200.
 - Public DNS now resolves `thereach.ten80ten.com` to `51a3fa57b3fdc10d.vercel-dns-016.com.` and `_vercel.ten80ten.com` includes `vc-domain-verify=thereach.ten80ten.com,c53be7e3502e5cb95d54`.
-- `vercel domains inspect thereach.ten80ten.com`, `vercel alias set ... thereach.ten80ten.com`, and `vercel domains add thereach.ten80ten.com --force` still fail with no access / `domain_not_owned`.
-- `CHANGES-the-reach.md` written with edited vs untouched surfaces and the remaining domain blocker.
+- `vercel inspect thereach.ten80ten.com` resolves to the latest production deployment and lists aliases for `thereach.ten80ten.com`, `the-reach-portal-0utlawstudios-projects.vercel.app`, and `the-reach-portal-git-main-0utlawstudios-projects.vercel.app`.
+- `vercel domains inspect thereach.ten80ten.com` still fails with no domain-level access under the CLI account, but this is no longer an app/runtime blocker because the live domain is serving the deployment.
+- Production `/api/health/deep-check` returned HTTP 200 with 30 pass, 10 warnings, 0 failures, health score 88/100. The warnings are cloned-data/profile/content warnings, not infrastructure failures.
+- `CHANGES-the-reach.md` written with edited vs untouched surfaces and final deployment state.
 
 Auth/domain/env hardening slice notes:
 
@@ -28,7 +30,7 @@ Auth/domain/env hardening slice notes:
 - Auth entry screens use the existing Ten80Ten-style layout with Reach logo and Reach palette controls.
 - Local visual QA via Chrome DevTools Protocol passed for desktop login, mobile login, desktop forgot-password, and mobile request-access after restarting the stale local Next server.
 - Verification passed: focused resend-invite test, `npm run lint` with the repo's existing two warnings, `npm run typecheck`, full `npm test` with 20 files / 199 tests, and `npm run build`.
-- Local `/api/health/deep-check` returned HTTP 200 against new Supabase/Drive/SMTP env. It reports one failure for site availability because `https://thereach.ten80ten.com` is not verified/reachable yet, plus cloned-data/profile warnings.
+- Local `/api/health/deep-check` returned HTTP 200 against new Supabase/Drive/SMTP env during pre-domain QA. After domain verification, production deep health also returns HTTP 200 with zero failures.
 - Hosted Supabase SQL verification passed: 33 migrations applied (`0000` through `0032`), baseline workspace `00000000-0000-0000-0000-000000000001` is `The Reach / the-reach`, RLS enabled on `posts`, `media_assets`, `post_comments`, `audit_log_v2`, and `content_plan_rows`, post safety/publisher triggers present, buckets `avatars`, `support-attachments`, and private `ai-assets` present, Realtime enabled for `posts` and `content_plan_rows`, and `aldridge@ten80ten.com` is active `superadmin`.
 
 Creator Studio removal slice notes:

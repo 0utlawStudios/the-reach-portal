@@ -5,7 +5,7 @@
 - Git/repo binding: reset `origin` to `https://github.com/0utlawStudios/the-reach-portal.git` and pushed `main`.
 - Supabase binding: linked the project to ref `gxmpmdhmxyfqusdzcemt`, applied all migrations `0000` through `0032`, kept baseline workspace `00000000-0000-0000-0000-000000000001`, created private `ai-assets`, and enabled Realtime for `posts` and `content_plan_rows`.
 - Supabase hosted Auth: set `site_url` and redirect allow-list to `https://thereach.ten80ten.com`, disabled public signup, set SMTP sender name/subjects/templates to The Reach, and kept invite/recovery routes on `/auth/confirm`.
-- Vercel: created/linked/deployed project `the-reach-portal`, connected GitHub, populated Production and Development env keys, and deployed production at `https://the-reach-portal-9bz0k25l0-0utlawstudios-projects.vercel.app`.
+- Vercel: created/linked/deployed project `the-reach-portal`, connected GitHub, populated Production and Development env keys, and deployed production at `https://thereach.ten80ten.com`.
 - Domain config: changed app/Supabase/env site URL from the old Reach placeholder to `https://thereach.ten80ten.com`.
 - Branding/assets: replaced Ten80Ten user-facing strings/logos with The Reach assets, regenerated icons/favicon/OG image, removed `Content Engine` user-facing copy, and updated manifest/package/n8n/service-worker branding.
 - Palette tokens: applied Reach Sand `#E1DFD5`, Stone `#6C655A`, Sun `#975428`, and Water `#5A656C` to central tokens/manifest and auth entry surfaces.
@@ -30,9 +30,9 @@
 - Full test suite passed: 20 files, 199 tests.
 - Build passed locally and on Vercel.
 - Hosted Supabase SQL audit passed: 33 migrations, RLS on protected tables, post safety/publisher triggers, buckets, Realtime, baseline workspace, and superadmin.
-- Local deep health returned HTTP 200 against new Supabase/Drive/SMTP env.
+- Production deep health returned HTTP 200 against new Supabase/Drive/SMTP env: 30 pass, 10 warnings, 0 failures, health score 88/100.
 - Local Chrome CDP visual QA passed for desktop/mobile login, forgot-password, and request-access.
 
-## Remaining Blocker
+## Final Status
 
-- `thereach.ten80ten.com` has public DNS records in place, but Vercel still reports `domain_not_owned` / no access under `0utlawstudios-projects`. The Vercel-generated URLs are protected by team SSO, and project protection is set to `all_except_custom_domains`, so public access depends on completing custom-domain ownership in Vercel.
+- `https://thereach.ten80ten.com` is live and serving the latest Vercel production deployment. The Vercel CLI still cannot inspect the domain ownership object directly, but `vercel inspect thereach.ten80ten.com`, HTTPS, and production health all verify the app is live.
