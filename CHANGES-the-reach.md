@@ -75,6 +75,7 @@
 - Dashboard fit/density slice passed production screenshot inspection before patch, `npm run typecheck`, `npm run lint` with only existing warnings, full `npm test` with 26 files / 232 tests, and `npm run build`.
 - Dashboard fit/density final correction was pushed as `5fb733e`; GitHub CI passed and Vercel production deployment `dpl_F9MbsVF19BuF1K8AdVPa8zYnGCZQ` is ready on `https://thereach.ten80ten.com`; live screenshots were captured at `2048x1192` and `1280x720`.
 - Team/invite cleanup verified production now has only `aldridge@ten80ten.com` as active `superadmin` with avatar, exactly one active baseline `workspace_members` row, and no Auth users for the removed cloned/test emails.
+- Production health after team cleanup passed: keep-alive HTTP 200 and deep-check HTTP 200 with 40 checks, 0 failures, and 0 warnings.
 - Command-button contrast slice passed `git diff --check`, `npm run typecheck`, `npm run lint` with only existing warnings, and `npm run build`.
 - Command-button contrast slice was pushed as `64dd5b8`; GitHub CI passed and Vercel production deployment `dpl_6rwRBoBCpcyM6bUj2Wg8p9pu7Q3n` is ready on `https://thereach.ten80ten.com`.
 - Support Inbox root cause reproduced on production before the fix: thread list returned the Hanes chat, but thread detail and read receipt routes returned `404`; live schema verification confirmed `workspace_members.id` does not exist and `workspace_members.workspace_id` does.

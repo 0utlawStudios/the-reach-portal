@@ -49,6 +49,7 @@ Team/invite production cleanup notes:
 - Removed cloned/test users `christer@ten80ten.com`, `hanes@ten80ten.com`, and `shang.ten80ten@gmail.com` from production team rows, workspace access, and Auth.
 - Verified live post-cleanup state: exactly one `team_members` row remains (`aldridge@ten80ten.com`, `superadmin`, `active`, avatar present); exactly one active `workspace_members` row remains for the baseline workspace; removed emails have no Auth users.
 - Reinvites for those emails are now clean and will pass through the hardened setup flow that requires a profile photo before workspace activation.
+- Production health after cleanup passed using the correct `Authorization: Bearer <HEALTH_CHECK_SECRET>` contract: `/api/health/keep-alive` returned HTTP 200 `ok: true`; `/api/health/deep-check` returned HTTP 200 with 40 checks, 0 failures, and 0 warnings.
 
 Reach command-button contrast slice notes:
 
