@@ -219,9 +219,10 @@ async function putToGoogle(
 }
 
 async function finalizeUpload(fileId: string): Promise<DriveUploadResult> {
+  const headers = await getAuthHeaders();
   const res = await fetch("/api/drive/finalize", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({ fileId }),
   });
 

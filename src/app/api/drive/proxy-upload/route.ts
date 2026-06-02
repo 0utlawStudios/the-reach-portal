@@ -1,5 +1,4 @@
 import { NextRequest } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import {
   getRootFolderId,
   ensureSubfolder,
@@ -7,10 +6,25 @@ import {
   getAccessToken,
 } from "@/lib/google-drive";
 import { consume, getClientIp } from "@/lib/rate-limit";
+import { requireBearerTeamRole } from "@/lib/auth/require";
 
 export const maxDuration = 60;
 
 const VALID_FOLDERS = ["thumbnails", "raw-files", "media-library"] as const;
+const ALLOWED_DRIVE_ROLES: ReadonlyArray<string> = [
+  "superadmin",
+  "admin",
+  "owner",
+  "approver",
+  "creative_director",
+  "editor",
+  "social_media_specialist",
+  "video_editor",
+  "graphic_designer",
+  "specialist",
+  "technician",
+  "viewer",
+];
 
 // SEC-001: Allowed MIME types for proxy-uploaded media. Mirrors the formats
 // the rest of the pipeline (Drive thumbnails, video preview, IG/FB targets)
@@ -37,24 +51,9 @@ function jsonResponse(data: Record<string, unknown>, status = 200) {
 
 export async function POST(request: NextRequest) {
   try {
-    // SEC-001: Bearer-user auth at the top — proxy-upload was previously
-    // unauthenticated, so anyone could write to our Drive folder. Match the
-    // drive/upload pattern exactly so the two endpoints share one auth
-    // contract.
-    const userToken = request.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
-    if (!userToken) {
-      return jsonResponse({ error: "Unauthorized" }, 401);
-    }
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!supabaseUrl || !serviceKey) {
-      return jsonResponse({ error: "Auth not configured" }, 500);
-    }
-    const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
-    const { data: { user }, error: authErr } = await admin.auth.getUser(userToken);
-    if (authErr || !user) {
-      return jsonResponse({ error: "Unauthorized" }, 401);
-    }
+    const auth = await requireBearerTeamRole(request, ALLOWED_DRIVE_ROLES);
+    if (auth instanceof Response) return auth;
+    const { user } = auth;
 
     // SEC-001: 30/min/user. Tighter than drive/upload (which only mints a
     // resumable URL) because each call here actually streams bytes through

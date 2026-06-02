@@ -1,9 +1,20 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: d2d6d51 support access hardening
-Next: Push the Reach light-theme contrast and persisted theme-default slice, then continue Drive/media-library hardening.
+Last pushed SHA: 4da63b8 Reach light-theme contrast and persisted theme defaults
+Next: Push the Drive/media-library wiring hardening slice, then build the client manual.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
+
+Drive / Media Library wiring hardening slice notes:
+
+- Fixed the large-file Drive upload path: `/api/drive/finalize` requires bearer team auth, so the client resumable upload flow now sends the current Supabase bearer headers during finalize.
+- Hardened `/api/drive/upload` and `/api/drive/proxy-upload` from "any Auth user" to the shared active team/workspace role gate via `requireBearerTeamRole`, preventing pending/stale Auth users from writing to the 60TB Drive backend.
+- Kept the existing Drive upload folder allow-list: `thumbnails`, `raw-files`, and `media-library`.
+- Patched `MediaPicker` so Create Post → Browse Library loads `media_assets` from Supabase, subscribes to Realtime updates, and merges preuploaded Media Library assets with post-attached source vault files.
+- Patched Media Library uploads to save rows under `Media Library` and use the baseline workspace fallback if `workspaceId` is still hydrating, preserving AGENTS.md workspace insert rules.
+- Added a visible error toast if a file reaches Drive but the `media_assets` row insert fails, instead of silently pretending the library save worked.
+- Verified `npm run typecheck` passed.
+- Verified `npm run lint` passed with only the repo's existing warnings in untouched `src/lib/ai/worker.ts` and `src/lib/pipeline-context.tsx`.
 
 Reach light-theme / design polish slice notes:
 

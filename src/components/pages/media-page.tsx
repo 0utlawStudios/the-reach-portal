@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 
 type StatusFilter = "all" | "unused" | "inuse";
+const BASELINE_WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 type MediaAssetRow = {
   id?: string;
   name?: string;
@@ -146,14 +147,14 @@ export function MediaPage() {
           name: file.name,
           url: result.url,
           type: file.type.startsWith("video") ? "video" : "image",
-          folder: "Uploads",
+          folder: "Media Library",
           uploadedAt: new Date().toISOString(),
           addedBy: currentUser.name,
         };
 
         // Persist to Supabase
         if (useDb) {
-          const { data: inserted } = await supabase
+          const { data: inserted, error } = await supabase
             .from("media_assets")
             .insert({
               name: asset.name,
@@ -161,10 +162,15 @@ export function MediaPage() {
               file_type: asset.type,
               folder: asset.folder,
               added_by: asset.addedBy,
-              workspace_id: workspaceId,
+              workspace_id: workspaceId || BASELINE_WORKSPACE_ID,
             })
             .select("id")
             .single();
+          if (error) {
+            console.error("[media] upload library insert failed:", error.message);
+            addToast(`Uploaded ${file.name} to Drive, but library save failed. Try again.`, "error");
+            continue;
+          }
           if (inserted) asset.id = inserted.id;
         }
 

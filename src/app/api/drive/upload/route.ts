@@ -1,16 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import {
   getRootFolderId,
   ensureSubfolder,
   createResumableUploadSession,
 } from "@/lib/google-drive";
 import { consume, getClientIp } from "@/lib/rate-limit";
+import { requireBearerTeamRole } from "@/lib/auth/require";
 
 export const maxDuration = 10;
 
 const VALID_FOLDERS = ["thumbnails", "raw-files", "media-library"] as const;
 type FolderName = (typeof VALID_FOLDERS)[number];
+const ALLOWED_DRIVE_ROLES: ReadonlyArray<string> = [
+  "superadmin",
+  "admin",
+  "owner",
+  "approver",
+  "creative_director",
+  "editor",
+  "social_media_specialist",
+  "video_editor",
+  "graphic_designer",
+  "specialist",
+  "technician",
+  "viewer",
+];
 
 interface UploadRequest {
   fileName: string;
@@ -22,22 +36,9 @@ interface UploadRequest {
 
 export async function POST(request: NextRequest) {
   try {
-    // ─── Auth: require a valid Supabase session to prevent anonymous abuse
-    // of our Google Drive write quota / storage.
-    const token = request.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!supabaseUrl || !serviceKey) {
-      return NextResponse.json({ error: "Auth not configured" }, { status: 500 });
-    }
-    const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
-    const { data: { user }, error: authErr } = await admin.auth.getUser(token);
-    if (authErr || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireBearerTeamRole(request, ALLOWED_DRIVE_ROLES);
+    if (auth instanceof NextResponse) return auth;
+    const { user } = auth;
 
     // Rate-limit: 60 upload-session creations per minute per user.
     const rlKey = `user:${user.id}|ip:${getClientIp(request)}`;

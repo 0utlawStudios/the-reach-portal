@@ -4,11 +4,13 @@ import { RawImage } from "@/components/raw-image";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { usePipeline } from "@/lib/pipeline-context";
 import { useToast } from "@/lib/toast-context";
+import { supabase } from "@/lib/supabaseClient";
 import { X, Upload, FolderOpen, Image as ImageIcon, Film, Search, CheckCircle, Clock, Link2, ExternalLink } from "lucide-react";
 import { PLACEHOLDER_MEDIA } from "@/lib/placeholder-data";
 import { useFocusTrap } from "./use-focus-trap";
 
 const ASSET_SOURCES = ["Canva Pro", "Envato Elements", "Pexels", "Shot by Team", "Client Provided", "Google Images", "AI Generated"];
+const BASELINE_WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
 type PickerTab = "upload" | "library";
 
@@ -21,6 +23,16 @@ interface MediaEntry {
   usedInCards: { id: string; title: string }[];
 }
 
+interface MediaAssetRow {
+  id?: string;
+  name?: string;
+  url?: string;
+  file_type?: "image" | "video" | null;
+  folder?: string | null;
+  used_in?: string[] | null;
+  workspace_id?: string | null;
+}
+
 interface MediaPickerProps {
   open: boolean;
   onClose: () => void;
@@ -31,8 +43,9 @@ interface MediaPickerProps {
 }
 
 export function MediaPicker({ open, onClose, onSelect, folder = "raw-files", cardId, defaultTab = "upload" }: MediaPickerProps) {
-  const { cards } = usePipeline();
+  const { cards, workspaceId } = usePipeline();
   const { addToast } = useToast();
+  const [mediaAssets, setMediaAssets] = useState<MediaAssetRow[]>([]);
   const [tab, setTab] = useState<PickerTab>(defaultTab);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -58,9 +71,71 @@ export function MediaPicker({ open, onClose, onSelect, folder = "raw-files", car
 
   useFocusTrap(dialogRef, open);
 
+  useEffect(() => {
+    if (!open) return;
+    const wsId = workspaceId || BASELINE_WORKSPACE_ID;
+    let cancelled = false;
+
+    supabase
+      .from("media_assets")
+      .select("id, name, url, file_type, folder, used_in, workspace_id")
+      .eq("workspace_id", wsId)
+      .order("uploaded_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) {
+          console.error("[media-picker] media_assets load failed:", error.message);
+          setMediaAssets([]);
+          return;
+        }
+        setMediaAssets((data || []) as MediaAssetRow[]);
+      });
+
+    const channel = supabase
+      .channel(`media-picker-assets-${wsId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "media_assets", filter: `workspace_id=eq.${wsId}` },
+        (payload) => {
+          if (payload.eventType === "INSERT") {
+            const row = payload.new as MediaAssetRow;
+            setMediaAssets((prev) => prev.some((m) => m.id === row.id) ? prev : [row, ...prev]);
+          } else if (payload.eventType === "UPDATE") {
+            const row = payload.new as MediaAssetRow;
+            setMediaAssets((prev) => prev.map((m) => m.id === row.id ? row : m));
+          } else if (payload.eventType === "DELETE") {
+            const row = payload.old as MediaAssetRow;
+            setMediaAssets((prev) => prev.filter((m) => m.id !== row.id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [open, workspaceId]);
+
   // Build media index: accumulate ALL card references per URL
   const allMedia = useMemo(() => {
     const urlMap = new Map<string, MediaEntry>();
+    const cardsById = new Map(cards.map((c) => [c.id, c]));
+
+    mediaAssets.forEach((asset) => {
+      if (!asset.url) return;
+      const usedInCards = (asset.used_in || [])
+        .map((id) => cardsById.get(id))
+        .filter(Boolean)
+        .map((c) => ({ id: c!.id, title: c!.title }));
+      urlMap.set(asset.url, {
+        url: asset.url,
+        name: asset.name || "Media Library asset",
+        type: asset.file_type === "video" ? "video" : "image",
+        usedInCards,
+        source: asset.folder || "Media Library",
+      });
+    });
 
     cards.forEach((c) => {
       // Thumbnails
@@ -103,7 +178,7 @@ export function MediaPicker({ open, onClose, onSelect, folder = "raw-files", car
     });
 
     return Array.from(urlMap.values());
-  }, [cards]);
+  }, [cards, mediaAssets]);
 
   // Filter
   const filteredMedia = useMemo(() => {
