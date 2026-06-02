@@ -1,8 +1,8 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: ed89de2 docs: record pipeline drag production verification
-Next: Push dashboard fit/density cleanup, then verify CI/Vercel production.
+Last pushed SHA: 5fb733e fix: fit dashboard at short desktop height
+Next: Continue production-readiness backlog from the latest user additions: team/invite cleanup, settings/profile polish, pipeline realtime QA, and full production QA.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
 
 Settings / Brand Playbook UI cleanup slice notes:
@@ -38,6 +38,9 @@ Dashboard fit/density slice notes:
 - Adjusted the desktop auto-fit scale floor from the clipping-prone 0.8 behavior to a lower 0.72 readability floor so 1280x720 viewports fit instead of hiding lower cards behind the footer.
 - No data, pipeline, auth, Supabase, or support behavior changed.
 - Verification passed: `npm run typecheck`, `npm run lint` with only existing warnings, full `npm test` with 26 files / 232 tests, and `npm run build`.
+- Pushed dashboard fit commits `f646411`, `144c46a`, and final correction `5fb733e` to `origin/main`; GitHub CI passed lint, typecheck, tests, and build for `5fb733e`.
+- Vercel production deployment `dpl_F9MbsVF19BuF1K8AdVPa8zYnGCZQ` is ready and aliased to `https://thereach.ten80ten.com`.
+- Production screenshot checks captured `2048x1192` and `1280x720` live dashboard views with one-time superadmin Supabase magic-link sessions.
 
 Reach command-button contrast slice notes:
 
