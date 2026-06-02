@@ -11,6 +11,7 @@
 - Palette tokens: applied Reach Sand `#E1DFD5`, Stone `#6C655A`, Sun `#975428`, and Water `#5A656C` to central tokens/manifest and auth entry surfaces.
 - Creator Studio: removed the Studio navigation/page/settings/API surface and set `STUDIO_ENABLED=false`.
 - Auth/login/email: applied The Reach logo/palette to login, forgot-password, reset-password, setup, request-access, and shared email templates.
+- Forgot-password recovery bridge: if a copied Reach team member has no Supabase Auth user yet, `/api/auth/forgot-password` now creates or reuses the missing Auth user state and sends a branded setup link instead of silently failing.
 - Invite/reinvite hardening: updated `/api/team/resend-invite` to use persisted pending member data, normalize email, clean stale workspace access, delete the old auth user, and generate a fresh invite link. Added unit coverage.
 - Superadmin: verified `aldridge@ten80ten.com` is active `superadmin`.
 
@@ -23,11 +24,13 @@
 - Auto-revise backend routes and migration-backed AI/publisher tables.
 - SMTP credential values, copied from the approved Ten80Ten env source.
 - Existing cloned content data, team rows, posts, support schema, and keep-alive/deep-health route behavior.
+- Existing authenticated-user reset behavior: known Auth users still receive normal reset-password links.
 
 ## Verification
 
 - `npm run preflight` passed.
-- Full test suite passed: 20 files, 199 tests.
+- Full test suite passed: 21 files, 202 tests.
+- Focused forgot-password tests passed for existing Auth reset, active team-member setup recovery, partial Auth-user retry, and unknown-email anti-enumeration.
 - Build passed locally and on Vercel.
 - Hosted Supabase SQL audit passed: 33 migrations, RLS on protected tables, post safety/publisher triggers, buckets, Realtime, baseline workspace, and superadmin.
 - Production deep health returned HTTP 200 against new Supabase/Drive/SMTP env: 30 pass, 10 warnings, 0 failures, health score 88/100.

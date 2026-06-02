@@ -1,9 +1,18 @@
 # The Reach Clone Progress
 
-Phase: DONE - The Reach clone deployed and verified
-Last SHA: 9369f85
-Next: None for the clone/rebrand scope. Optional follow-up: clean cloned-data health warnings such as active members without auth/profile completeness and old scheduled content.
-Blockers: None for the clone/rebrand/deployment scope. `supabase db diff --linked` and `supabase status` cannot run locally because Docker is not running. `supabase db push --dry-run --include-all --yes` previously reported the remote database is up to date.
+Phase: AUTH FIX - forgot-password clone recovery bridge committed
+Last SHA: af95bdb
+Next: Push the forgot-password fix, wait for Vercel production deployment, trigger `aldridge@ten80ten.com` self-service setup email, then verify Auth user/workspace activation path.
+Blockers: None for the forgot-password fix. `supabase db diff --linked` and `supabase status` cannot run locally because Docker is not running. `supabase db push --dry-run --include-all --yes` previously reported the remote database is up to date.
+
+Forgot-password/auth-user clone fix notes:
+
+- Root cause confirmed in the live Reach Supabase project: `aldridge@ten80ten.com` exists as active `superadmin` in `team_members`, but the new Supabase project had zero Auth users, so password login and recovery had no Auth identity to operate on.
+- Patched `/api/auth/forgot-password` to preserve the normal reset flow for existing Auth users and add a silent self-service setup bridge for known `team_members` rows with `status in ('active','pending')` when a recovery link cannot be generated.
+- The bridge creates the missing Supabase Auth user with a temporary password, generates a token-hash invite link, and sends the existing branded Reach setup email through `/auth/confirm` -> `/auth/setup`. If a previous setup-email attempt already created the Auth user, it skips deletion and still generates a fresh setup link.
+- Unknown emails still return the same `{ success: true }` response and do not create Auth users, preserving the anti-enumeration behavior.
+- Recovery and invite token hashes are URL-encoded before being placed in `/auth/confirm`.
+- Verification passed: focused forgot-password tests, auth setup tests, resend-invite tests, setup-flow static tests, and full `npm run preflight` with 202 tests and production build. A post-hardening focused forgot-password run passed 4 tests.
 
 Deployment/final verification notes:
 

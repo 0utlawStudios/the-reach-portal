@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { getTransporter, getFromAddress, getSiteUrl, buildPasswordResetEmailHtml } from "@/lib/email-utils";
+import {
+  getTransporter,
+  getFromAddress,
+  getSiteUrl,
+  buildInviteEmailHtml,
+  buildPasswordResetEmailHtml,
+} from "@/lib/email-utils";
 import { consume, getClientIp } from "@/lib/rate-limit";
 
 export const maxDuration = 10;
@@ -10,6 +16,26 @@ function getAdminClient() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error("Supabase admin credentials not configured");
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+}
+
+async function sendRecoveryEmail(email: string, confirmUrl: string) {
+  const transporter = getTransporter();
+  await transporter.sendMail({
+    from: getFromAddress(),
+    to: email,
+    subject: "Reset your password for The Reach",
+    html: buildPasswordResetEmailHtml(confirmUrl),
+  });
+}
+
+async function sendSetupEmail(email: string, name: string, role: string, confirmUrl: string) {
+  const transporter = getTransporter();
+  await transporter.sendMail({
+    from: getFromAddress(),
+    to: email,
+    subject: "Set up your account for The Reach",
+    html: buildInviteEmailHtml(name, role, confirmUrl),
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -44,25 +70,75 @@ export async function POST(request: NextRequest) {
     });
 
     if (linkErr || !linkData?.properties?.hashed_token) {
-      // Don't reveal that the email doesn't exist
-      console.error("[forgot-password] generateLink failed:", linkErr?.message);
+      // New cloned deployments can have active team_members rows before their
+      // matching Supabase Auth users exist. In that case, treat forgot password
+      // as a self-service setup-link request for known team members only.
+      const { data: member, error: memberErr } = await admin
+        .from("team_members")
+        .select("name, role, status")
+        .eq("email", cleanEmail)
+        .maybeSingle();
+
+      if (memberErr) {
+        console.error("[forgot-password] member lookup failed:", memberErr.message);
+        return successResponse;
+      }
+
+      const status = String(member?.status || "");
+      const name = typeof member?.name === "string" && member.name.trim() ? member.name.trim() : cleanEmail.split("@")[0];
+      const role = typeof member?.role === "string" ? member.role : "";
+      if (!member || !role || !["active", "pending"].includes(status)) {
+        // Don't reveal that the email doesn't exist.
+        console.error("[forgot-password] recovery link unavailable:", linkErr?.message);
+        return successResponse;
+      }
+
+      const tempPassword = crypto.randomUUID() + "!Aa1";
+      const { data: authData, error: createErr } = await admin.auth.admin.createUser({
+        email: cleanEmail,
+        password: tempPassword,
+        email_confirm: false,
+        user_metadata: { name, role },
+      });
+
+      const createdUserId = authData?.user?.id || null;
+      if (createErr) {
+        // Keep going: a previous setup-email attempt may have created the Auth
+        // user already, and Supabase can still generate a fresh invite link.
+        console.error("[forgot-password] setup user creation failed:", createErr?.message);
+      }
+
+      const { data: inviteData, error: inviteErr } = await admin.auth.admin.generateLink({
+        type: "invite",
+        email: cleanEmail,
+        options: { data: { name, role } },
+      });
+
+      if (inviteErr || !inviteData?.properties?.hashed_token) {
+        console.error("[forgot-password] setup link generation failed:", inviteErr?.message);
+        if (createdUserId) await admin.auth.admin.deleteUser(createdUserId);
+        return successResponse;
+      }
+
+      const siteUrl = getSiteUrl();
+      const tokenHash = inviteData.properties.hashed_token;
+      const confirmUrl = `${siteUrl}/auth/confirm?token_hash=${encodeURIComponent(tokenHash)}&type=invite`;
+      try {
+        await sendSetupEmail(cleanEmail, name, role, confirmUrl);
+      } catch (emailErr: unknown) {
+        console.error("[forgot-password] Setup email send failed:", emailErr instanceof Error ? emailErr.message : emailErr);
+      }
       return successResponse;
     }
 
     // Build our own confirmation URL
     const siteUrl = getSiteUrl();
     const tokenHash = linkData.properties.hashed_token;
-    const confirmUrl = `${siteUrl}/auth/confirm?token_hash=${tokenHash}&type=recovery`;
+    const confirmUrl = `${siteUrl}/auth/confirm?token_hash=${encodeURIComponent(tokenHash)}&type=recovery`;
 
     // Send branded password reset email
     try {
-      const transporter = getTransporter();
-      await transporter.sendMail({
-        from: getFromAddress(),
-        to: cleanEmail,
-        subject: "Reset your password for The Reach",
-        html: buildPasswordResetEmailHtml(confirmUrl),
-      });
+      await sendRecoveryEmail(cleanEmail, confirmUrl);
     } catch (emailErr: unknown) {
       console.error("[forgot-password] Email send failed:", emailErr instanceof Error ? emailErr.message : emailErr);
     }
