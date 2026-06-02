@@ -2,7 +2,7 @@
 
 import { RawImage } from "@/components/raw-image";
 import { useState, useMemo, useRef, useEffect } from "react";
-import { MediaAsset } from "@/lib/types";
+import { ContentCard, MediaAsset } from "@/lib/types";
 import { usePipeline } from "@/lib/pipeline-context";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
@@ -44,6 +44,13 @@ function dbToAsset(row: MediaAssetRow): MediaAsset {
     addedBy: row.added_by || undefined,
     usedIn: row.used_in || undefined,
   };
+}
+
+function addUsage(map: Map<string, ContentCard[]>, url: string | undefined, card: ContentCard) {
+  if (!url || url.startsWith("blob:")) return;
+  const existing = map.get(url) || [];
+  if (!existing.some((c) => c.id === card.id)) existing.push(card);
+  map.set(url, existing);
 }
 
 export function MediaPage() {
@@ -122,15 +129,39 @@ export function MediaPage() {
 
   const folders = useMemo(() => Array.from(new Set(media.map((m) => m.folder))).sort(), [media]);
 
+  const cardsById = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards]);
+  const cardsByMediaUrl = useMemo(() => {
+    const map = new Map<string, ContentCard[]>();
+    for (const card of cards) {
+      addUsage(map, card.thumbnailUrl, card);
+      card.sourceVault?.rawFiles?.forEach((file) => addUsage(map, file.url, card));
+    }
+    return map;
+  }, [cards]);
+
+  const usageByAssetId = useMemo(() => {
+    const usage = new Map<string, ContentCard[]>();
+    for (const asset of media) {
+      const byCardId = new Map<string, ContentCard>();
+      (asset.usedIn || []).forEach((id) => {
+        const card = cardsById.get(id);
+        if (card) byCardId.set(card.id, card);
+      });
+      (cardsByMediaUrl.get(asset.url) || []).forEach((card) => byCardId.set(card.id, card));
+      if (byCardId.size > 0) usage.set(asset.id, Array.from(byCardId.values()));
+    }
+    return usage;
+  }, [media, cardsById, cardsByMediaUrl]);
+
   const filteredMedia = useMemo(() => {
     let items = [...media];
     if (activeFolder !== "all") items = items.filter((m) => m.folder === activeFolder);
     if (activeType !== "all") items = items.filter((m) => m.type === activeType);
-    if (statusFilter === "unused") items = items.filter((m) => !m.usedIn || m.usedIn.length === 0);
-    if (statusFilter === "inuse") items = items.filter((m) => m.usedIn && m.usedIn.length > 0);
+    if (statusFilter === "unused") items = items.filter((m) => !usageByAssetId.has(m.id));
+    if (statusFilter === "inuse") items = items.filter((m) => usageByAssetId.has(m.id));
     if (search) items = items.filter((m) => m.name.toLowerCase().includes(search.toLowerCase()));
     return items.sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
-  }, [media, activeFolder, activeType, statusFilter, search]);
+  }, [media, activeFolder, activeType, statusFilter, search, usageByAssetId]);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -216,11 +247,7 @@ export function MediaPage() {
     }
   };
 
-  // PERF-017: O(1) lookups by card id instead of N×M find() scans inside
-  // getUsageInfo. Empty cards array yields an empty Map (safe — get returns
-  // undefined and filter(Boolean) drops it).
-  const cardsById = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards]);
-  const getUsageInfo = (asset: MediaAsset) => (!asset.usedIn || asset.usedIn.length === 0) ? null : asset.usedIn.map((id) => cardsById.get(id)).filter(Boolean);
+  const getUsageInfo = (asset: MediaAsset) => usageByAssetId.get(asset.id) || null;
 
   const copyShareLink = (asset: MediaAsset) => {
     const siteUrl = typeof window !== "undefined" ? window.location.origin : "";
