@@ -17,6 +17,7 @@ import { resolveLoadedCards, type PostRow } from "../pipeline-context";
 
 const PIPELINE_PATH = join(process.cwd(), "src/lib/pipeline-context.tsx");
 const PIPELINE_SRC = readFileSync(PIPELINE_PATH, "utf8");
+const ASSET_DRAWER_SRC = readFileSync(join(process.cwd(), "src/components/asset-review-drawer.tsx"), "utf8");
 const AUDIT_SRC = readFileSync(join(process.cwd(), "src/lib/audit.ts"), "utf8");
 
 /** Recursively collect every *.ts / *.tsx file under a directory. */
@@ -118,6 +119,16 @@ describe("iron-law guards in pipeline-context.tsx", () => {
     // Sites: moveCard, submitReapproval, submitKickback, updateCard, deleteCard.
     const guardSites = PIPELINE_SRC.match(/isValidUuid\s*\(\s*cardId\s*\)/g) || [];
     expect(guardSites.length).toBeGreaterThanOrEqual(5);
+  });
+
+  it("asset drawer revision requests use submitKickback instead of split note/stage/notification writes", () => {
+    expect(ASSET_DRAWER_SRC).toMatch(/submitKickback\s*\(\s*selectedCard\.id\s*,\s*feedback\s*\)/);
+    expect(ASSET_DRAWER_SRC).not.toMatch(
+      /updateCard\s*\(\s*selectedCard\.id\s*,\s*\{\s*notes[\s\S]{0,600}moveCard\s*\(\s*selectedCard\.id\s*,\s*["']revision_needed["']\s*\)/,
+    );
+    expect(ASSET_DRAWER_SRC).not.toMatch(
+      /body:\s*JSON\.stringify\s*\(\s*\{[\s\S]{0,250}revisionNote:\s*feedback/,
+    );
   });
 
   it("every .eq(\"id\", cardId) on supabase posts is preceded by an isValidUuid guard (AGENTS.md §5)", () => {

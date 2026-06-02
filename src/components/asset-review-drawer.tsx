@@ -36,7 +36,7 @@ const MENTION_RE = /@[a-zA-Z][\w.-]*/;
 type DrawerTab = "content" | "vault" | "audit";
 
 export function AssetReviewDrawer() {
-  const { selectedCard, isDrawerOpen, isEditingOnOpen, closeDrawer, moveCard, requestReapproval, updateCard, deleteCard, workspaceId } = usePipeline();
+  const { selectedCard, isDrawerOpen, isEditingOnOpen, closeDrawer, moveCard, requestReapproval, submitKickback, updateCard, deleteCard, workspaceId } = usePipeline();
   const { addToast } = useToast();
   const { currentUser } = useAuth();
   const { members } = useTeam();
@@ -1016,34 +1016,9 @@ export function AssetReviewDrawer() {
                 <Button variant="outline" size="sm" onClick={() => { setRevisionMode(false); setRevisionFeedback(""); }} className="flex-1 h-9 rounded-lg text-[12px]">Cancel</Button>
                 <Button size="sm" disabled={!revisionFeedback.trim()} onClick={() => {
                   const feedback = revisionFeedback.trim();
-                  const ts = formatDateTimeCompact(new Date());
-                  const note = `${currentUser.name} (${ts}): ${feedback}`;
-                  updateCard(selectedCard.id, { notes: (selectedCard.notes ? selectedCard.notes + "\n\n" : "") + note });
-                  moveCard(selectedCard.id, "revision_needed");
-                  addToast("Revision requested. Creator & Creative Director notified.", "warning");
+                  submitKickback(selectedCard.id, feedback);
+                  addToast("Revision request submitted. Saving and notifying the team.", "warning");
                   setRevisionMode(false); setRevisionFeedback("");
-
-                  // Fire revision email to Creator + Creative Director
-                  fetch("/api/notifications/revision", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      postId: selectedCard.id,
-                      postTitle: selectedCard.title,
-                      revisionNote: feedback,
-                      requestedBy: currentUser.email,
-                      createdBy: selectedCard.createdBy,
-                    }),
-                  }).catch(() => {});
-
-                  // Also fire @mention notifications if present
-                  if (feedback.includes("@")) {
-                    fetch("/api/notifications/mention", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ comment: feedback, postTitle: selectedCard.title, postId: selectedCard.id, authorName: currentUser.name, authorEmail: currentUser.email }),
-                    }).catch(() => {});
-                  }
                 }} className="flex-1 h-9 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[12px] shadow-sm disabled:opacity-40 transition-all duration-150">
                   Submit Revision Request
                 </Button>
