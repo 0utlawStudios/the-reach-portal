@@ -35,7 +35,7 @@ Dashboard fit/density slice notes:
 - Removed the shared forced `h-full` from the dashboard card wrapper so cards use grid/flex row sizing instead of always stretching from the component root.
 - Stopped forcing the summary row to consume viewport flex height; only the lower operational row can absorb remaining dashboard height.
 - Distributed existing content inside Content Funnel, Platform Split, Upcoming Posts, Calendar, and Recently Published cards so tall viewports use available space more deliberately.
-- Adjusted the desktop auto-fit threshold so short viewports scroll naturally instead of scaling/clipping lower cards behind the footer.
+- Adjusted the desktop auto-fit scale floor from the clipping-prone 0.8 behavior to a lower 0.72 readability floor so 1280x720 viewports fit instead of hiding lower cards behind the footer.
 - No data, pipeline, auth, Supabase, or support behavior changed.
 - Verification passed: `npm run typecheck`, `npm run lint` with only existing warnings, full `npm test` with 26 files / 232 tests, and `npm run build`.
 

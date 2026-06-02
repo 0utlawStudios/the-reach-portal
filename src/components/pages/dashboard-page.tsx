@@ -65,16 +65,13 @@ export function DashboardPage() {
         return;
       }
       const raw = Math.min(el.clientHeight / inner.scrollHeight, 1);
-      if (raw < 0.92) {
-        setScale(1);
-        setNeedsScroll(true);
-        return;
-      }
-      // UX-008: for near-fit desktop windows, scale gently. For genuinely
-      // short windows, scroll instead of clipping content behind the footer.
-      const s = Math.max(raw, 0.8);
+      // UX-008: scale down to the real fit value for short desktop windows.
+      // The old 0.8 floor clipped the lower cards behind the footer at
+      // 1280x720. Keep a lower readability floor, then allow nested scroll
+      // only for genuinely tiny windows.
+      const s = Math.max(raw, 0.72);
       setScale(prev => Math.abs(prev - s) > 0.003 ? s : prev);
-      setNeedsScroll(false);
+      setNeedsScroll(raw < 0.72);
     };
     fit();
     const ro = new ResizeObserver(fit);
