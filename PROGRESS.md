@@ -1,8 +1,8 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: 5fb733e fix: fit dashboard at short desktop height
-Next: Continue production-readiness backlog from the latest user additions: team/invite cleanup, settings/profile polish, pipeline realtime QA, and full production QA.
+Last pushed SHA: 3321f40 docs: record dashboard production verification
+Next: Push team/invite production cleanup record, then continue settings/profile polish, pipeline realtime QA, and full production QA.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
 
 Settings / Brand Playbook UI cleanup slice notes:
@@ -41,6 +41,14 @@ Dashboard fit/density slice notes:
 - Pushed dashboard fit commits `f646411`, `144c46a`, and final correction `5fb733e` to `origin/main`; GitHub CI passed lint, typecheck, tests, and build for `5fb733e`.
 - Vercel production deployment `dpl_F9MbsVF19BuF1K8AdVPa8zYnGCZQ` is ready and aliased to `https://thereach.ten80ten.com`.
 - Production screenshot checks captured `2048x1192` and `1280x720` live dashboard views with one-time superadmin Supabase magic-link sessions.
+
+Team/invite production cleanup notes:
+
+- Verified live Reach team state before cleanup: Aldridge active with avatar; Hanes active with avatar; Shahannie active without avatar; Christer pending without avatar.
+- Used the existing remove-member cleanup contract directly with service-role authority: delete workspace access by Auth user id, delete `team_members` row by id/email, delete Supabase Auth user, and write best-effort audit.
+- Removed cloned/test users `christer@ten80ten.com`, `hanes@ten80ten.com`, and `shang.ten80ten@gmail.com` from production team rows, workspace access, and Auth.
+- Verified live post-cleanup state: exactly one `team_members` row remains (`aldridge@ten80ten.com`, `superadmin`, `active`, avatar present); exactly one active `workspace_members` row remains for the baseline workspace; removed emails have no Auth users.
+- Reinvites for those emails are now clean and will pass through the hardened setup flow that requires a profile photo before workspace activation.
 
 Reach command-button contrast slice notes:
 

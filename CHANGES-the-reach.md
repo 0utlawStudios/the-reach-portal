@@ -7,6 +7,7 @@
 - Pipeline drag handle: restored the Ten80Ten card drag contract by moving dnd-kit listeners back to a real visible handle button instead of the whole card/decorative handle pattern.
 - Pipeline drag regression coverage: added a static test that locks the drag handle to a real listener button and keeps native image drag disabled on card thumbnails.
 - Dashboard fit/density: removed the shared forced-height card wrapper, stopped the summary row from consuming viewport flex height, distributed existing dashboard card content across tall viewports, and corrected the desktop auto-fit scale floor so 1280x720 viewports fit instead of clipping behind the footer.
+- Team/invite production cleanup: removed cloned/test non-superadmin users from `team_members`, `workspace_members`, and Supabase Auth so The Reach starts with Aldridge as the only active workspace member.
 - Command-button contrast: hardened central Reach action foregrounds, disabled action states, and `bg-primary`/`text-primary-foreground` coverage so primary buttons do not disappear into cream surfaces.
 - Primary action wiring: applied the existing Reach action classes to login, forgot-password, reset-password, setup, request-access, create-post, avatar crop, revision, repurpose, support ticket, and support chat command buttons.
 - Support Inbox chat access: fixed the server role helper to query `workspace_members.workspace_id` instead of the non-existent `workspace_members.id` column, so superadmins/admins with active workspace access can open and mark support conversations read.
@@ -73,6 +74,7 @@
 - Pipeline drag-handle fix was pushed as `a17861a`; GitHub CI passed and Vercel production deployment `dpl_5DUQkRveJqhjnFmctSLA7v81eFdd` is ready on `https://thereach.ten80ten.com`.
 - Dashboard fit/density slice passed production screenshot inspection before patch, `npm run typecheck`, `npm run lint` with only existing warnings, full `npm test` with 26 files / 232 tests, and `npm run build`.
 - Dashboard fit/density final correction was pushed as `5fb733e`; GitHub CI passed and Vercel production deployment `dpl_F9MbsVF19BuF1K8AdVPa8zYnGCZQ` is ready on `https://thereach.ten80ten.com`; live screenshots were captured at `2048x1192` and `1280x720`.
+- Team/invite cleanup verified production now has only `aldridge@ten80ten.com` as active `superadmin` with avatar, exactly one active baseline `workspace_members` row, and no Auth users for the removed cloned/test emails.
 - Command-button contrast slice passed `git diff --check`, `npm run typecheck`, `npm run lint` with only existing warnings, and `npm run build`.
 - Command-button contrast slice was pushed as `64dd5b8`; GitHub CI passed and Vercel production deployment `dpl_6rwRBoBCpcyM6bUj2Wg8p9pu7Q3n` is ready on `https://thereach.ten80ten.com`.
 - Support Inbox root cause reproduced on production before the fix: thread list returned the Hanes chat, but thread detail and read receipt routes returned `404`; live schema verification confirmed `workspace_members.id` does not exist and `workspace_members.workspace_id` does.
