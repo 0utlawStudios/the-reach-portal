@@ -63,6 +63,7 @@
 ## Verification
 
 - Command-button contrast slice passed `git diff --check`, `npm run typecheck`, `npm run lint` with only existing warnings, and `npm run build`.
+- Command-button contrast slice was pushed as `64dd5b8`; GitHub CI passed and Vercel production deployment `dpl_6rwRBoBCpcyM6bUj2Wg8p9pu7Q3n` is ready on `https://thereach.ten80ten.com`.
 - Support Inbox root cause reproduced on production before the fix: thread list returned the Hanes chat, but thread detail and read receipt routes returned `404`; live schema verification confirmed `workspace_members.id` does not exist and `workspace_members.workspace_id` does.
 - Support Inbox fix passed focused support helper/API tests, `npm run typecheck`, `npm run lint` with only existing warnings, `npm test` with 26 files / 231 tests, and `npm run build`.
 - Support Inbox fix was pushed as `d82c490`; GitHub CI passed and Vercel production deployment `dpl_AFz3i9e4T7TEh55L2ngmLbv88ZMz` is ready on `https://thereach.ten80ten.com`.

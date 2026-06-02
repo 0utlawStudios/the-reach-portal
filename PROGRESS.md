@@ -1,7 +1,7 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: d82c490 fix: repair support thread access
+Last pushed SHA: 64dd5b8 fix: harden reach action button contrast
 Next: Continue the production-readiness audit backlog: Settings surface cleanup and remaining brand/UI hardening as separate scoped slices.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
 
@@ -12,6 +12,8 @@ Reach command-button contrast slice notes:
 - Raised disabled primary-action readability from washed-out opacity to a readable disabled state with explicit foreground, `-webkit-text-fill-color`, and cursor handling.
 - Added the existing `reach-action-button` / `reach-secondary-action` classes to primary commands in login, forgot-password, reset-password, setup, request-access, create-post, avatar crop, revision, repurpose, and support ticket/chat surfaces.
 - Verification passed: `git diff --check`, `npm run typecheck`, `npm run lint` with only existing warnings, and `npm run build`.
+- Pushed commit `64dd5b8` to `origin/main`; GitHub CI passed lint, typecheck, tests, and build.
+- Vercel production deployment `dpl_6rwRBoBCpcyM6bUj2Wg8p9pu7Q3n` is ready and aliased to `https://thereach.ten80ten.com`.
 
 Support Inbox schema/access root-fix slice notes:
 
