@@ -6,30 +6,21 @@ import {
 } from "@/lib/google-drive";
 import { consume, getClientIp } from "@/lib/rate-limit";
 import { requireBearerTeamRole } from "@/lib/auth/require";
+import {
+  ALLOWED_DRIVE_ROLES,
+  DriveFolderName,
+  isAllowedDriveMediaMime,
+  MAX_DRIVE_MEDIA_FILE_SIZE,
+  normalizeDriveMimeType,
+  VALID_DRIVE_FOLDERS,
+} from "@/lib/drive-policy";
 
 export const maxDuration = 10;
-
-const VALID_FOLDERS = ["thumbnails", "raw-files", "media-library"] as const;
-type FolderName = (typeof VALID_FOLDERS)[number];
-const ALLOWED_DRIVE_ROLES: ReadonlyArray<string> = [
-  "superadmin",
-  "admin",
-  "owner",
-  "approver",
-  "creative_director",
-  "editor",
-  "social_media_specialist",
-  "video_editor",
-  "graphic_designer",
-  "specialist",
-  "technician",
-  "viewer",
-];
 
 interface UploadRequest {
   fileName: string;
   mimeType: string;
-  folder: FolderName;
+  folder: DriveFolderName;
   cardId?: string;
   fileSize?: number;
 }
@@ -58,10 +49,20 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    if (!VALID_FOLDERS.includes(body.folder)) {
+    if (!VALID_DRIVE_FOLDERS.includes(body.folder)) {
       return NextResponse.json(
-        { error: `Invalid folder. Must be one of: ${VALID_FOLDERS.join(", ")}` },
+        { error: `Invalid folder. Must be one of: ${VALID_DRIVE_FOLDERS.join(", ")}` },
         { status: 400 }
+      );
+    }
+    const mimeType = normalizeDriveMimeType(body.mimeType);
+    if (!isAllowedDriveMediaMime(mimeType)) {
+      return NextResponse.json({ error: "Unsupported media type" }, { status: 415 });
+    }
+    if (typeof body.fileSize === "number" && body.fileSize > MAX_DRIVE_MEDIA_FILE_SIZE) {
+      return NextResponse.json(
+        { error: `File exceeds ${MAX_DRIVE_MEDIA_FILE_SIZE / (1024 * 1024)}MB limit.` },
+        { status: 413 },
       );
     }
 
@@ -77,12 +78,12 @@ export async function POST(request: NextRequest) {
     // Create resumable upload session — fileId comes from PUT completion
     const { uploadUri } = await createResumableUploadSession(
       driveFileName,
-      body.mimeType,
+      mimeType,
       parentId,
       body.fileSize,
     );
 
-    const isImage = body.mimeType.startsWith("image/");
+    const isImage = mimeType.startsWith("image/");
 
     return NextResponse.json({
       uploadUri,

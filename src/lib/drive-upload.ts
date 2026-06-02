@@ -22,6 +22,12 @@
  * - 413 is treated as permanent (not retried)
  */
 
+import {
+  isAllowedDriveMediaMime,
+  MAX_DRIVE_MEDIA_FILE_SIZE,
+  normalizeDriveMimeType,
+} from "@/lib/drive-policy";
+
 export interface DriveUploadResult {
   fileId: string;
   url: string;
@@ -35,9 +41,6 @@ const RETRY_DELAYS = [2000, 8000, 32000];
 
 // Files at or above this threshold use the resumable path to avoid Vercel's 4.5 MB body limit.
 const RESUMABLE_THRESHOLD = 4 * 1024 * 1024; // 4 MB
-
-// Instagram video limit (250 MB) — largest common platform constraint.
-const MAX_FILE_SIZE = 250 * 1024 * 1024; // 250 MB
 
 async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
   let lastError: Error | null = null;
@@ -84,7 +87,7 @@ async function uploadViaProxy(
     formData.append("file", file);
     formData.append("folder", folder);
     formData.append("fileName", file.name);
-    formData.append("mimeType", file.type || "application/octet-stream");
+    formData.append("mimeType", normalizeDriveMimeType(file.type));
     if (cardId) formData.append("cardId", cardId);
 
     return new Promise<DriveUploadResult>((resolve, reject) => {
@@ -157,7 +160,7 @@ async function getUploadSession(
     headers,
     body: JSON.stringify({
       fileName: file.name,
-      mimeType: file.type || "application/octet-stream",
+      mimeType: normalizeDriveMimeType(file.type),
       folder,
       cardId,
       fileSize: file.size,
@@ -186,7 +189,7 @@ async function putToGoogle(
   return new Promise<string>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", uploadUri, true);
-    xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+    xhr.setRequestHeader("Content-Type", normalizeDriveMimeType(file.type));
 
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) {
@@ -284,7 +287,8 @@ export async function uploadToDrive(
   onProgress?: ProgressCallback
 ): Promise<DriveUploadResult> {
   if (file.size === 0) throw new Error("Cannot upload empty file");
-  if (file.size > MAX_FILE_SIZE) throw new Error(`File exceeds ${MAX_FILE_SIZE / (1024 * 1024)}MB limit.`);
+  if (file.size > MAX_DRIVE_MEDIA_FILE_SIZE) throw new Error(`File exceeds ${MAX_DRIVE_MEDIA_FILE_SIZE / (1024 * 1024)}MB limit.`);
+  if (!isAllowedDriveMediaMime(file.type)) throw new Error("Unsupported media type. Upload an image or video file.");
 
   onProgress?.(0);
 

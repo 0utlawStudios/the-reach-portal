@@ -7,39 +7,15 @@ import {
 } from "@/lib/google-drive";
 import { consume, getClientIp } from "@/lib/rate-limit";
 import { requireBearerTeamRole } from "@/lib/auth/require";
+import {
+  ALLOWED_DRIVE_ROLES,
+  isAllowedDriveMediaMime,
+  MAX_DRIVE_MEDIA_FILE_SIZE,
+  normalizeDriveMimeType,
+  VALID_DRIVE_FOLDERS,
+} from "@/lib/drive-policy";
 
 export const maxDuration = 60;
-
-const VALID_FOLDERS = ["thumbnails", "raw-files", "media-library"] as const;
-const ALLOWED_DRIVE_ROLES: ReadonlyArray<string> = [
-  "superadmin",
-  "admin",
-  "owner",
-  "approver",
-  "creative_director",
-  "editor",
-  "social_media_specialist",
-  "video_editor",
-  "graphic_designer",
-  "specialist",
-  "technician",
-  "viewer",
-];
-
-// SEC-001: Allowed MIME types for proxy-uploaded media. Mirrors the formats
-// the rest of the pipeline (Drive thumbnails, video preview, IG/FB targets)
-// can actually display. Anything else gets rejected before we burn Drive quota.
-const ALLOWED_MIME_TYPES = new Set<string>([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-  "image/heic",
-  "image/heif",
-  "video/mp4",
-  "video/quicktime",
-  "video/webm",
-]);
 
 // Helper: always return clean JSON (no control characters ever)
 function jsonResponse(data: Record<string, unknown>, status = 200) {
@@ -68,18 +44,19 @@ export async function POST(request: NextRequest) {
     const file = formData.get("file") as File | null;
     const folder = formData.get("folder") as string;
     const fileName = formData.get("fileName") as string || file?.name || "upload";
-    const mimeType = formData.get("mimeType") as string || file?.type || "application/octet-stream";
+    const mimeType = normalizeDriveMimeType(formData.get("mimeType") || file?.type);
 
     if (!file || !(file instanceof File)) {
       return jsonResponse({ error: "No file provided" }, 400);
     }
-    if (!VALID_FOLDERS.includes(folder as typeof VALID_FOLDERS[number])) {
+    if (!VALID_DRIVE_FOLDERS.includes(folder as typeof VALID_DRIVE_FOLDERS[number])) {
       return jsonResponse({ error: "Invalid folder" }, 400);
     }
-    // SEC-001: MIME allowlist. Reject anything we don't render downstream
-    // BEFORE allocating a Drive resumable session.
-    if (!ALLOWED_MIME_TYPES.has(mimeType)) {
+    if (!isAllowedDriveMediaMime(mimeType)) {
       return jsonResponse({ error: "Unsupported media type" }, 415);
+    }
+    if (file.size > MAX_DRIVE_MEDIA_FILE_SIZE) {
+      return jsonResponse({ error: `File exceeds ${MAX_DRIVE_MEDIA_FILE_SIZE / (1024 * 1024)}MB limit.` }, 413);
     }
 
     // Resolve subfolder
