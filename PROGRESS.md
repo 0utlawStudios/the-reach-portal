@@ -1,7 +1,7 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: a34deff Reach client manual
+Last pushed SHA: eadf83a Reach client manual
 Next: Audit unreadable non-hover buttons across invite/send-invite/resend/support/settings/modal actions, then run the final production QA swarm.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
 
