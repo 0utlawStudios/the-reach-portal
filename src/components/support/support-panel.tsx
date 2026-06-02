@@ -193,7 +193,7 @@ export function SupportPanel({ support, initialThreadId, onClose }: SupportPanel
                   <button
                     type="button"
                     onClick={() => sentThreadId && goThread(sentThreadId)}
-                    className="h-11 rounded-lg bg-orange-500 text-[13px] font-semibold text-white transition-colors hover:bg-orange-600"
+                    className="reach-action-button h-11 rounded-lg bg-orange-500 text-[13px] font-semibold text-white transition-colors hover:bg-orange-600"
                   >
                     View ticket
                   </button>
@@ -211,7 +211,7 @@ export function SupportPanel({ support, initialThreadId, onClose }: SupportPanel
                 <button
                   type="button"
                   onClick={() => setView("form")}
-                  className="flex w-full items-center gap-3 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-4 py-3.5 text-left text-white shadow-sm shadow-orange-500/20 transition-transform hover:scale-[1.01]"
+                  className="reach-action-button flex w-full items-center gap-3 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-4 py-3.5 text-left text-white shadow-sm shadow-orange-500/20 transition-transform hover:scale-[1.01]"
                 >
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/20">
                     <Plus className="h-5 w-5" />

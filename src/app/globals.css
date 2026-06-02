@@ -59,8 +59,8 @@
   --reach-field-hover: color-mix(in srgb, #E1DFD5 80%, #6C655A 20%);
   --reach-border: color-mix(in srgb, #6C655A 32%, transparent);
   --reach-border-strong: color-mix(in srgb, #6C655A 48%, transparent);
-  --reach-light-text: color-mix(in srgb, #E1DFD5 78%, white 22%);
-  --reach-action-fg: color-mix(in srgb, #E1DFD5 74%, white 26%);
+  --reach-light-text: color-mix(in srgb, #E1DFD5 58%, white 42%);
+  --reach-action-fg: color-mix(in srgb, #E1DFD5 52%, white 48%);
   --reach-action-bg: linear-gradient(
     135deg,
     color-mix(in srgb, #975428 82%, black 18%) 0%,
@@ -281,9 +281,13 @@
     button[class*="bg-orange-500"],
     button[class*="bg-orange-600"],
     button[class*="bg-orange-700"],
+    button[class*="bg-primary"],
+    button[class*="text-primary-foreground"],
     button[class*="bg-[#975428]"],
     a[class*="bg-orange-500"],
     a[class*="bg-orange-600"],
+    a[class*="bg-primary"],
+    a[class*="text-primary-foreground"],
     a[class*="bg-[#975428]"]
   ) {
     color: var(--reach-light-text) !important;
@@ -304,9 +308,13 @@
     button[class*="bg-orange-500"],
     button[class*="bg-orange-600"],
     button[class*="bg-orange-700"],
+    button[class*="bg-primary"],
+    button[class*="text-primary-foreground"],
     button[class*="bg-[#975428]"],
     a[class*="bg-orange-500"],
     a[class*="bg-orange-600"],
+    a[class*="bg-primary"],
+    a[class*="text-primary-foreground"],
     a[class*="bg-[#975428]"]
   ) :where(span, p, svg) {
     color: currentColor !important;
@@ -317,10 +325,14 @@
     button:disabled[class*="bg-blue-"],
     button:disabled[class*="bg-indigo-"],
     button:disabled[class*="bg-orange-"],
+    button:disabled[class*="bg-primary"],
+    button:disabled[class*="text-primary-foreground"],
     button:disabled[class*="bg-[#975428]"]
   ) {
-    opacity: 0.68 !important;
-    filter: saturate(0.85);
+    opacity: 0.9 !important;
+    filter: saturate(0.86) contrast(0.98);
+    color: var(--reach-action-fg) !important;
+    -webkit-text-fill-color: var(--reach-action-fg) !important;
   }
 }
 
@@ -742,8 +754,11 @@ html:not(.dark)[data-design] [role="button"].reach-secondary-action {
 
 html:not(.dark) button.reach-action-button:disabled,
 html:not(.dark) button.reach-secondary-action:disabled {
-  opacity: 0.96 !important;
-  filter: saturate(0.88) contrast(0.96) !important;
+  opacity: 0.94 !important;
+  filter: saturate(0.84) contrast(0.98) !important;
+  color: var(--reach-action-fg) !important;
+  -webkit-text-fill-color: var(--reach-action-fg) !important;
+  cursor: not-allowed !important;
 }
 
 html:not(.dark) :where(.reach-action-button, .reach-secondary-action) :where(span, p, svg),

@@ -246,7 +246,7 @@ export function RepurposeModal({ card, onClose }: Props) {
               <Button
                 onClick={handleSubmit}
                 disabled={platforms.length === 0 || !scheduledDate || !scheduledTime || submitting}
-                className="flex-1 h-10 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-[12px] shadow-sm disabled:opacity-40"
+                className="reach-secondary-action flex-1 h-10 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-[12px] shadow-sm disabled:opacity-40"
               >
                 <CheckCircle className="w-3.5 h-3.5 mr-1.5" />
                 {mode === "repost" ? "Schedule Repost" : "Send to The Reach"}

@@ -149,7 +149,7 @@ export function AvatarCropModal({ imageSrc, onCropComplete, onClose }: Props) {
           {/* Actions */}
           <div className="flex gap-2">
             <Button variant="outline" onClick={onClose} className="flex-1 h-10 rounded-lg text-[12px]">Cancel</Button>
-            <Button onClick={handleSave} disabled={saving} className="flex-1 h-10 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-[12px] shadow-sm disabled:opacity-40">
+            <Button onClick={handleSave} disabled={saving} className="reach-action-button flex-1 h-10 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-[12px] shadow-sm disabled:opacity-40">
               {saving ? "Cropping..." : <><Check className="w-3.5 h-3.5 mr-1.5" />Apply Crop</>}
             </Button>
           </div>

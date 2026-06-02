@@ -119,7 +119,7 @@ export function TicketForm({ onSubmit, onError }: TicketFormProps) {
           type="button"
           onClick={handleSubmit}
           disabled={!canSubmit}
-          className="h-11 w-full rounded-lg bg-orange-500 text-[13px] font-semibold text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-40"
+          className="reach-action-button h-11 w-full rounded-lg bg-orange-500 text-[13px] font-semibold text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {submitting ? "Sending…" : "Send ticket"}
         </button>

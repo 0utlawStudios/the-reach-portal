@@ -245,7 +245,7 @@ export function ThreadView({
             type="button"
             onClick={handleSend}
             disabled={!canSend}
-            className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-lg bg-orange-500 px-4 text-[13px] font-semibold text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-40"
+            className="reach-action-button inline-flex h-11 shrink-0 items-center gap-1.5 rounded-lg bg-orange-500 px-4 text-[13px] font-semibold text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Send className="h-3.5 w-3.5" />
             {sending ? "Sending…" : "Send"}

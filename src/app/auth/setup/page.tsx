@@ -334,7 +334,7 @@ export default function SetupPasswordPage() {
               {confirm.length > 0 && password !== confirm && <p className="text-[10px] text-red-500">Passwords don&apos;t match</p>}
             </div>
 
-            <button type="submit" disabled={!canSubmit} className="w-full h-11 rounded-xl bg-[#975428] hover:bg-[#7f4421] text-white text-[13px] font-bold shadow-lg shadow-[#975428]/20 disabled:opacity-40 transition-all cursor-pointer flex items-center justify-center gap-2">
+            <button type="submit" disabled={!canSubmit} className="reach-action-button w-full h-11 rounded-xl bg-[#975428] hover:bg-[#7f4421] text-white text-[13px] font-bold shadow-lg shadow-[#975428]/20 disabled:opacity-40 transition-all cursor-pointer flex items-center justify-center gap-2">
               {loading ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Setting up...</> : "Create Account & Enter Dashboard"}
             </button>
           </form>

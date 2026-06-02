@@ -139,7 +139,7 @@ export default function RequestAccessPage() {
               </div>
             </div>
 
-            <button type="submit" disabled={!isValid || loading} className="w-full h-11 rounded-xl bg-[#975428] hover:bg-[#7f4421] text-white text-[13px] font-bold shadow-lg shadow-[#975428]/20 disabled:opacity-40 transition-all cursor-pointer flex items-center justify-center gap-2">
+            <button type="submit" disabled={!isValid || loading} className="reach-action-button w-full h-11 rounded-xl bg-[#975428] hover:bg-[#7f4421] text-white text-[13px] font-bold shadow-lg shadow-[#975428]/20 disabled:opacity-40 transition-all cursor-pointer flex items-center justify-center gap-2">
               {loading ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Submitting...</> : "Submit Request"}
             </button>
 

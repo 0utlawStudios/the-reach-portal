@@ -113,7 +113,7 @@ export function RevisionModal() {
             <Button
               onClick={handleSubmit}
               disabled={!isValid || submitting}
-              className="flex-1 h-10 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-[13px] font-medium shadow-sm shadow-violet-500/20 disabled:opacity-40 disabled:shadow-none cursor-pointer transition-all duration-200"
+              className="reach-action-button flex-1 h-10 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-[13px] font-medium shadow-sm shadow-violet-500/20 disabled:opacity-40 disabled:shadow-none cursor-pointer transition-all duration-200"
             >
               <Send className="w-3.5 h-3.5 mr-1.5" />
               {submitting ? "Submitting..." : "Submit Revision"}

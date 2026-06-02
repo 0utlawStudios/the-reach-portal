@@ -2,6 +2,8 @@
 
 ## Edited
 
+- Command-button contrast: hardened central Reach action foregrounds, disabled action states, and `bg-primary`/`text-primary-foreground` coverage so primary buttons do not disappear into cream surfaces.
+- Primary action wiring: applied the existing Reach action classes to login, forgot-password, reset-password, setup, request-access, create-post, avatar crop, revision, repurpose, support ticket, and support chat command buttons.
 - Support Inbox chat access: fixed the server role helper to query `workspace_members.workspace_id` instead of the non-existent `workspace_members.id` column, so superadmins/admins with active workspace access can open and mark support conversations read.
 - Support schema test coverage: updated support helper tests to match the real Reach `workspace_members` schema shape.
 - Client manual cost comparison: added the zero separate portal subscription positioning and competitor savings math for Later and Hootsuite under "Why this portal beats generic tools for The Reach."
@@ -60,6 +62,7 @@
 
 ## Verification
 
+- Command-button contrast slice passed `git diff --check`, `npm run typecheck`, `npm run lint` with only existing warnings, and `npm run build`.
 - Support Inbox root cause reproduced on production before the fix: thread list returned the Hanes chat, but thread detail and read receipt routes returned `404`; live schema verification confirmed `workspace_members.id` does not exist and `workspace_members.workspace_id` does.
 - Support Inbox fix passed focused support helper/API tests, `npm run typecheck`, `npm run lint` with only existing warnings, `npm test` with 26 files / 231 tests, and `npm run build`.
 - Support Inbox fix was pushed as `d82c490`; GitHub CI passed and Vercel production deployment `dpl_AFz3i9e4T7TEh55L2ngmLbv88ZMz` is ready on `https://thereach.ten80ten.com`.

@@ -2,8 +2,16 @@
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
 Last pushed SHA: d82c490 fix: repair support thread access
-Next: Continue the production-readiness audit backlog: Settings surface cleanup, button contrast sweep, and remaining brand/UI hardening as separate scoped slices.
+Next: Continue the production-readiness audit backlog: Settings surface cleanup and remaining brand/UI hardening as separate scoped slices.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
+
+Reach command-button contrast slice notes:
+
+- Hardened central light-theme command-button foregrounds so Sand-tinted labels are brighter on Reach Sun/Stone/Water action backgrounds.
+- Extended the central action selector to cover `bg-primary` / `text-primary-foreground` buttons, not only old orange/blue utility classes.
+- Raised disabled primary-action readability from washed-out opacity to a readable disabled state with explicit foreground, `-webkit-text-fill-color`, and cursor handling.
+- Added the existing `reach-action-button` / `reach-secondary-action` classes to primary commands in login, forgot-password, reset-password, setup, request-access, create-post, avatar crop, revision, repurpose, and support ticket/chat surfaces.
+- Verification passed: `git diff --check`, `npm run typecheck`, `npm run lint` with only existing warnings, and `npm run build`.
 
 Support Inbox schema/access root-fix slice notes:
 
