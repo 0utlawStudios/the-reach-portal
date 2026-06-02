@@ -1,7 +1,7 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: 870f7b8 Reach dashboard and Brand Playbook polish
+Last pushed SHA: f745297 Reach dashboard and Brand Playbook polish
 Next: Build the client manual, then run the final production QA swarm.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
 
