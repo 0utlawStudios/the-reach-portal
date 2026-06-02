@@ -26,7 +26,7 @@ const darkCardGradients = [
 
 // Luxury card wrapper
 const Card = ({ children, className = "", onClick, idx = 0 }: { children: React.ReactNode; className?: string; onClick?: () => void; idx?: number }) => (
-  <div onClick={onClick} className={`card-premium h-full bg-white dark:bg-[#131316] rounded-xl sm:rounded-2xl border border-gray-100/80 dark:border-white/[0.06] p-3 sm:p-4 xl:p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_6px_24px_rgba(0,0,0,0.03)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.2),0_6px_24px_rgba(0,0,0,0.15)] transition-all duration-300 ${onClick ? "cursor-pointer hover:shadow-[0_2px_8px_rgba(0,0,0,0.06),0_12px_40px_rgba(0,0,0,0.05)] dark:hover:shadow-[0_2px_8px_rgba(0,0,0,0.3),0_12px_40px_rgba(0,0,0,0.2)] hover:border-gray-200 dark:hover:border-white/[0.1]" : ""} ${className}`} style={{ '--card-gradient': darkCardGradients[idx % darkCardGradients.length] } as React.CSSProperties}>
+  <div onClick={onClick} className={`card-premium bg-white dark:bg-[#131316] rounded-xl sm:rounded-2xl border border-gray-100/80 dark:border-white/[0.06] p-3 sm:p-4 xl:p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_6px_24px_rgba(0,0,0,0.03)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.2),0_6px_24px_rgba(0,0,0,0.15)] transition-all duration-300 ${onClick ? "cursor-pointer hover:shadow-[0_2px_8px_rgba(0,0,0,0.06),0_12px_40px_rgba(0,0,0,0.05)] dark:hover:shadow-[0_2px_8px_rgba(0,0,0,0.3),0_12px_40px_rgba(0,0,0,0.2)] hover:border-gray-200 dark:hover:border-white/[0.1]" : ""} ${className}`} style={{ '--card-gradient': darkCardGradients[idx % darkCardGradients.length] } as React.CSSProperties}>
     {children}
   </div>
 );
@@ -168,12 +168,12 @@ export function DashboardPage() {
       </div>
 
       {/* ═══ Row 1: Funnel + Scorecard + Platforms ═══ */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-2 sm:gap-3 lg:min-h-0 lg:flex-[0.95]">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-2 sm:gap-3 lg:flex-none">
 
         {/* Content Funnel */}
         <Card idx={0} className="md:col-span-1 lg:col-span-5 flex flex-col">
           <SectionLabel icon={<BarChart3 className="w-4 h-4 text-orange-500" />} badge={<span className="text-[8px] text-gray-400 bg-gray-50 dark:bg-white/[0.04] px-2.5 py-1 rounded-full font-semibold uppercase tracking-[0.1em]">This week</span>}>Content Funnel</SectionLabel>
-          <div className="space-y-2 sm:space-y-3.5 flex-1">
+          <div className="flex-1 flex flex-col justify-evenly gap-2 sm:gap-3">
             {stageCounts.map((col, i) => {
               const Icon = stageIcons[i];
               return (
@@ -228,7 +228,7 @@ export function DashboardPage() {
         {/* Platform Split */}
         <Card idx={2} className="lg:col-span-4 flex flex-col">
           <SectionLabel icon={<TrendingUp className="w-4 h-4 text-amber-500" />}>Platform Split</SectionLabel>
-          <div className="space-y-2.5 sm:space-y-4 flex-1 flex flex-col justify-center">
+          <div className="flex-1 flex flex-col justify-evenly gap-2.5 sm:gap-4">
             {platformCounts.map(([platform, count], i) => {
               const brandColors: Record<string, string> = { instagram: "#E4405F", facebook: "#1877F2", tiktok: "#000000", youtube: "#FF0000", linkedin: "#0A66C2" };
               const brandColor = brandColors[platform] || "#3b82f6";
@@ -256,7 +256,7 @@ export function DashboardPage() {
         <Card idx={3} className="lg:col-span-5 flex flex-col">
           <SectionLabel icon={<Zap className="w-4 h-4 text-orange-500" />}>Upcoming Posts</SectionLabel>
           {upcomingPosts.length > 0 ? (
-            <div className="space-y-1">
+            <div className="flex-1 flex flex-col justify-evenly gap-1 min-h-0">
               {upcomingPosts.map((card) => {
                 const col = PIPELINE_COLUMNS.find((c) => c.id === card.stage);
                 const daysUntil = card.scheduledDate ? Math.ceil((new Date(card.scheduledDate).getTime() - renderTime) / (1000 * 60 * 60 * 24)) : null;
@@ -287,7 +287,7 @@ export function DashboardPage() {
         {/* Recently Published - hidden on mobile to reduce scroll length */}
         <Card idx={5} className="hidden sm:flex lg:col-span-4 flex-col">
           <SectionLabel icon={<Eye className="w-4 h-4 text-sky-500" />}>Recently Published</SectionLabel>
-          <div className="space-y-1">
+          <div className="flex-1 flex flex-col justify-evenly gap-1 min-h-0">
             {recentPosted.map((card) => (
               <div key={card.id} className="flex items-center gap-3 px-2 py-2.5 rounded-xl hover:bg-gray-50/80 dark:hover:bg-white/[0.02] transition-all duration-300">
                 <RawImage src={card.thumbnailUrl} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0 shadow-sm" />
@@ -364,46 +364,48 @@ function MiniCalendar({ cards, navigate }: { cards: ContentCard[]; navigate: (pa
         </div>
       </div>
 
-      <div className="grid grid-cols-7 gap-0.5 mb-1">
-        {DAYS.map((d) => <div key={d} className="text-center text-[8px] font-bold text-gray-400 dark:text-gray-500 uppercase">{d.slice(0, 1)}</div>)}
-      </div>
+      <div className="flex-1 flex flex-col justify-center min-h-0">
+        <div className="grid grid-cols-7 gap-0.5 mb-1">
+          {DAYS.map((d) => <div key={d} className="text-center text-[8px] font-bold text-gray-400 dark:text-gray-500 uppercase">{d.slice(0, 1)}</div>)}
+        </div>
 
-      <div className="grid grid-cols-7 gap-0.5">
-        {calendarDays.map((day, i) => {
-          if (!day) return <div key={`e-${i}`} className="h-8 sm:aspect-square" />;
-          const dayCards = getCardsForDay(day);
-          const hasCards = dayCards.length > 0;
-          const isTodayDate = isToday(day);
-          return (
-            <div key={day} className={`h-8 sm:aspect-square rounded-md sm:rounded-lg flex flex-col items-center justify-center relative transition-all duration-200 ${
-              isTodayDate ? "bg-blue-600 text-white shadow-sm shadow-blue-500/30" :
-              hasCards ? "bg-gray-50 dark:bg-white/[0.03]" : "hover:bg-gray-50/50 dark:hover:bg-white/[0.02]"
-            }`}>
-              <span className={`text-[9px] font-medium ${isTodayDate ? "text-white font-bold" : hasCards ? "text-gray-800 dark:text-gray-200" : "text-gray-400 dark:text-gray-600"}`}>{day}</span>
-              {hasCards && !isTodayDate && (
-                <div className="flex gap-[2px] mt-[1px]">
-                  {dayCards.slice(0, 3).map((c, j) => (
-                    <div key={j} className="w-[4px] h-[4px] rounded-full" style={{ backgroundColor: stageColors[c.stage] || "#3b82f6" }} />
-                  ))}
-                </div>
-              )}
-              {hasCards && isTodayDate && (
-                <div className="flex gap-[2px] mt-[1px]">
-                  {dayCards.slice(0, 3).map((_, j) => <div key={j} className="w-[4px] h-[4px] rounded-full bg-white/70" />)}
-                </div>
-              )}
+        <div className="grid grid-cols-7 gap-0.5">
+          {calendarDays.map((day, i) => {
+            if (!day) return <div key={`e-${i}`} className="h-8 sm:aspect-square" />;
+            const dayCards = getCardsForDay(day);
+            const hasCards = dayCards.length > 0;
+            const isTodayDate = isToday(day);
+            return (
+              <div key={day} className={`h-8 sm:aspect-square rounded-md sm:rounded-lg flex flex-col items-center justify-center relative transition-all duration-200 ${
+                isTodayDate ? "bg-blue-600 text-white shadow-sm shadow-blue-500/30" :
+                hasCards ? "bg-gray-50 dark:bg-white/[0.03]" : "hover:bg-gray-50/50 dark:hover:bg-white/[0.02]"
+              }`}>
+                <span className={`text-[9px] font-medium ${isTodayDate ? "text-white font-bold" : hasCards ? "text-gray-800 dark:text-gray-200" : "text-gray-400 dark:text-gray-600"}`}>{day}</span>
+                {hasCards && !isTodayDate && (
+                  <div className="flex gap-[2px] mt-[1px]">
+                    {dayCards.slice(0, 3).map((c, j) => (
+                      <div key={j} className="w-[4px] h-[4px] rounded-full" style={{ backgroundColor: stageColors[c.stage] || "#3b82f6" }} />
+                    ))}
+                  </div>
+                )}
+                {hasCards && isTodayDate && (
+                  <div className="flex gap-[2px] mt-[1px]">
+                    {dayCards.slice(0, 3).map((_, j) => <div key={j} className="w-[4px] h-[4px] rounded-full bg-white/70" />)}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="flex items-center justify-center gap-3 mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-gray-100/60 dark:border-white/[0.04]">
+          {[{ label: "Scheduled", color: "#22c55e" }, { label: "Awaiting", color: "#f59e0b" }, { label: "Posted", color: "#0ea5e9" }].map((l) => (
+            <div key={l.label} className="flex items-center gap-1">
+              <div className="w-[5px] h-[5px] rounded-full" style={{ backgroundColor: l.color }} />
+              <span className="text-[8px] text-gray-400 font-medium">{l.label}</span>
             </div>
-          );
-        })}
-      </div>
-
-      <div className="flex items-center justify-center gap-3 mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-gray-100/60 dark:border-white/[0.04]">
-        {[{ label: "Scheduled", color: "#22c55e" }, { label: "Awaiting", color: "#f59e0b" }, { label: "Posted", color: "#0ea5e9" }].map((l) => (
-          <div key={l.label} className="flex items-center gap-1">
-            <div className="w-[5px] h-[5px] rounded-full" style={{ backgroundColor: l.color }} />
-            <span className="text-[8px] text-gray-400 font-medium">{l.label}</span>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
       <p className="text-[9px] text-gray-300 dark:text-gray-600 text-center mt-auto pt-1 sm:pt-2 group-hover:text-blue-400 transition-colors duration-300">Click to open full calendar →</p>

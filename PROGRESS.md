@@ -1,8 +1,8 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: a17861a fix: restore pipeline drag handle
-Next: Continue production-readiness backlog from the latest user additions: dashboard fit, team/invite cleanup, settings/profile polish, and full production QA.
+Last pushed SHA: ed89de2 docs: record pipeline drag production verification
+Next: Push dashboard fit/density cleanup, then verify CI/Vercel production.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
 
 Settings / Brand Playbook UI cleanup slice notes:
@@ -28,6 +28,15 @@ Pipeline drag-handle root-fix slice notes:
 - Verification passed: focused iron-law/static tests, `npm run typecheck`, `npm run lint` with only existing warnings, full `npm test` with 26 files / 232 tests, and `npm run build`.
 - Pushed commit `a17861a` to `origin/main`; GitHub CI passed lint, typecheck, tests, and build.
 - Vercel production deployment `dpl_5DUQkRveJqhjnFmctSLA7v81eFdd` is ready and aliased to `https://thereach.ten80ten.com`.
+
+Dashboard fit/density slice notes:
+
+- Verified the live production dashboard at a 2048x1192 viewport with a one-time superadmin Supabase magic-link session. The dashboard viewport is filled, but the stretched card rows leave large internal dead zones.
+- Removed the shared forced `h-full` from the dashboard card wrapper so cards use grid/flex row sizing instead of always stretching from the component root.
+- Stopped forcing the summary row to consume viewport flex height; only the lower operational row can absorb remaining dashboard height.
+- Distributed existing content inside Content Funnel, Platform Split, Upcoming Posts, Calendar, and Recently Published cards so tall viewports use available space more deliberately.
+- No data, pipeline, auth, Supabase, or support behavior changed.
+- Verification passed: `npm run typecheck`, `npm run lint` with only existing warnings, full `npm test` with 26 files / 232 tests, and `npm run build`.
 
 Reach command-button contrast slice notes:
 
