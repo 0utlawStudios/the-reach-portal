@@ -1,8 +1,31 @@
 import { describe, it, expect } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { rowToThread, rowToMessage } from "@/lib/support/types";
 import type { SupportThreadRow, SupportMessageRow } from "@/lib/support/types";
 import { tgEscape } from "@/lib/support/telegram";
-import { parseAttachmentClaims } from "@/lib/support/server";
+import { getTeamRole, parseAttachmentClaims } from "@/lib/support/server";
+
+type MockQueryResult = { data: unknown; error?: unknown };
+type MockQuery = {
+  select: () => MockQuery;
+  eq: () => MockQuery;
+  limit: () => MockQuery;
+  maybeSingle: () => Promise<MockQueryResult>;
+};
+
+function makeAdmin(resultsByTable: Record<string, MockQueryResult>): SupabaseClient {
+  return {
+    from(table: string) {
+      const query: MockQuery = {
+        select: () => query,
+        eq: () => query,
+        limit: () => query,
+        maybeSingle: async () => resultsByTable[table] ?? { data: null, error: null },
+      };
+      return query;
+    },
+  } as unknown as SupabaseClient;
+}
 
 describe("rowToThread", () => {
   it("maps a snake_case row to the camelCase domain object", () => {
@@ -102,5 +125,31 @@ describe("parseAttachmentClaims", () => {
   it("never returns more than the file cap plus one", () => {
     const many = Array.from({ length: 30 }, (_, i) => ({ storageKey: `k${i}`, name: `n${i}` }));
     expect(parseAttachmentClaims(many).length).toBe(6);
+  });
+});
+
+describe("getTeamRole", () => {
+  it("returns a lowercased role only for an active team member with active workspace access", async () => {
+    const admin = makeAdmin({
+      team_members: { data: { role: "SuperAdmin", status: "active" } },
+      workspace_members: { data: { id: "wm1" } },
+    });
+    await expect(getTeamRole(admin, "OWNER@EXAMPLE.COM", "u1")).resolves.toBe("superadmin");
+  });
+
+  it("rejects inactive or pending team rows", async () => {
+    const admin = makeAdmin({
+      team_members: { data: { role: "superadmin", status: "pending" } },
+      workspace_members: { data: { id: "wm1" } },
+    });
+    await expect(getTeamRole(admin, "owner@example.com", "u1")).resolves.toBeNull();
+  });
+
+  it("rejects callers without active workspace access when a user id is provided", async () => {
+    const admin = makeAdmin({
+      team_members: { data: { role: "superadmin", status: "active" } },
+      workspace_members: { data: null },
+    });
+    await expect(getTeamRole(admin, "owner@example.com", "u1")).resolves.toBeNull();
   });
 });

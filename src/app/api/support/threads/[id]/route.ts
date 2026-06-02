@@ -46,7 +46,7 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ id: str
   const thread = threadRow as SupportThreadRow;
   const isOwner = thread.created_by === auth.user.id;
   if (!isOwner) {
-    const role = await getTeamRole(admin, auth.user.email ?? "");
+    const role = await getTeamRole(admin, auth.user.email ?? "", auth.user.id);
     // Don't reveal that the thread exists to anyone but its owner / superadmin.
     if (role !== "superadmin") return NextResponse.json({ error: "Not found" }, { status: 404 });
     // Multi-tenant guard: a superadmin only reaches threads in their own workspace.

@@ -62,7 +62,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
   if (isOwner) {
     senderType = "user";
   } else {
-    const role = await getTeamRole(admin, auth.user.email ?? "");
+    const role = await getTeamRole(admin, auth.user.email ?? "", auth.user.id);
     if (role !== "superadmin") return NextResponse.json({ error: "Not found" }, { status: 404 });
     // Multi-tenant guard: a superadmin only reaches threads in their own workspace.
     const callerWorkspaceId = await resolveWorkspaceId(admin, auth.user.id);

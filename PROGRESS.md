@@ -1,9 +1,19 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: 42c9c29 data/auth cleanup and hardening
-Next: Push the demo-data slice, then continue Support Inbox/last-seen and Drive/media-library hardening.
+Last pushed SHA: f1bb745 demo pipeline data readiness
+Next: Push the Support Inbox hardening slice, then fix light-theme contrast/elevation and persisted theme defaults.
 Blockers: None for the current demo-data slice. `supabase status`/local DB diff still require Docker if needed.
+
+Support Inbox / last-seen hardening slice notes:
+
+- Hardened support thread detail, reply, and read-receipt routes so non-owner admin access now requires both an active `team_members` row and an active `workspace_members` row for the authenticated user.
+- Kept owner access unchanged: a thread creator can still open, reply to, and clear their own support unread state.
+- Preserved the existing no-leak behavior for unauthorized support thread access by returning `404` instead of exposing thread existence.
+- Added focused unit coverage for active superadmin access, pending/inactive team denial, and missing workspace-membership denial.
+- Verified focused support behavior with `npx vitest run src/lib/support/__tests__/support-helpers.test.ts src/app/api/support/admin/start-chat/__tests__/route.test.ts`: 14 tests passed.
+- Verified `npm run typecheck` passed.
+- Verified `npm run lint` passed with only the repo's existing warnings in untouched `src/lib/ai/worker.ts` and `src/lib/pipeline-context.tsx`.
 
 Demo-data slice notes:
 

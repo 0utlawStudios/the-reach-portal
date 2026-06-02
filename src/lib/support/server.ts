@@ -65,12 +65,30 @@ export async function resolveWorkspaceId(admin: SupabaseClient, userId: string):
   return (data?.workspace_id as string | undefined) || BASELINE_WORKSPACE_ID;
 }
 
-/** The caller's team role (lowercased), or null. Used to detect the superadmin. */
-export async function getTeamRole(admin: SupabaseClient, email: string): Promise<string | null> {
+/** The caller's active team role (lowercased), or null. Used to detect the superadmin. */
+export async function getTeamRole(admin: SupabaseClient, email: string, userId?: string): Promise<string | null> {
   const lower = (email || "").toLowerCase();
   if (!lower) return null;
-  const { data } = await admin.from("team_members").select("role").eq("email", lower).maybeSingle();
-  const role = data?.role as string | undefined;
+  const { data } = await admin
+    .from("team_members")
+    .select("role, status")
+    .eq("email", lower)
+    .maybeSingle();
+  const team = data as { role?: string | null; status?: string | null } | null;
+  if (team?.status !== "active") return null;
+
+  if (userId) {
+    const { data: workspaceMember } = await admin
+      .from("workspace_members")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("status", "active")
+      .limit(1)
+      .maybeSingle();
+    if (!workspaceMember) return null;
+  }
+
+  const role = team?.role || "";
   return role ? role.toLowerCase() : null;
 }
 
