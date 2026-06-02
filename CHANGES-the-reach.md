@@ -69,6 +69,7 @@
 
 ## Verification
 
+- Support Inbox production smoke passed on `https://thereach.ten80ten.com`: admin list HTTP 200, thread detail HTTP 200, own support list HTTP 200, own live-chat empty state HTTP 200, self-chat guard HTTP 400, and inactive-recipient guard HTTP 400. Positive admin-to-teammate chat is intentionally blocked until a second user is reinvited and active.
 - Brand Playbook copy-card elevation passed `git diff --check`, `npm run typecheck`, `npm run lint` with only existing warnings, and `npm run build`; functional commit `1b57a08` and tracking commit `67cb69d` were pushed to `origin/main`, GitHub CI passed for the latest tree, and production CSS on `https://thereach.ten80ten.com` contains the new raised-card selectors.
 - Settings/Brand Playbook UI cleanup passed `git diff --check`, `npm run typecheck`, `npm run lint` with only existing warnings, and `npm run build`; Settings hashtag/caption Manage buttons were verified to already route to the Brand Kit Copy Hub focus targets.
 - Settings/Brand Playbook UI cleanup was pushed as `e658660`; GitHub CI passed and Vercel production deployment `dpl_FnJETeprE7sE3U7f72kbmqz8NccL` is ready on `https://thereach.ten80ten.com`.

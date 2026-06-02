@@ -5,6 +5,17 @@ Last pushed SHA: 67cb69d docs: record brand playbook card polish
 Next: Continue production QA backlog: Settings/Profile polish, pipeline realtime QA, Support Inbox/chat regression checks, and full production QA.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
 
+Support Inbox production smoke notes:
+
+- Verified Support Inbox/chat on the live domain with an authenticated `aldridge@ten80ten.com` superadmin session.
+- Admin support list returned HTTP 200 with 1 existing workspace thread.
+- Superadmin thread detail returned HTTP 200 and loaded the existing thread messages.
+- Own support list returned HTTP 200 with 0 own threads, which is correct for Aldridge's own user account.
+- Own live-chat load returned HTTP 200 with no thread and 0 messages, which is the correct empty initial chat state.
+- Admin start-chat with self returned HTTP 400 `You cannot start a support chat with yourself.`, matching the route guard.
+- Admin start-chat with removed/inactive `hanes@ten80ten.com` returned HTTP 400 `That teammate has not activated their account yet, so they cannot receive a message.`, matching the cleaned production team state.
+- A successful admin-to-teammate chat cannot be production-tested while Aldridge is the only active member; it should be tested immediately after the next invite completes setup with a profile photo.
+
 Brand Playbook copy-card elevation slice notes:
 
 - Treated the latest Brand Playbook screenshot as an additional visual QA task, not a redirect from the active production-readiness work.
