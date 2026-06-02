@@ -2,6 +2,8 @@
 
 ## Edited
 
+- Action-button contrast hardening: strengthened central Reach action/secondary button rules so Review Posts, Invite, Send Invite, Resend, profile save/upload, and other marked command buttons remain readable in light mode, saved design-theme modes, and disabled states.
+- Button palette: derived deeper Sun/Stone and Water/Stone action gradients from the approved Reach brand tokens and kept labels/icons on a high-contrast Sand-tinted foreground.
 - Action-button readability: added final Reach action classes after the design-mode overrides and applied them to the dashboard Review Posts CTA plus Settings Invite, Send Invite, Approve, Resend, profile save, and profile upload controls.
 - Email-change feature: added `POST /api/team/change-email` so active users can safely change their own Supabase Auth email and pending invite emails can be corrected by admins with fresh invite links.
 - Email identity reconciliation: the new route updates Supabase Auth, `team_members.email`, support thread reply email, creator display labels where old email was stored, and audit logs together; active self-changes sign out for a fresh Supabase session.
@@ -37,6 +39,7 @@
 
 ## Verification
 
+- Action-button contrast slice passed `npm run lint`, `npm run typecheck`, `npm test` with 25 files / 224 tests, and `npm run build`; generated production CSS contains the strengthened `reach-action-button` and `reach-secondary-action` rules.
 - Focused email-change tests passed: active self-change, duplicate rejection, active non-self rejection, pending invite regeneration, and Auth rollback on DB failure.
 - Full `npm run preflight` passed after the email-change/action-button slice: 23 test files, 215 tests, lint, typecheck, and production build.
 - Focused profile/role tests passed: active role workspace sync, superadmin edit blocking, workspace failure rollback, missing active Auth rejection, and pending invite metadata update.

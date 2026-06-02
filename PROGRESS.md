@@ -1,9 +1,18 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: d0d881f Reach support access hardening
-Next: Verify Vercel production for this SHA, then continue revision/media/realtime hardening.
+Last pushed SHA: 91ba74b Reach action button contrast hardening
+Next: Verify CI/Vercel production for this SHA, then continue revision/media/realtime hardening.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
+
+Reach action button contrast hardening slice notes:
+
+- Reworked the central light-theme action controls to use darker Reach-token-derived Sun/Stone and Water/Stone gradients instead of low-contrast cream-on-cream states.
+- Added explicit `background-color`, `background-image`, foreground color, `-webkit-text-fill-color`, stacking, and design-theme selectors for `reach-action-button` and `reach-secondary-action`.
+- Raised disabled action controls from low opacity to a readable desaturated/contrast-adjusted state, so primary labels do not disappear when a button is unavailable.
+- Verified computed contrast for primary and secondary gradients is about 6:1 or stronger at both gradient endpoints.
+- Verification passed: `npm run lint` with only existing warnings, `npm run typecheck`, `npm test` with 25 files / 224 tests, and production `npm run build`.
+- Build artifact inspection confirmed the generated CSS includes the stronger Reach action-button selectors and foreground rules.
 
 Reach support access hardening slice notes:
 
