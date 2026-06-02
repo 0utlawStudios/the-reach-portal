@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>The Reach SMM Portal - Client Manual</title>
+<style>
+  :root {
+    --sand: #E1DFD5;
+    --sand-2: #F1EFE8;
+    --stone: #6C655A;
+    --stone-2: #4F493F;
+    --water: #5A656C;
+    --sun: #975428;
+    --line: rgba(108, 101, 90, 0.26);
+    --line-strong: rgba(108, 101, 90, 0.42);
+    --ink: #2F302E;
+    --white: #FBFAF6;
+    --shadow: 0 1px 2px rgba(108, 101, 90, 0.12), 0 18px 42px rgba(108, 101, 90, 0.16);
+    --soft-shadow: 0 1px 2px rgba(108, 101, 90, 0.12), 0 10px 24px rgba(108, 101, 90, 0.12);
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    background: linear-gradient(180deg, var(--sand-2), var(--sand));
+    color: var(--stone);
+    font-family: "Everett", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0 0 auto;
+    height: 3px;
+    z-index: 30;
+    background: linear-gradient(90deg, var(--stone), var(--sun), var(--water), var(--stone));
+    background-size: 220% 100%;
+    animation: quiet-line 10s linear infinite;
+  }
+
+  a { color: var(--sun); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .shell {
+    width: min(1160px, calc(100% - 32px));
+    margin: 0 auto;
+  }
+
+  .wordmark {
+    font-size: clamp(18px, 3vw, 32px);
+    letter-spacing: 0.36em;
+    color: var(--stone);
+    font-weight: 500;
+    text-transform: uppercase;
+    line-height: 1;
+  }
+
+  .luxury-rail {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    background: rgba(251, 250, 246, 0.42);
+    border-radius: 999px;
+    padding: 9px 0;
+    margin: 22px 0 0;
+    color: rgba(79, 73, 63, 0.66);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  .luxury-rail span {
+    display: inline-flex;
+    gap: 28px;
+    min-width: max-content;
+    padding-left: 100%;
+    animation: editorial-drift 28s linear infinite;
+  }
+
+  .eyebrow {
+    color: var(--sun);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  .hero {
+    padding: 58px 0 30px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .hero-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+    gap: 28px;
+    align-items: stretch;
+  }
+
+  h1, h2, h3, h4 {
+    color: var(--stone-2);
+    margin: 0;
+    letter-spacing: -0.02em;
+  }
+
+  h1 {
+    font-family: "Bradford", Georgia, "Times New Roman", serif;
+    font-size: clamp(42px, 7vw, 82px);
+    line-height: 0.94;
+    max-width: 760px;
+    margin: 26px 0 18px;
+  }
+
+  .lead {
+    max-width: 690px;
+    font-size: clamp(16px, 2vw, 20px);
+    color: rgba(79, 73, 63, 0.84);
+    margin: 0 0 26px;
+  }
+
+  .meta-row, .pill-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .pill, .mini-pill {
+    border: 1px solid var(--line);
+    background: rgba(251, 250, 246, 0.54);
+    border-radius: 999px;
+    padding: 8px 12px;
+    color: var(--stone-2);
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .mini-pill {
+    padding: 5px 9px;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .hero-card, .card, .table-card, .callout {
+    border: 1px solid var(--line);
+    background: rgba(251, 250, 246, 0.58);
+    border-radius: 18px;
+    box-shadow: var(--shadow);
+  }
+
+  .hero-card, .card, .table-card {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero-card::after, .card::after, .table-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(115deg, transparent 0%, rgba(251, 250, 246, 0.22) 36%, transparent 68%);
+    transform: translateX(-120%);
+    animation: panel-sheen 14s ease-in-out infinite;
+  }
+
+  .hero-card {
+    padding: 22px;
+    display: grid;
+    gap: 18px;
+  }
+
+  .metric-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .metric {
+    padding: 16px;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    background: rgba(225, 223, 213, 0.72);
+  }
+
+  .metric b {
+    display: block;
+    color: var(--stone-2);
+    font-size: 25px;
+    line-height: 1;
+    margin-bottom: 7px;
+  }
+
+  .metric span {
+    display: block;
+    color: rgba(79, 73, 63, 0.70);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .toc {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: rgba(225, 223, 213, 0.92);
+    backdrop-filter: blur(18px);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .toc-inner {
+    width: min(1160px, calc(100% - 32px));
+    margin: 0 auto;
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 10px 0;
+  }
+
+  .toc a {
+    flex: 0 0 auto;
+    color: var(--stone);
+    border: 1px solid transparent;
+    padding: 8px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .toc a:hover {
+    border-color: var(--line);
+    background: rgba(251, 250, 246, 0.58);
+    text-decoration: none;
+  }
+
+  section {
+    padding: 54px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  section > .section-head {
+    display: grid;
+    grid-template-columns: minmax(0, 0.85fr) minmax(280px, 1.15fr);
+    gap: 26px;
+    align-items: start;
+    margin-bottom: 24px;
+  }
+
+  h2 {
+    font-family: "Bradford", Georgia, "Times New Roman", serif;
+    font-size: clamp(31px, 5vw, 54px);
+    line-height: 0.98;
+  }
+
+  .section-copy {
+    color: rgba(79, 73, 63, 0.78);
+    font-size: 16px;
+    margin: 0;
+  }
+
+  .grid-2, .grid-3, .grid-4 {
+    display: grid;
+    gap: 14px;
+  }
+
+  .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+  .card {
+    padding: 18px;
+    min-width: 0;
+  }
+
+  .card h3 {
+    font-size: 17px;
+    margin-bottom: 8px;
+  }
+
+  .card p, .callout p {
+    margin: 0;
+    color: rgba(79, 73, 63, 0.76);
+  }
+
+  .card ul {
+    margin: 12px 0 0;
+    padding-left: 18px;
+    color: rgba(79, 73, 63, 0.78);
+  }
+
+  .card li + li { margin-top: 6px; }
+
+  .workflow {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(150px, 1fr));
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .stage {
+    border: 1px solid var(--line);
+    background: rgba(251, 250, 246, 0.56);
+    border-radius: 14px;
+    padding: 14px;
+    min-height: 122px;
+    box-shadow: var(--soft-shadow);
+  }
+
+  .stage .num {
+    display: inline-grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    background: var(--sun);
+    color: var(--sand);
+    font-size: 12px;
+    font-weight: 900;
+    margin-bottom: 12px;
+  }
+
+  .stage h3 { font-size: 14px; margin-bottom: 6px; }
+  .stage p { font-size: 12px; color: rgba(79, 73, 63, 0.72); margin: 0; }
+
+  .bar-row {
+    display: grid;
+    grid-template-columns: 120px minmax(120px, 1fr) 42px;
+    gap: 10px;
+    align-items: center;
+    font-size: 12px;
+    font-weight: 700;
+    margin: 10px 0;
+  }
+
+  .bar-track {
+    height: 10px;
+    border-radius: 999px;
+    background: rgba(108, 101, 90, 0.16);
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    height: 100%;
+    width: var(--w);
+    background: linear-gradient(90deg, var(--sun), var(--water));
+    border-radius: inherit;
+    background-size: 160% 100%;
+    animation: bar-breathe 7s ease-in-out infinite;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    border-spacing: 0;
+    overflow: hidden;
+  }
+
+  .table-card { overflow: hidden; }
+
+  th, td {
+    text-align: left;
+    vertical-align: top;
+    padding: 13px 14px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  th {
+    color: var(--stone-2);
+    background: rgba(108, 101, 90, 0.08);
+    font-size: 11px;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+  }
+
+  td { color: rgba(79, 73, 63, 0.80); }
+  tr:last-child td { border-bottom: 0; }
+
+  .tag {
+    display: inline-block;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: rgba(225, 223, 213, 0.72);
+    padding: 4px 8px;
+    margin: 2px 2px 2px 0;
+    font-size: 11px;
+    font-weight: 750;
+    color: var(--stone-2);
+  }
+
+  .tag.sun { background: rgba(151, 84, 40, 0.12); border-color: rgba(151, 84, 40, 0.28); color: var(--sun); }
+  .tag.water { background: rgba(90, 101, 108, 0.14); border-color: rgba(90, 101, 108, 0.28); color: var(--water); }
+
+  .callout {
+    padding: 20px;
+    border-left: 5px solid var(--sun);
+  }
+
+  .compare {
+    display: grid;
+    grid-template-columns: 1.1fr repeat(3, minmax(160px, 1fr));
+  }
+
+  .compare > div {
+    padding: 13px;
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    min-height: 64px;
+  }
+
+  .compare > div:nth-child(4n) { border-right: 0; }
+  .compare .head { background: rgba(108, 101, 90, 0.08); font-weight: 900; color: var(--stone-2); }
+  .compare .win { background: rgba(151, 84, 40, 0.10); color: var(--stone-2); }
+
+  .note {
+    font-size: 12px;
+    color: rgba(79, 73, 63, 0.66);
+    margin-top: 12px;
+  }
+
+  .footer {
+    padding: 38px 0 62px;
+    color: rgba(79, 73, 63, 0.70);
+    font-size: 12px;
+  }
+
+  .signature-strip {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(120px, 1fr));
+    gap: 1px;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    overflow: hidden;
+    background: var(--line);
+    box-shadow: var(--soft-shadow);
+    margin-top: 18px;
+  }
+
+  .signature-strip div {
+    min-height: 78px;
+    display: grid;
+    place-items: center;
+    background: rgba(251, 250, 246, 0.56);
+    color: var(--stone-2);
+    font-family: "Bradford", Georgia, "Times New Roman", serif;
+    font-size: clamp(18px, 2.5vw, 28px);
+  }
+
+  .signature-strip div:nth-child(2) { background: rgba(151, 84, 40, 0.12); color: var(--sun); }
+  .signature-strip div:nth-child(3) { background: rgba(90, 101, 108, 0.14); color: var(--water); }
+  .signature-strip div:nth-child(4) { background: rgba(108, 101, 90, 0.14); color: var(--stone-2); }
+
+  @keyframes quiet-line {
+    from { background-position: 0% 50%; }
+    to { background-position: 220% 50%; }
+  }
+
+  @keyframes editorial-drift {
+    from { transform: translateX(0); }
+    to { transform: translateX(-100%); }
+  }
+
+  @keyframes panel-sheen {
+    0%, 72% { transform: translateX(-120%); opacity: 0; }
+    82% { opacity: 1; }
+    100% { transform: translateX(120%); opacity: 0; }
+  }
+
+  @keyframes bar-breathe {
+    0%, 100% { background-position: 0% 50%; filter: saturate(0.96); }
+    50% { background-position: 100% 50%; filter: saturate(1.08); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  .source-list {
+    display: grid;
+    gap: 8px;
+    padding-left: 18px;
+  }
+
+  @media (max-width: 900px) {
+    .hero-grid, section > .section-head, .grid-2, .grid-3, .grid-4 {
+      grid-template-columns: 1fr;
+    }
+
+    .hero { padding-top: 38px; }
+    .hero-card { padding: 16px; }
+    .workflow { grid-template-columns: repeat(5, 180px); }
+    .compare { grid-template-columns: 1fr; }
+    .compare > div { border-right: 0; }
+    .compare .head:not(:first-child) { display: none; }
+    .signature-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  @media (max-width: 560px) {
+    .shell, .toc-inner { width: min(100% - 22px, 1160px); }
+    .hero { padding-top: 28px; }
+    .wordmark { font-size: 15px; letter-spacing: 0.30em; }
+    h1 { margin-top: 20px; }
+    .metric-grid { grid-template-columns: 1fr; }
+    section { padding: 38px 0; }
+    .bar-row { grid-template-columns: 86px minmax(90px, 1fr) 34px; gap: 7px; }
+    th, td { padding: 11px; }
+  }
+</style>
+</head>
+<body>
+  <header class="hero">
+    <div class="shell hero-grid">
+      <div>
+        <div class="wordmark">The Reach</div>
+        <p class="eyebrow">Client manual - SMM portal</p>
+        <h1>Run polished social operations without losing the thread.</h1>
+        <p class="lead">The Reach SMM Portal is a private production workspace for planning, approving, scheduling, publishing, and archiving social content. It keeps creative assets, comments, approvals, support, and audit history in one place.</p>
+        <div class="meta-row">
+          <span class="pill">Production domain: thereach.ten80ten.com</span>
+          <span class="pill">Default view: Light</span>
+          <span class="pill">Brand palette: Sand, Stone, Sun, Water</span>
+        </div>
+        <div class="luxury-rail" aria-hidden="true"><span>Perspective Access Taste Precision Ease Perspective Access Taste Precision Ease</span></div>
+      </div>
+      <aside class="hero-card">
+        <div class="metric-grid">
+          <div class="metric"><b>5</b><span>Pipeline stages</span></div>
+          <div class="metric"><b>5</b><span>Social platforms</span></div>
+          <div class="metric"><b>60 TB</b><span>Drive backend</span></div>
+          <div class="metric"><b>24/7</b><span>Support surface</span></div>
+        </div>
+        <div class="callout">
+          <p><strong>Best first move:</strong> preupload approved media in Media Library, then create posts from Browse Library. That keeps Drive, thumbnails, source files, and proof-of-rights tied to the post from the start.</p>
+        </div>
+        <div class="signature-strip" aria-hidden="true">
+          <div>Plan</div>
+          <div>Review</div>
+          <div>Publish</div>
+          <div>Archive</div>
+        </div>
+      </aside>
+    </div>
+  </header>
+
+  <nav class="toc" aria-label="Manual navigation">
+    <div class="toc-inner">
+      <a href="#quick-start">Quick Start</a>
+      <a href="#dashboard">Dashboard</a>
+      <a href="#pipeline">Pipeline</a>
+      <a href="#create-post">Create Post</a>
+      <a href="#platforms">Platforms</a>
+      <a href="#media">Media + Drive</a>
+      <a href="#preview">Post Preview</a>
+      <a href="#mentions">Mentions</a>
+      <a href="#support">Support</a>
+      <a href="#settings">Settings</a>
+      <a href="#competition">Comparison</a>
+      <a href="#admin">Admin</a>
+    </div>
+  </nav>
+
+  <main class="shell">
+    <section id="quick-start">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">01 - Operating rhythm</p>
+          <h2>From asset to published post.</h2>
+        </div>
+        <p class="section-copy">The app is built around one simple rule: no post should silently vanish, skip approval, or publish without the required creative context. The safest workflow is upload, create, review, approve, publish, archive.</p>
+      </div>
+
+      <div class="workflow" aria-label="Recommended workflow">
+        <div class="stage"><span class="num">1</span><h3>Upload Media</h3><p>Add files to Media Library or upload during Create Post. Files are backed by Google Drive.</p></div>
+        <div class="stage"><span class="num">2</span><h3>Create Post</h3><p>Pick platform, content type, caption, date/time, asset source, and source vault details.</p></div>
+        <div class="stage"><span class="num">3</span><h3>Review</h3><p>Use the drawer comments, notes, and checklist to prepare the post for approval.</p></div>
+        <div class="stage"><span class="num">4</span><h3>Approve</h3><p>Only complete posts can move to Approved / Scheduled. Revision requests require notes.</p></div>
+        <div class="stage"><span class="num">5</span><h3>Publish</h3><p>The publisher claims due jobs, posts to connected platforms, records attempts, and archives URLs.</p></div>
+      </div>
+
+      <div class="grid-3" style="margin-top:18px">
+        <div class="card"><h3>Daily</h3><p>Check Dashboard, review posts awaiting approval, and clear support tickets or mentions.</p></div>
+        <div class="card"><h3>Weekly</h3><p>Review the calendar, fill date gaps, upload fresh media, and confirm every scheduled post has a caption and source.</p></div>
+        <div class="card"><h3>Before client demo</h3><p>Open Dashboard, Pipeline, Post Preview, Media Library, Brand Kit, and Support. Confirm cards move and data saves after refresh.</p></div>
+      </div>
+    </section>
+
+    <section id="dashboard">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">02 - Dashboard</p>
+          <h2>The executive snapshot.</h2>
+        </div>
+        <p class="section-copy">Dashboard is the production cockpit. It shows how much content exists, where posts are blocked, what is scheduled, and what has already gone live.</p>
+      </div>
+
+      <div class="grid-3">
+        <div class="card"><h3>Content Funnel</h3><p>Counts cards by stage: Ideas, Awaiting Approval, Revision Needed, Approved / Scheduled, and Posted.</p></div>
+        <div class="card"><h3>Scorecard</h3><p>Shows approval rate, in-review count, scheduled count, and the number of active social platforms.</p></div>
+        <div class="card"><h3>Platform Split</h3><p>Shows how content is distributed across Instagram, Facebook, LinkedIn, TikTok, and YouTube.</p></div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <h3>Healthy June demo spread</h3>
+        <div class="bar-row"><span>Ideas</span><div class="bar-track"><div class="bar-fill" style="--w:60%"></div></div><span>3</span></div>
+        <div class="bar-row"><span>Approval</span><div class="bar-track"><div class="bar-fill" style="--w:100%"></div></div><span>5</span></div>
+        <div class="bar-row"><span>Revision</span><div class="bar-track"><div class="bar-fill" style="--w:80%"></div></div><span>4</span></div>
+        <div class="bar-row"><span>Scheduled</span><div class="bar-track"><div class="bar-fill" style="--w:80%"></div></div><span>4</span></div>
+        <div class="bar-row"><span>Posted</span><div class="bar-track"><div class="bar-fill" style="--w:100%"></div></div><span>8</span></div>
+      </div>
+    </section>
+
+    <section id="pipeline">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">03 - Content Pipeline</p>
+          <h2>Where the work actually moves.</h2>
+        </div>
+        <p class="section-copy">The pipeline uses draggable cards with server-backed stage changes. A move is not just visual: it writes to Supabase, updates other screens through Realtime, and records audit history.</p>
+      </div>
+
+      <div class="table-card">
+        <table>
+          <thead><tr><th>Stage</th><th>What belongs there</th><th>Move rule</th></tr></thead>
+          <tbody>
+            <tr><td><span class="tag water">Ideas</span></td><td>Draft concepts, new uploads, posts not ready for formal review.</td><td>Can move forward when the post has enough content to review.</td></tr>
+            <tr><td><span class="tag sun">Awaiting Approval</span></td><td>Posts ready for the approver to inspect.</td><td>Approver can approve or request revision.</td></tr>
+            <tr><td><span class="tag">Revision Needed</span></td><td>Posts blocked by creative, copy, source, or timing feedback.</td><td>Returning to Awaiting Approval requires a revision note.</td></tr>
+            <tr><td><span class="tag water">Approved / Scheduled</span></td><td>Complete posts approved for the scheduled date and time.</td><td>Requires media, caption, design link, schedule, asset source, and checklist completion.</td></tr>
+            <tr><td><span class="tag">Posted</span></td><td>Published content with recorded publish metadata.</td><td>Manual drag into Posted is blocked; publisher service marks posted.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout" style="margin-top:16px">
+        <p><strong>Realtime behavior:</strong> when one approved user drags a card, other active screens receive the change through Supabase Realtime. If the database rejects a move, the UI rolls the card back instead of pretending it worked.</p>
+      </div>
+    </section>
+
+    <section id="create-post">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">04 - Create Post</p>
+          <h2>Every required field has a purpose.</h2>
+        </div>
+        <p class="section-copy">The Create Post modal is intentionally strict. It prevents posts from reaching approval with missing media rights, missing schedule data, or missing source context.</p>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <h3>Fastest clean workflow</h3>
+          <ul>
+            <li>Click <strong>Create Post</strong>.</li>
+            <li>Choose <strong>Browse Library</strong> if the asset is already uploaded.</li>
+            <li>Select platforms and content type.</li>
+            <li>Write the caption and use @mentions if a teammate needs attention.</li>
+            <li>Set date/time and asset source.</li>
+            <li>Add design link, Drive folder, license/release if needed, and notes.</li>
+            <li>Complete the checklist before sending to approval.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Required to demo drag approval</h3>
+          <p>A card can move into Approved / Scheduled only when the production fields are filled.</p>
+          <div class="pill-row" style="margin-top:12px">
+            <span class="mini-pill">Thumbnail</span>
+            <span class="mini-pill">Caption</span>
+            <span class="mini-pill">Date/time</span>
+            <span class="mini-pill">Asset source</span>
+            <span class="mini-pill">Design link</span>
+            <span class="mini-pill">Checklist</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="platforms">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">05 - Platform logic</p>
+          <h2>Platform first, format second.</h2>
+        </div>
+        <p class="section-copy">The app disables invalid platform/content-type pairings so the team does not build a post that cannot be published cleanly. If a platform fades out, switch the content type or remove incompatible platforms.</p>
+      </div>
+
+      <div class="table-card">
+        <table>
+          <thead><tr><th>Content type</th><th>Compatible platforms in this portal</th><th>Best use</th></tr></thead>
+          <tbody>
+            <tr><td><span class="tag sun">Image</span></td><td>Facebook, Instagram, LinkedIn</td><td>Static hotel features, destination notes, founder POV, quick announcements.</td></tr>
+            <tr><td><span class="tag water">Video</span></td><td>Facebook, Instagram, LinkedIn, YouTube, TikTok</td><td>Broader video assets, walkthroughs, destination footage, brand explainers.</td></tr>
+            <tr><td><span class="tag water">Reel</span></td><td>Facebook, Instagram, YouTube, TikTok</td><td>Short vertical video, fast hooks, behind-the-scenes, trip moments.</td></tr>
+            <tr><td><span class="tag sun">Carousel</span></td><td>Facebook, Instagram</td><td>Multi-image storytelling, itinerary breakdowns, hotel detail sequences.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="grid-3" style="margin-top:16px">
+        <div class="card"><h3>Caption</h3><p>This is the text the publisher sends to platforms. Include hashtags, mentions, CTA, and any platform-specific copy in one reviewed place.</p></div>
+        <div class="card"><h3>Checklist</h3><p>Confirms cover, caption, hook, CTA, brand guidelines, and schedule before approval.</p></div>
+        <div class="card"><h3>Details</h3><p>Keeps source vault, raw files, rights, notes, and Drive folder attached to the post record.</p></div>
+      </div>
+    </section>
+
+    <section id="media">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">06 - Media Library + Drive</p>
+          <h2>The asset vault behind the board.</h2>
+        </div>
+        <p class="section-copy">Media Library is the cleanest way to prepare for post creation. Upload once, then reuse through Browse Library. The production backend is connected to the Google Drive asset store, with source files and license references kept on the post.</p>
+      </div>
+
+      <div class="grid-4">
+        <div class="card"><h3>60 TB backend</h3><p>Drive is the durable storage layer for publishing media and large source files.</p></div>
+        <div class="card"><h3>Small + large uploads</h3><p>Small files proxy through the server; large files use resumable Drive upload sessions.</p></div>
+        <div class="card"><h3>Source vault</h3><p>Design links, raw files, usage type, and Drive folder stay attached to each card.</p></div>
+        <div class="card"><h3>Rights proof</h3><p>License, release, or screenshot proof can be uploaded for compliance.</p></div>
+      </div>
+
+      <div class="callout" style="margin-top:16px">
+        <p><strong>SMM trick:</strong> upload batches by campaign before creating posts. Then use Create Post -> Browse Library to pick the exact asset. This saves repeated upload time, keeps Drive organized, and makes demo cards draggable without "missing media source" errors.</p>
+      </div>
+    </section>
+
+    <section id="preview">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">07 - Post Preview</p>
+          <h2>Preview prevents avoidable mistakes.</h2>
+        </div>
+        <p class="section-copy">Post Preview shows platform-style renderings before the post goes live. It is useful because the same caption and media can feel different on Instagram, Facebook, TikTok, YouTube, and LinkedIn.</p>
+      </div>
+
+      <div class="grid-3">
+        <div class="card"><h3>Visual fit</h3><p>Quickly check whether the image or video thumbnail reads well at platform scale.</p></div>
+        <div class="card"><h3>Caption rhythm</h3><p>See whether the first line, hashtags, and CTA feel natural before publishing.</p></div>
+        <div class="card"><h3>Approver confidence</h3><p>Approvers can review the post in context, not just as a file and a text box.</p></div>
+      </div>
+    </section>
+
+    <section id="mentions">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">08 - Mentions + notes</p>
+          <h2>Pull the right person into the exact post.</h2>
+        </div>
+        <p class="section-copy">Type @ in captions, notes, and comments to mention teammates. Mention notifications are designed for exact-name team routing, so feedback is tied to the card instead of getting lost in side chats.</p>
+      </div>
+
+      <div class="table-card">
+        <table>
+          <thead><tr><th>Where</th><th>Use it for</th><th>Result</th></tr></thead>
+          <tbody>
+            <tr><td>Caption field</td><td>Call attention to copy, hashtag, CTA, or platform nuance.</td><td>Reviewer sees the mention in the publishing text context.</td></tr>
+            <tr><td>Notes</td><td>Internal handoff, creative instruction, rights note, or client caveat.</td><td>Note is attached to the post record.</td></tr>
+            <tr><td>Asset drawer comments</td><td>Threaded post feedback and revisions.</td><td>Comment history stays with the asset and audit trail.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="support">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">09 - Support center</p>
+          <h2>Built-in help without leaving the portal.</h2>
+        </div>
+        <p class="section-copy">The support button can be used for bugs, feature requests, "how do I" questions, media issues, and urgent publishing problems. Superadmins get a private Support Inbox for tickets and live chat.</p>
+      </div>
+
+      <div class="grid-3">
+        <div class="card"><h3>Tickets</h3><p>Best for bugs, access requests, publishing questions, and feature requests that need tracking.</p></div>
+        <div class="card"><h3>Live chat</h3><p>Best for quick questions while actively working inside the portal.</p></div>
+        <div class="card"><h3>Attachments</h3><p>Upload screenshots or short videos so support can see the exact issue.</p></div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <h3>Support status flow</h3>
+        <div class="pill-row" style="margin-top:12px">
+          <span class="pill">Open</span>
+          <span class="pill">In progress</span>
+          <span class="pill">Resolved</span>
+          <span class="pill">Closed</span>
+        </div>
+        <p class="note">Unread alerts, read receipts, user reply emails, admin SMTP notices, and optional Telegram pings are part of the support stack.</p>
+      </div>
+    </section>
+
+    <section id="settings">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">10 - Brand Kit + Settings</p>
+          <h2>The shared operating standard.</h2>
+        </div>
+        <p class="section-copy">Brand Kit stores the copy patterns and visual rules that make the portal useful for repeatable social work. Settings controls team access, themes, account integrations, audit logs, and publishing operations.</p>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <h3>Brand Kit includes</h3>
+          <ul>
+            <li>Business essentials and website reference.</li>
+            <li>Hashtag banks and caption templates.</li>
+            <li>Hooks, CTAs, content pillars, and voice rules.</li>
+            <li>Reach colors: Sand, Stone, Sun, Water.</li>
+            <li>Logo assets, social specs, guardrails, and approval chain.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Settings includes</h3>
+          <ul>
+            <li>Default light theme, with dark mode saved per user preference.</li>
+            <li>Team members, invites, resend invites, roles, avatars, and last-seen state.</li>
+            <li>Audit logs for important post and system activity.</li>
+            <li>Publishing queue monitoring and admin retry for failed/stuck jobs.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="competition">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">11 - Market comparison</p>
+          <h2>Why this portal beats generic tools for The Reach.</h2>
+        </div>
+        <p class="section-copy">Later and Hootsuite are strong general-purpose platforms. The Reach portal is better for this client workflow because it is single-tenant, source-vaulted, approval-gated, Drive-backed, and branded for the exact SMM operating model.</p>
+      </div>
+
+      <div class="table-card compare" role="table" aria-label="Competitor comparison">
+        <div class="head">Capability</div><div class="head">The Reach Portal</div><div class="head">Later</div><div class="head">Hootsuite</div>
+        <div>Client-specific brand system</div><div class="win">Built around The Reach palette, wordmark, Brand Kit, approval chain, and internal roles.</div><div>Brand and media tools, but generic product structure.</div><div>Enterprise-grade general social suite, not bespoke to The Reach.</div>
+        <div>Approval + audit safety</div><div class="win">Stage gates, revision notes, audit trail, RLS, and publisher lockdown are built into the workflow.</div><div>Content approval exists on higher plans according to Later pricing docs.</div><div>Approval workflows are part of Hootsuite publishing tools.</div>
+        <div>Media backend</div><div class="win">Connected Google Drive backend with source vault, raw files, license proof, and media-library reuse.</div><div>Media Library and access groups are available in Later.</div><div>Media library and creative integrations are available in Hootsuite.</div>
+        <div>Support inside the portal</div><div class="win">Client can open tickets/chat, attach screenshots, and keep support tied to the same workspace.</div><div>Help center/chatbot/support channels depend on plan.</div><div>Enterprise support and services are available by plan.</div>
+        <div>Best for</div><div class="win">A private, production-ready SMM operating room for one brand.</div><div>Scheduling, Link in Bio, social sets, and creator/brand workflows.</div><div>Large social teams needing listening, analytics, benchmarking, and broad governance.</div>
+      </div>
+
+      <div class="callout" style="margin-top:16px">
+        <p><strong>Honest positioning:</strong> Later is strong for Link in Bio and visual scheduling. Hootsuite is strong for enterprise analytics, listening, benchmarking, and broad integrations. The Reach portal wins when the priority is a controlled client workspace with custom approval rules, Drive-backed creative evidence, support, and production safety.</p>
+      </div>
+    </section>
+
+    <section id="admin">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">12 - Admin and production controls</p>
+          <h2>What keeps the portal hardened.</h2>
+        </div>
+        <p class="section-copy">The app uses Supabase Auth, workspace membership, RLS, server-side support routes, and protected health checks so access and data integrity are enforced beyond the browser UI.</p>
+      </div>
+
+      <div class="grid-3">
+        <div class="card"><h3>Invites and resend</h3><p>Superadmins invite users, resend pending invites, and activate team profiles through the setup flow.</p></div>
+        <div class="card"><h3>Forgot password</h3><p>Known Auth users receive reset links. Known team members without Auth can receive a setup bridge without exposing unknown emails.</p></div>
+        <div class="card"><h3>Last seen</h3><p>Presence, route pings, heartbeat, departure beacons, and audit sync contribute to team status labels.</p></div>
+      </div>
+
+      <div class="table-card" style="margin-top:16px">
+        <table>
+          <thead><tr><th>Control</th><th>Why it matters</th></tr></thead>
+          <tbody>
+            <tr><td>Workspace RLS</td><td>Domain tables are gated through active workspace membership.</td></tr>
+            <tr><td>Post safety triggers</td><td>Approved and posted cards cannot be hard-deleted by normal browser behavior.</td></tr>
+            <tr><td>Publisher lockdown</td><td>Only service-role publishing can mark a post as Posted with posted metadata.</td></tr>
+            <tr><td>Realtime subscriptions</td><td>Posts, media, support, and presence changes can update across active screens.</td></tr>
+            <tr><td>Keep-alive and deep health</td><td>Secret-gated checks monitor Supabase, Drive, site, API, storage, auth, and content health.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="sources">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Sources reviewed</p>
+          <h2>Manual basis.</h2>
+        </div>
+        <p class="section-copy">This manual uses the local Reach technical audit, the Reach brand guidelines, and current official Later/Hootsuite pages checked in June 2026.</p>
+      </div>
+      <ul class="source-list">
+        <li><a href="../The%20Reach/FULL_TECHNICAL_FEATURE_AUDIT.md">The Reach technical feature audit</a></li>
+        <li><a href="../The%20Reach/The_Reach_Brand_Guidelines_May_2026_compressed.pdf">The Reach Brand Guidelines, May 2026</a></li>
+        <li><a href="https://later.com/pricing/">Later pricing and feature comparison</a></li>
+        <li><a href="https://help.later.com/hc/en-us/articles/360060842914-Supported-Social-Platforms-Post-Types">Later supported platforms and post types</a></li>
+        <li><a href="https://www.hootsuite.com/platform">Hootsuite platform overview</a></li>
+        <li><a href="https://www.hootsuite.com/platform/publishing">Hootsuite publishing platform</a></li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="shell">
+      <div class="wordmark" style="font-size:14px">The Reach</div>
+      <p style="margin:12px 0 0">SMM Portal client manual. Built for production use, client demos, and team onboarding.</p>
+    </div>
+  </footer>
+</body>
+</html>

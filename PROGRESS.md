@@ -1,9 +1,19 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: f745297 Reach dashboard and Brand Playbook polish
-Next: Build the client manual, then run the final production QA swarm.
+Last pushed SHA: a34deff Reach client manual
+Next: Audit unreadable non-hover buttons across invite/send-invite/resend/support/settings/modal actions, then run the final production QA swarm.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
+
+Reach client manual slice notes:
+
+- Created `docs/THE-REACH-SMM-CLIENT-MANUAL.html` as a standalone, OneCompiler-compatible, mobile-responsive client manual with inline CSS and no build/runtime dependency.
+- Used only The Reach brand palette from the guidelines: Sand, Stone, Sun, and Water. The manual uses a text wordmark instead of relying on local logo paths.
+- Added restrained luxury motion: animated brand line, editorial ticker, subtle panel sheen, animated chart bars, and `prefers-reduced-motion` support. Removed atmospheric radial decoration to keep the design editorial and on-brand.
+- Included operational sections for Dashboard, Content Pipeline, Create Post, platform/content-type compatibility, Media Library, Google Drive 60 TB backend, Post Preview, mentions, support tickets/chat, Brand Kit, Settings, admin controls, Realtime, and keep-alive/deep health.
+- Included a realistic comparison against Later and Hootsuite using current official Later/Hootsuite sources checked via web research.
+- Verified old-brand/off-brand scan is clean for `Ten80Ten`, `Content Engine`, `Creator Studio`, `smm.ten80ten`, `purple`, `orb`, and `bokeh`.
+- Verified HTML tag balance with a direct Node structural check. The system `tidy` binary is a 2006 build and flags HTML5 semantic tags as unknown, so it is not useful for this document.
 
 Reach dashboard / Brand Playbook visual slice notes:
 
