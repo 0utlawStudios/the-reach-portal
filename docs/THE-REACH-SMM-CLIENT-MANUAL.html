@@ -568,6 +568,7 @@
       <a href="#preview">Post Preview</a>
       <a href="#mentions">Mentions</a>
       <a href="#support">Support</a>
+      <a href="#access">Access</a>
       <a href="#settings">Settings</a>
       <a href="#competition">Comparison</a>
       <a href="#admin">Admin</a>
@@ -729,11 +730,11 @@
         <div class="card"><h3>60 TB backend</h3><p>Drive is the durable storage layer for publishing media and large source files.</p></div>
         <div class="card"><h3>Small + large uploads</h3><p>Small files proxy through the server; large files use resumable Drive upload sessions.</p></div>
         <div class="card"><h3>Source vault</h3><p>Design links, raw files, usage type, and Drive folder stay attached to each card.</p></div>
-        <div class="card"><h3>Rights proof</h3><p>License, release, or screenshot proof can be uploaded for compliance.</p></div>
+        <div class="card"><h3>Usage tracking</h3><p>In-use labels follow the post cards that reference each asset, even when the asset is reused from Browse Library.</p></div>
       </div>
 
       <div class="callout" style="margin-top:16px">
-        <p><strong>SMM trick:</strong> upload batches by campaign before creating posts. Then use Create Post -> Browse Library to pick the exact asset. This saves repeated upload time, keeps Drive organized, and makes demo cards draggable without "missing media source" errors.</p>
+        <p><strong>SMM trick:</strong> upload batches by campaign before creating posts. Then use Create Post -> Browse Library to pick the exact asset. This saves repeated upload time, keeps Drive organized, and makes demo cards draggable without "missing media source" errors. License, release, or screenshot proof can still be attached to each post when needed.</p>
       </div>
     </section>
 
@@ -801,10 +802,36 @@
       </div>
     </section>
 
+    <section id="access">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">10 - Access + onboarding</p>
+          <h2>Invites should be clean, recoverable, and admin-controlled.</h2>
+        </div>
+        <p class="section-copy">Users join by invite only. A person does not get workspace access until their setup is complete and their workspace membership is active, which protects posts, media, support, and audit data from partial accounts.</p>
+      </div>
+
+      <div class="table-card">
+        <table>
+          <thead><tr><th>Scenario</th><th>What to do</th><th>Expected result</th></tr></thead>
+          <tbody>
+            <tr><td>New invite</td><td>Open the latest invite email, set password, add profile details, then finish setup.</td><td>User becomes active and can enter the portal.</td></tr>
+            <tr><td>Invite says expired or invalid</td><td>Use the newest invite only, or ask a superadmin to click Resend.</td><td>Old links stay invalid; the newest link works.</td></tr>
+            <tr><td>Workspace access pending</td><td>Click Complete Setup. If setup is already complete, refresh or sign in again.</td><td>The app rechecks workspace membership and opens the workspace once active.</td></tr>
+            <tr><td>Wrong email</td><td>Admin edits the pending invite email or the active user changes their own email from Settings.</td><td>Auth, team profile, workspace membership, and support records stay aligned.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout" style="margin-top:16px">
+        <p><strong>Admin note:</strong> resend invalidates the older invite link. This is intentional. It prevents multiple stale setup URLs from creating duplicate or partially activated accounts.</p>
+      </div>
+    </section>
+
     <section id="settings">
       <div class="section-head">
         <div>
-          <p class="eyebrow">10 - Brand Kit + Settings</p>
+          <p class="eyebrow">11 - Brand Kit + Settings</p>
           <h2>The shared operating standard.</h2>
         </div>
         <p class="section-copy">Brand Kit stores the copy patterns and visual rules that make the portal useful for repeatable social work. Settings controls team access, themes, account integrations, audit logs, and publishing operations.</p>
@@ -836,10 +863,29 @@
     <section id="competition">
       <div class="section-head">
         <div>
-          <p class="eyebrow">11 - Market comparison</p>
+          <p class="eyebrow">12 - Market comparison</p>
           <h2>Why this portal beats generic tools for The Reach.</h2>
         </div>
-        <p class="section-copy">Later and Hootsuite are strong general-purpose platforms. The Reach portal is better for this client workflow because it is single-tenant, source-vaulted, approval-gated, Drive-backed, and branded for the exact SMM operating model.</p>
+        <p class="section-copy">Later and Hootsuite are strong general-purpose platforms. The Reach portal is better for this client workflow because it is single-tenant, source-vaulted, approval-gated, Drive-backed, branded for the exact SMM operating model, and included at zero separate software cost inside the full social media package.</p>
+      </div>
+
+      <div class="grid-4" style="margin-bottom:16px">
+        <div class="card"><h3>The Reach Portal</h3><p><strong>$0/month</strong> separate subscription. The portal is already included in the full social media package.</p></div>
+        <div class="card"><h3>Later baseline</h3><p>Growth is listed at <strong>$37.50/month</strong> billed yearly for 2 users. A 3rd user adds <strong>$3.75/month</strong>.</p></div>
+        <div class="card"><h3>Later higher tier</h3><p>Scale is listed at <strong>$82.50/month</strong> billed yearly for 4 users, before taxes and optional extras.</p></div>
+        <div class="card"><h3>Hootsuite baseline</h3><p>Hootsuite is paid per user/month, with public page metadata observed at a <strong>$99/user/month</strong> starting point; Enterprise is custom.</p></div>
+      </div>
+
+      <div class="table-card" style="margin-bottom:16px">
+        <table>
+          <thead><tr><th>Cost scenario</th><th>Monthly software cost</th><th>Annual software cost</th><th>Approx. annual savings with The Reach portal</th></tr></thead>
+          <tbody>
+            <tr><td>The Reach portal inside SMM package</td><td>$0</td><td>$0</td><td>Baseline</td></tr>
+            <tr><td>Later Growth for 3 users</td><td>$41.25</td><td>$495</td><td>$495 saved</td></tr>
+            <tr><td>Later Scale</td><td>$82.50</td><td>$990</td><td>$990 saved</td></tr>
+            <tr><td>Hootsuite starting point for 3 users</td><td>$297</td><td>$3,564</td><td>$3,564 saved</td></tr>
+          </tbody>
+        </table>
       </div>
 
       <div class="table-card compare" role="table" aria-label="Competitor comparison">
@@ -848,25 +894,26 @@
         <div>Approval + audit safety</div><div class="win">Stage gates, revision notes, audit trail, RLS, and publisher lockdown are built into the workflow.</div><div>Content approval exists on higher plans according to Later pricing docs.</div><div>Approval workflows are part of Hootsuite publishing tools.</div>
         <div>Media backend</div><div class="win">Connected Google Drive backend with source vault, raw files, license proof, and media-library reuse.</div><div>Media Library and access groups are available in Later.</div><div>Media library and creative integrations are available in Hootsuite.</div>
         <div>Support inside the portal</div><div class="win">Client can open tickets/chat, attach screenshots, and keep support tied to the same workspace.</div><div>Help center/chatbot/support channels depend on plan.</div><div>Enterprise support and services are available by plan.</div>
+        <div>Separate software cost</div><div class="win">$0 separate portal subscription. Included in the full social media package.</div><div>Paid monthly/annual subscription by plan, user count, social sets, and feature tier. Current examples above range from $495 to $990/year for relevant small-team baselines.</div><div>Paid platform subscription by plan, seats, social accounts, and enterprise needs. A 3-user starting baseline is approximately $3,564/year before taxes or add-ons.</div>
         <div>Best for</div><div class="win">A private, production-ready SMM operating room for one brand.</div><div>Scheduling, Link in Bio, social sets, and creator/brand workflows.</div><div>Large social teams needing listening, analytics, benchmarking, and broad governance.</div>
       </div>
 
       <div class="callout" style="margin-top:16px">
-        <p><strong>Honest positioning:</strong> Later is strong for Link in Bio and visual scheduling. Hootsuite is strong for enterprise analytics, listening, benchmarking, and broad integrations. The Reach portal wins when the priority is a controlled client workspace with custom approval rules, Drive-backed creative evidence, support, and production safety.</p>
+        <p><strong>Honest positioning:</strong> Later is strong for Link in Bio and visual scheduling. Hootsuite is strong for enterprise analytics, listening, benchmarking, and broad integrations. The Reach portal wins when the priority is a controlled client workspace with custom approval rules, Drive-backed creative evidence, support, production safety, and no additional software subscription beyond the social media package. Savings estimates exclude taxes, ad spend, payment processing changes, and future competitor pricing changes.</p>
       </div>
     </section>
 
     <section id="admin">
       <div class="section-head">
         <div>
-          <p class="eyebrow">12 - Admin and production controls</p>
+          <p class="eyebrow">13 - Admin and production controls</p>
           <h2>What keeps the portal hardened.</h2>
         </div>
         <p class="section-copy">The app uses Supabase Auth, workspace membership, RLS, server-side support routes, and protected health checks so access and data integrity are enforced beyond the browser UI.</p>
       </div>
 
       <div class="grid-3">
-        <div class="card"><h3>Invites and resend</h3><p>Superadmins invite users, resend pending invites, and activate team profiles through the setup flow.</p></div>
+        <div class="card"><h3>Invites and resend</h3><p>Superadmins invite users, resend pending invites, and recover interrupted setup sessions without opening domain data to pending users.</p></div>
         <div class="card"><h3>Forgot password</h3><p>Known Auth users receive reset links. Known team members without Auth can receive a setup bridge without exposing unknown emails.</p></div>
         <div class="card"><h3>Last seen</h3><p>Presence, route pings, heartbeat, departure beacons, and audit sync contribute to team status labels.</p></div>
       </div>
@@ -891,13 +938,14 @@
           <p class="eyebrow">Sources reviewed</p>
           <h2>Manual basis.</h2>
         </div>
-        <p class="section-copy">This manual uses the local Reach technical audit, the Reach brand guidelines, and current official Later/Hootsuite pages checked in June 2026.</p>
+        <p class="section-copy">This manual uses the local Reach technical audit, the Reach brand guidelines, and current official Later/Hootsuite pages checked on June 3, 2026.</p>
       </div>
       <ul class="source-list">
         <li><a href="../The%20Reach/FULL_TECHNICAL_FEATURE_AUDIT.md">The Reach technical feature audit</a></li>
         <li><a href="../The%20Reach/The_Reach_Brand_Guidelines_May_2026_compressed.pdf">The Reach Brand Guidelines, May 2026</a></li>
         <li><a href="https://later.com/pricing/">Later pricing and feature comparison</a></li>
         <li><a href="https://help.later.com/hc/en-us/articles/360060842914-Supported-Social-Platforms-Post-Types">Later supported platforms and post types</a></li>
+        <li><a href="https://www.hootsuite.com/plans">Hootsuite plans and pricing</a></li>
         <li><a href="https://www.hootsuite.com/platform">Hootsuite platform overview</a></li>
         <li><a href="https://www.hootsuite.com/platform/publishing">Hootsuite publishing platform</a></li>
       </ul>
