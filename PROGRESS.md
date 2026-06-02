@@ -1,9 +1,17 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: 98fb3c8 Reach realtime contract migration
-Next: Verify CI/Vercel production for this SHA, then continue media tracking and final production QA.
+Last pushed SHA: 76c98a7 Media Library usage reconciliation
+Next: Trace and fix the Hanes invite/signup workspace-access path, then continue final production QA.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
+
+Reach Media Library usage reconciliation slice notes:
+
+- Patched Media Library usage detection so an asset is considered in use when either `media_assets.used_in` references a card or any live pipeline card points at the asset URL through `thumbnailUrl` or `sourceVault.rawFiles`.
+- Kept the change out of `src/lib/pipeline-context.tsx`; post persistence, Realtime subscriptions, drag behavior, and workspace insert rules remain untouched.
+- Ignored temporary `blob:` URLs and deduplicated repeated card references so upload previews and repeated references do not create false usage rows.
+- Fixed `unused` and `in use` Media Library filters to use the reconciled usage map instead of trusting only the persisted `used_in` array.
+- Verification passed: `npm run typecheck`, `npm run lint` with only existing warnings, `npm test` with 26 files / 228 tests, and `npm run build`.
 
 Reach realtime / keep-alive proof slice notes:
 
