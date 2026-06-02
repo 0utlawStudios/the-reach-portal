@@ -2,6 +2,9 @@
 
 ## Edited
 
+- Invite setup recovery: pending invite users now get a `Complete Setup` action, and `/auth/setup` can resume from an existing Supabase session if the invite token hash was already consumed.
+- Invite activation hardening: avatar upload during setup is non-blocking, so storage upload failure cannot leave a confirmed invite user pending without workspace access.
+- Live invite repair: confirmed pending invite sessions for Hanes and Shahannie were promoted to active team/workspace access; Christer remains pending because his invite is unconfirmed and unused.
 - Media Library usage reconciliation: assets now show as in use when they are referenced by live pipeline card thumbnails or source-vault raw files, even if the persisted `media_assets.used_in` array is empty or stale.
 - Media Library filters: `unused` and `in use` now use the reconciled card/media URL map, while ignoring temporary `blob:` preview URLs and deduplicating repeated card references.
 - Realtime contract: added migration `0035_reach_realtime_contract.sql` to guarantee `posts` and `content_plan_rows` are in `supabase_realtime` and use `REPLICA IDENTITY FULL`.
@@ -48,6 +51,8 @@
 
 ## Verification
 
+- Invite setup recovery passed focused auth/setup/provision tests, `npm run typecheck`, `npm run lint`, `npm test` with 26 files / 230 tests, `npm run build`, GitHub CI for SHA `ce84600`, and Vercel production deployment `dpl_6wSf2NKMEJyUQE47kcauTDvpgsUr`.
+- Live Supabase verification confirms `hanes@ten80ten.com` and `shang.ten80ten@gmail.com` are active team members with active baseline workspace access.
 - Media Library usage slice passed `npm run typecheck`, `npm run lint`, `npm test` with 26 files / 228 tests, and `npm run build`.
 - Realtime/keep-alive slice applied migration `0035` to Supabase project `gxmpmdhmxyfqusdzcemt`; direct SQL verified `posts` and `content_plan_rows` publication plus full replica identity, keep-alive returned HTTP 200, and deep-check returned HTTP 200 with 0 failures.
 - Drive upload policy slice passed focused Drive route tests, `npm run lint`, `npm run typecheck`, `npm test` with 26 files / 228 tests, and `npm run build`.

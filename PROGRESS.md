@@ -1,9 +1,18 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: 76c98a7 Media Library usage reconciliation
-Next: Trace and fix the Hanes invite/signup workspace-access path, then continue final production QA.
+Last pushed SHA: ce84600 Invite setup recovery
+Next: Record invite repair docs, then continue final production QA.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
+
+Reach invite/setup recovery slice notes:
+
+- Root cause confirmed in live Supabase: Hanes and Shahannie had consumed/confirmed invite Auth sessions, but their `team_members` rows stayed `pending` and no `workspace_members` rows existed, so the app correctly blocked them at the pending-access gate.
+- Patched the pending-access gate to show `Complete Setup` for pending invite users instead of only `Refresh`/`Sign Out`.
+- Patched `/auth/setup` so an interrupted invite setup can resume from an existing Supabase session after the invite token hash has already been consumed.
+- Made setup avatar upload non-blocking so a storage hiccup cannot strand a confirmed invite user as pending without workspace access.
+- Live repair completed for `hanes@ten80ten.com` and `shang.ten80ten@gmail.com`: both are now active `team_members` with active baseline `workspace_members` rows. `christer@ten80ten.com` remains pending because the Auth email is unconfirmed and has never signed in.
+- Verification passed: focused auth/setup/provision tests, `npm run typecheck`, `npm run lint` with only existing warnings, `npm test` with 26 files / 230 tests, `npm run build`, GitHub CI green, and Vercel production ready on `thereach.ten80ten.com`.
 
 Reach Media Library usage reconciliation slice notes:
 
