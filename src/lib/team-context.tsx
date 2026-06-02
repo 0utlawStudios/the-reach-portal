@@ -39,7 +39,7 @@ interface TeamContextType {
   pendingRequests: SignupRequest[];
   inviteMember: (email: string, name: string, role: UserRole) => void;
   removeMember: (id: string, email: string, requestedBy: string) => void;
-  updateMember: (id: string, updates: Partial<TeamMember>) => void;
+  updateMember: (id: string, updates: Partial<TeamMember>) => Promise<boolean>;
   refreshMembers: () => Promise<void>;
   refreshPendingRequests: () => void;
 }
@@ -59,15 +59,6 @@ type TeamMemberRow = {
   created_at?: string | null;
   updated_at?: string | null;
   avatar_url?: string | null;
-};
-
-type TeamMemberUpdate = {
-  name?: string;
-  role?: UserRole;
-  secondary_role?: string;
-  status?: InviteStatus;
-  avatar_url?: string;
-  phone?: string;
 };
 
 function isSupabaseConfigured(): boolean {
@@ -266,28 +257,39 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     }
   }, [useDb, members, addToast, refreshMembers]);
 
-  const updateMember = useCallback((id: string, updates: Partial<TeamMember>) => {
+  const updateMember = useCallback(async (id: string, updates: Partial<TeamMember>): Promise<boolean> => {
     // DATA-007: snapshot the member so a failed update can be rolled back.
     const previousMember = members.find((m) => m.id === id);
     setMembers((prev) => prev.map((m) => m.id === id ? { ...m, ...updates } : m));
     if (useDb) {
-      const dbUpdates: TeamMemberUpdate = {};
-      if (updates.name !== undefined) dbUpdates.name = updates.name;
-      if (updates.role !== undefined) dbUpdates.role = updates.role;
-      if (updates.secondaryRole !== undefined) dbUpdates.secondary_role = updates.secondaryRole;
-      if (updates.status !== undefined) dbUpdates.status = updates.status;
-      if (updates.avatar !== undefined) dbUpdates.avatar_url = updates.avatar;
-      if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
-      supabase.from("team_members").update(dbUpdates).eq("id", id).then(({ error }) => {
-        // On failure, revert the optimistic local change so the edit does not
-        // appear saved when the DB rejected it.
-        if (error && previousMember) {
-          console.error("[team] updateMember sync failed:", error.message);
-          setMembers((prev) => prev.map((m) => m.id === id ? previousMember : m));
-          addToast(`Update failed: ${error.message}. Changes reverted.`, "error");
+      const apiUpdates: Partial<TeamMember> = {};
+      if (updates.name !== undefined) apiUpdates.name = updates.name;
+      if (updates.role !== undefined) apiUpdates.role = updates.role;
+      if (updates.avatar !== undefined) apiUpdates.avatar = updates.avatar;
+      if (updates.phone !== undefined) apiUpdates.phone = updates.phone;
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const headers: HeadersInit = { "Content-Type": "application/json" };
+        if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+        const res = await fetch("/api/team/update-member", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ memberId: id, updates: apiUpdates }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          if (previousMember) setMembers((prev) => prev.map((m) => m.id === id ? previousMember : m));
+          addToast(`Update failed: ${data.error || "changes reverted"}.`, "error");
+          return false;
         }
-      });
+        return true;
+      } catch {
+        if (previousMember) setMembers((prev) => prev.map((m) => m.id === id ? previousMember : m));
+        addToast("Update failed. Changes reverted.", "error");
+        return false;
+      }
     }
+    return true;
   }, [useDb, members, addToast]);
 
   const value = useMemo(

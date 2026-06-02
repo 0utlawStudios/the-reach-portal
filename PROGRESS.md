@@ -1,9 +1,21 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: 745f0a0 Reach email-change/action-button hardening
-Next: Verify Vercel production for this SHA, then continue the QA hardening queue.
+Last pushed SHA: pending Reach profile/role sync hardening
+Next: Push this slice, verify Vercel production, then continue support/revision/media hardening.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
+
+Reach profile / role sync hardening slice notes:
+
+- Added `POST /api/team/update-member` so Settings profile and role edits now run through a service-role API route instead of direct browser writes to `team_members`.
+- Role changes for active members now update both `team_members.role` and `workspace_members.role`, preserving the server/API role gate used by `requireBearerTeamRole`.
+- The route updates matching Supabase Auth user metadata for name, phone, avatar, and role so invite/setup/profile enrichment remains aligned.
+- The route blocks non-superadmins from editing superadmins and blocks invalid role payloads.
+- On workspace/Auth reconciliation failure, the route rolls back the `team_members` update and, for role changes, attempts to restore the previous workspace role.
+- `TeamContext.updateMember` now awaits `/api/team/update-member`, rolls optimistic UI back on server failure, and no longer has a direct Supabase mutation path for profile/role edits.
+- Removed the old browser-side role-change audit write; role/profile audit now comes from the verified server route.
+- Added focused route coverage for active role sync, superadmin edit blocking, workspace failure rollback, missing active Auth rejection, and pending invite metadata updates.
+- Verification passed: focused team/auth tests, `npm run typecheck`, `npm run lint` with the repo's existing two warnings, production `npm run build`, and full `npm run preflight` with 24 files / 220 tests.
 
 Reach email-change / action-button hardening slice notes:
 

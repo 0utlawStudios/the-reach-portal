@@ -120,7 +120,6 @@ function EditProfileModal({
       return;
     }
     setSaving(true);
-    const roleChanged = canEditRole && role !== member.role;
     try {
       if (emailChanged) {
         if (!canChangeEmail) {
@@ -157,10 +156,8 @@ function EditProfileModal({
           avatar: avatarUrl || undefined,
         };
         if (canEditRole) updates.role = role;
-        updateMember(member.id, updates);
-        if (roleChanged) {
-          logAudit("system", currentUser.name, "role_changed", `Changed ${name}'s role from ${member.role} to ${role}`);
-        }
+        const profileSaved = await updateMember(member.id, updates);
+        if (!profileSaved) return;
       }
       if (isSelf) {
         updateCurrentUserAvatar(avatarUrl || undefined);
