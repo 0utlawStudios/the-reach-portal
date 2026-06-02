@@ -788,7 +788,7 @@ const INTEGRATIONS = [
       version: "n8n Community Edition 2.3.6",
       region: "n8n.casemovers.com",
       features: ["Scheduled Auto-Post (5-min cron)", "Platform-Specific Caption Formatting", "Master File Download via Drive Proxy", "Supabase Status Update → Posted", "Audit Log Auto-Entry"],
-      tables: ["[WIP] - Ten80Ten Auto-Post Engine"],
+      tables: ["[WIP] - The Reach Auto-Post Engine"],
       lastSync: "Active — workflow deployed",
     },
   },
@@ -1455,7 +1455,7 @@ function StudioAccessPanel({ addToast }: { addToast: (msg: string, kind?: "info"
           value={newEmail}
           onChange={(e) => setNewEmail(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void addOne(); } }}
-          placeholder="name@ten80ten.com"
+          placeholder="name@example.com"
           disabled={saving}
           className="flex-1 h-8 text-[12px]"
         />

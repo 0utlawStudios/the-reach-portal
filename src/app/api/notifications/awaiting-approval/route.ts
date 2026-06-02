@@ -14,8 +14,8 @@ function getAdminClient() {
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
 }
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://smm.ten80ten.com";
-const LOGO_URL = `${SITE_URL}/ten80ten-logo.png`;
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+const LOGO_URL = `${SITE_URL}/the-reach-logo.png`;
 
 const PLATFORM_META: Record<string, { label: string; color: string }> = {
   facebook:  { label: "Facebook",  color: "#1877f2" },
@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
       <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
         <tr>
           <td style="vertical-align:middle;">
-            <img src="${LOGO_URL}" alt="Ten80Ten" height="26" style="display:block;height:26px;width:auto;" />
+            <img src="${LOGO_URL}" alt="The Reach" height="26" style="display:block;height:26px;width:auto;" />
           </td>
           <td style="text-align:right;vertical-align:middle;">
             <span style="background:#ea580c;color:#ffffff;font-size:9px;font-weight:800;padding:5px 14px;border-radius:100px;letter-spacing:0.12em;text-transform:uppercase;">Action Required</span>
@@ -199,7 +199,7 @@ export async function POST(request: NextRequest) {
     <div style="padding:0 32px 28px;">
       <a href="${esc(SITE_URL)}"
          style="display:inline-block;background:linear-gradient(135deg,#ea580c 0%,#c2410c 100%);color:#ffffff;text-decoration:none;padding:14px 30px;border-radius:8px;font-size:14px;font-weight:700;letter-spacing:0.01em;">
-        Open in Content Engine &rarr;
+        Open in The Reach &rarr;
       </a>
       <p style="color:#9ca3af;font-size:12px;margin:14px 0 0;">Review, leave feedback, or approve this post for publishing.</p>
     </div>
@@ -209,10 +209,10 @@ export async function POST(request: NextRequest) {
       <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
         <tr>
           <td style="vertical-align:middle;">
-            <img src="${LOGO_URL}" alt="Ten80Ten" height="14" style="display:block;height:14px;width:auto;opacity:0.5;" />
+            <img src="${LOGO_URL}" alt="The Reach" height="14" style="display:block;height:14px;width:auto;opacity:0.5;" />
           </td>
           <td style="text-align:right;vertical-align:middle;">
-            <span style="color:#9ca3af;font-size:11px;">Ten80Ten Content Engine</span>
+            <span style="color:#9ca3af;font-size:11px;">The Reach</span>
           </td>
         </tr>
       </table>

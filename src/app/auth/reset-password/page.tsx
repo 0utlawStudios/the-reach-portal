@@ -112,7 +112,7 @@ export default function ResetPasswordPage() {
           <motion.div className="w-full max-w-[360px]" variants={stagger} initial="hidden" animate="show">
             {/* Logo + heading */}
             <motion.div className="mb-10" variants={fadeUp}>
-              <RawImage src="/ten80ten-logo.png" alt="Ten80Ten" className="w-[130px] h-auto object-contain mb-8" />
+              <RawImage src="/the-reach-logo.png" alt="The Reach" className="w-[130px] h-auto object-contain mb-8" />
               <h1 className="text-[28px] font-extrabold text-gray-900 dark:text-white tracking-[-0.03em] leading-[1.1]">
                 Set new password
               </h1>

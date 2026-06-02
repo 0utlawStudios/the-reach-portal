@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import {
-  Hash, Type, Palette, Shield, Download, Megaphone, Phone, Globe, Mail,
+  Hash, Type, Palette, Shield, Download, Megaphone, Phone, Globe,
   CheckCircle, XCircle, Star, Award, Eye, Pencil, Save, X,
   Clock, Zap, Target, ArrowRight, Layers, BookOpen,
 } from "lucide-react";
@@ -34,32 +34,32 @@ interface PlaybookData {
 }
 
 const DEFAULT_DATA: PlaybookData = {
-  phone: "+1 615-258-6179",
-  website: "ten80ten.com",
-  tagline: "Empower your core, delegate the chore!",
-  serviceArea: "Global Remote Talent — Headquartered in Nashville, TN",
-  hashtagCore: "#Ten80Ten #VirtualAssistant #Delegate #RemoteTeam #BusinessGrowth",
-  hashtagSeasonal: "#Q4Planning #ScaleSmart #FutureProofYourBusiness",
-  hashtagEngagement: "#TeamEfficiency #LeadershipStrategy #OperationalClarity #ThinkBigger #LeadershipClarity",
-  hashtagCommercial: "#BusinessExpansion #StartupScaling #CostEffectiveGrowth #B2B",
+  phone: "",
+  website: "www.thereach.travel",
+  tagline: "Chic, curated, full service.",
+  serviceArea: "Luxury travel planning and booking for hotels, transfers, airfare, tours, and activities.",
+  hashtagCore: "#TheReach #LuxuryTravel #BespokeTravel #CuratedTravel #DesignForwardTravel",
+  hashtagSeasonal: "#BhutanTravel #SwitzerlandTravel #NatureForwardTravel #BoutiqueHotels",
+  hashtagEngagement: "#TravelByPerspective #SeamlessTravel #HighTouchTravel #WhereToNext #TravelWithTaste",
+  hashtagCommercial: "#LuxuryTravelAdvisor #BespokeItinerary #HotelPerks #FullServiceTravel",
   hooks: [
-    "Overwhelm isn't always about workload. It's often about unclear priorities.",
-    "If execution was predictable, where would your focus go?",
-    "Empower your core, delegate the chore! Here's how the 10/80/10 framework works.",
-    "Your competitors are already tapping into the global talent pool — don't get left behind.",
+    "Time and ease are the best form of luxury.",
+    "AI can plan a trip. It cannot VIP a client.",
+    "A cool designed hotel can change the way a destination feels.",
+    "Where do you want to go, and how do you want to feel when you return?",
   ],
   ctas: [
-    "Book a discovery call today at ten80ten.com",
-    "Ready to reclaim your time? DM us to learn about the 10/80/10 framework.",
-    "Email us at hello@ten80ten.com to build your remote dream team.",
+    "Where do you want to go, and how do you want to feel?",
+    "Start planning a trip that feels personal from the first detail.",
+    "Let The Reach handle the research, access, and booking.",
   ],
-  whenToPost: "Monday through Friday mornings — B2B prime time. Focus heavily on LinkedIn for agency outreach and decision-maker engagement. Use Instagram for brand culture, team spotlights, and behind-the-scenes content.",
+  whenToPost: "Use polished, personal travel content built around design-forward stays, hotel features, off-the-beaten-path destinations, and scouting trips. Lead with Bhutan in June and Switzerland in July when relevant.",
   contentPillars: [
-    { title: "The 10/80/10 Framework", desc: "Educate the audience on the core model: 10% Planning, 80% Execution (the VA handles this), and 10% Optimization. Position it as the operating system for scaling without burnout." },
-    { title: "Leadership & Strategy", desc: "Free up founder time. 'Structure reduces stress.' Focus on the psychological relief of delegation — show overwhelmed CEOs what life looks like on the other side." },
-    { title: "Cost-Effective Scaling", desc: "Highlight how businesses can hire top-tier global talent for up to 70% less than local hires — without cutting corners on quality, communication, or reliability." },
+    { title: "Perspective-Led Planning", desc: "Show travel shaped by taste, access, and personal context rather than generic guidebook recommendations." },
+    { title: "Design-Forward Destinations", desc: "Feature interesting places, nature-forward stays, thoughtful hotels, and off-the-beaten-path experiences." },
+    { title: "Seamless Full-Service Travel", desc: "Emphasize high-touch planning, booking, transfers, airfare, tours, activities, VIP access, perks, time, and ease." },
   ],
-  brandVoice: "Professional, empowering, and highly structured. We speak directly to overwhelmed founders and CEOs. We do not sound like a cheap outsourcing farm — we sound like strategic growth partners. Our tone is authoritative yet supportive, focused on reducing overwhelm through systems, frameworks, and world-class remote talent.",
+  brandVoice: "Chic, curated, personal, and precise. The Reach should feel high-touch and perspective-led, never generic, cookie-cutter, cold, disconnected, or luxury on the nose.",
 };
 
 const useSupabase = !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
@@ -144,7 +144,7 @@ export function BrandKitPage() {
               </div>
               <h1 className="text-[24px] font-extrabold text-slate-900 dark:text-white tracking-[-0.04em]">Brand Playbook</h1>
             </div>
-            <p className="text-[13px] text-gray-400 ml-[48px]">Copy-ready assets, content strategy, and brand guidelines for Ten80Ten.</p>
+            <p className="text-[13px] text-gray-400 ml-[48px]">Copy-ready assets, content strategy, and brand guidelines for The Reach.</p>
           </div>
           {!editMode ? (
             <Button onClick={startEdit} className="h-9 rounded-lg bg-slate-900 dark:bg-white dark:text-slate-900 hover:bg-slate-800 text-white text-[12px] font-medium cursor-pointer shrink-0">
@@ -196,13 +196,10 @@ export function BrandKitPage() {
                   </>
                 ) : (
                   <>
-                    <CopyBlock label="Phone" text={d.phone} />
+                    <CopyBlock label="Phone" text={d.phone || "Not provided"} />
                     <CopyBlock label="Website" text={d.website} />
-                    <CopyBlock label="Email" text="hello@ten80ten.com" />
+                    <CopyBlock label="Tagline" text={d.tagline} />
                     <CopyBlock label="Service Area" text={d.serviceArea} />
-                    <div className="sm:col-span-2">
-                      <CopyBlock label="Tagline" text={d.tagline} />
-                    </div>
                   </>
                 )}
               </div>
@@ -304,7 +301,7 @@ export function BrandKitPage() {
               </div>
             </Section>
 
-            <Section icon={<Award className="w-4 h-4 text-yellow-600" />} title="Brand Voice & Tone" sub="How Ten80Ten sounds across all platforms">
+            <Section icon={<Award className="w-4 h-4 text-yellow-600" />} title="Brand Voice & Tone" sub="How The Reach sounds across all platforms">
               {editMode ? (
                 <EditField value={editData.brandVoice} onChange={(v) => updateField("brandVoice", v)} multiline />
               ) : (
@@ -314,7 +311,7 @@ export function BrandKitPage() {
                     <div className="p-7">
                       <p className="text-[14px] text-gray-700 dark:text-gray-300 leading-[1.8]">{d.brandVoice}</p>
                       <div className="flex flex-wrap gap-2 mt-5">
-                        {["Professional", "Empowering", "Structured", "Authoritative", "Supportive"].map((trait) => (
+                        {["Chic", "Curated", "Personal", "Precise", "High-Touch"].map((trait) => (
                           <span key={trait} className="px-3 py-1 rounded-full bg-orange-50 dark:bg-orange-500/10 border border-orange-200/60 dark:border-orange-500/20 text-[10px] font-semibold text-orange-700 dark:text-orange-400 uppercase tracking-wider">{trait}</span>
                         ))}
                       </div>
@@ -332,38 +329,34 @@ export function BrandKitPage() {
 
             <Section icon={<Palette className="w-4 h-4 text-orange-500" />} title="Color Palette" sub="Click any swatch to copy the hex code">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-                <ColorSwatch name="Ten80Ten Orange" hex="#ea580c" desc="Primary action, highlights" role="Primary" />
-                <ColorSwatch name="Structural Gold" hex="#ca8a04" desc="Premium accents, CTAs" role="Secondary" />
-                <ColorSwatch name="Midnight Slate" hex="#0f172a" desc="Headings, dark surfaces" role="Foundation" />
-                <ColorSwatch name="Crisp Base" hex="#f8fafc" desc="Backgrounds, cards" role="Surface" />
-                <ColorSwatch name="Warm Ember" hex="#c2410c" desc="Hover states, emphasis" role="Accent" />
-                <ColorSwatch name="Muted Gold" hex="#a16207" desc="Subtle premium touches" role="Accent" />
-                <ColorSwatch name="Signal Green" hex="#16a34a" desc="Approvals, success" role="Semantic" />
-                <ColorSwatch name="Alert Red" hex="#dc2626" desc="Warnings, kickbacks" role="Semantic" />
+                <ColorSwatch name="Sand" hex="#E1DFD5" desc="Primary background" role="Background" />
+                <ColorSwatch name="Stone" hex="#6C655A" desc="Primary text" role="Text" />
+                <ColorSwatch name="Sun" hex="#975428" desc="Accent and emphasis" role="Accent" />
+                <ColorSwatch name="Water" hex="#5A656C" desc="Secondary accent" role="Support" />
               </div>
             </Section>
 
-            <Section icon={<Type className="w-4 h-4 text-yellow-600" />} title="Typography" sub="Inter — system font across all platforms">
+            <Section icon={<Type className="w-4 h-4 text-yellow-600" />} title="Typography" sub="Bradford and Everett from The Reach brand guidelines">
               <div className="bg-white dark:bg-[#151518] rounded-2xl border border-gray-200 dark:border-white/[0.06] overflow-hidden shadow-sm">
                 <div className="p-8 space-y-8">
                   <div>
-                    <p className="text-[9px] font-bold text-orange-500/60 uppercase tracking-[0.15em] mb-3">H1 — Hero / Page Titles</p>
-                    <p className="text-[32px] font-extrabold text-slate-900 dark:text-white tracking-tight leading-[1.1]">Empower Your Core,<br />Delegate the Chore</p>
+                    <p className="text-[9px] font-bold text-orange-500/60 uppercase tracking-[0.15em] mb-3">Bradford - Primary Voice</p>
+                    <p className="text-[32px] font-extrabold text-slate-900 dark:text-white tracking-tight leading-[1.1]">The Reach designs travel shaped by perspective, access, and taste.</p>
                   </div>
                   <hr className="border-gray-100 dark:border-white/[0.06]" />
                   <div>
-                    <p className="text-[9px] font-bold text-orange-500/60 uppercase tracking-[0.15em] mb-3">H2 — Section Headers</p>
-                    <p className="text-[22px] font-bold text-slate-800 dark:text-gray-200 tracking-tight">Strategic Virtual Talent for Scaling Businesses</p>
+                    <p className="text-[9px] font-bold text-orange-500/60 uppercase tracking-[0.15em] mb-3">Everett - Counterpoint</p>
+                    <p className="text-[22px] font-bold text-slate-800 dark:text-gray-200 tracking-tight">Chic, curated, full-service travel planning.</p>
                   </div>
                   <hr className="border-gray-100 dark:border-white/[0.06]" />
                   <div>
-                    <p className="text-[9px] font-bold text-orange-500/60 uppercase tracking-[0.15em] mb-3">Body — Paragraphs</p>
-                    <p className="text-[15px] text-gray-600 dark:text-gray-400 leading-[1.8]">Ten80Ten connects overwhelmed founders with world-class remote talent through the 10/80/10 framework — so you can focus on the 20% that moves the needle while we handle the rest.</p>
+                    <p className="text-[9px] font-bold text-orange-500/60 uppercase tracking-[0.15em] mb-3">Body - Travel Copy</p>
+                    <p className="text-[15px] text-gray-600 dark:text-gray-400 leading-[1.8]">Highly personal journeys rooted in where you are and where you want to go next.</p>
                   </div>
                   <hr className="border-gray-100 dark:border-white/[0.06]" />
                   <div>
-                    <p className="text-[9px] font-bold text-orange-500/60 uppercase tracking-[0.15em] mb-3">Caption — Social Copy</p>
-                    <p className="text-[14px] text-gray-500 dark:text-gray-500 leading-relaxed italic">&quot;Structure reduces stress. Delegation creates freedom. That&apos;s the 10/80/10 way.&quot;</p>
+                    <p className="text-[9px] font-bold text-orange-500/60 uppercase tracking-[0.15em] mb-3">Caption - Social Copy</p>
+                    <p className="text-[14px] text-gray-500 dark:text-gray-500 leading-relaxed italic">&quot;Where do you want to go, and how do you want to feel?&quot;</p>
                   </div>
                 </div>
               </div>
@@ -378,7 +371,7 @@ export function BrandKitPage() {
                 ].map((a) => (
                   <div key={a.name} className="bg-white dark:bg-[#151518] rounded-2xl border border-gray-200 dark:border-white/[0.06] overflow-hidden shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
                     <div className={`${a.bg} h-36 flex items-center justify-center`}>
-                      <RawImage src="/ten80ten-logo.png" alt={a.name} className="h-14 object-contain" style={a.name === "Light Logo" ? { filter: "brightness(0) invert(1)" } : {}} />
+                      <RawImage src="/the-reach-logo.png" alt={a.name} className="h-14 object-contain" style={a.name === "Light Logo" ? { filter: "brightness(0) invert(1)" } : {}} />
                     </div>
                     <div className="p-5 flex items-center justify-between border-t border-gray-100 dark:border-white/[0.06]">
                       <div><p className="text-[13px] font-semibold text-slate-800 dark:text-gray-200">{a.name}</p><p className="text-[11px] text-gray-400 mt-0.5">{a.desc}</p></div>
@@ -429,15 +422,15 @@ export function BrandKitPage() {
                   </div>
                   <ul className="p-6 space-y-3.5">
                     {[
-                      "Lead with the 10/80/10 framework",
-                      "Use real team photos and BTS content",
-                      "Always include a CTA (call, DM, or email)",
-                      "Position Ten80Ten as a strategic partner",
-                      "Emphasize cost savings with quality intact",
-                      "Post Monday – Friday mornings",
-                      "Speak directly to overwhelmed founders",
-                      "Show client results and transformations",
-                      "End every post with a clear next step",
+                      "Lead with perspective, access, and taste",
+                      "Use authentic hotel features and personal travel experiences",
+                      "Highlight time, ease, and high-touch planning",
+                      "Position The Reach as a bespoke travel partner",
+                      "Feature design-forward and nature-forward destinations",
+                      "Use the CTA: where do you want to go, and how do you want to feel?",
+                      "Speak to open-minded travelers with great taste",
+                      "Show interesting elements that are hard to secure",
+                      "Keep every post polished, personal, and precise",
                     ].map((item, i) => (
                       <li key={i} className="flex items-start gap-3"><CheckCircle className="w-4 h-4 text-yellow-600 dark:text-yellow-500 mt-0.5 shrink-0" /><span className="text-[13px] text-gray-700 dark:text-gray-300 leading-snug">{item}</span></li>
                     ))}
@@ -456,14 +449,14 @@ export function BrandKitPage() {
                   </div>
                   <ul className="p-6 space-y-3.5">
                     {[
-                      "Sound like a cheap outsourcing agency",
-                      "Post without phone, email, or website",
+                      "Make luxury feel on the nose",
+                      "Use cookie-cutter captions with no personality",
                       "Stretch, recolor, or alter the logo",
-                      "Use generic stock photos",
-                      "Make direct competitor comparisons",
-                      "Post outside Mon–Fri without approval",
-                      "Use casual slang or excessive emojis",
-                      "Promise specific revenue guarantees",
+                      "Use cold or disconnected travel content",
+                      "Oversell or overexplain the brand",
+                      "Promise perks or access that are not confirmed",
+                      "Use generic posts that feel like everyone else",
+                      "Let AI-sounding copy replace personal perspective",
                       "Publish without the pre-submit checklist",
                     ].map((item, i) => (
                       <li key={i} className="flex items-start gap-3"><XCircle className="w-4 h-4 text-orange-500 mt-0.5 shrink-0" /><span className="text-[13px] text-gray-700 dark:text-gray-300 leading-snug">{item}</span></li>
@@ -473,7 +466,7 @@ export function BrandKitPage() {
               </div>
             </Section>
 
-            <Section icon={<Eye className="w-4 h-4 text-yellow-600" />} title="Approval Chain" sub="Every post follows this pipeline before going live">
+            <Section icon={<Eye className="w-4 h-4 text-yellow-600" />} title="Approval Chain" sub="Every post follows this workflow before going live">
               <div className="bg-white dark:bg-[#151518] rounded-2xl border border-gray-200 dark:border-white/[0.06] p-7 shadow-sm">
                 <div className="flex flex-wrap items-center gap-2 justify-center">
                   {[
@@ -500,12 +493,12 @@ export function BrandKitPage() {
             <Section icon={<Star className="w-4 h-4 text-orange-500" />} title="Key Facts & Proof Points" sub="Reference these in captions, bios, and sales decks">
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 {[
-                  { fact: "10/80/10 Framework", note: "Core operating model", icon: <Layers className="w-4 h-4 text-orange-500" /> },
-                  { fact: "Up to 70% Savings", note: "vs. local hires, same quality", icon: <Zap className="w-4 h-4 text-yellow-600" /> },
-                  { fact: "Nashville, TN HQ", note: "US-based leadership", icon: <Globe className="w-4 h-4 text-orange-400" /> },
-                  { fact: "hello@ten80ten.com", note: "Primary business contact", icon: <Mail className="w-4 h-4 text-yellow-600" /> },
-                  { fact: "+1 615-258-6179", note: "Discovery call line", icon: <Phone className="w-4 h-4 text-orange-500" /> },
-                  { fact: "Mon – Fri AM", note: "Peak posting window", icon: <Clock className="w-4 h-4 text-yellow-500" /> },
+                  { fact: "Chic, curated, full service", note: "Brand description", icon: <Layers className="w-4 h-4 text-orange-500" /> },
+                  { fact: "Hotels, transfers, airfare, tours", note: "Core service set", icon: <Zap className="w-4 h-4 text-yellow-600" /> },
+                  { fact: "www.thereach.travel", note: "Website from intake", icon: <Globe className="w-4 h-4 text-orange-400" /> },
+                  { fact: "Bhutan in June", note: "Scouting-trip content focus", icon: <Star className="w-4 h-4 text-yellow-600" /> },
+                  { fact: "Switzerland in July", note: "Seasonal content focus", icon: <Phone className="w-4 h-4 text-orange-500" /> },
+                  { fact: "Bookings", note: "Primary success metric", icon: <Clock className="w-4 h-4 text-yellow-500" /> },
                 ].map((item) => (
                   <div key={item.fact} className="bg-white dark:bg-[#151518] rounded-xl border border-gray-200 dark:border-white/[0.06] p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300">
                     <div className="flex items-center gap-2 mb-2.5">

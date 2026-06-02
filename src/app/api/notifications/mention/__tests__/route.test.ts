@@ -20,7 +20,7 @@ vi.mock("@/lib/auth/require", () => ({
         NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
       );
     }
-    return Promise.resolve({ user: { id: "user-1", email: "caller@ten80ten.com" } });
+    return Promise.resolve({ user: { id: "user-1", email: "caller@example.com" } });
   }),
 }));
 
@@ -52,7 +52,7 @@ vi.mock("@/lib/rate-limit", () => ({
 // Email layer — never actually send.
 vi.mock("@/lib/email-utils", () => ({
   getTransporter: vi.fn(() => ({ sendMail: vi.fn(() => Promise.resolve()) })),
-  getFromAddress: vi.fn(() => "noreply@ten80ten.com"),
+  getFromAddress: vi.fn(() => "noreply@example.com"),
   esc: (v: unknown) => String(v ?? ""),
   safeSubject: (v: unknown) => String(v ?? ""),
 }));

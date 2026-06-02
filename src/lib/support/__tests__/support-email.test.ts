@@ -10,11 +10,11 @@ describe("buildSupportTicketEmailHtml", () => {
       category: "Bug",
       body: "The publish button does nothing.",
       attachments: [],
-      threadUrl: "https://smm.ten80ten.com/?support=t1",
+      threadUrl: "https://reach.example.com/?support=t1",
     });
     expect(html).toContain("A1B2");
     expect(html).toContain("The publish button does nothing.");
-    expect(html).toContain("https://smm.ten80ten.com/?support=t1");
+    expect(html).toContain("https://reach.example.com/?support=t1");
   });
 
   it("escapes HTML in user-supplied fields to prevent injection", () => {
@@ -25,7 +25,7 @@ describe("buildSupportTicketEmailHtml", () => {
       category: "Bug",
       body: "<img src=x onerror=alert(1)>",
       attachments: [],
-      threadUrl: "https://smm.ten80ten.com/",
+      threadUrl: "https://reach.example.com/",
     });
     expect(html).not.toContain("<script>alert(1)</script>");
     expect(html).not.toContain("<img src=x onerror=alert(1)>");
@@ -40,7 +40,7 @@ describe("buildSupportTicketEmailHtml", () => {
       category: "Bug",
       body: "see screenshot",
       attachments: [{ name: "shot.png", signedUrl: "https://store/shot.png", kind: "image" }],
-      threadUrl: "https://smm.ten80ten.com/",
+      threadUrl: "https://reach.example.com/",
     });
     expect(html).toContain("https://store/shot.png");
   });
@@ -52,7 +52,7 @@ describe("buildSupportReplyEmailHtml", () => {
       userName: "Ann",
       shortCode: "A1B2",
       replyPreview: "We shipped a fix.",
-      threadUrl: "https://smm.ten80ten.com/?support=t1",
+      threadUrl: "https://reach.example.com/?support=t1",
     });
     expect(html).toContain("We shipped a fix.");
     expect(html).toContain("A1B2");
@@ -64,7 +64,7 @@ describe("buildSupportReplyEmailHtml", () => {
       userName: "Ann",
       shortCode: "A1B2",
       replyPreview: "<script>steal()</script>",
-      threadUrl: "https://smm.ten80ten.com/",
+      threadUrl: "https://reach.example.com/",
     });
     expect(html).not.toContain("<script>steal()</script>");
     expect(html).toContain("&lt;script&gt;");

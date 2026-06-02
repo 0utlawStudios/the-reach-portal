@@ -102,7 +102,7 @@ describe("consume — FAIL OPEN on infrastructure failure", () => {
 
 describe("getClientIp — header precedence", () => {
   function reqWith(headers: Record<string, string>): Request {
-    return new Request("https://smm.ten80ten.com/api/x", { headers });
+    return new Request("https://reach.example.com/api/x", { headers });
   }
 
   it("prefers cf-connecting-ip over everything else", () => {

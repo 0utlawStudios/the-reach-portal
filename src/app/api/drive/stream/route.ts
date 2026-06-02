@@ -6,15 +6,23 @@ export const maxDuration = 60; // Fluid Compute — stays alive while streaming
 
 // Allow-list of origins permitted to stream Drive content. Production app +
 // localhost dev. CORS:* was a P0 finding (anonymous cross-site streaming).
+const SITE_ORIGIN = (() => {
+  try {
+    return new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").origin;
+  } catch {
+    return "http://localhost:3000";
+  }
+})();
+
 const ALLOWED_ORIGINS = new Set([
-  "https://smm.ten80ten.com",
+  SITE_ORIGIN,
   "http://localhost:3000",
   "http://localhost:3001",
 ]);
 
 function corsHeadersFor(req: NextRequest): Record<string, string> {
   const origin = req.headers.get("origin") || "";
-  const allow = ALLOWED_ORIGINS.has(origin) ? origin : "https://smm.ten80ten.com";
+  const allow = ALLOWED_ORIGINS.has(origin) ? origin : SITE_ORIGIN;
   return {
     "Access-Control-Allow-Origin": allow,
     "Vary": "Origin",

@@ -70,12 +70,12 @@ export function LoginScreen() {
 
             {/* Logo + heading */}
             <motion.div className="mb-10" {...fadeUp(0)}>
-              <RawImage src="/ten80ten-logo.png" alt="Ten80Ten" className="w-[130px] h-auto object-contain mb-8" />
+              <RawImage src="/the-reach-logo.png" alt="The Reach" className="w-[130px] h-auto object-contain mb-8" />
               <h1 className="text-[28px] font-extrabold text-gray-900 dark:text-white tracking-[-0.03em] leading-[1.1]">
                 Welcome back
               </h1>
               <p className="text-[14px] text-gray-400 dark:text-gray-500 mt-2.5">
-                Sign in to your Content Engine
+                Sign in to The Reach
               </p>
             </motion.div>
 
@@ -211,7 +211,7 @@ export function LoginScreen() {
             </div>
           </motion.div>
 
-          {/* Card 2 — Center left: Content Engine status */}
+          {/* Card 2 — Center left: The Reach status */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
@@ -219,7 +219,7 @@ export function LoginScreen() {
             className="absolute top-[38%] left-[6%] w-[200px] backdrop-blur-xl bg-white/[0.06] border border-white/[0.08] rounded-2xl p-5 shadow-2xl"
           >
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] font-semibold text-white/40 uppercase tracking-[0.1em]">Content Engine</span>
+              <span className="text-[10px] font-semibold text-white/40 uppercase tracking-[0.1em]">The Reach</span>
               <Zap className="w-3.5 h-3.5 text-[#f59e0b]/60" />
             </div>
             <div className="space-y-2.5">
@@ -253,7 +253,7 @@ export function LoginScreen() {
             </div>
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#f59e0b]/20 to-orange-500/10 border border-white/[0.06] flex items-center justify-center">
-                <RawImage src="/ten80ten-logo.png" alt="" className="w-6 h-6 object-contain" />
+                <RawImage src="/the-reach-logo.png" alt="" className="w-6 h-6 object-contain" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-[11px] text-white/60 font-medium truncate">Spring Campaign</p>
@@ -285,7 +285,7 @@ export function LoginScreen() {
 
             <div className="flex items-center gap-8 mt-10 pb-2">
               {[
-                { label: "Content Engine", color: "bg-[#f59e0b]" },
+                { label: "The Reach", color: "bg-[#f59e0b]" },
                 { label: "Approvals", color: "bg-emerald-400" },
                 { label: "Scheduling", color: "bg-sky-400" },
                 { label: "Publishing", color: "bg-violet-400" },

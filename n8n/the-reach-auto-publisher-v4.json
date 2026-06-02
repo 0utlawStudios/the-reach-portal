@@ -1,0 +1,229 @@
+{
+  "name": "The Reach Auto-Publisher V4",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "minutes", "minutesInterval": 1 }] }
+      },
+      "id": "trigger-schedule",
+      "name": "Every 1 Minute",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [220, 440]
+    },
+    {
+      "parameters": {},
+      "id": "trigger-manual",
+      "name": "Manual Test",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [220, 660]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            { "id": "dry_run_flag", "name": "dry_run", "value": true, "type": "boolean" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-dry-run",
+      "name": "Set Dry Run",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [460, 660]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// ─── EDIT FOR CLIENT (per-instance) ───\n// Multi-tenant n8n: edit these constants when deploying for a new client.\n// Do NOT use $env — those live in n8n instance settings, not per-workflow.\nconst SUPABASE_URL = 'https://gxmpmdhmxyfqusdzcemt.supabase.co';\nconst SUPABASE_SERVICE_ROLE_KEY = 'REPLACE_WITH_SERVICE_ROLE_KEY';\n// ───────────────────────────────────────\n\nconst item = $input.first()?.json || {};\nconst _http = this.helpers.httpRequest.bind(this.helpers);\nconst h = { apikey: SUPABASE_SERVICE_ROLE_KEY, Authorization: 'Bearer ' + SUPABASE_SERVICE_ROLE_KEY, 'Content-Type': 'application/json' };\nconst workerId = 'n8n-the-reach-' + ($execution?.id || 'manual');\n\ntry {\n  const claimRes = await _http({\n    method: 'POST',\n    url: SUPABASE_URL + '/rest/v1/rpc/claim_publish_job',\n    headers: h,\n    body: { p_worker_id: workerId, p_claim_seconds: 120 },\n  });\n  const jobs = Array.isArray(claimRes) ? claimRes : [];\n  if (!jobs.length) return [{ json: { ...item, hasJob: false, worker_id: workerId } }];\n  const job = jobs[0];\n\n  const postRes = await _http({\n    method: 'GET',\n    url: SUPABASE_URL + '/rest/v1/posts?id=eq.' + job.post_id + '&select=*',\n    headers: { apikey: SUPABASE_SERVICE_ROLE_KEY, Authorization: 'Bearer ' + SUPABASE_SERVICE_ROLE_KEY },\n  });\n  const posts = Array.isArray(postRes) ? postRes : [];\n  if (!posts.length) {\n    await _http({\n      method: 'POST',\n      url: SUPABASE_URL + '/rest/v1/rpc/dead_letter_publish_job',\n      headers: h,\n      body: { p_job_id: job.id, p_reason: 'Post not found at claim time' },\n    });\n    return [{ json: { ...item, hasJob: false, worker_id: workerId, error: 'Orphan job dead-lettered' } }];\n  }\n  const dry_run = item.dry_run === true;\n  return [{ json: { hasJob: true, dry_run, worker_id: workerId, job, post: posts[0], _results: [], _SUPABASE_URL: SUPABASE_URL, _SUPABASE_SERVICE_ROLE_KEY: SUPABASE_SERVICE_ROLE_KEY } }];\n} catch (err) {\n  return [{ json: { ...item, hasJob: false, worker_id: workerId, error: 'Claim failed: ' + err.message } }];\n}"
+      },
+      "id": "claim-job",
+      "name": "Claim Next Job",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 440]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "" },
+          "conditions": [
+            { "id": "cond_has_job", "leftValue": "={{ $json.hasJob }}", "rightValue": "", "operator": { "type": "boolean", "operation": "true" } }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-has-job",
+      "name": "Has Job?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [940, 440]
+    },
+    {
+      "parameters": {},
+      "id": "stop-no-job",
+      "name": "No More Jobs",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [940, 660]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Unified media resolver. Returns assets in publishing order.\n// Studio-generated posts: posts.asset_urls is the source (ordered: slide 1 first).\n// Legacy manual posts: posts.source_vault.rawFiles is the source.\nconst item = $input.item.json;\nconst post = item.post || {};\nlet assets = [];\n\nif (Array.isArray(post.asset_urls) && post.asset_urls.length) {\n  assets = post.asset_urls.map((url) => {\n    const ext = ((url || '').split('?')[0].split('.').pop() || '').toLowerCase();\n    const isVideo = ['mp4', 'mov', 'webm'].includes(ext);\n    return { url, mimeType: isVideo ? 'video/mp4' : 'image/jpeg', usageType: 'master' };\n  });\n} else {\n  let vault = post.source_vault || {};\n  if (typeof vault === 'string') { try { vault = JSON.parse(vault); } catch { vault = {}; } }\n  assets = Array.isArray(vault.rawFiles) ? vault.rawFiles : [];\n}\n\nif (!assets.length) {\n  return { json: { ...item, hasJob: false, error: 'No media files (neither asset_urls nor source_vault.rawFiles)' } };\n}\nreturn { json: { ...item, assets } };"
+      },
+      "id": "resolve-media",
+      "name": "Resolve Media",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 440]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Pre-flight validation. Catch known bad rows before burning platform quota.\nconst item = $input.item.json;\nconst post = item.post || {};\nconst errors = [];\n\nif (!Array.isArray(post.platforms) || !post.platforms.length) errors.push('No target platforms');\nif (!post.caption || !post.caption.trim()) errors.push('Empty caption');\nif (post.caption && post.caption.length > 2200) errors.push('Caption exceeds 2200 chars');\nif (post.content_type === 'carousel' && (item.assets || []).length < 2) errors.push('Carousel needs >=2 assets');\nif (post.content_type === 'carousel' && (item.assets || []).length > 10) errors.push('Carousel max is 10 slides');\n\nconst scheduledAt = new Date(post.scheduled_at || item.job?.scheduled_at).getTime();\nconst driftSec = (Date.now() - scheduledAt) / 1000;\nif (driftSec < -60) errors.push('Premature claim: scheduled_at is ' + Math.abs(driftSec).toFixed(0) + 's in the future');\n\nif (errors.length) {\n  return { json: { ...item, hasJob: false, error: 'Validation failed: ' + errors.join('; ') } };\n}\nreturn { json: item };"
+      },
+      "id": "preflight",
+      "name": "Pre-flight",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1260, 440]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// ─── EDIT FOR CLIENT ───\nconst META_PAGE_ACCESS_TOKEN = 'REPLACE_WITH_META_TOKEN';\nconst FACEBOOK_PAGE_ID       = 'REPLACE_WITH_FACEBOOK_PAGE_ID';\n// ───────────────────────\n\nconst item = $input.item.json;\nconst r = [...(item._results || [])];\nconst plat = Array.isArray(item.post?.platforms) ? item.post.platforms : [];\nif (!plat.includes('facebook')) return { json: { ...item, _results: [...r, { platform: 'facebook', skipped: true, reason: 'not_targeted' }] } };\nif (item.dry_run) return { json: { ...item, _results: [...r, { platform: 'facebook', skipped: true, reason: 'dry_run' }] } };\nif (META_PAGE_ACCESS_TOKEN.startsWith('REPLACE') || FACEBOOK_PAGE_ID.startsWith('REPLACE')) {\n  return { json: { ...item, _results: [...r, { platform: 'facebook', success: false, error: 'Token or page ID not configured in node' }] } };\n}\n\nconst files = item.assets || [];\nconst master = files.find(f => f.usageType === 'master') || files[0];\nif (!master?.url) return { json: { ...item, _results: [...r, { platform: 'facebook', success: false, error: 'No media file' }] } };\n\nconst _http = this.helpers.httpRequest.bind(this.helpers);\nconst auth = { Authorization: 'Bearer ' + META_PAGE_ACCESS_TOKEN };\n\ntry {\n  const ct = item.post.content_type || 'image';\n  const caption = item.post.caption || '';\n  let res, postUrl;\n\n  if (ct === 'video' || ct === 'reel') {\n    res = await _http({ method: 'POST', url: 'https://graph.facebook.com/v21.0/' + FACEBOOK_PAGE_ID + '/videos', headers: auth, qs: { file_url: master.url, description: caption } });\n    postUrl = 'https://www.facebook.com/' + FACEBOOK_PAGE_ID + '/videos/' + (res.id || '');\n  } else if (ct === 'carousel' && files.length > 1) {\n    const ids = [];\n    for (const f of files) {\n      if (!f.url) continue;\n      const p = await _http({ method: 'POST', url: 'https://graph.facebook.com/v21.0/' + FACEBOOK_PAGE_ID + '/photos', headers: auth, qs: { url: f.url, published: false } });\n      if (p.id) ids.push({ media_fbid: p.id });\n    }\n    res = await _http({ method: 'POST', url: 'https://graph.facebook.com/v21.0/' + FACEBOOK_PAGE_ID + '/feed', headers: { ...auth, 'Content-Type': 'application/json' }, body: { message: caption, attached_media: ids } });\n    const pid = (res.id || res.post_id || '').toString();\n    const postPart = pid.includes('_') ? pid.split('_')[1] : pid;\n    postUrl = 'https://www.facebook.com/' + FACEBOOK_PAGE_ID + '/posts/' + postPart;\n  } else {\n    res = await _http({ method: 'POST', url: 'https://graph.facebook.com/v21.0/' + FACEBOOK_PAGE_ID + '/photos', headers: auth, qs: { url: master.url, message: caption } });\n    postUrl = res.post_id ? 'https://www.facebook.com/' + FACEBOOK_PAGE_ID + '/posts/' + res.post_id.split('_')[1] : '';\n  }\n  return { json: { ...item, _results: [...r, { platform: 'facebook', success: true, externalPostId: res.id || res.post_id, postUrl, response: res }] } };\n} catch (err) {\n  return { json: { ...item, _results: [...r, { platform: 'facebook', success: false, error: err.message }] } };\n}"
+      },
+      "id": "pub-facebook",
+      "name": "Publish Facebook",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1460, 440],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// ─── EDIT FOR CLIENT ───\nconst META_PAGE_ACCESS_TOKEN          = 'REPLACE_WITH_META_TOKEN';\nconst INSTAGRAM_BUSINESS_ACCOUNT_ID   = 'REPLACE_WITH_IG_BUSINESS_ACCOUNT_ID';\n// ───────────────────────\n\nconst item = $input.item.json;\nconst r = [...(item._results || [])];\nconst plat = Array.isArray(item.post?.platforms) ? item.post.platforms : [];\nif (!plat.includes('instagram')) return { json: { ...item, _results: [...r, { platform: 'instagram', skipped: true, reason: 'not_targeted' }] } };\nif (item.dry_run) return { json: { ...item, _results: [...r, { platform: 'instagram', skipped: true, reason: 'dry_run' }] } };\nif (META_PAGE_ACCESS_TOKEN.startsWith('REPLACE') || INSTAGRAM_BUSINESS_ACCOUNT_ID.startsWith('REPLACE')) {\n  return { json: { ...item, _results: [...r, { platform: 'instagram', success: false, error: 'Token or IG account ID not configured in node' }] } };\n}\n\nconst files = item.assets || [];\nconst master = files.find(f => f.usageType === 'master') || files[0];\nif (!master?.url) return { json: { ...item, _results: [...r, { platform: 'instagram', success: false, error: 'No media file' }] } };\n\nconst _http = this.helpers.httpRequest.bind(this.helpers);\nconst base = 'https://graph.facebook.com/v21.0/' + INSTAGRAM_BUSINESS_ACCOUNT_ID;\n\nasync function waitContainer(id) {\n  for (let i = 0; i < 20; i++) {\n    await new Promise(resolve => setTimeout(resolve, 3000));\n    const s = await _http({ method: 'GET', url: 'https://graph.facebook.com/v21.0/' + id, qs: { fields: 'status_code', access_token: META_PAGE_ACCESS_TOKEN } });\n    if (s.status_code === 'FINISHED') return;\n    if (s.status_code === 'ERROR') throw new Error('Container error: ' + JSON.stringify(s));\n  }\n  throw new Error('Container timed out after 60s');\n}\n\nasync function getPermalink(mediaId) {\n  try {\n    const r = await _http({ method: 'GET', url: 'https://graph.facebook.com/v21.0/' + mediaId, qs: { fields: 'permalink', access_token: META_PAGE_ACCESS_TOKEN } });\n    return r.permalink || '';\n  } catch { return ''; }\n}\n\ntry {\n  const ct = item.post.content_type || 'image';\n  const caption = item.post.caption || '';\n  let publishId;\n\n  if (ct === 'carousel' && files.length > 1) {\n    const childIds = [];\n    for (const f of files) {\n      if (!f.url) continue;\n      const isVideo = (f.mimeType || '').startsWith('video/');\n      const qs = isVideo\n        ? { media_type: 'VIDEO', video_url: f.url, is_carousel_item: true, access_token: META_PAGE_ACCESS_TOKEN }\n        : { image_url: f.url, is_carousel_item: true, access_token: META_PAGE_ACCESS_TOKEN };\n      const c = await _http({ method: 'POST', url: base + '/media', qs });\n      if (isVideo) await waitContainer(c.id);\n      childIds.push(c.id);\n    }\n    const container = await _http({ method: 'POST', url: base + '/media', qs: { media_type: 'CAROUSEL', children: childIds.join(','), caption, access_token: META_PAGE_ACCESS_TOKEN } });\n    await waitContainer(container.id);\n    const pub = await _http({ method: 'POST', url: base + '/media_publish', qs: { creation_id: container.id, access_token: META_PAGE_ACCESS_TOKEN } });\n    publishId = pub.id;\n  } else if (ct === 'video' || ct === 'reel') {\n    const container = await _http({ method: 'POST', url: base + '/media', qs: { media_type: 'REELS', video_url: master.url, caption, access_token: META_PAGE_ACCESS_TOKEN } });\n    await waitContainer(container.id);\n    const pub = await _http({ method: 'POST', url: base + '/media_publish', qs: { creation_id: container.id, access_token: META_PAGE_ACCESS_TOKEN } });\n    publishId = pub.id;\n  } else {\n    const container = await _http({ method: 'POST', url: base + '/media', qs: { image_url: master.url, caption, access_token: META_PAGE_ACCESS_TOKEN } });\n    await waitContainer(container.id);\n    const pub = await _http({ method: 'POST', url: base + '/media_publish', qs: { creation_id: container.id, access_token: META_PAGE_ACCESS_TOKEN } });\n    publishId = pub.id;\n  }\n\n  const postUrl = await getPermalink(publishId);\n  return { json: { ...item, _results: [...r, { platform: 'instagram', success: true, externalPostId: publishId, postUrl }] } };\n} catch (err) {\n  return { json: { ...item, _results: [...r, { platform: 'instagram', success: false, error: err.message }] } };\n}"
+      },
+      "id": "pub-instagram",
+      "name": "Publish Instagram",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1720, 440],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// ─── EDIT FOR CLIENT ───\nconst LINKEDIN_ACCESS_TOKEN = 'REPLACE_WITH_LINKEDIN_TOKEN';\nconst LINKEDIN_ORG_URN      = 'REPLACE_WITH_LINKEDIN_ORG_URN'; // e.g. urn:li:organization:12345\n// ───────────────────────\n\nconst item = $input.item.json;\nconst r = [...(item._results || [])];\nconst plat = Array.isArray(item.post?.platforms) ? item.post.platforms : [];\nif (!plat.includes('linkedin')) return { json: { ...item, _results: [...r, { platform: 'linkedin', skipped: true, reason: 'not_targeted' }] } };\nif (item.dry_run) return { json: { ...item, _results: [...r, { platform: 'linkedin', skipped: true, reason: 'dry_run' }] } };\nif (LINKEDIN_ACCESS_TOKEN.startsWith('REPLACE') || LINKEDIN_ORG_URN.startsWith('REPLACE')) {\n  return { json: { ...item, _results: [...r, { platform: 'linkedin', success: false, error: 'Token or org URN not configured in node' }] } };\n}\n\nconst files = item.assets || [];\nconst master = files.find(f => f.usageType === 'master') || files[0];\nif (!master?.url) return { json: { ...item, _results: [...r, { platform: 'linkedin', success: false, error: 'No media file' }] } };\n\nconst _http = this.helpers.httpRequest.bind(this.helpers);\nconst liH = { Authorization: 'Bearer ' + LINKEDIN_ACCESS_TOKEN, 'Content-Type': 'application/json', 'LinkedIn-Version': '202411', 'X-Restli-Protocol-Version': '2.0.0' };\n\ntry {\n  const ct = item.post.content_type || 'image';\n  const caption = item.post.caption || '';\n  const postBody = { author: LINKEDIN_ORG_URN, commentary: caption, visibility: 'PUBLIC', distribution: { feedDistribution: 'MAIN_FEED', targetEntities: [], thirdPartyDistributionChannels: [] }, lifecycleState: 'PUBLISHED' };\n\n  if (ct === 'video' || ct === 'reel') {\n    const binary = await _http({ method: 'GET', url: master.url, encoding: 'arraybuffer' });\n    const fileSize = binary.byteLength || binary.length || 10000000;\n    const init = await _http({ method: 'POST', url: 'https://api.linkedin.com/rest/videos?action=initializeUpload', headers: liH, body: { initializeUploadRequest: { owner: LINKEDIN_ORG_URN, fileSizeBytes: fileSize, uploadCaptions: false, uploadThumbnail: false } } });\n    const uploadUrl = init.value?.uploadInstructions?.[0]?.uploadUrl;\n    const videoUrn = init.value?.video;\n    if (!uploadUrl || !videoUrn) throw new Error('Video upload init failed: ' + JSON.stringify(init));\n    await _http({ method: 'PUT', url: uploadUrl, headers: { Authorization: 'Bearer ' + LINKEDIN_ACCESS_TOKEN, 'Content-Type': 'application/octet-stream' }, body: binary });\n    postBody.content = { media: { id: videoUrn } };\n  } else {\n    const binary = await _http({ method: 'GET', url: master.url, encoding: 'arraybuffer' });\n    const init = await _http({ method: 'POST', url: 'https://api.linkedin.com/rest/images?action=initializeUpload', headers: liH, body: { initializeUploadRequest: { owner: LINKEDIN_ORG_URN } } });\n    const uploadUrl = init.value?.uploadUrl;\n    const imageUrn = init.value?.image;\n    if (!uploadUrl || !imageUrn) throw new Error('Image upload init failed: ' + JSON.stringify(init));\n    await _http({ method: 'PUT', url: uploadUrl, headers: { Authorization: 'Bearer ' + LINKEDIN_ACCESS_TOKEN }, body: binary });\n    postBody.content = { media: { id: imageUrn } };\n  }\n\n  const res = await _http({ method: 'POST', url: 'https://api.linkedin.com/rest/posts', headers: liH, body: postBody, returnFullResponse: true });\n  const postId = res.headers?.['x-restli-id'] || res.body?.id || '';\n  const postUrl = postId ? 'https://www.linkedin.com/feed/update/' + encodeURIComponent(postId) + '/' : '';\n  return { json: { ...item, _results: [...r, { platform: 'linkedin', success: true, externalPostId: postId, postUrl, response: res.body || res }] } };\n} catch (err) {\n  return { json: { ...item, _results: [...r, { platform: 'linkedin', success: false, error: err.message }] } };\n}"
+      },
+      "id": "pub-linkedin",
+      "name": "Publish LinkedIn",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1980, 440],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Finalize Job V4:\n//   - PATCH platform_publish_attempts per platform\n//   - On any success: UPDATE posts SET stage='posted', posted_at=now(), posted_urls={...}\n//     (the 0026 lockdown trigger requires posted_at to be non-null)\n//   - PATCH publish_jobs with retry decision:\n//       all-fail-all-transient + attempts<3 -> pending + next_retry_at\n//       any success -> 'succeeded' or 'partial'\n//       permanent fail -> 'failed' + dead_letter\nconst item = $input.first().json;\nconst SB = item._SUPABASE_URL;\nconst SK = item._SUPABASE_SERVICE_ROLE_KEY;\nconst h = { apikey: SK, Authorization: 'Bearer ' + SK, 'Content-Type': 'application/json', Prefer: 'return=minimal' };\nconst _http = this.helpers.httpRequest.bind(this.helpers);\n\nconst results   = item._results || [];\nconst succeeded = results.filter(x => x.success);\nconst failed    = results.filter(x => !x.success && !x.skipped);\n\n// Per-platform attempt rows (upsert)\nfor (const result of results) {\n  if (result.skipped) continue;\n  try {\n    await _http({\n      method: 'POST',\n      url: SB + '/rest/v1/platform_publish_attempts',\n      headers: { ...h, Prefer: 'resolution=merge-duplicates,return=minimal' },\n      body: {\n        job_id: item.job.id,\n        platform: result.platform,\n        state: result.success ? 'succeeded' : 'failed',\n        external_post_id: result.externalPostId || null,\n        post_url: result.postUrl || null,\n        response_payload: result.response ? JSON.stringify(result.response).slice(0, 4000) : null,\n        error_message: result.error || null,\n        attempt_count: (item.job.attempts || 0) + 1,\n        updated_at: new Date().toISOString(),\n      },\n    });\n  } catch (err) {\n    console.error('Failed to update attempt for ' + result.platform + ': ' + err.message);\n  }\n}\n\n// Retry decision\nconst isTransient = (e) => e && /5\\d\\d|timeout|ECONN|fetch failed|temporarily unavailable|503|502|504/i.test(String(e));\nconst attempts    = (item.job.attempts || 0) + 1;\nconst allFailed   = succeeded.length === 0 && failed.length > 0;\nconst allTransient = allFailed && failed.every(f => isTransient(f.error));\nconst shouldRetry = allFailed && allTransient && attempts < 3;\n\nlet jobState, nextRetryAt = null, lastError = null;\nif (succeeded.length > 0 && failed.length === 0) jobState = 'succeeded';\nelse if (succeeded.length > 0)                   jobState = 'partial';\nelse if (shouldRetry) {\n  jobState    = 'pending';\n  nextRetryAt = new Date(Date.now() + attempts * 5 * 60 * 1000).toISOString();\n  lastError   = failed.map(f => f.platform + ': ' + f.error).join(' | ');\n} else                                           jobState = 'failed';\n\nconst postedUrls = {};\nfor (const s of succeeded) postedUrls[s.platform] = s.postUrl || null;\n\n// IMPORTANT ORDER: patch the post FIRST (lockdown trigger requires posted_at\n// non-null when stage='posted'). Then patch the job. The order matters only\n// for crash recovery — service-role bypasses RLS so both writes are atomic\n// from the caller's perspective.\nif (succeeded.length > 0) {\n  await _http({\n    method: 'PATCH',\n    url: SB + '/rest/v1/posts?id=eq.' + item.post.id,\n    headers: h,\n    body: {\n      stage: 'posted',\n      posted_at: new Date().toISOString(),\n      posted_urls: postedUrls,\n      updated_at: new Date().toISOString(),\n    },\n  });\n}\n\nawait _http({\n  method: 'PATCH',\n  url: SB + '/rest/v1/publish_jobs?id=eq.' + item.job.id,\n  headers: h,\n  body: {\n    state: jobState,\n    worker_id: null,\n    claim_expires_at: null,\n    attempts,\n    last_error: lastError,\n    next_retry_at: nextRetryAt,\n    updated_at: new Date().toISOString(),\n  },\n});\n\nif (jobState === 'failed') {\n  try {\n    await _http({\n      method: 'POST',\n      url: SB + '/rest/v1/rpc/dead_letter_publish_job',\n      headers: { apikey: SK, Authorization: 'Bearer ' + SK, 'Content-Type': 'application/json' },\n      body: {\n        p_job_id: item.job.id,\n        p_reason: failed.map(f => f.platform + ': ' + f.error).join(' | ').slice(0, 500),\n      },\n    });\n  } catch (err) {\n    console.error('Dead letter failed: ' + err.message);\n  }\n}\n\nreturn [{\n  json: {\n    ...item,\n    jobState,\n    publishedCount: succeeded.length,\n    failedCount: failed.length,\n    hasFailures: failed.length > 0,\n    willRetry: jobState === 'pending',\n    audit: {\n      executionId: $execution?.id || 'manual',\n      workerId: item.worker_id,\n      timestamp: new Date().toISOString(),\n      postId: item.post.id,\n      postTitle: item.post.title,\n      jobId: item.job.id,\n      jobState,\n      attempts,\n      nextRetryAt,\n      platforms: results.map(x => ({\n        platform: x.platform,\n        state: x.success ? 'succeeded' : x.skipped ? 'skipped' : 'failed',\n        externalPostId: x.externalPostId || null,\n        postUrl: x.postUrl || null,\n        error: x.error || null,\n      })),\n    },\n  },\n}];"
+      },
+      "id": "finalize-job",
+      "name": "Finalize Job",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2240, 440]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Write to audit_log_v2 (NOT legacy post_audit_logs). The portal UI reads\n// via v_audit_log_with_actor which resolves actor_role='n8n' as the name.\nconst item = $input.first().json;\nconst SB = item._SUPABASE_URL;\nconst SK = item._SUPABASE_SERVICE_ROLE_KEY;\nconst h = { apikey: SK, Authorization: 'Bearer ' + SK, 'Content-Type': 'application/json', Prefer: 'return=minimal' };\nconst _http = this.helpers.httpRequest.bind(this.helpers);\n\nconst actionByState = {\n  succeeded: 'auto_published',\n  partial:   'auto_published_partial',\n  pending:   'auto_publish_retry_queued',\n  failed:    'auto_publish_failed',\n};\n\ntry {\n  await _http({\n    method: 'POST',\n    url: SB + '/rest/v1/audit_log_v2',\n    headers: h,\n    body: {\n      workspace_id: item.post.workspace_id,\n      actor_user_id: null,\n      actor_role: 'n8n',\n      entity_type: 'post',\n      entity_id: item.post.id,\n      action: actionByState[item.jobState] || 'auto_publish_unknown',\n      metadata: {\n        user_name: 'n8n Auto-Publisher',\n        details: JSON.stringify(item.audit).slice(0, 4000),\n        worker_id: item.worker_id,\n        attempts: item.audit.attempts,\n        platforms: (item.audit.platforms || []).map(p => ({ platform: p.platform, state: p.state, postUrl: p.postUrl })),\n      },\n    },\n  });\n} catch (err) {\n  console.error('Audit write failed: ' + err.message);\n}\nreturn [{ json: item }];"
+      },
+      "id": "log-audit",
+      "name": "Log to audit_log_v2",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2480, 440]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "" },
+          "conditions": [
+            { "id": "cond_has_failures", "leftValue": "={{ $json.hasFailures }}", "rightValue": "", "operator": { "type": "boolean", "operation": "true" } }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-failures",
+      "name": "Has Failures?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2720, 440]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// ─── EDIT FOR CLIENT ───\n// Set to a Slack/Teams/webhook URL to get failure alerts. Empty string = no alerts.\nconst ALERT_WEBHOOK_URL = '';\n// ───────────────────────\n\nconst item = $input.first().json;\nconst failed = (item._results || []).filter(x => !x.success && !x.skipped);\nconst retryNote = item.willRetry ? '\\n  Will retry at: ' + item.audit.nextRetryAt : '';\nconst message = 'Auto-Publisher Alert\\n' +\n  'Post: ' + (item.post?.title || 'Unknown') + '\\n' +\n  'Job: ' + (item.job?.id || 'Unknown') + '\\n' +\n  'State: ' + item.jobState + retryNote + '\\n' +\n  'Failed platforms:\\n' +\n  failed.map(f => '  - ' + f.platform + ': ' + f.error).join('\\n');\n\nconsole.log('[PUBLISH ALERT]', message);\nif (ALERT_WEBHOOK_URL && !ALERT_WEBHOOK_URL.startsWith('REPLACE')) {\n  try {\n    await this.helpers.httpRequest({\n      method: 'POST',\n      url: ALERT_WEBHOOK_URL,\n      headers: { 'Content-Type': 'application/json' },\n      body: { text: message },\n    });\n  } catch (err) {\n    console.error('[ALERT] Webhook failed: ' + err.message);\n  }\n}\nreturn [{ json: item }];"
+      },
+      "id": "send-alert",
+      "name": "Send Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2720, 660]
+    },
+    {
+      "parameters": {
+        "content": "## The Reach Auto-Publisher V4\n\n### Per-client setup (no env vars)\nEvery secret lives in the node code marked `EDIT FOR CLIENT`. Edit before activating:\n- **Claim Next Job**: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY\n- **Publish Facebook**: META_PAGE_ACCESS_TOKEN, FACEBOOK_PAGE_ID\n- **Publish Instagram**: META_PAGE_ACCESS_TOKEN, INSTAGRAM_BUSINESS_ACCOUNT_ID\n- **Publish LinkedIn**: LINKEDIN_ACCESS_TOKEN, LINKEDIN_ORG_URN\n- **Send Alert**: ALERT_WEBHOOK_URL (optional)\n\n### Schedule\nEvery 1 minute — drift ≤ 60s.\n\n### Architecture (claim-based)\n```\nSchedule → Claim → Has Job? → Resolve Media → Pre-flight\n          → Pub FB → Pub IG → Pub LI → Finalize → Audit → Has Failures?\n            → Send Alert (or end)\n            → loop to Claim (drain queue)\n```\n\n### Key fixes vs V3\n- No $env references; all secrets baked in nodes per multi-tenant constraint\n- Resolve Media reads posts.asset_urls (Studio drafts) AND source_vault.rawFiles (legacy)\n- Audit goes to audit_log_v2 not the legacy table\n- Posts get stage='posted' + posted_at + posted_urls in one PATCH (matches the 0026 lockdown trigger)\n- Retry on transient errors with attempts*5min backoff; permanent at 3 attempts\n- TikTok + YouTube nodes removed (not used)\n- Posts get a per-platform live URL written so the kanban Live badge links\n\n### Activation\n1. Import this JSON.\n2. Edit every `REPLACE_WITH_*` constant.\n3. Run **Manual Test** (dry_run=true) — should claim a job and skip all platform calls.\n4. Trigger a real test post in approved_scheduled with a scheduled_at <= now() and watch it go live.\n5. Activate the Schedule Trigger.",
+        "height": 720,
+        "width": 540,
+        "color": 5
+      },
+      "id": "note-setup",
+      "name": "Setup Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [140, -300]
+    }
+  ],
+  "connections": {
+    "Every 1 Minute": { "main": [[{ "node": "Claim Next Job", "type": "main", "index": 0 }]] },
+    "Manual Test":    { "main": [[{ "node": "Set Dry Run", "type": "main", "index": 0 }]] },
+    "Set Dry Run":    { "main": [[{ "node": "Claim Next Job", "type": "main", "index": 0 }]] },
+    "Claim Next Job": { "main": [[{ "node": "Has Job?", "type": "main", "index": 0 }]] },
+    "Has Job?":       { "main": [
+      [{ "node": "Resolve Media", "type": "main", "index": 0 }],
+      [{ "node": "No More Jobs", "type": "main", "index": 0 }]
+    ]},
+    "Resolve Media":     { "main": [[{ "node": "Pre-flight", "type": "main", "index": 0 }]] },
+    "Pre-flight":        { "main": [[{ "node": "Publish Facebook", "type": "main", "index": 0 }]] },
+    "Publish Facebook":  { "main": [[{ "node": "Publish Instagram", "type": "main", "index": 0 }]] },
+    "Publish Instagram": { "main": [[{ "node": "Publish LinkedIn", "type": "main", "index": 0 }]] },
+    "Publish LinkedIn":  { "main": [[{ "node": "Finalize Job", "type": "main", "index": 0 }]] },
+    "Finalize Job":      { "main": [[{ "node": "Log to audit_log_v2", "type": "main", "index": 0 }]] },
+    "Log to audit_log_v2": { "main": [[{ "node": "Has Failures?", "type": "main", "index": 0 }]] },
+    "Has Failures?":     { "main": [
+      [{ "node": "Send Alert", "type": "main", "index": 0 }],
+      [{ "node": "Claim Next Job", "type": "main", "index": 0 }]
+    ]},
+    "Send Alert":        { "main": [[{ "node": "Claim Next Job", "type": "main", "index": 0 }]] }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "versionId": "the-reach-auto-publisher-v4"
+}

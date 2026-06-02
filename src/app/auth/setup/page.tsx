@@ -203,10 +203,10 @@ export default function SetupPasswordPage() {
           {/* Header */}
           <div className="bg-gradient-to-r from-orange-500 to-orange-600 px-7 py-6">
             <div className="flex items-center gap-4">
-              <RawImage src="/ten80ten-logo.png" alt="Ten80Ten" className="w-10 h-10 rounded-xl object-contain bg-white/20 backdrop-blur-sm p-1.5" />
+              <RawImage src="/the-reach-logo.png" alt="The Reach" className="w-10 h-10 rounded-xl object-contain bg-white/20 backdrop-blur-sm p-1.5" />
               <div>
                 <h1 className="text-[18px] font-bold text-white tracking-tight">Complete Your Profile</h1>
-                <p className="text-[12px] text-white/70 mt-0.5">Welcome to the Ten80Ten team</p>
+                <p className="text-[12px] text-white/70 mt-0.5">Welcome to The Reach team</p>
               </div>
             </div>
           </div>
@@ -300,7 +300,7 @@ export default function SetupPasswordPage() {
           </form>
         </div>
 
-        <p className="text-center text-[10px] text-gray-400 dark:text-gray-600 mt-4">Ten80Ten Social Media Management Portal</p>
+        <p className="text-center text-[10px] text-gray-400 dark:text-gray-600 mt-4">The Reach</p>
       </div>
 
       {cropImageSrc && (

@@ -27,7 +27,7 @@ Hard rules — violating any of these fails the generation:
 
 function brandSummary(ctx: BuildPromptContext): string {
   const b = ctx.brand?.data;
-  if (!b) return "No brand playbook loaded — use generic professional B2B voice.";
+  if (!b) return "No brand playbook loaded — use a polished, personal luxury-travel voice.";
   const lines: string[] = [];
   if (b.tagline) lines.push(`Tagline: ${b.tagline}`);
   if (b.brandVoice) lines.push(`Brand voice: ${b.brandVoice}`);
@@ -64,7 +64,7 @@ export function buildTextSystem(ctx: BuildPromptContext): string {
   );
 
   return [
-    `You are the in-house social-media copywriter for Ten80Ten, a healthcare-and-operations agency. Your job right now is to ${role} for one row of the operator's content plan.`,
+    `You are the in-house social-media copywriter for The Reach, a high-touch luxury travel planning brand. Your job right now is to ${role} for one row of the operator's content plan.`,
     "",
     "Brand context:",
     brandSummary(ctx),

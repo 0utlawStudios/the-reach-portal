@@ -249,7 +249,7 @@ export function RepurposeModal({ card, onClose }: Props) {
                 className="flex-1 h-10 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-[12px] shadow-sm disabled:opacity-40"
               >
                 <CheckCircle className="w-3.5 h-3.5 mr-1.5" />
-                {mode === "repost" ? "Schedule Repost" : "Send to Content Engine"}
+                {mode === "repost" ? "Schedule Repost" : "Send to The Reach"}
               </Button>
             </div>
           </div>

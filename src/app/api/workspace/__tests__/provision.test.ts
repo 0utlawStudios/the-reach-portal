@@ -86,7 +86,7 @@ describe("GET /api/workspace/provision — auth contract", () => {
 describe("GET /api/workspace/provision — membership contract", () => {
   it("returns 403 for a valid user with no team_members row", async () => {
     getUserResult = {
-      data: { user: { id: "user-1", email: "nobody@ten80ten.com" } },
+      data: { user: { id: "user-1", email: "nobody@example.com" } },
       error: null,
     };
     // workspace_members lookup → not a member; team_members lookup → no row.
@@ -100,7 +100,7 @@ describe("GET /api/workspace/provision — membership contract", () => {
 
   it("returns 403 for a team_members row with an empty role", async () => {
     getUserResult = {
-      data: { user: { id: "user-2", email: "norole@ten80ten.com" } },
+      data: { user: { id: "user-2", email: "norole@example.com" } },
       error: null,
     };
     tableResults = {
@@ -113,7 +113,7 @@ describe("GET /api/workspace/provision — membership contract", () => {
 
   it("returns 200 + workspaceId for an existing active workspace member", async () => {
     getUserResult = {
-      data: { user: { id: "user-3", email: "member@ten80ten.com" } },
+      data: { user: { id: "user-3", email: "member@example.com" } },
       error: null,
     };
     tableResults = {
@@ -132,7 +132,7 @@ describe("GET /api/workspace/provision — membership contract", () => {
 
   it("returns 403 and no workspaceId for a pending invite", async () => {
     getUserResult = {
-      data: { user: { id: "user-4", email: "pending@ten80ten.com" } },
+      data: { user: { id: "user-4", email: "pending@example.com" } },
       error: null,
     };
     tableResults = {
@@ -152,7 +152,7 @@ describe("GET /api/workspace/provision — membership contract", () => {
 
   it("returns 200 + workspaceId after provisioning a new active team member", async () => {
     getUserResult = {
-      data: { user: { id: "user-5", email: "newhire@ten80ten.com" } },
+      data: { user: { id: "user-5", email: "newhire@example.com" } },
       error: null,
     };
     // Not yet a workspace member, but has an active team_members row →
@@ -175,7 +175,7 @@ describe("GET /api/workspace/provision — membership contract", () => {
 
   it("promotes a stale pending workspace_members row when team_members is active", async () => {
     getUserResult = {
-      data: { user: { id: "user-6", email: "retry@ten80ten.com" } },
+      data: { user: { id: "user-6", email: "retry@example.com" } },
       error: null,
     };
     tableResults = {

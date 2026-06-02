@@ -15,11 +15,11 @@ export function getTransporter() {
 }
 
 export function getFromAddress() {
-  return `"Ten80Ten Social Media Management Portal" <${process.env.SMTP_USER}>`;
+  return `"The Reach" <${process.env.SMTP_USER}>`;
 }
 
 export function getSiteUrl() {
-  return process.env.NEXT_PUBLIC_SITE_URL || "https://smm.ten80ten.com";
+  return process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 }
 
 // ─── HTML Escaping (prevent XSS injection) ───
@@ -81,7 +81,7 @@ function wrapEmail(content: string) {
 <div style="max-width:540px;margin:40px auto;border-radius:16px;overflow:hidden;background:#ffffff;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
 ${content}
 <div style="padding:24px 32px;text-align:center;background:#fafafa;border-top:1px solid #f0f0f0;">
-  <p style="color:#999;font-size:11px;margin:0;">Ten80Ten Social Media Management Portal</p>
+  <p style="color:#999;font-size:11px;margin:0;">The Reach</p>
 </div>
 </div>
 </body>
@@ -104,16 +104,16 @@ function roleBadge(role: string) {
 // ─── Template 1: Invite Email ───
 
 export function buildInviteEmailHtml(name: string, role: string, confirmUrl: string) {
-  const logoUrl = `${getSiteUrl()}/ten80ten-logo.png`;
+  const logoUrl = `${getSiteUrl()}/the-reach-logo.png`;
   return wrapEmail(`
 <div style="background:linear-gradient(135deg,#ea580c,#f59e0b);padding:32px;text-align:center;">
-  <img src="${logoUrl}" alt="Ten80Ten" width="52" height="52" style="display:block;margin:0 auto 16px;border-radius:14px;background:rgba(255,255,255,0.2);padding:8px;" />
+  <img src="${logoUrl}" alt="The Reach" width="52" height="52" style="display:block;margin:0 auto 16px;border-radius:14px;background:rgba(255,255,255,0.2);padding:8px;" />
   <h1 style="color:#fff;font-size:22px;font-weight:800;margin:0;">You're Invited!</h1>
-  <p style="color:rgba(255,255,255,0.8);font-size:13px;margin:8px 0 0;">Join Ten80Ten Creative Design team</p>
+  <p style="color:rgba(255,255,255,0.8);font-size:13px;margin:8px 0 0;">Join The Reach team</p>
 </div>
 <div style="background:#fff;padding:32px;">
   <p style="color:#111;font-size:15px;line-height:1.6;margin:0 0 16px;">Hi <strong>${esc(name)}</strong>,</p>
-  <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 16px;">You've been invited to join the <strong>Ten80Ten</strong> Social Media Management Portal as:</p>
+  <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 16px;">You've been invited to join <strong>The Reach</strong> as:</p>
   <div style="text-align:center;margin:12px 0;">${roleBadge(role)}</div>
   <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 24px;">Click the button below to set up your password and complete your profile.</p>
   <div style="text-align:center;margin:28px 0;">${ctaButton("ACCEPT INVITATION", confirmUrl)}</div>
@@ -124,12 +124,12 @@ export function buildInviteEmailHtml(name: string, role: string, confirmUrl: str
 // ─── Template 2: Approval Email ───
 
 export function buildApprovalEmailHtml(name: string, role: string, confirmUrl: string) {
-  const logoUrl = `${getSiteUrl()}/ten80ten-logo.png`;
+  const logoUrl = `${getSiteUrl()}/the-reach-logo.png`;
   return wrapEmail(`
 <div style="background:linear-gradient(135deg,#059669,#10b981);padding:32px;text-align:center;">
-  <img src="${logoUrl}" alt="Ten80Ten" width="52" height="52" style="display:block;margin:0 auto 16px;border-radius:14px;background:rgba(255,255,255,0.2);padding:8px;" />
+  <img src="${logoUrl}" alt="The Reach" width="52" height="52" style="display:block;margin:0 auto 16px;border-radius:14px;background:rgba(255,255,255,0.2);padding:8px;" />
   <h1 style="color:#fff;font-size:22px;font-weight:800;margin:0;">Request Approved!</h1>
-  <p style="color:rgba(255,255,255,0.8);font-size:13px;margin:8px 0 0;">Welcome to the Ten80Ten team</p>
+  <p style="color:rgba(255,255,255,0.8);font-size:13px;margin:8px 0 0;">Welcome to The Reach team</p>
 </div>
 <div style="background:#fff;padding:32px;">
   <p style="color:#111;font-size:15px;line-height:1.6;margin:0 0 16px;">Hi <strong>${esc(name)}</strong>,</p>
@@ -144,15 +144,15 @@ export function buildApprovalEmailHtml(name: string, role: string, confirmUrl: s
 // ─── Template 3: Password Reset Email ───
 
 export function buildPasswordResetEmailHtml(confirmUrl: string) {
-  const logoUrl = `${getSiteUrl()}/ten80ten-logo.png`;
+  const logoUrl = `${getSiteUrl()}/the-reach-logo.png`;
   return wrapEmail(`
 <div style="background:linear-gradient(135deg,#d97706,#f59e0b);padding:32px;text-align:center;">
-  <img src="${logoUrl}" alt="Ten80Ten" width="52" height="52" style="display:block;margin:0 auto 16px;border-radius:14px;background:rgba(255,255,255,0.2);padding:8px;" />
+  <img src="${logoUrl}" alt="The Reach" width="52" height="52" style="display:block;margin:0 auto 16px;border-radius:14px;background:rgba(255,255,255,0.2);padding:8px;" />
   <h1 style="color:#fff;font-size:22px;font-weight:800;margin:0;">Reset Your Password</h1>
-  <p style="color:rgba(255,255,255,0.8);font-size:13px;margin:8px 0 0;">Ten80Ten Portal</p>
+  <p style="color:rgba(255,255,255,0.8);font-size:13px;margin:8px 0 0;">The Reach</p>
 </div>
 <div style="background:#fff;padding:32px;">
-  <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 16px;">We received a request to reset your password for the Ten80Ten Social Media Management Portal.</p>
+  <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 16px;">We received a request to reset your password for The Reach.</p>
   <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 24px;">Click the button below to choose a new password.</p>
   <div style="text-align:center;margin:28px 0;">${ctaButton("RESET PASSWORD", confirmUrl, "background:linear-gradient(135deg,#d97706,#f59e0b);")}</div>
   <p style="color:#9ca3af;font-size:11px;text-align:center;margin:20px 0 0;">This link expires in 1 hour. If you didn't request this, ignore this email.</p>
@@ -162,10 +162,10 @@ export function buildPasswordResetEmailHtml(confirmUrl: string) {
 // ─── Template 4: Revision Requested Email ───
 
 export function buildRevisionEmailHtml(postTitle: string, revisionNote: string, requestedBy: string, siteUrl: string) {
-  const logoUrl = `${getSiteUrl()}/ten80ten-logo.png`;
+  const logoUrl = `${getSiteUrl()}/the-reach-logo.png`;
   return wrapEmail(`
 <div style="background:linear-gradient(135deg,#dc2626,#ea580c);padding:32px;text-align:center;">
-  <img src="${logoUrl}" alt="Ten80Ten" width="52" height="52" style="display:block;margin:0 auto 16px;border-radius:14px;background:rgba(255,255,255,0.2);padding:8px;" />
+  <img src="${logoUrl}" alt="The Reach" width="52" height="52" style="display:block;margin:0 auto 16px;border-radius:14px;background:rgba(255,255,255,0.2);padding:8px;" />
   <h1 style="color:#fff;font-size:22px;font-weight:800;margin:0;">Revision Requested</h1>
   <p style="color:rgba(255,255,255,0.8);font-size:13px;margin:8px 0 0;">Your post has been sent back for fixes</p>
 </div>
@@ -176,7 +176,7 @@ export function buildRevisionEmailHtml(postTitle: string, revisionNote: string, 
     <p style="color:#6b7280;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 6px;">What needs to be fixed</p>
     <p style="color:#374151;font-size:14px;line-height:1.6;margin:0;white-space:pre-wrap;">${esc(revisionNote)}</p>
   </div>
-  <div style="text-align:center;margin:28px 0;">${ctaButton("View in Content Engine", siteUrl, "background:linear-gradient(135deg,#dc2626,#ea580c);")}</div>
+  <div style="text-align:center;margin:28px 0;">${ctaButton("View in The Reach", siteUrl, "background:linear-gradient(135deg,#dc2626,#ea580c);")}</div>
   <p style="color:#9ca3af;font-size:11px;text-align:center;margin:20px 0 0;">Log in to make your changes and resubmit for approval.</p>
 </div>`);
 }
@@ -194,7 +194,7 @@ export function buildPostApprovedEmailHtml(params: {
   siteUrl: string;
 }): string {
   const { creatorName, approverName, postTitle, platforms, scheduled, contentType, captionPreview, siteUrl } = params;
-  const logoUrl = `${getSiteUrl()}/ten80ten-logo.png`;
+  const logoUrl = `${getSiteUrl()}/the-reach-logo.png`;
 
   const PLATFORM_COLORS: Record<string, { label: string; color: string }> = {
     facebook:  { label: "Facebook",  color: "#1877f2" },
@@ -237,7 +237,7 @@ export function buildPostApprovedEmailHtml(params: {
 
   return wrapEmail(`
 <div style="background:linear-gradient(135deg,#059669,#22c55e);padding:32px;text-align:center;">
-  <img src="${logoUrl}" alt="Ten80Ten" width="52" height="52" style="display:block;margin:0 auto 16px;border-radius:14px;background:rgba(255,255,255,0.2);padding:8px;" />
+  <img src="${logoUrl}" alt="The Reach" width="52" height="52" style="display:block;margin:0 auto 16px;border-radius:14px;background:rgba(255,255,255,0.2);padding:8px;" />
   <h1 style="color:#fff;font-size:22px;font-weight:800;margin:0;">Post Approved</h1>
   <p style="color:rgba(255,255,255,0.85);font-size:13px;margin:8px 0 0;">Your content has been approved</p>
 </div>
@@ -257,10 +257,10 @@ export function buildPostApprovedEmailHtml(params: {
     <p style="color:#374151;font-size:13px;font-weight:600;margin:0 0 8px;">Until auto-publishing is active:</p>
     <ol style="color:#374151;font-size:13px;line-height:1.8;margin:0 0 24px;padding-left:20px;">
       <li>Post this content manually on the platforms above at the scheduled time</li>
-      <li>Move the card to <strong>&ldquo;Posted&rdquo;</strong> in the Content Engine to confirm it&rsquo;s live</li>
+      <li>Move the card to <strong>&ldquo;Posted&rdquo;</strong> in The Reach to confirm it&rsquo;s live</li>
     </ol>
   </div>
-  <div style="text-align:center;margin:4px 0 8px;">${ctaButton("View in Content Engine", siteUrl, "background:linear-gradient(135deg,#059669,#22c55e);")}</div>
+  <div style="text-align:center;margin:4px 0 8px;">${ctaButton("View in The Reach", siteUrl, "background:linear-gradient(135deg,#059669,#22c55e);")}</div>
 </div>`);
 }
 
@@ -339,10 +339,10 @@ export function buildSupportReplyEmailHtml(params: {
   threadUrl: string;
 }): string {
   const { userName, shortCode, replyPreview, threadUrl } = params;
-  const logoUrl = `${getSiteUrl()}/ten80ten-logo.png`;
+  const logoUrl = `${getSiteUrl()}/the-reach-logo.png`;
   return wrapEmail(`
 <div style="background:linear-gradient(135deg,#ea580c,#f59e0b);padding:32px;text-align:center;">
-  <img src="${logoUrl}" alt="Ten80Ten" width="52" height="52" style="display:block;margin:0 auto 16px;border-radius:14px;background:rgba(255,255,255,0.2);padding:8px;" />
+  <img src="${logoUrl}" alt="The Reach" width="52" height="52" style="display:block;margin:0 auto 16px;border-radius:14px;background:rgba(255,255,255,0.2);padding:8px;" />
   <h1 style="color:#fff;font-size:22px;font-weight:800;margin:0;">You have a reply</h1>
   <p style="color:rgba(255,255,255,0.8);font-size:13px;margin:8px 0 0;">Support request #${esc(shortCode)}</p>
 </div>

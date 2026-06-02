@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
 
     if (smtpConfigured) {
       const transporter = getTransporter();
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://smm.ten80ten.com";
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
       for (const member of members) {
         // Don't email yourself
@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
                   <a href="${esc(siteUrl)}" style="display: inline-block; background: #ea580c; color: white; text-decoration: none; padding: 10px 24px; border-radius: 8px; font-size: 13px; font-weight: 600;">
                     Open Portal
                   </a>
-                  <p style="color: #9ca3af; font-size: 11px; margin: 16px 0 0;">Ten80Ten Social Media Management Portal</p>
+                  <p style="color: #9ca3af; font-size: 11px; margin: 16px 0 0;">The Reach</p>
                 </div>
               </div>
             `,

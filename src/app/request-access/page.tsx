@@ -77,7 +77,7 @@ export default function RequestAccessPage() {
           {/* Header */}
           <div className="bg-gradient-to-r from-gray-900 to-gray-800 dark:from-[#1a1a1e] dark:to-[#131316] px-7 py-6">
             <div className="flex items-center gap-4">
-              <RawImage src="/ten80ten-logo.png" alt="Ten80Ten" className="w-10 h-10 rounded-xl object-contain" />
+              <RawImage src="/the-reach-logo.png" alt="The Reach" className="w-10 h-10 rounded-xl object-contain" />
               <div>
                 <h1 className="text-[18px] font-bold text-white tracking-tight">Request Access</h1>
                 <p className="text-[12px] text-white/50 mt-0.5">Tell us about yourself and why you need access</p>

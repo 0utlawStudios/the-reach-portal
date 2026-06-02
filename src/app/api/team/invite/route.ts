@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
         await transporter.sendMail({
           from: getFromAddress(),
           to: email,
-          subject: `You're invited to join Ten80Ten`,
+          subject: `You're invited to join The Reach`,
           html: buildInviteEmailHtml(body.name, body.role, confirmUrl),
         });
         emailSent = true;

@@ -254,7 +254,7 @@ export async function GET(req: Request) {
 
   // ═══ 4. SITE AVAILABILITY ═══
   try {
-    const siteUrl = "https://smm.ten80ten.com";
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
     const r = await timedFetch(siteUrl, { method: "HEAD" });
     checks["04_site_availability"] = r.ok
       ? r.ms > 3000 ? warn(`Responding but slow (${r.ms}ms)`) : pass(`${siteUrl} — ${r.ms}ms, HTTP ${r.status}`)
@@ -267,7 +267,7 @@ export async function GET(req: Request) {
   try {
     // SEC-006: Derive the probe host from NEXT_PUBLIC_SITE_URL instead of
     // hardcoding the prod domain, so preview/staging deploys probe themselves.
-    const base = process.env.NEXT_PUBLIC_SITE_URL || "https://smm.ten80ten.com";
+    const base = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
     const endpoints = ["/api/team/invite", "/api/notifications/mention", "/api/notifications/revision"];
     const results: Record<string, string> = {};
     for (const ep of endpoints) {

@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     }
 
     const admin = getAdminClient();
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://smm.ten80ten.com";
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
     // SEC-012: Trust the authenticated caller's identity, not the body.
     // SEC-010: `.eq` — callerEmail is already lowercased; `.ilike` would let

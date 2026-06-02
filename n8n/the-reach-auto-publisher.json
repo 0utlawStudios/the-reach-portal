@@ -1,0 +1,297 @@
+{
+  "name": "The Reach Auto-Publisher V3",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "minutes", "minutesInterval": 5 }]
+        }
+      },
+      "id": "trigger-schedule",
+      "name": "Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [220, 440]
+    },
+    {
+      "parameters": {},
+      "id": "trigger-manual",
+      "name": "Manual Test",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [220, 660]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            { "id": "dry_run_flag", "name": "dry_run", "value": true, "type": "boolean" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-dry-run",
+      "name": "Set Dry Run",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [460, 660]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Claims the next pending publish job via Supabase RPC.\n// Returns job + post data, or hasJob: false if nothing pending.\nconst SB = $env.SUPABASE_URL;\nconst SK = $env.SUPABASE_SERVICE_ROLE_KEY;\nif (!SB || !SK) return [{ json: { hasJob: false, error: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY' } }];\n\nconst h = { apikey: SK, Authorization: 'Bearer ' + SK, 'Content-Type': 'application/json' };\nconst _http = this.helpers.httpRequest.bind(this.helpers);\n\ntry {\n  const claimRes = await _http({\n    method: 'POST',\n    url: SB + '/rest/v1/rpc/claim_publish_job',\n    headers: h,\n    body: { p_worker_id: 'n8n-' + ($execution?.id || 'manual'), p_claim_seconds: 120 },\n  });\n\n  const jobs = Array.isArray(claimRes) ? claimRes : [];\n  if (!jobs.length) return [{ json: { hasJob: false } }];\n  const job = jobs[0];\n\n  // Fetch full post data\n  const postRes = await _http({\n    method: 'GET',\n    url: SB + '/rest/v1/posts?id=eq.' + job.post_id + '&select=*',\n    headers: { apikey: SK, Authorization: 'Bearer ' + SK },\n  });\n\n  const posts = Array.isArray(postRes) ? postRes : [];\n  if (!posts.length) {\n    await _http({ method: 'PATCH', url: SB + '/rest/v1/publish_jobs?id=eq.' + job.id, headers: h, body: { state: 'failed' } });\n    return [{ json: { hasJob: false, error: 'Post ' + job.post_id + ' not found' } }];\n  }\n\n  const dry_run = $input.first()?.json?.dry_run === true;\n  return [{ json: { hasJob: true, dry_run, job, post: posts[0], _results: [] } }];\n} catch (err) {\n  return [{ json: { hasJob: false, error: 'Claim failed: ' + err.message } }];\n}"
+      },
+      "id": "claim-job",
+      "name": "Claim Next Job",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 440]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "" },
+          "conditions": [
+            {
+              "id": "cond_has_job",
+              "leftValue": "={{ $json.hasJob }}",
+              "rightValue": "",
+              "operator": { "type": "boolean", "operation": "true" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-has-job",
+      "name": "Has Job?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [940, 440]
+    },
+    {
+      "parameters": {},
+      "id": "stop-no-job",
+      "name": "No More Jobs",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [940, 660]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Facebook Publisher - Graph API v21\n// Credentials: META_PAGE_ACCESS_TOKEN, FACEBOOK_PAGE_ID\nconst item = $input.item.json;\nconst r = [...(item._results || [])];\nconst plat = Array.isArray(item.post?.platforms) ? item.post.platforms : [];\n\nif (!plat.includes('facebook')) return { json: { ...item, _results: [...r, { platform: 'facebook', skipped: true, reason: 'not_targeted' }] } };\nif (item.dry_run) return { json: { ...item, _results: [...r, { platform: 'facebook', skipped: true, reason: 'dry_run' }] } };\n\nconst TOKEN = $env.META_PAGE_ACCESS_TOKEN;\nconst PAGE = $env.FACEBOOK_PAGE_ID;\nif (!TOKEN || !PAGE) return { json: { ...item, _results: [...r, { platform: 'facebook', success: false, error: 'Missing META_PAGE_ACCESS_TOKEN or FACEBOOK_PAGE_ID' }] } };\n\nlet vault = item.post.source_vault || {};\nif (typeof vault === 'string') try { vault = JSON.parse(vault); } catch { vault = {}; }\nconst files = vault.rawFiles || [];\nconst master = files.find(f => f.usageType === 'master') || files[0];\nif (!master?.url) return { json: { ...item, _results: [...r, { platform: 'facebook', success: false, error: 'No media file' }] } };\n\nconst _http = this.helpers.httpRequest.bind(this.helpers);\nconst auth = { Authorization: 'Bearer ' + TOKEN };\n\ntry {\n  const ct = item.post.content_type || 'image';\n  const caption = item.post.caption || '';\n  let res;\n\n  if (ct === 'video' || ct === 'reel') {\n    res = await _http({ method: 'POST', url: 'https://graph.facebook.com/v21.0/' + PAGE + '/videos', headers: auth, qs: { file_url: master.url, description: caption } });\n  } else if (ct === 'carousel' && files.length > 1) {\n    const ids = [];\n    for (const f of files) {\n      if (!f.url) continue;\n      const p = await _http({ method: 'POST', url: 'https://graph.facebook.com/v21.0/' + PAGE + '/photos', headers: auth, qs: { url: f.url, published: false } });\n      if (p.id) ids.push({ media_fbid: p.id });\n    }\n    res = await _http({ method: 'POST', url: 'https://graph.facebook.com/v21.0/' + PAGE + '/feed', headers: { ...auth, 'Content-Type': 'application/json' }, body: { message: caption, attached_media: ids } });\n  } else {\n    res = await _http({ method: 'POST', url: 'https://graph.facebook.com/v21.0/' + PAGE + '/photos', headers: auth, qs: { url: master.url, message: caption } });\n  }\n\n  return { json: { ...item, _results: [...r, { platform: 'facebook', success: true, externalPostId: res.id || res.post_id, response: res }] } };\n} catch (err) {\n  return { json: { ...item, _results: [...r, { platform: 'facebook', success: false, error: err.message }] } };\n}"
+      },
+      "id": "pub-facebook",
+      "name": "Publish Facebook",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1200, 440],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Instagram Publisher - Container/Poll/Publish pattern\n// Credentials: META_PAGE_ACCESS_TOKEN, INSTAGRAM_BUSINESS_ACCOUNT_ID\n// Polling: 20 attempts x 3s = 60s max (reduced from 150s)\nconst item = $input.item.json;\nconst r = [...(item._results || [])];\nconst plat = Array.isArray(item.post?.platforms) ? item.post.platforms : [];\n\nif (!plat.includes('instagram')) return { json: { ...item, _results: [...r, { platform: 'instagram', skipped: true, reason: 'not_targeted' }] } };\nif (item.dry_run) return { json: { ...item, _results: [...r, { platform: 'instagram', skipped: true, reason: 'dry_run' }] } };\n\nconst TOKEN = $env.META_PAGE_ACCESS_TOKEN;\nconst IG = $env.INSTAGRAM_BUSINESS_ACCOUNT_ID;\nif (!TOKEN || !IG) return { json: { ...item, _results: [...r, { platform: 'instagram', success: false, error: 'Missing META_PAGE_ACCESS_TOKEN or INSTAGRAM_BUSINESS_ACCOUNT_ID' }] } };\n\nlet vault = item.post.source_vault || {};\nif (typeof vault === 'string') try { vault = JSON.parse(vault); } catch { vault = {}; }\nconst files = vault.rawFiles || [];\nconst master = files.find(f => f.usageType === 'master') || files[0];\nif (!master?.url) return { json: { ...item, _results: [...r, { platform: 'instagram', success: false, error: 'No media file' }] } };\n\nconst _http = this.helpers.httpRequest.bind(this.helpers);\nconst base = 'https://graph.facebook.com/v21.0/' + IG;\n\nasync function waitContainer(id) {\n  for (let i = 0; i < 20; i++) {\n    await new Promise(resolve => setTimeout(resolve, 3000));\n    const s = await _http({ method: 'GET', url: 'https://graph.facebook.com/v21.0/' + id, qs: { fields: 'status_code', access_token: TOKEN } });\n    if (s.status_code === 'FINISHED') return;\n    if (s.status_code === 'ERROR') throw new Error('Container error: ' + JSON.stringify(s));\n  }\n  throw new Error('Container timed out after 60s');\n}\n\ntry {\n  const ct = item.post.content_type || 'image';\n  const caption = item.post.caption || '';\n  let publishId;\n\n  if (ct === 'carousel' && files.length > 1) {\n    const childIds = [];\n    for (const f of files) {\n      if (!f.url) continue;\n      const isVideo = (f.mimeType || '').startsWith('video/');\n      const qs = isVideo\n        ? { media_type: 'VIDEO', video_url: f.url, is_carousel_item: true, access_token: TOKEN }\n        : { image_url: f.url, is_carousel_item: true, access_token: TOKEN };\n      const c = await _http({ method: 'POST', url: base + '/media', qs });\n      if (isVideo) await waitContainer(c.id);\n      childIds.push(c.id);\n    }\n    const container = await _http({ method: 'POST', url: base + '/media', qs: { media_type: 'CAROUSEL', children: childIds.join(','), caption, access_token: TOKEN } });\n    await waitContainer(container.id);\n    const pub = await _http({ method: 'POST', url: base + '/media_publish', qs: { creation_id: container.id, access_token: TOKEN } });\n    publishId = pub.id;\n  } else if (ct === 'video' || ct === 'reel') {\n    const container = await _http({ method: 'POST', url: base + '/media', qs: { media_type: 'REELS', video_url: master.url, caption, access_token: TOKEN } });\n    await waitContainer(container.id);\n    const pub = await _http({ method: 'POST', url: base + '/media_publish', qs: { creation_id: container.id, access_token: TOKEN } });\n    publishId = pub.id;\n  } else {\n    const container = await _http({ method: 'POST', url: base + '/media', qs: { image_url: master.url, caption, access_token: TOKEN } });\n    await waitContainer(container.id);\n    const pub = await _http({ method: 'POST', url: base + '/media_publish', qs: { creation_id: container.id, access_token: TOKEN } });\n    publishId = pub.id;\n  }\n\n  return { json: { ...item, _results: [...r, { platform: 'instagram', success: true, externalPostId: publishId }] } };\n} catch (err) {\n  return { json: { ...item, _results: [...r, { platform: 'instagram', success: false, error: err.message }] } };\n}"
+      },
+      "id": "pub-instagram",
+      "name": "Publish Instagram",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1460, 440],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// LinkedIn Publisher - NEW /rest/posts API (replaces deprecated /v2/ugcPosts)\n// Credentials: LINKEDIN_ACCESS_TOKEN, LINKEDIN_ORG_URN\n// Required headers: LinkedIn-Version, X-Restli-Protocol-Version\nconst item = $input.item.json;\nconst r = [...(item._results || [])];\nconst plat = Array.isArray(item.post?.platforms) ? item.post.platforms : [];\n\nif (!plat.includes('linkedin')) return { json: { ...item, _results: [...r, { platform: 'linkedin', skipped: true, reason: 'not_targeted' }] } };\nif (item.dry_run) return { json: { ...item, _results: [...r, { platform: 'linkedin', skipped: true, reason: 'dry_run' }] } };\n\nconst TOKEN = $env.LINKEDIN_ACCESS_TOKEN;\nconst ORG = $env.LINKEDIN_ORG_URN;\nif (!TOKEN || !ORG) return { json: { ...item, _results: [...r, { platform: 'linkedin', success: false, error: 'Missing LINKEDIN_ACCESS_TOKEN or LINKEDIN_ORG_URN' }] } };\n\nlet vault = item.post.source_vault || {};\nif (typeof vault === 'string') try { vault = JSON.parse(vault); } catch { vault = {}; }\nconst files = vault.rawFiles || [];\nconst master = files.find(f => f.usageType === 'master') || files[0];\nif (!master?.url) return { json: { ...item, _results: [...r, { platform: 'linkedin', success: false, error: 'No media file' }] } };\n\nconst _http = this.helpers.httpRequest.bind(this.helpers);\nconst liH = { Authorization: 'Bearer ' + TOKEN, 'Content-Type': 'application/json', 'LinkedIn-Version': '202411', 'X-Restli-Protocol-Version': '2.0.0' };\n\ntry {\n  const ct = item.post.content_type || 'image';\n  const caption = item.post.caption || '';\n  const postBody = { author: ORG, commentary: caption, visibility: 'PUBLIC', distribution: { feedDistribution: 'MAIN_FEED', targetEntities: [], thirdPartyDistributionChannels: [] }, lifecycleState: 'PUBLISHED' };\n\n  if (ct === 'video' || ct === 'reel') {\n    // Video upload via /rest/videos\n    const binary = await _http({ method: 'GET', url: master.url, encoding: 'arraybuffer' });\n    const fileSize = binary.byteLength || binary.length || 10000000;\n    const init = await _http({ method: 'POST', url: 'https://api.linkedin.com/rest/videos?action=initializeUpload', headers: liH, body: { initializeUploadRequest: { owner: ORG, fileSizeBytes: fileSize, uploadCaptions: false, uploadThumbnail: false } } });\n    const uploadUrl = init.value?.uploadInstructions?.[0]?.uploadUrl;\n    const videoUrn = init.value?.video;\n    if (!uploadUrl || !videoUrn) throw new Error('Video upload init failed: ' + JSON.stringify(init));\n    await _http({ method: 'PUT', url: uploadUrl, headers: { Authorization: 'Bearer ' + TOKEN, 'Content-Type': 'application/octet-stream' }, body: binary });\n    postBody.content = { media: { id: videoUrn } };\n  } else {\n    // Image upload via /rest/images\n    const binary = await _http({ method: 'GET', url: master.url, encoding: 'arraybuffer' });\n    const init = await _http({ method: 'POST', url: 'https://api.linkedin.com/rest/images?action=initializeUpload', headers: liH, body: { initializeUploadRequest: { owner: ORG } } });\n    const uploadUrl = init.value?.uploadUrl;\n    const imageUrn = init.value?.image;\n    if (!uploadUrl || !imageUrn) throw new Error('Image upload init failed: ' + JSON.stringify(init));\n    await _http({ method: 'PUT', url: uploadUrl, headers: { Authorization: 'Bearer ' + TOKEN }, body: binary });\n    postBody.content = { media: { id: imageUrn } };\n  }\n\n  const res = await _http({ method: 'POST', url: 'https://api.linkedin.com/rest/posts', headers: liH, body: postBody, returnFullResponse: true });\n  const postId = res.headers?.['x-restli-id'] || res.body?.id || 'unknown';\n  return { json: { ...item, _results: [...r, { platform: 'linkedin', success: true, externalPostId: postId, response: res.body || res }] } };\n} catch (err) {\n  return { json: { ...item, _results: [...r, { platform: 'linkedin', success: false, error: err.message }] } };\n}"
+      },
+      "id": "pub-linkedin",
+      "name": "Publish LinkedIn",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1720, 440],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// YouTube Publisher - Data API v3 resumable upload\n// Credentials: YOUTUBE_ACCESS_TOKEN (Google OAuth2)\n// Supports: video, reel (as Shorts with #Shorts tag), story\n// Skips: image, carousel\nconst item = $input.item.json;\nconst r = [...(item._results || [])];\nconst plat = Array.isArray(item.post?.platforms) ? item.post.platforms : [];\n\nif (!plat.includes('youtube')) return { json: { ...item, _results: [...r, { platform: 'youtube', skipped: true, reason: 'not_targeted' }] } };\nif (item.dry_run) return { json: { ...item, _results: [...r, { platform: 'youtube', skipped: true, reason: 'dry_run' }] } };\n\nconst TOKEN = $env.YOUTUBE_ACCESS_TOKEN;\nif (!TOKEN) return { json: { ...item, _results: [...r, { platform: 'youtube', success: false, error: 'Missing YOUTUBE_ACCESS_TOKEN' }] } };\n\nconst ct = item.post.content_type || 'image';\nif (ct === 'image' || ct === 'carousel') return { json: { ...item, _results: [...r, { platform: 'youtube', skipped: true, reason: 'image_not_supported' }] } };\n\nlet vault = item.post.source_vault || {};\nif (typeof vault === 'string') try { vault = JSON.parse(vault); } catch { vault = {}; }\nconst files = vault.rawFiles || [];\nconst master = files.find(f => f.usageType === 'master') || files[0];\nif (!master?.url) return { json: { ...item, _results: [...r, { platform: 'youtube', success: false, error: 'No media file' }] } };\n\nconst _http = this.helpers.httpRequest.bind(this.helpers);\nconst title = item.post.title || 'Untitled';\nconst description = item.post.caption || '';\nconst isShort = ct === 'reel' || ct === 'story';\n\ntry {\n  const binary = await _http({ method: 'GET', url: master.url, encoding: 'arraybuffer' });\n  const size = binary.byteLength || binary.length;\n\n  // Initialize resumable upload\n  const initRes = await _http({\n    method: 'POST',\n    url: 'https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status',\n    headers: { Authorization: 'Bearer ' + TOKEN, 'Content-Type': 'application/json', 'X-Upload-Content-Type': 'video/*', 'X-Upload-Content-Length': String(size) },\n    body: { snippet: { title: isShort ? title + ' #Shorts' : title, description, categoryId: '22' }, status: { privacyStatus: 'public', selfDeclaredMadeForKids: false } },\n    returnFullResponse: true,\n  });\n\n  const uploadUrl = initRes.headers?.location;\n  if (!uploadUrl) throw new Error('No upload URL from YouTube init');\n\n  const uploadRes = await _http({ method: 'PUT', url: uploadUrl, headers: { 'Content-Type': 'video/*' }, body: binary });\n  return { json: { ...item, _results: [...r, { platform: 'youtube', success: true, externalPostId: uploadRes.id, response: uploadRes }] } };\n} catch (err) {\n  return { json: { ...item, _results: [...r, { platform: 'youtube', success: false, error: err.message }] } };\n}"
+      },
+      "id": "pub-youtube",
+      "name": "Publish YouTube",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1980, 440],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// TikTok Publisher - Content Posting API v2\n// Credentials: TIKTOK_ACCESS_TOKEN, TIKTOK_OPEN_ID\n// Supports: video, reel only. Skips image/carousel.\nconst item = $input.item.json;\nconst r = [...(item._results || [])];\nconst plat = Array.isArray(item.post?.platforms) ? item.post.platforms : [];\n\nif (!plat.includes('tiktok')) return { json: { ...item, _results: [...r, { platform: 'tiktok', skipped: true, reason: 'not_targeted' }] } };\nif (item.dry_run) return { json: { ...item, _results: [...r, { platform: 'tiktok', skipped: true, reason: 'dry_run' }] } };\n\nconst TOKEN = $env.TIKTOK_ACCESS_TOKEN;\nif (!TOKEN) return { json: { ...item, _results: [...r, { platform: 'tiktok', success: false, error: 'Missing TIKTOK_ACCESS_TOKEN' }] } };\n\nconst ct = item.post.content_type || 'image';\nif (ct === 'image' || ct === 'carousel') return { json: { ...item, _results: [...r, { platform: 'tiktok', skipped: true, reason: 'image_not_supported' }] } };\n\nlet vault = item.post.source_vault || {};\nif (typeof vault === 'string') try { vault = JSON.parse(vault); } catch { vault = {}; }\nconst files = vault.rawFiles || [];\nconst master = files.find(f => f.usageType === 'master') || files[0];\nif (!master?.url) return { json: { ...item, _results: [...r, { platform: 'tiktok', success: false, error: 'No media file' }] } };\n\nconst _http = this.helpers.httpRequest.bind(this.helpers);\nconst caption = (item.post.caption || '').substring(0, 2200);\n\ntry {\n  const binary = await _http({ method: 'GET', url: master.url, encoding: 'arraybuffer' });\n  const fileSize = binary.byteLength || binary.length;\n\n  const initRes = await _http({\n    method: 'POST',\n    url: 'https://open.tiktokapis.com/v2/post/publish/video/init/',\n    headers: { Authorization: 'Bearer ' + TOKEN, 'Content-Type': 'application/json' },\n    body: {\n      post_info: { title: caption, privacy_level: 'PUBLIC_TO_EVERYONE', disable_duet: false, disable_comment: false, disable_stitch: false },\n      source_info: { source: 'FILE_UPLOAD', video_size: fileSize, chunk_size: fileSize, total_chunk_count: 1 },\n    },\n  });\n\n  const uploadUrl = initRes.data?.upload_url;\n  const publishId = initRes.data?.publish_id;\n  if (!uploadUrl) throw new Error('TikTok init failed: ' + JSON.stringify(initRes));\n\n  await _http({\n    method: 'PUT',\n    url: uploadUrl,\n    headers: { 'Content-Type': 'video/mp4', 'Content-Range': 'bytes 0-' + (fileSize - 1) + '/' + fileSize },\n    body: binary,\n  });\n\n  return { json: { ...item, _results: [...r, { platform: 'tiktok', success: true, externalPostId: publishId, response: initRes }] } };\n} catch (err) {\n  return { json: { ...item, _results: [...r, { platform: 'tiktok', success: false, error: err.message }] } };\n}"
+      },
+      "id": "pub-tiktok",
+      "name": "Publish TikTok",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2240, 440],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Finalize Job: write per-platform results to platform_publish_attempts,\n// update publish_jobs state, update posts.stage if any platform succeeded.\nconst item = $input.first().json;\nconst results = item._results || [];\nconst SB = $env.SUPABASE_URL;\nconst SK = $env.SUPABASE_SERVICE_ROLE_KEY;\nconst h = { apikey: SK, Authorization: 'Bearer ' + SK, 'Content-Type': 'application/json', Prefer: 'return=minimal' };\nconst _http = this.helpers.httpRequest.bind(this.helpers);\n\nconst succeeded = results.filter(x => x.success);\nconst failed = results.filter(x => !x.success && !x.skipped);\n\n// Write per-platform attempt results\nfor (const result of results) {\n  if (result.skipped) continue;\n  try {\n    await _http({\n      method: 'PATCH',\n      url: SB + '/rest/v1/platform_publish_attempts?job_id=eq.' + item.job.id + '&platform=eq.' + result.platform,\n      headers: h,\n      body: {\n        state: result.success ? 'succeeded' : 'failed',\n        external_post_id: result.externalPostId || null,\n        response_payload: result.response ? JSON.stringify(result.response) : null,\n        error_message: result.error || null,\n        attempt_count: 1,\n        updated_at: new Date().toISOString(),\n      },\n    });\n  } catch (err) {\n    console.error('Failed to update attempt for ' + result.platform + ': ' + err.message);\n  }\n}\n\n// Determine overall job state\nlet jobState;\nif (succeeded.length > 0 && failed.length === 0) jobState = 'succeeded';\nelse if (succeeded.length > 0 && failed.length > 0) jobState = 'partial';\nelse if (failed.length > 0) jobState = 'failed';\nelse jobState = 'succeeded';\n\n// Update publish_jobs\nawait _http({\n  method: 'PATCH',\n  url: SB + '/rest/v1/publish_jobs?id=eq.' + item.job.id,\n  headers: h,\n  body: { state: jobState, worker_id: null, claim_expires_at: null, updated_at: new Date().toISOString() },\n});\n\n// Update post stage to posted if any platform succeeded\nif (jobState === 'succeeded' || jobState === 'partial') {\n  await _http({\n    method: 'PATCH',\n    url: SB + '/rest/v1/posts?id=eq.' + item.post.id,\n    headers: h,\n    body: { stage: 'posted', updated_at: new Date().toISOString() },\n  });\n}\n\n// If all failed, check if we should dead-letter\nif (jobState === 'failed') {\n  try {\n    await _http({\n      method: 'POST',\n      url: SB + '/rest/v1/rpc/dead_letter_publish_job',\n      headers: { apikey: SK, Authorization: 'Bearer ' + SK, 'Content-Type': 'application/json' },\n      body: { p_job_id: item.job.id, p_reason: 'All platforms failed: ' + failed.map(f => f.platform + ': ' + f.error).join('; ') },\n    });\n  } catch (err) {\n    console.error('Dead letter failed: ' + err.message);\n  }\n}\n\nreturn [{\n  json: {\n    ...item,\n    jobState,\n    publishedCount: succeeded.length,\n    failedCount: failed.length,\n    hasFailures: failed.length > 0,\n    audit: {\n      executionId: $execution?.id || 'manual',\n      timestamp: new Date().toISOString(),\n      postId: item.post.id,\n      postTitle: item.post.title,\n      jobId: item.job.id,\n      jobState,\n      platforms: results.map(x => ({ platform: x.platform, state: x.success ? 'succeeded' : x.skipped ? 'skipped' : 'failed', externalPostId: x.externalPostId || null, error: x.error || null })),\n    },\n  },\n}];"
+      },
+      "id": "finalize-job",
+      "name": "Finalize Job",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2500, 440]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Log structured audit entry to post_audit_logs\nconst item = $input.first().json;\nconst SB = $env.SUPABASE_URL;\nconst SK = $env.SUPABASE_SERVICE_ROLE_KEY;\nconst h = { apikey: SK, Authorization: 'Bearer ' + SK, 'Content-Type': 'application/json', Prefer: 'return=minimal' };\n\ntry {\n  await this.helpers.httpRequest({\n    method: 'POST',\n    url: SB + '/rest/v1/post_audit_logs',\n    headers: h,\n    body: {\n      post_id: item.post.id,\n      user_name: 'n8n Auto-Publisher',\n      action_type: 'auto_published',\n      details: JSON.stringify(item.audit),\n    },\n  });\n} catch (err) {\n  console.error('Audit log write failed: ' + err.message);\n}\n\nreturn [{ json: item }];"
+      },
+      "id": "log-audit",
+      "name": "Log to Audit Trail",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2740, 440]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "" },
+          "conditions": [
+            {
+              "id": "cond_has_failures",
+              "leftValue": "={{ $json.hasFailures }}",
+              "rightValue": "",
+              "operator": { "type": "boolean", "operation": "true" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-failures",
+      "name": "Has Failures?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2980, 440]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Send failure alert via webhook (Slack/Teams/email)\nconst item = $input.first().json;\nconst failed = (item._results || []).filter(x => !x.success && !x.skipped);\n\nconst message = 'Auto-Publisher Alert\\n' +\n  'Post: ' + (item.post?.title || 'Unknown') + '\\n' +\n  'Job: ' + (item.job?.id || 'Unknown') + '\\n' +\n  'State: ' + item.jobState + '\\n' +\n  'Failed platforms:\\n' +\n  failed.map(f => '  - ' + f.platform + ': ' + f.error).join('\\n');\n\nconsole.log('[PUBLISH ALERT]', message);\n\nconst webhook = $env.ALERT_WEBHOOK_URL;\nif (webhook) {\n  try {\n    await this.helpers.httpRequest({\n      method: 'POST',\n      url: webhook,\n      headers: { 'Content-Type': 'application/json' },\n      body: { text: message },\n    });\n  } catch (err) {\n    console.error('[ALERT] Webhook failed: ' + err.message);\n  }\n}\n\nreturn [{ json: item }];"
+      },
+      "id": "send-alert",
+      "name": "Send Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2980, 660]
+    },
+    {
+      "parameters": {
+        "content": "## The Reach Auto-Publisher V3\n\n### Architecture: Claim-Based State Machine\nThe workflow uses `claim_publish_job` RPC for atomic job claiming.\nThis prevents duplicate publishes when multiple n8n instances run.\n\n### Flow\n```\nSchedule (5min) -> Claim Job (RPC)\n                    -> Has Job? -> Publish FB -> IG -> LI -> YT -> TT\n                    -> No Job   -> Stop          -> Finalize -> Log -> Alert?\n                                                    -> Loop back to Claim\n```\n\n### Environment Variables Required\n```\nSUPABASE_URL              - Supabase project URL\nSUPABASE_SERVICE_ROLE_KEY - Supabase service role key\nMETA_PAGE_ACCESS_TOKEN    - Meta System User token (FB + IG)\nFACEBOOK_PAGE_ID          - Facebook Page ID\nINSTAGRAM_BUSINESS_ACCOUNT_ID - IG Business Account ID\nLINKEDIN_ACCESS_TOKEN     - LinkedIn OAuth2 token\nLINKEDIN_ORG_URN          - urn:li:organization:XXXXX\nYOUTUBE_ACCESS_TOKEN      - Google OAuth2 token\nTIKTOK_ACCESS_TOKEN       - TikTok OAuth2 token\nALERT_WEBHOOK_URL         - (optional) Slack/Teams webhook\n```\n\n### Setup\n1. Set all env vars in n8n Settings > Variables\n2. Ensure Supabase migrations 0010-0014 are applied\n3. Run Manual Test (dry_run mode, no live publishing)\n4. Activate the schedule trigger",
+        "height": 640,
+        "width": 480,
+        "color": 5
+      },
+      "id": "note-setup",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [140, -200]
+    },
+    {
+      "parameters": {
+        "content": "## Platform Support Matrix\n\n| Platform | Content Types | API Version | Auth |\n|----------|---------------|-------------|------|\n| Facebook | Image, Video, Reel, Carousel | Graph v21.0 | Bearer token (header) |\n| Instagram | Image, Video, Reel, Carousel | Graph v21.0 | Container/Poll/Publish |\n| LinkedIn | Image, Video | REST /rest/posts | OAuth2 + Version header |\n| YouTube | Video, Shorts | Data API v3 | OAuth2 resumable upload |\n| TikTok | Video | Content Posting v2 | OAuth2 chunked upload |\n\n### Key Changes from V2\n- LinkedIn migrated from /v2/ugcPosts to /rest/posts\n- All tokens in env vars, zero hardcoded secrets\n- Instagram polling reduced from 150s to 60s max\n- YouTube and TikTok nodes added\n- Facebook uses Authorization header (not query string)\n- Carousel support for FB multi-photo and IG mixed media\n\n### Token Refresh Schedule\n- Meta: System User token (never expires)\n- LinkedIn: 60-day expiry, needs refresh workflow\n- YouTube: Auto-refreshed by Google OAuth2\n- TikTok: 24h access token, 365d refresh token",
+        "height": 560,
+        "width": 480,
+        "color": 4
+      },
+      "id": "note-platforms",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [660, -200]
+    },
+    {
+      "parameters": {
+        "content": "## Safety and Error Handling\n\n### Claim-Based Locking\nJob claimed with 120s expiry via FOR UPDATE SKIP LOCKED.\nIf worker crashes, job auto-releases after 120s.\nNo duplicate publishes across concurrent workers.\n\n### Dry Run Mode\nManual Test trigger sets dry_run=true.\nAll publisher nodes skip API calls in dry_run.\nUse to validate workflow logic without posting.\n\n### Per-Platform Isolation\nonError: continueRegularOutput on all publishers.\nFacebook failing does NOT block Instagram.\nResults accumulate in _results array.\n\n### Status Machine\npending -> claimed -> [succeeded | partial | failed | dead]\n- succeeded: all targeted platforms posted\n- partial: some platforms posted, some failed\n- failed: all targeted platforms failed -> dead letter\n- dead: moved to dead_letter_jobs for manual review\n\n### Failure Alerts\nSend Alert node fires when any platform fails.\nConfigurable via ALERT_WEBHOOK_URL env var.\nSupports Slack, Teams, or any webhook endpoint.\n\n### Post Stage Update\npost.stage only changes to 'posted' AFTER publish succeeds.\nNever marks posted before actual API confirmation.\nThis is the key safety fix from V2.",
+        "height": 620,
+        "width": 480,
+        "color": 6
+      },
+      "id": "note-errors",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1180, -200]
+    }
+  ],
+  "connections": {
+    "Every 5 Minutes": {
+      "main": [[{ "node": "Claim Next Job", "type": "main", "index": 0 }]]
+    },
+    "Manual Test": {
+      "main": [[{ "node": "Set Dry Run", "type": "main", "index": 0 }]]
+    },
+    "Set Dry Run": {
+      "main": [[{ "node": "Claim Next Job", "type": "main", "index": 0 }]]
+    },
+    "Claim Next Job": {
+      "main": [[{ "node": "Has Job?", "type": "main", "index": 0 }]]
+    },
+    "Has Job?": {
+      "main": [
+        [{ "node": "Publish Facebook", "type": "main", "index": 0 }],
+        [{ "node": "No More Jobs", "type": "main", "index": 0 }]
+      ]
+    },
+    "Publish Facebook": {
+      "main": [[{ "node": "Publish Instagram", "type": "main", "index": 0 }]]
+    },
+    "Publish Instagram": {
+      "main": [[{ "node": "Publish LinkedIn", "type": "main", "index": 0 }]]
+    },
+    "Publish LinkedIn": {
+      "main": [[{ "node": "Publish YouTube", "type": "main", "index": 0 }]]
+    },
+    "Publish YouTube": {
+      "main": [[{ "node": "Publish TikTok", "type": "main", "index": 0 }]]
+    },
+    "Publish TikTok": {
+      "main": [[{ "node": "Finalize Job", "type": "main", "index": 0 }]]
+    },
+    "Finalize Job": {
+      "main": [[{ "node": "Log to Audit Trail", "type": "main", "index": 0 }]]
+    },
+    "Log to Audit Trail": {
+      "main": [[{ "node": "Has Failures?", "type": "main", "index": 0 }]]
+    },
+    "Has Failures?": {
+      "main": [
+        [{ "node": "Send Alert", "type": "main", "index": 0 }],
+        [{ "node": "Claim Next Job", "type": "main", "index": 0 }]
+      ]
+    },
+    "Send Alert": {
+      "main": [[{ "node": "Claim Next Job", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "versionId": "the-reach-auto-publisher-v3"
+}

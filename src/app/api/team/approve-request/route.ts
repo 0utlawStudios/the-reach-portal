@@ -132,7 +132,7 @@ export async function POST(request: NextRequest) {
         await transporter.sendMail({
           from: getFromAddress(),
           to: req.email,
-          subject: `Your access to Ten80Ten has been approved!`,
+          subject: `Your access to The Reach has been approved!`,
           html: buildApprovalEmailHtml(req.name, role, confirmUrl),
         });
         emailSent = true;

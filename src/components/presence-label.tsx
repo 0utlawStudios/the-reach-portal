@@ -13,7 +13,7 @@
 // numeric value and fall back to the individual columns to label which
 // signal we believe.
 //
-// Times render in America/Chicago because Ten80Ten ops reports there.
+// Times render in America/Chicago because The Reach ops reports there.
 // Replace TIMEZONE below if your reporting tz differs.
 
 import { useEffect, useState } from "react";

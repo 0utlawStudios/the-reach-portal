@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
     const token = await getAccessToken();
 
     // Upload to Google Drive using multipart upload
-    const boundary = "ten80ten_" + Date.now();
+    const boundary = "the_reach_" + Date.now();
     const metadata = JSON.stringify({
       name: driveFileName,
       parents: [parentId],

@@ -1,11 +1,11 @@
 {
-  "name": "Ten80Ten SMM",
-  "short_name": "Ten80Ten",
-  "description": "Content Engine & Social Media Management for Ten80Ten",
+  "name": "The Reach",
+  "short_name": "The Reach",
+  "description": "Social media management for The Reach",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0a0a0e",
-  "theme_color": "#ea580c",
+  "background_color": "#E1DFD5",
+  "theme_color": "#975428",
   "orientation": "any",
   "icons": [
     {

@@ -82,7 +82,7 @@ describe("safeSubject — strips CR/LF and truncates", () => {
 
 describe("isValidEmail — strict single-address validation", () => {
   it("accepts a normal address", () => {
-    expect(isValidEmail("jane.cruz@ten80ten.com")).toBe(true);
+    expect(isValidEmail("jane.cruz@example.com")).toBe(true);
   });
 
   it("rejects an empty string", () => {
@@ -101,7 +101,7 @@ describe("isValidEmail — strict single-address validation", () => {
 
   it("rejects an over-long address (> 320 chars)", () => {
     const longLocal = "a".repeat(320);
-    expect(isValidEmail(`${longLocal}@ten80ten.com`)).toBe(false);
+    expect(isValidEmail(`${longLocal}@example.com`)).toBe(false);
   });
 
   it("rejects an address containing a comma (recipient-list smuggling)", () => {
@@ -130,19 +130,19 @@ describe("isValidEmail — strict single-address validation", () => {
 
 describe("safeRecipients — dedupe + drop invalid", () => {
   it("dedupes case-insensitively and lowercases the output", () => {
-    const out = safeRecipients(["Jane@Ten80Ten.com", "jane@ten80ten.com"]);
-    expect(out).toEqual(["jane@ten80ten.com"]);
+    const out = safeRecipients(["Jane@Example.com", "jane@example.com"]);
+    expect(out).toEqual(["jane@example.com"]);
   });
 
   it("drops invalid entries while keeping valid ones", () => {
     const out = safeRecipients([
-      "valid@ten80ten.com",
+      "valid@example.com",
       "",
       "bad,injection@x.com",
       "with\r\nnewline@x.com",
       "good@example.com",
     ]);
-    expect(out).toEqual(["valid@ten80ten.com", "good@example.com"]);
+    expect(out).toEqual(["valid@example.com", "good@example.com"]);
   });
 
   it("returns an empty array when every entry is invalid", () => {
@@ -154,7 +154,7 @@ describe("safeRecipients — dedupe + drop invalid", () => {
   });
 
   it("trims surrounding whitespace before dedupe comparison", () => {
-    const out = safeRecipients(["  jane@ten80ten.com  ", "jane@ten80ten.com"]);
-    expect(out).toEqual(["jane@ten80ten.com"]);
+    const out = safeRecipients(["  jane@example.com  ", "jane@example.com"]);
+    expect(out).toEqual(["jane@example.com"]);
   });
 });

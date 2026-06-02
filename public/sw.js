@@ -1,4 +1,4 @@
-// Ten80Ten SMM service worker.
+// The Reach service worker.
 //
 // History:
 // v2 (prior): intercepted EVERY GET including HTML navigation, and on network
@@ -12,10 +12,10 @@
 //   2. Skip /api/* — API calls always hit the network so auth + RLS + rate
 //      limits get evaluated server-side every time.
 //   3. The fetch catch ALWAYS returns a valid Response object. Never undefined.
-//   4. Stable cache name `ten80ten-smm-v3`. Old `ten80ten-smm-v${Date.now()}`
+//   4. Stable cache name `the-reach-v1`. Old date-stamped cache names
 //      caches get garbage-collected by the activate handler.
 
-const CACHE_NAME = "ten80ten-smm-v3";
+const CACHE_NAME = "the-reach-v1";
 
 self.addEventListener("install", () => {
   self.skipWaiting();

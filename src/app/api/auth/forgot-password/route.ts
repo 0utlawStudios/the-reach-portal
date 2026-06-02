@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
       await transporter.sendMail({
         from: getFromAddress(),
         to: cleanEmail,
-        subject: "Reset your Ten80Ten password",
+        subject: "Reset your password for The Reach",
         html: buildPasswordResetEmailHtml(confirmUrl),
       });
     } catch (emailErr: unknown) {

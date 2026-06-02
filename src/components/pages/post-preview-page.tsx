@@ -13,9 +13,9 @@ function InstagramPreview({ card }: { card: ContentCard }) {
     <div className="max-w-full overflow-x-auto"><div className="w-full max-w-[400px] mx-auto bg-white rounded-xl overflow-hidden border border-gray-200 shadow-lg">
       <div className="flex items-center gap-2.5 px-3 py-2.5">
         <div className="w-8 h-8 rounded-full bg-white ring-1 ring-gray-200 overflow-hidden flex items-center justify-center shrink-0">
-          <RawImage src="/ten80ten-logo.png" alt="Ten80Ten" className="w-[80%] h-[80%] object-contain" />
+          <RawImage src="/the-reach-logo.png" alt="The Reach" className="w-[80%] h-[80%] object-contain" />
         </div>
-        <div className="flex-1"><p className="text-[11px] font-semibold text-gray-900" style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}>ten80ten</p><p className="text-[10px] text-gray-400">Sponsored</p></div>
+        <div className="flex-1"><p className="text-[11px] font-semibold text-gray-900" style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}>The Reach</p><p className="text-[10px] text-gray-400">Sponsored</p></div>
         <MoreHorizontal className="w-4 h-4 text-gray-400" />
       </div>
       <div className="aspect-square w-full bg-gray-100"><RawImage src={card.thumbnailUrl} alt="" className="w-full h-full object-cover" /></div>
@@ -26,7 +26,7 @@ function InstagramPreview({ card }: { card: ContentCard }) {
         </div>
         <p className="text-[12px] font-semibold text-gray-900 mb-0.5" style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}>2,847 likes</p>
         <p className="text-[12px] text-gray-900 leading-relaxed" style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}>
-          <span className="font-semibold">ten80ten</span>{" "}{card.caption || "No caption yet..."}
+          <span className="font-semibold">The Reach</span>{" "}{card.caption || "No caption yet..."}
         </p>
       </div>
     </div></div>
@@ -38,9 +38,9 @@ function FacebookPreview({ card }: { card: ContentCard }) {
     <div className="max-w-full overflow-x-auto"><div className="w-full max-w-[400px] mx-auto bg-white rounded-xl overflow-hidden border border-gray-200 shadow-lg">
       <div className="p-3 flex items-center gap-2.5">
         <div className="w-10 h-10 rounded-full bg-white ring-1 ring-gray-200 overflow-hidden flex items-center justify-center shrink-0">
-          <RawImage src="/ten80ten-logo.png" alt="Ten80Ten" className="w-[80%] h-[80%] object-contain" />
+          <RawImage src="/the-reach-logo.png" alt="The Reach" className="w-[80%] h-[80%] object-contain" />
         </div>
-        <div><p className="text-[13px] font-semibold text-gray-900">Ten80Ten</p><p className="text-[11px] text-gray-500">Just now · 🌍</p></div>
+        <div><p className="text-[13px] font-semibold text-gray-900">The Reach</p><p className="text-[11px] text-gray-500">Just now · 🌍</p></div>
       </div>
       <p className="px-3 pb-2 text-[13px] text-gray-800 leading-relaxed">{card.caption || "No caption..."}</p>
       <div className="aspect-video w-full bg-gray-100"><RawImage src={card.thumbnailUrl} alt="" className="w-full h-full object-cover" /></div>
@@ -67,9 +67,9 @@ function YouTubePreview({ card }: { card: ContentCard }) {
       </div>
       <div className="p-3 flex gap-3">
         <div className="w-9 h-9 rounded-full bg-white ring-1 ring-gray-200 overflow-hidden flex items-center justify-center shrink-0">
-          <RawImage src="/ten80ten-logo.png" alt="Ten80Ten" className="w-[80%] h-[80%] object-contain" />
+          <RawImage src="/the-reach-logo.png" alt="The Reach" className="w-[80%] h-[80%] object-contain" />
         </div>
-        <div><p className="text-[13px] font-medium text-gray-900 line-clamp-2 leading-tight">{card.title}</p><p className="text-[11px] text-gray-500 mt-1">Ten80Ten · 1.2K views · 2 hours ago</p></div>
+        <div><p className="text-[13px] font-medium text-gray-900 line-clamp-2 leading-tight">{card.title}</p><p className="text-[11px] text-gray-500 mt-1">The Reach · 1.2K views · 2 hours ago</p></div>
       </div>
     </div></div>
   );
@@ -80,9 +80,9 @@ function LinkedInPreview({ card }: { card: ContentCard }) {
     <div className="max-w-full overflow-x-auto"><div className="w-full max-w-[400px] mx-auto bg-white rounded-xl overflow-hidden border border-gray-200 shadow-lg">
       <div className="p-3 flex items-center gap-3">
         <div className="w-12 h-12 rounded-full bg-white ring-1 ring-gray-200 overflow-hidden flex items-center justify-center shrink-0">
-          <RawImage src="/ten80ten-logo.png" alt="Ten80Ten" className="w-[80%] h-[80%] object-contain" />
+          <RawImage src="/the-reach-logo.png" alt="The Reach" className="w-[80%] h-[80%] object-contain" />
         </div>
-        <div><p className="text-[13px] font-semibold text-gray-900">Ten80Ten</p><p className="text-[11px] text-gray-500">2,400 followers · 2h</p></div>
+        <div><p className="text-[13px] font-semibold text-gray-900">The Reach</p><p className="text-[11px] text-gray-500">2,400 followers · 2h</p></div>
       </div>
       <p className="px-3 pb-2 text-[13px] text-gray-800 leading-relaxed">{card.caption || "No caption..."}</p>
       <div className="aspect-video w-full bg-gray-100"><RawImage src={card.thumbnailUrl} alt="" className="w-full h-full object-cover" /></div>
@@ -107,7 +107,7 @@ function TikTokPreview({ card }: { card: ContentCard }) {
       <div className="absolute bottom-0 left-0 right-14 p-4">
         <p className="text-[13px] font-bold text-white mb-1">@teneightyten</p>
         <p className="text-[11px] text-white/90 line-clamp-3 leading-relaxed">{card.caption || "No caption..."}</p>
-        <div className="flex items-center gap-2 mt-2"><div className="w-4 h-4 rounded-full bg-white/20" /><p className="text-[10px] text-white/70">Original Sound - Ten80Ten</p></div>
+        <div className="flex items-center gap-2 mt-2"><div className="w-4 h-4 rounded-full bg-white/20" /><p className="text-[10px] text-white/70">Original Sound - The Reach</p></div>
       </div>
       <div className="absolute right-3 bottom-20 flex flex-col items-center gap-5">
         {[{ icon: Heart, label: "24.5K" }, { icon: MessageCircle, label: "312" }, { icon: Bookmark, label: "1.2K" }, { icon: Share2, label: "489" }].map(({ icon: Icon, label }) => (

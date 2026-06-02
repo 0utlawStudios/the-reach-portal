@@ -9,34 +9,36 @@ const inter = Inter({
   display: "swap",
 });
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+
 export const metadata: Metadata = {
-  metadataBase: new URL("https://smm.ten80ten.com"),
-  title: "Ten80Ten SMM",
-  description: "Content Engine & Social Media Management for Ten80Ten",
+  metadataBase: new URL(siteUrl),
+  title: "The Reach",
+  description: "Social media management for The Reach",
   manifest: "/manifest.json",
   icons: {
     icon: "/favicon.ico",
     apple: "/icon-192.png",
   },
   openGraph: {
-    title: "Ten80Ten SMM",
-    description: "Content Engine & Social Media Management for Ten80Ten",
-    url: "https://smm.ten80ten.com",
-    siteName: "Ten80Ten",
-    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "Ten80Ten SMM" }],
+    title: "The Reach",
+    description: "Social media management for The Reach",
+    url: siteUrl,
+    siteName: "The Reach",
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "The Reach" }],
     type: "website",
   },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Ten80Ten SMM",
+    title: "The Reach",
   },
 };
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f8f9fb" },
-    { media: "(prefers-color-scheme: dark)", color: "#0a0a0e" },
+    { media: "(prefers-color-scheme: light)", color: "#E1DFD5" },
+    { media: "(prefers-color-scheme: dark)", color: "#6C655A" },
   ],
   width: "device-width",
   initialScale: 1,

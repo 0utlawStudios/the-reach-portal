@@ -98,7 +98,7 @@ function DashboardLayout() {
                 <TopBar onMenuClick={() => setMobileOpen(true)} />
                 <PageContent />
                 <div className="h-8 flex items-center justify-center border-t border-gray-100 dark:border-white/[0.04] bg-white dark:bg-[#111] shrink-0">
-                  <p className="text-[10px] text-gray-400 dark:text-gray-600">Ten80Ten Social Media Management Platform &copy; 2026</p>
+                  <p className="text-[10px] text-gray-400 dark:text-gray-600">The Reach &copy; 2026</p>
                 </div>
               </main>
               <AssetReviewDrawer />
@@ -185,7 +185,7 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
   void canAccessStudio;
   const NAV_ITEMS = [
     { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" />, section: "plan" },
-    { id: "pipeline", label: "Content Engine", icon: <Kanban className="w-4 h-4" />, section: "plan" },
+    { id: "pipeline", label: "The Reach", icon: <Kanban className="w-4 h-4" />, section: "plan" },
     { id: "studio", label: "Creator Studio", icon: <Sparkles className="w-4 h-4" />, section: "plan" },
     { id: "calendar", label: "Content Calendar", icon: <CalendarDays className="w-4 h-4" />, section: "plan" },
     { id: "preview", label: "Post Preview", icon: <Eye className="w-4 h-4" />, section: "publish" },
@@ -207,7 +207,7 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
       <>
         {/* Logo */}
         <div className="relative flex items-center justify-center h-[60px] px-4 shrink-0">
-          <RawImage src="/ten80ten-logo.png" alt="Ten80Ten" className={`${expanded ? "w-[48px]" : "w-7"} h-auto object-contain`} />
+          <RawImage src="/the-reach-logo.png" alt="The Reach" className={`${expanded ? "w-[48px]" : "w-7"} h-auto object-contain`} />
           {isMobile && (
             <button className="absolute right-3 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-400 cursor-pointer" onClick={closeMobile}>
               <ChevronLeft className="w-4 h-4" />
