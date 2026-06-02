@@ -1,8 +1,8 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: pending Reach profile/role sync hardening
-Next: Push this slice, verify Vercel production, then continue support/revision/media hardening.
+Last pushed SHA: c9003d3 Reach profile/role sync hardening
+Next: Verify Vercel production for this SHA, then continue support/revision/media hardening.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
 
 Reach profile / role sync hardening slice notes:
