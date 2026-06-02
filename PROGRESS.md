@@ -1,8 +1,8 @@
 # The Reach Clone Progress
 
-Phase: Phase 2 slice 5 in progress - auth/domain/env hardening for The Reach
-Last SHA: 7fd060a
-Next: Commit and push the auth/domain/env hardening slice, run final preflight, deploy production to Vercel, rerun production health where the domain allows it, and write `CHANGES-the-reach.md`.
+Phase: Phase 2 slice 5 complete - auth/domain/env hardening for The Reach
+Last SHA: c1ef747
+Next: Push the auth/domain/env hardening slice, run final preflight, deploy production to Vercel, rerun production health where the domain allows it, and write `CHANGES-the-reach.md`.
 Blockers: Production `https://thereach.ten80ten.com` is not reachable yet because Vercel still reports domain ownership verification required/no access under `0utlawstudios-projects`. `supabase db diff --linked` and `supabase status` cannot run locally because Docker is not running. `supabase db push --dry-run --include-all --yes` previously reported the remote database is up to date.
 
 Auth/domain/env hardening slice notes:
