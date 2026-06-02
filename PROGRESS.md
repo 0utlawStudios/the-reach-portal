@@ -1,8 +1,8 @@
 # The Reach Clone Progress
 
-Phase: AUTH FIX - forgot-password clone recovery bridge committed
-Last SHA: d0a4af7 auth fix commit
-Next: Push the forgot-password fix, wait for Vercel production deployment, trigger `aldridge@ten80ten.com` self-service setup email, then verify Auth user/workspace activation path.
+Phase: DONE - forgot-password clone recovery bridge deployed and verified
+Last SHA: d0a4af7 auth fix commit; latest docs commit records deployment state
+Next: `aldridge@ten80ten.com` must open the setup email and complete `/auth/setup`; that will activate the baseline `workspace_members` row.
 Blockers: None for the forgot-password fix. `supabase db diff --linked` and `supabase status` cannot run locally because Docker is not running. `supabase db push --dry-run --include-all --yes` previously reported the remote database is up to date.
 
 Forgot-password/auth-user clone fix notes:
@@ -13,6 +13,11 @@ Forgot-password/auth-user clone fix notes:
 - Unknown emails still return the same `{ success: true }` response and do not create Auth users, preserving the anti-enumeration behavior.
 - Recovery and invite token hashes are URL-encoded before being placed in `/auth/confirm`.
 - Verification passed: focused forgot-password tests, auth setup tests, resend-invite tests, setup-flow static tests, and full `npm run preflight` with 202 tests and production build. A post-hardening focused forgot-password run passed 4 tests.
+- Pushed to `origin/main`; Vercel deployed production `dpl_GgP5iCDvKEyZPKgAg8U36oq9kygb` and aliased `https://thereach.ten80ten.com`.
+- Production `/api/auth/forgot-password` was triggered for `aldridge@ten80ten.com` and returned `{ success: true }`.
+- Vercel logs show the forgot-password POST and no error-level logs for the deployment after the request.
+- Supabase now has one Auth user for `aldridge@ten80ten.com` with `superadmin` metadata. Email is unconfirmed and `workspace_members` is still absent until setup completion, which is the expected pre-click state.
+- Production `/api/health/deep-check` returned HTTP 200 with 30 passed, 10 warnings, and 0 failures after the auth fix deployment.
 
 Deployment/final verification notes:
 

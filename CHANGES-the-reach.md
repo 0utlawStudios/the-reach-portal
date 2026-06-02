@@ -32,10 +32,12 @@
 - Full test suite passed: 21 files, 202 tests.
 - Focused forgot-password tests passed for existing Auth reset, active team-member setup recovery, partial Auth-user retry, and unknown-email anti-enumeration.
 - Build passed locally and on Vercel.
+- Forgot-password fix deployed to Vercel production `dpl_GgP5iCDvKEyZPKgAg8U36oq9kygb`; production POST `/api/auth/forgot-password` for `aldridge@ten80ten.com` returned success and produced no error-level Vercel logs.
+- Supabase Auth now contains the `aldridge@ten80ten.com` user with `superadmin` metadata. Workspace activation is expected after the setup link is opened and `/auth/setup` is completed.
 - Hosted Supabase SQL audit passed: 33 migrations, RLS on protected tables, post safety/publisher triggers, buckets, Realtime, baseline workspace, and superadmin.
 - Production deep health returned HTTP 200 against new Supabase/Drive/SMTP env: 30 pass, 10 warnings, 0 failures, health score 88/100.
 - Local Chrome CDP visual QA passed for desktop/mobile login, forgot-password, and request-access.
 
 ## Final Status
 
-- `https://thereach.ten80ten.com` is live and serving the latest Vercel production deployment. The Vercel CLI still cannot inspect the domain ownership object directly, but `vercel inspect thereach.ten80ten.com`, HTTPS, and production health all verify the app is live.
+- `https://thereach.ten80ten.com` is live and serving the latest Vercel production deployment with the forgot-password recovery bridge.
