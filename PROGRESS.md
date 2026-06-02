@@ -1,9 +1,9 @@
 # The Reach Clone Progress
 
-Phase: Phase 1 plan
-Last SHA: pending Phase 1 commit
-Next: Commit `PLAN-the-reach.md`, then reset Git origin to `0utlawStudios/the-reach-portal`.
-Blockers: None for Phase 1. Creator Studio/OpenAI keys are absent in the provided The Reach env, so execution will set `STUDIO_ENABLED=false` unless real values are discovered.
+Phase: Phase 2 slice 1 complete - Git remote reset
+Last SHA: caf3427
+Next: Configure The Reach env, link Supabase project `gxmpmdhmxyfqusdzcemt`, push all migrations, create `ai-assets`, enable Realtime, and verify RLS/triggers/buckets.
+Blockers: None for Git. Creator Studio/OpenAI keys are absent in the provided The Reach env, so execution will set `STUDIO_ENABLED=false` unless real values are discovered.
 
 Safety notes:
 
