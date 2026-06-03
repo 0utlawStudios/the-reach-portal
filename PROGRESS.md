@@ -1,9 +1,9 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed functional SHA: fbd198c fix: harden auth audit avatar boundaries
-Last verified tracking SHA: 2801590 docs: record auth boundary hardening
-Next: Continue pipeline realtime/notification hardening and production QA.
+Last pushed functional SHA: 03218aa fix: harden pipeline notification boundaries
+Last verified tracking SHA: 1ee4e8f docs: record auth hardening deployment
+Next: Verify GitHub/Vercel for `03218aa`, then run production QA on live auth/invite/request/support/drag/health.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
 
 Auth audit/avatar boundary hardening slice notes:
@@ -23,6 +23,18 @@ Auth audit/avatar boundary hardening slice notes:
 - Pushed functional commit `fbd198c` and tracking commit `2801590` to `origin/main`.
 - GitHub CI passed for `2801590`; Vercel production deployment `https://the-reach-portal-6k7uvq29d-0utlawstudios-projects.vercel.app` is ready and serving the live domain.
 - Production health after deploy passed: `https://thereach.ten80ten.com/api/health/keep-alive` returned HTTP 200 and `https://thereach.ten80ten.com/api/health/deep-check` returned HTTP 200 with 0 failures and 0 warnings.
+
+Pipeline notification boundary hardening slice notes:
+
+- Touched `src/lib/pipeline-context.tsx` only after rechecking the AGENTS iron-law requirements: provision still happens before posts SELECT, empty DB arrays remain valid, every post insert still carries `workspace_id`, and UUID guards remain in place for id-keyed writes.
+- Fixed the create-card realtime race: when a Supabase INSERT echo arrives before the insert promise resolves, the temp card and real UUID are now reconciled idempotently instead of leaving duplicate cards.
+- Added `src/app/api/notifications/_shared.ts` so approved, awaiting-approval, revision, and mention notification routes all require an active workspace member via `requireBearerTeamRole`.
+- Hardened notification routes to validate post UUIDs and load the canonical post by `id + workspace_id` before sending email or writing audit rows.
+- Notification routes now derive actor display names and creator/recipient data server-side from `team_members`; browser-supplied `postTitle`, `createdBy`, `approvedBy`, `movedBy`, `requestedBy`, `authorName`, and `authorEmail` are no longer trusted as authoritative.
+- Notification audit rows now pass `p_workspace_id: ctx.workspaceId`.
+- Added static regression coverage for create-card temp/real-id reconciliation and active-workspace notification route guards.
+- Verification passed locally: focused pipeline/notification tests (44), `git diff --check`, `npm run typecheck`, `npm run lint` with the existing AI worker warning only, full `npm test` with 29 files / 259 tests, and `npm run build`.
+- Pushed functional commit `03218aa` to `origin/main`; GitHub CI and Vercel deployment verification are pending.
 
 Team request lifecycle hardening slice notes:
 
