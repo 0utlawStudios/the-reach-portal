@@ -20,6 +20,8 @@ const TEAM_ACCESS_REALTIME_MIGRATION_SRC = readFileSync(join(process.cwd(), "sup
 const AUDIT_ACTOR_CLEANUP_MIGRATION_SRC = readFileSync(join(process.cwd(), "supabase/migrations/0038_reach_launch_audit_actor_cleanup.sql"), "utf8");
 const AUDIT_ACTOR_NORMALIZATION_MIGRATION_SRC = readFileSync(join(process.cwd(), "supabase/migrations/0039_reach_cleanup_audit_actor_normalization.sql"), "utf8");
 const AUTH_AUDIT_AVATAR_MIGRATION_SRC = readFileSync(join(process.cwd(), "supabase/migrations/0041_auth_audit_avatar_hardening.sql"), "utf8");
+const THEME_PREFERENCE_MIGRATION_SRC = readFileSync(join(process.cwd(), "supabase/migrations/0042_team_theme_preference.sql"), "utf8");
+const THEME_CONTEXT_SRC = readFileSync(join(process.cwd(), "src/lib/theme-context.tsx"), "utf8");
 
 describe("invite setup flow hardening", () => {
   it("activates invitations through the server route, not a client-side team_members update", () => {
@@ -103,6 +105,14 @@ describe("Supabase IO hardening", () => {
     expect(AUDIT_ACTOR_CLEANUP_MIGRATION_SRC).toContain("to_jsonb('SYSTEM'::text)");
     expect(AUDIT_ACTOR_NORMALIZATION_MIGRATION_SRC).toContain("'Removed alex@ten80ten.com from team, workspace access, and auth'");
     expect(AUDIT_ACTOR_NORMALIZATION_MIGRATION_SRC).toContain("to_jsonb('SYSTEM'::text)");
+  });
+
+  it("keeps default light mode backed by a real team_members preference column", () => {
+    expect(THEME_CONTEXT_SRC).toContain("return \"light\"");
+    expect(THEME_CONTEXT_SRC).toContain("theme_preference");
+    expect(THEME_PREFERENCE_MIGRATION_SRC).toContain("add column if not exists theme_preference text");
+    expect(THEME_PREFERENCE_MIGRATION_SRC).toContain("set default 'light'");
+    expect(THEME_PREFERENCE_MIGRATION_SRC).toContain("check (theme_preference in ('light', 'dark'))");
   });
 });
 
