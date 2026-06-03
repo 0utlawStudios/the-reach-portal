@@ -1,5 +1,7 @@
 # The Reach Clone Changes
 
+Latest slice: team request lifecycle hardening is pushed as `fc70b21`. Request-access no longer leaks whether an email is already on the team or already pending, `signup_requests.workspace_id` is now baseline-scoped and `NOT NULL`, admins cannot remove admin-level users, and the last active superadmin cannot be removed. Production audit rows for launch cleanup removals were rechecked and return `SYSTEM`. Verification passed `supabase db push --yes`, focused tests, `git diff --check`, `npm run typecheck`, `npm run lint`, full `npm test`, and `npm run build`.
+
 Latest slice: Drive media access is hardened. Stream fallback is limited to app-known/app-managed Drive files, finalize verifies Drive parent folders before public permissions, and proxy upload rejects files above 4 MB before buffering. Verification passed focused Drive tests, `npm run typecheck`, `git diff --check`, `npm run lint`, full `npm test`, and `npm run build`.
 
 Latest slice: pipeline realtime and notification hardening now drives posts Realtime from resolved workspace state, applies Supabase UPDATE payloads as canonical, rejects revision kickbacks for temporary post IDs, and sends protected notification routes with bearer auth plus response checks. Verification passed focused iron-law tests, `npm run typecheck`, `git diff --check`, `npm run lint`, full `npm test`, and `npm run build`.
@@ -8,6 +10,10 @@ Latest slice: audit cleanup actor normalization now resolves known cloned/test l
 
 ## Edited
 
+- Team removal hierarchy: `/api/team/remove-member` now blocks admin-level removal by non-superadmins, prevents deleting the last active superadmin, and preserves the existing stale id/email and self-removal safeguards.
+- Request-access anti-enumeration: existing team emails and duplicate pending requests now return a generic received response instead of exposing team/request state to unauthenticated callers.
+- Signup request workspace hardening: migration `0040` backfills `signup_requests.workspace_id`, sets the baseline default, enforces `NOT NULL`, and uses a workspace-scoped admin SELECT policy.
+- Audit actor verification: production `v_audit_log_with_actor` now returns `SYSTEM` for the launch cleanup member-removal rows shown in the Settings audit screenshot.
 - Auth access revalidation: authenticated sessions now re-check team/workspace access on same-user token refresh, focus, visibility recovery, and a 60-second visible-tab interval so revoked/pending users do not keep stale workspace access until manual reload.
 - Team/request Realtime invalidation: Settings now subscribes to `team_members` and `signup_requests` changes and reloads through the normal RLS-protected SELECT paths.
 - Supabase Realtime access contract: added and applied migration `0037_reach_team_access_realtime.sql`; production now publishes `team_members` and `signup_requests` with full replica identity.

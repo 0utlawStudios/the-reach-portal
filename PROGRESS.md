@@ -1,9 +1,21 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: 897571c fix: harden drive media access
-Next: Fix team removal hierarchy, request-access enumeration/null-workspace gaps, then continue UI/accessibility and full production QA.
+Last pushed SHA: fc70b21 fix: harden team request lifecycle
+Next: Verify GitHub/Vercel deployment for `fc70b21`, then continue UI/accessibility and full production QA.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
+
+Team request lifecycle hardening slice notes:
+
+- Treated the latest audit screenshot as an additive verification item, not a redirect from the active goal.
+- Re-verified production Supabase directly: the launch cleanup member-removal rows for Shang, Hanes, Christer, Muaaz, Carlo, and Alex now return `actor_name: SYSTEM` and `metadata.user_name: SYSTEM` from `v_audit_log_with_actor`.
+- Confirmed the app still has the defensive audit display guard for both `Reach launch cleanup removed ...` and older `Removed <email> from team, workspace access, and auth` cleanup formats.
+- Added migration `0040_signup_requests_workspace_hardening.sql`; production Supabase is up to date and remote migration list includes `0040`.
+- Hardened `signup_requests.workspace_id`: backfilled null values to the baseline workspace, added a baseline default, set the column `NOT NULL`, and recreated the admin SELECT policy with workspace-scoped membership.
+- Hardened `/api/team/request-access`: existing team emails and duplicate pending requests now return a generic received response instead of leaking membership/request status; the duplicate lookup is scoped to the baseline workspace.
+- Hardened `/api/team/remove-member`: admins cannot remove admin-level members, superadmins cannot remove the last active superadmin, stale id/email mismatches still fail before cleanup, and self-removal remains blocked.
+- Verification passed: `supabase db push --yes`, focused team/request tests, `git diff --check`, `npm run typecheck`, `npm run lint` with one existing AI worker warning, full `npm test` with 29 files / 253 tests, and `npm run build`.
+- Pushed commit `fc70b21` to `origin/main`; GitHub/Vercel deployment verification is next.
 
 QA swarm / audit normalization slice notes:
 
