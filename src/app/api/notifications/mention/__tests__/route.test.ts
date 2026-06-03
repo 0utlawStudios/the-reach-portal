@@ -10,24 +10,24 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextResponse } from "next/server";
 
-// ── Mock the auth helper. requireBearerUser returns either { user } or a
+// ── Mock the auth helper. requireBearerTeamRole returns either { user } or a
 // NextResponse (the 401 to return directly). `authMode` flips per test. ────
 let authMode: "unauth" | "ok";
 vi.mock("@/lib/auth/require", () => ({
-  requireBearerUser: vi.fn(() => {
+  requireBearerTeamRole: vi.fn(() => {
     if (authMode === "unauth") {
       return Promise.resolve(
         NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
       );
     }
-    return Promise.resolve({ user: { id: "user-1", email: "caller@example.com" } });
+    return Promise.resolve({ user: { id: "user-1", email: "caller@example.com" }, email: "caller@example.com", role: "admin", workspaceId: "workspace-1" });
   }),
 }));
 
 // Supabase admin client — only reached after auth passes.
 function makeQuery() {
   const builder: Record<string, unknown> = {};
-  for (const m of ["select", "ilike", "in"]) builder[m] = vi.fn(() => builder);
+  for (const m of ["select", "eq", "ilike", "in"]) builder[m] = vi.fn(() => builder);
   builder.maybeSingle = vi.fn(() => Promise.resolve({ data: null, error: null }));
   // `.in(...)` is awaited directly for the mentioned-members lookup.
   builder.then = (resolve: (v: unknown) => unknown) =>

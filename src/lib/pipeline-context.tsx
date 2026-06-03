@@ -845,16 +845,33 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
           // Rollback: the row was never persisted, so remove the local tempId
           // card to keep UI honest. Surface the failure to the user.
           setCards((prev) => prev.filter((c) => c.id !== tempId));
+          recentMutations.current.delete(tempId);
           addToast(`Save failed: ${error.message}. Card was not created.`, "error");
         } else if (data) {
-          setCards((prev) => prev.map((c) => c.id === tempId ? { ...c, id: data.id } : c));
+          const savedCard = dbToCard(data as PostRow);
+          setCards((prev) => {
+            let inserted = false;
+            const next: ContentCard[] = [];
+            for (const existing of prev) {
+              if (existing.id === tempId || existing.id === savedCard.id) {
+                if (!inserted) {
+                  next.push(savedCard);
+                  inserted = true;
+                }
+                continue;
+              }
+              next.push(existing);
+            }
+            return inserted ? next : [savedCard, ...next];
+          });
           // Remap an open drawer's selectedCard from the temp id to the real
           // UUID too. Without this, every subsequent save from that drawer
           // fails the isValidUuid guard and is silently skipped (DATA-005).
-          setSelectedCard((prev) => prev?.id === tempId ? { ...prev, id: data.id } : prev);
+          setSelectedCard((prev) => (prev?.id === tempId || prev?.id === savedCard.id ? savedCard : prev));
           // Also mark the real id so the realtime INSERT echo (which will
           // arrive with the real UUID) is suppressed.
-          markMutation(data.id);
+          recentMutations.current.delete(tempId);
+          markMutation(savedCard.id);
         }
       });
     }

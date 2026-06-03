@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getTransporter, getFromAddress, safeSubject, buildRevisionEmailHtml } from "@/lib/email-utils";
 import { consume, getClientIp } from "@/lib/rate-limit";
-import { requireBearerUser } from "@/lib/auth/require";
+import { loadCallerProfile, loadMemberByCreatorKey, loadWorkspacePost, requireNotificationContext } from "../_shared";
 
 export const maxDuration = 10;
 
@@ -16,17 +16,17 @@ function getAdminClient() {
 
 interface RevisionRequest {
   postId: string;
-  postTitle: string;
   revisionNote: string;
-  requestedBy: string;
+  postTitle?: string;
+  requestedBy?: string;
   createdBy?: string;
 }
 
 export async function POST(request: NextRequest) {
   try {
     // SEC-012: Authenticate the caller and derive `requestedBy` server-side.
-    const auth = await requireBearerUser(request);
-    if (auth instanceof NextResponse) return auth;
+    const ctx = await requireNotificationContext(request);
+    if (ctx instanceof NextResponse) return ctx;
 
     // Rate limit: 10 per minute per IP.
     const ip = getClientIp(request);
@@ -36,44 +36,40 @@ export async function POST(request: NextRequest) {
     }
 
     const body: RevisionRequest = await request.json();
-    if (!body.postId || !body.postTitle || !body.revisionNote) {
+    if (!body.postId || !body.revisionNote) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
     const admin = getAdminClient();
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+    const post = await loadWorkspacePost<{ id: string; title?: string | null; created_by?: string | null }>(
+      admin,
+      body.postId,
+      ctx.workspaceId,
+      "id, title, created_by",
+    );
+    if (post instanceof NextResponse) return post;
+    const postTitle = post.title || "Post";
 
     // SEC-012: Trust the authenticated caller's identity, not the body.
-    // SEC-010: `.eq` — callerEmail is already lowercased; `.ilike` would let
-    // wildcard chars in a crafted email act as SQL patterns.
-    const callerEmail = (auth.user.email || "").toLowerCase();
-    const { data: callerRow } = await admin
-      .from("team_members")
-      .select("name, email")
-      .eq("email", callerEmail)
-      .maybeSingle();
-    const requestedBy = (callerRow?.name as string) || auth.user.email || "Reviewer";
-    const requesterEmail = (callerRow?.email as string) || auth.user.email || "";
+    const caller = await loadCallerProfile(admin, ctx.email);
+    const requestedBy = caller.name || "Reviewer";
+    const requesterEmail = caller.email;
 
     const recipients: string[] = [];
 
     // Find the Creator's email
-    if (body.createdBy) {
-      const { data: creator } = await admin
-        .from("team_members")
-        .select("email")
-        .eq("name", body.createdBy)
-        .maybeSingle();
-      if (creator?.email && creator.email !== requesterEmail) {
-        recipients.push(creator.email);
-      }
+    const creator = await loadMemberByCreatorKey(admin, post.created_by || body.createdBy);
+    if (creator?.email && creator.email !== requesterEmail) {
+      recipients.push(creator.email);
     }
 
     // Find all Creative Directors and Approvers
     const { data: directors } = await admin
       .from("team_members")
       .select("email, role")
-      .in("role", ["creative_director", "approver"]);
+      .in("role", ["creative_director", "approver"])
+      .eq("status", "active");
 
     if (directors) {
       for (const d of directors) {
@@ -93,14 +89,14 @@ export async function POST(request: NextRequest) {
     if (smtpConfigured) {
       const transporter = getTransporter();
 
-      const htmlEmail = buildRevisionEmailHtml(body.postTitle, body.revisionNote, requestedBy, siteUrl);
+      const htmlEmail = buildRevisionEmailHtml(postTitle, body.revisionNote, requestedBy, siteUrl);
 
       for (const email of recipients) {
         try {
           await transporter.sendMail({
             from: getFromAddress(),
             to: email,
-            subject: safeSubject(`Revision Requested: "${body.postTitle}"`),
+            subject: safeSubject(`Revision Requested: "${postTitle}"`),
             html: htmlEmail,
           });
           sent++;
@@ -115,6 +111,7 @@ export async function POST(request: NextRequest) {
       p_entity_type: "post",
       p_action: "revision_requested",
       p_entity_id: body.postId,
+      p_workspace_id: ctx.workspaceId,
       p_metadata: { user_name: requestedBy, details: `Notified: ${recipients.join(", ")}. Note: ${body.revisionNote.slice(0, 100)}` },
     });
 

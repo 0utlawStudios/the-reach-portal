@@ -20,6 +20,13 @@ const PIPELINE_SRC = readFileSync(PIPELINE_PATH, "utf8");
 const ASSET_DRAWER_SRC = readFileSync(join(process.cwd(), "src/components/asset-review-drawer.tsx"), "utf8");
 const CONTENT_CARD_SRC = readFileSync(join(process.cwd(), "src/components/content-card.tsx"), "utf8");
 const AUDIT_SRC = readFileSync(join(process.cwd(), "src/lib/audit.ts"), "utf8");
+const NOTIFICATIONS_SHARED_SRC = readFileSync(join(process.cwd(), "src/app/api/notifications/_shared.ts"), "utf8");
+const NOTIFICATION_ROUTE_SRCS = [
+  "approved",
+  "awaiting-approval",
+  "mention",
+  "revision",
+].map((name) => readFileSync(join(process.cwd(), `src/app/api/notifications/${name}/route.ts`), "utf8"));
 
 /** Recursively collect every *.ts / *.tsx file under a directory. */
 function walkSourceFiles(dir: string): string[] {
@@ -215,6 +222,23 @@ describe("iron-law guards in pipeline-context.tsx", () => {
     expect(ASSET_DRAWER_SRC).toContain("headers.Authorization = `Bearer ${accessToken}`");
     expect(ASSET_DRAWER_SRC).toContain("if (!res.ok)");
     expect(ASSET_DRAWER_SRC).toContain("[asset-review-drawer] mention notify failed");
+  });
+
+  it("reconciles createCard temp IDs idempotently when realtime insert echoes first", () => {
+    expect(PIPELINE_SRC).toContain("const savedCard = dbToCard(data as PostRow)");
+    expect(PIPELINE_SRC).toContain("existing.id === tempId || existing.id === savedCard.id");
+    expect(PIPELINE_SRC).toContain("return inserted ? next : [savedCard, ...next]");
+    expect(PIPELINE_SRC).toContain("recentMutations.current.delete(tempId)");
+  });
+
+  it("notification APIs require active workspace access and verify the post belongs to that workspace", () => {
+    expect(NOTIFICATIONS_SHARED_SRC).toContain("requireBearerTeamRole(request, ACTIVE_NOTIFICATION_ROLES)");
+    expect(NOTIFICATIONS_SHARED_SRC).toContain(".eq(\"workspace_id\", workspaceId)");
+    for (const src of NOTIFICATION_ROUTE_SRCS) {
+      expect(src).toContain("requireNotificationContext(request)");
+      expect(src).toContain("loadWorkspacePost");
+      expect(src).toContain("p_workspace_id: ctx.workspaceId");
+    }
   });
 });
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getTransporter, getFromAddress, esc, safeSubject } from "@/lib/email-utils";
 import { consume, getClientIp } from "@/lib/rate-limit";
-import { requireBearerUser } from "@/lib/auth/require";
+import { loadCallerProfile, loadWorkspacePost, requireNotificationContext } from "../_shared";
 
 export const maxDuration = 10;
 
@@ -22,10 +22,10 @@ function extractMentions(text: string): string[] {
 
 interface MentionRequest {
   comment: string;
-  postTitle: string;
   postId: string;
-  authorName: string;
-  authorEmail: string;
+  postTitle?: string;
+  authorName?: string;
+  authorEmail?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -33,8 +33,8 @@ export async function POST(request: NextRequest) {
     // SEC-012: Require an authenticated caller. The previous IP rate-limit
     // alone allowed any anonymous client to enumerate team_members via
     // crafted @mentions and to send emails on behalf of impersonated names.
-    const auth = await requireBearerUser(request);
-    if (auth instanceof NextResponse) return auth;
+    const ctx = await requireNotificationContext(request);
+    if (ctx instanceof NextResponse) return ctx;
 
     // Rate limit: 10 per minute per IP.
     const ip = getClientIp(request);
@@ -45,24 +45,25 @@ export async function POST(request: NextRequest) {
 
     const body: MentionRequest = await request.json();
 
-    if (!body.comment || !body.postTitle) {
+    if (!body.comment || !body.postId) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
     const admin = getAdminClient();
+    const post = await loadWorkspacePost<{ id: string; title?: string | null }>(
+      admin,
+      body.postId,
+      ctx.workspaceId,
+      "id, title",
+    );
+    if (post instanceof NextResponse) return post;
 
     // SEC-012: Derive the author identity from the authenticated user's
     // team_members row. Anything sent in the body is ignored / overridden.
-    // SEC-010: `.eq` — callerEmail is already lowercased; `.ilike` would let
-    // wildcard chars in a crafted email act as SQL patterns.
-    const callerEmail = (auth.user.email || "").toLowerCase();
-    const { data: callerRow } = await admin
-      .from("team_members")
-      .select("name, email")
-      .eq("email", callerEmail)
-      .maybeSingle();
-    const authorEmail = (callerRow?.email as string) || auth.user.email || "";
-    const authorName = (callerRow?.name as string) || authorEmail || "Team member";
+    const caller = await loadCallerProfile(admin, ctx.email);
+    const authorEmail = caller.email;
+    const authorName = caller.name;
+    const postTitle = post.title || "Post";
 
     const mentionedNames = extractMentions(body.comment);
     if (mentionedNames.length === 0) {
@@ -73,7 +74,8 @@ export async function POST(request: NextRequest) {
     const { data: members } = await admin
       .from("team_members")
       .select("name, email")
-      .in("name", mentionedNames);
+      .in("name", mentionedNames)
+      .eq("status", "active");
 
     if (!members || members.length === 0) {
       // SEC-012: Don't echo whether any name matched. Returning the matched
@@ -97,7 +99,7 @@ export async function POST(request: NextRequest) {
           await transporter.sendMail({
             from: getFromAddress(),
             to: member.email,
-            subject: safeSubject(`${authorName} mentioned you in "${body.postTitle}"`),
+            subject: safeSubject(`${authorName} mentioned you in "${postTitle}"`),
             html: `
               <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 520px; margin: 0 auto;">
                 <div style="background: linear-gradient(135deg, #ea580c, #dc2626); padding: 24px; border-radius: 12px 12px 0 0;">
@@ -105,7 +107,7 @@ export async function POST(request: NextRequest) {
                 </div>
                 <div style="background: #ffffff; padding: 24px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
                   <p style="color: #374151; font-size: 14px; line-height: 1.6; margin: 0 0 16px;">
-                    <strong>${esc(authorName)}</strong> mentioned you in a comment on <strong>"${esc(body.postTitle)}"</strong>:
+                    <strong>${esc(authorName)}</strong> mentioned you in a comment on <strong>"${esc(postTitle)}"</strong>:
                   </p>
                   <div style="background: #f9fafb; border-left: 3px solid #ea580c; padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 0 0 20px;">
                     <p style="color: #4b5563; font-size: 13px; line-height: 1.5; margin: 0; white-space: pre-wrap;">${esc(body.comment)}</p>
@@ -131,6 +133,7 @@ export async function POST(request: NextRequest) {
         p_entity_type: "post",
         p_action: "mention_sent",
         p_entity_id: body.postId,
+        p_workspace_id: ctx.workspaceId,
         p_metadata: { user_name: authorName, details: `Mentioned ${members.length} member(s) in comment` },
       });
     }

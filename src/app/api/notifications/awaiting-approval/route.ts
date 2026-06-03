@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getTransporter, getFromAddress, esc, safeSubject } from "@/lib/email-utils";
 import { APP_TIMEZONE } from "@/lib/utils";
 import { consume, getClientIp } from "@/lib/rate-limit";
-import { requireBearerUser } from "@/lib/auth/require";
+import { loadCallerProfile, loadWorkspacePost, requireNotificationContext } from "../_shared";
 
 export const maxDuration = 10;
 
@@ -53,8 +53,8 @@ function formatScheduled(date?: string | null, time?: string | null): string | n
 
 interface AwaitingApprovalRequest {
   postId: string;
-  postTitle: string;
-  movedBy: string;
+  postTitle?: string;
+  movedBy?: string;
   fromStage?: string;
 }
 
@@ -62,8 +62,8 @@ export async function POST(request: NextRequest) {
   try {
     // SEC-012: Require an authenticated caller and trust the server's
     // resolution of `movedBy` over whatever the body claims.
-    const auth = await requireBearerUser(request);
-    if (auth instanceof NextResponse) return auth;
+    const ctx = await requireNotificationContext(request);
+    if (ctx instanceof NextResponse) return ctx;
 
     const ip = getClientIp(request);
     const ipCheck = await consume("notifications:awaiting-approval:ip", ip, 10, 60);
@@ -72,29 +72,33 @@ export async function POST(request: NextRequest) {
     }
 
     const body: AwaitingApprovalRequest = await request.json();
-    if (!body.postId || !body.postTitle) {
+    if (!body.postId) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
     const admin = getAdminClient();
 
     // SEC-012: Resolve `movedBy` from the authenticated caller.
-    // SEC-010: `.eq` — callerEmail is already lowercased; `.ilike` would let
-    // wildcard chars in a crafted email act as SQL patterns.
-    const callerEmail = (auth.user.email || "").toLowerCase();
-    const { data: callerRow } = await admin
-      .from("team_members")
-      .select("name, email")
-      .eq("email", callerEmail)
-      .maybeSingle();
-    const movedBy = (callerRow?.name as string) || auth.user.email || "Team member";
+    const caller = await loadCallerProfile(admin, ctx.email);
+    const movedBy = caller.name || "Team member";
 
     // Fetch full post data for rich email
-    const { data: post } = await admin
-      .from("posts")
-      .select("title, platforms, content_type, scheduled_date, scheduled_time, caption")
-      .eq("id", body.postId)
-      .maybeSingle();
+    const post = await loadWorkspacePost<{
+      id: string;
+      title?: string | null;
+      platforms?: string[] | null;
+      content_type?: string | null;
+      scheduled_date?: string | null;
+      scheduled_time?: string | null;
+      caption?: string | null;
+    }>(
+      admin,
+      body.postId,
+      ctx.workspaceId,
+      "id, title, platforms, content_type, scheduled_date, scheduled_time, caption",
+    );
+    if (post instanceof NextResponse) return post;
+    const postTitle = post.title || "Post";
 
     const platforms: string[] = (post?.platforms as string[]) || [];
     const contentType = CONTENT_TYPE_LABELS[(post?.content_type as string) || ""] || (post?.content_type as string) || "";
@@ -106,7 +110,8 @@ export async function POST(request: NextRequest) {
     const { data: admins } = await admin
       .from("team_members")
       .select("email")
-      .in("role", ["superadmin", "admin", "owner", "creative_director", "approver"]);
+      .in("role", ["superadmin", "admin", "owner", "creative_director", "approver"])
+      .eq("status", "active");
 
     const recipients: string[] = [];
     if (admins) {
@@ -183,7 +188,7 @@ export async function POST(request: NextRequest) {
         moved from <strong style="color:#6b7280;">${esc(fromLabel)}</strong>
       </p>
 
-      <h1 style="color:#111827;font-size:22px;font-weight:800;margin:0 0 22px;line-height:1.25;letter-spacing:-0.02em;">${esc(body.postTitle)}</h1>
+      <h1 style="color:#111827;font-size:22px;font-weight:800;margin:0 0 22px;line-height:1.25;letter-spacing:-0.02em;">${esc(postTitle)}</h1>
 
       <div style="margin-bottom:22px;">
         <p style="color:#9ca3af;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 10px;">Posting to</p>
@@ -229,7 +234,7 @@ export async function POST(request: NextRequest) {
           await transporter.sendMail({
             from: getFromAddress(),
             to: email,
-            subject: safeSubject(`Action Required: "${body.postTitle}" is awaiting your review`),
+            subject: safeSubject(`Action Required: "${postTitle}" is awaiting your review`),
             html: htmlEmail,
           });
           sent++;
@@ -243,6 +248,7 @@ export async function POST(request: NextRequest) {
       p_entity_type: "post",
       p_action: "awaiting_approval_notified",
       p_entity_id: body.postId,
+      p_workspace_id: ctx.workspaceId,
       p_metadata: { movedBy, notified: recipients },
     });
 

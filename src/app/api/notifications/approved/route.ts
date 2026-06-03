@@ -9,7 +9,7 @@ import {
 } from "@/lib/email-utils";
 import { APP_TIMEZONE } from "@/lib/utils";
 import { consume, getClientIp } from "@/lib/rate-limit";
-import { requireBearerUser } from "@/lib/auth/require";
+import { loadCallerProfile, loadMemberByCreatorKey, loadWorkspacePost, requireNotificationContext } from "../_shared";
 
 export const maxDuration = 10;
 
@@ -50,8 +50,8 @@ function formatScheduled(date?: string | null, time?: string | null): string | n
 
 interface ApprovedRequest {
   postId: string;
-  postTitle: string;
-  approvedBy: string;
+  postTitle?: string;
+  approvedBy?: string;
   createdBy?: string;
 }
 
@@ -60,8 +60,8 @@ export async function POST(request: NextRequest) {
     // SEC-012: Authenticate the caller. `approvedBy` is now derived from
     // the bearer-token user's team_members row — clients cannot forge the
     // approver name.
-    const auth = await requireBearerUser(request);
-    if (auth instanceof NextResponse) return auth;
+    const ctx = await requireNotificationContext(request);
+    if (ctx instanceof NextResponse) return ctx;
 
     const ip = getClientIp(request);
     const ipCheck = await consume("notifications:approved:ip", ip, 10, 60);
@@ -71,41 +71,38 @@ export async function POST(request: NextRequest) {
 
     const body: ApprovedRequest = await request.json();
 
-    if (!body.postId || !body.postTitle) {
+    if (!body.postId) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-    }
-
-    if (!body.createdBy) {
-      return NextResponse.json({ sent: 0, reason: "No creator specified" });
     }
 
     const admin = getAdminClient();
 
     // SEC-012: Override `approvedBy` with the server-resolved team_members
     // name for the authenticated caller.
-    // SEC-010: `.eq` — callerEmail is already lowercased; `.ilike` would let
-    // wildcard chars in a crafted email act as SQL patterns.
-    const callerEmail = (auth.user.email || "").toLowerCase();
-    const { data: approverRow } = await admin
-      .from("team_members")
-      .select("name, email")
-      .eq("email", callerEmail)
-      .maybeSingle();
-    const approvedBy = (approverRow?.name as string) || auth.user.email || "Approver";
+    const caller = await loadCallerProfile(admin, ctx.email);
+    const approvedBy = caller.name || "Approver";
 
     // Fetch full post data for rich email
-    const { data: post } = await admin
-      .from("posts")
-      .select("platforms, content_type, scheduled_date, scheduled_time, caption")
-      .eq("id", body.postId)
-      .maybeSingle();
+    const post = await loadWorkspacePost<{
+      id: string;
+      title?: string | null;
+      platforms?: string[] | null;
+      content_type?: string | null;
+      scheduled_date?: string | null;
+      scheduled_time?: string | null;
+      caption?: string | null;
+      created_by?: string | null;
+    }>(
+      admin,
+      body.postId,
+      ctx.workspaceId,
+      "id, title, platforms, content_type, scheduled_date, scheduled_time, caption, created_by",
+    );
+    if (post instanceof NextResponse) return post;
+    const postTitle = post.title || "Post";
 
     // Look up creator email by name (same pattern as revision route)
-    const { data: creator } = await admin
-      .from("team_members")
-      .select("email, name")
-      .eq("name", body.createdBy)
-      .maybeSingle();
+    const creator = await loadMemberByCreatorKey(admin, post.created_by || body.createdBy);
 
     if (!creator?.email) {
       return NextResponse.json({ sent: 0, reason: "Creator not found in team_members" });
@@ -132,9 +129,9 @@ export async function POST(request: NextRequest) {
     if (smtpConfigured) {
       const transporter = getTransporter();
       const html = buildPostApprovedEmailHtml({
-        creatorName: creator.name || body.createdBy,
+        creatorName: creator.name || body.createdBy || "Creator",
         approverName: approvedBy,
-        postTitle: body.postTitle,
+        postTitle,
         platforms,
         scheduled,
         contentType,
@@ -146,7 +143,7 @@ export async function POST(request: NextRequest) {
         await transporter.sendMail({
           from: getFromAddress(),
           to: creator.email,
-          subject: safeSubject(`Post Approved: "${body.postTitle}"`),
+          subject: safeSubject(`Post Approved: "${postTitle}"`),
           html,
         });
         sent = 1;
@@ -159,6 +156,7 @@ export async function POST(request: NextRequest) {
       p_entity_type: "post",
       p_action: "post_approved_notified",
       p_entity_id: body.postId,
+      p_workspace_id: ctx.workspaceId,
       p_metadata: { approvedBy, notified: creator.email, sent },
     });
 
