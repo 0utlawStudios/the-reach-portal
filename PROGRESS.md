@@ -1,8 +1,8 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: b0da6c7 fix: normalize launch cleanup audit actors
-Next: Fix pipeline realtime subscription/notification/dedup risks found by QA swarm, then continue Drive/security hardening and full production QA.
+Last pushed SHA: 0424dec fix: harden pipeline realtime and notifications
+Next: Fix Drive/security hardening findings from QA swarm, then continue UI/accessibility and full production QA.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
 
 QA swarm / audit normalization slice notes:
@@ -15,6 +15,19 @@ QA swarm / audit normalization slice notes:
 - Production verification passed through `v_audit_log_with_actor`: cloned/test cleanup rows for Christer, Alex, Carlo, Muaaz, Hanes, and Shang now resolve to `SYSTEM`; the unrelated `themanekinekogirl@gmail.com` removal still resolves to Aldridge because it was not a launch clone/test cleanup row.
 - Verification passed: focused setup/static test, `npm run typecheck`, `git diff --check`, `npm run lint` with only existing warnings, `npm run build`, `supabase db push`, and remote migration list showing `0039`.
 - Pushed commit `b0da6c7` to `origin/main`; GitHub CI is running.
+
+Pipeline realtime / notification hardening slice notes:
+
+- Treated the QA swarm pipeline findings as root issues in the active production-readiness goal.
+- Touched `src/lib/pipeline-context.tsx` deliberately after re-checking the AGENTS iron-law requirements: provision remains before posts SELECT, empty DB results still render an empty board, `createCard` still always writes `workspace_id`, and id-keyed Supabase writes remain UUID-guarded.
+- Fixed the baseline realtime subscription risk by initializing internal workspace subscription state to `null`, setting it after provision/fallback, and driving the Realtime effect from that state instead of `workspaceIdRef.current`.
+- Fixed canonical Realtime updates by applying every `UPDATE` payload from Supabase and clearing the local mutation mark instead of suppressing same-id updates for 10 seconds. This prevents peer and n8n publisher updates, including `posted`, from being ignored.
+- Hardened revision kickback flow so `requestKickback()` and `submitKickback()` reject temporary post IDs while a new card is still saving.
+- Added a shared authenticated notification helper for pipeline notification routes. Approved, awaiting-approval, revision, and mention notifications now attach a Supabase bearer token and log non-2xx responses instead of silently swallowing 401s.
+- Hardened asset drawer comment mentions with the same bearer token and non-2xx response check.
+- Added static regression coverage for workspace-state Realtime subscription, canonical Realtime updates, kickback temp-ID guards, and authenticated notification routes.
+- Verification passed: focused iron-law tests (16), `npm run typecheck`, `git diff --check`, `npm run lint` with one existing AI worker warning, full `npm test` with 28 files / 247 tests, and `npm run build`.
+- Pushed commit `0424dec` to `origin/main`; GitHub CI is running.
 
 Auth / team access hardening slice notes:
 
