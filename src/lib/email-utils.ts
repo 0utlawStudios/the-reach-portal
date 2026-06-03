@@ -356,3 +356,94 @@ export function buildSupportReplyEmailHtml(params: {
   <p style="color:#9ca3af;font-size:11px;text-align:center;margin:18px 0 0;">Open the support panel in the portal to continue the conversation.</p>
 </div>`);
 }
+
+// ─── Auto-Publisher: Published Notification (to admins / directors) ───
+
+export function buildPostPublishedAdminEmailHtml(params: {
+  postTitle: string;
+  jobState: "succeeded" | "partial" | string;
+  platforms: ReadonlyArray<{ platform: string; state: string; postUrl?: string | null; error?: string | null }>;
+  contentType?: string | null;
+  captionPreview?: string | null;
+  publishedAt?: string | null;
+  postUrl: string;
+}): string {
+  const { postTitle, jobState, platforms, contentType, captionPreview, publishedAt, postUrl } = params;
+  const logoUrl = `${getSiteUrl()}/the-reach-logo.png`;
+  const published = platforms.filter((p) => p.state === "succeeded");
+  const failed = platforms.filter((p) => p.state === "failed");
+  const statusLabel = jobState === "partial" ? "Published with Platform Attention" : "Published";
+
+  const platformRows = platforms.length
+    ? platforms.map((p) => {
+        const ok = p.state === "succeeded";
+        const color = ok ? "#2F7355" : p.state === "failed" ? "#A53D2C" : "#6C655A";
+        const label = p.platform.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+        const url = p.postUrl
+          ? `<a href="${esc(p.postUrl)}" style="color:#975428;text-decoration:none;font-weight:800;">Open live post</a>`
+          : `<span style="color:#8d867a;">${esc(p.error || p.state)}</span>`;
+        return `<tr>
+          <td style="padding:12px 0;border-bottom:1px solid rgba(108,101,90,0.16);">
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};margin-right:10px;"></span>
+            <strong style="color:#25221E;font-size:14px;">${esc(label)}</strong>
+          </td>
+          <td style="padding:12px 0;border-bottom:1px solid rgba(108,101,90,0.16);text-align:right;font-size:13px;">${url}</td>
+        </tr>`;
+      }).join("")
+    : `<tr><td style="padding:12px 0;color:#6C655A;font-size:13px;">No platform results were provided.</td></tr>`;
+
+  const captionBlock = captionPreview
+    ? `<div style="background:#FBF7EE;border:1px solid rgba(108,101,90,0.18);border-radius:14px;padding:16px 18px;margin:22px 0 0;">
+         <p style="color:#975428;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:0.12em;margin:0 0 8px;">Caption Preview</p>
+         <p style="color:#4B463E;font-size:13px;line-height:1.65;margin:0;white-space:pre-wrap;">${esc(captionPreview)}</p>
+       </div>`
+    : "";
+
+  const failedNote = failed.length
+    ? `<p style="color:#A53D2C;font-size:13px;line-height:1.6;margin:18px 0 0;"><strong>${failed.length} platform${failed.length === 1 ? "" : "s"} need attention.</strong> The card is posted because at least one platform succeeded; review the failed platform row before retrying.</p>`
+    : "";
+
+  return `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#E1DFD5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+<div style="max-width:560px;margin:40px auto;border-radius:18px;overflow:hidden;background:#ffffff;box-shadow:0 24px 70px rgba(37,34,30,0.16);">
+<div style="background:#25221E;padding:32px;text-align:center;">
+  <img src="${logoUrl}" alt="The Reach" width="54" height="54" style="display:block;margin:0 auto 18px;border-radius:14px;background:#F8F4EC;padding:8px;" />
+  <p style="color:#D6C3B1;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.2em;margin:0 0 10px;">Aldr1dge Hypervisor System</p>
+  <h1 style="color:#FFF9F0;font-size:24px;font-weight:900;margin:0;">${esc(statusLabel)}</h1>
+  <p style="color:#DCD4C9;font-size:13px;margin:10px 0 0;">The publisher finalized this post and updated the portal.</p>
+</div>
+<div style="background:#fff;padding:32px;">
+  <p style="color:#975428;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.12em;margin:0 0 10px;">${published.length} platform${published.length === 1 ? "" : "s"} live</p>
+  <h2 style="color:#25221E;font-size:21px;line-height:1.25;margin:0 0 18px;">${esc(postTitle)}</h2>
+  <div style="display:block;background:#F8F4EC;border:1px solid rgba(108,101,90,0.16);border-radius:16px;padding:16px 18px;margin:0 0 20px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+      <tr>
+        <td style="color:#6C655A;font-size:12px;">State</td>
+        <td style="color:#25221E;font-size:13px;font-weight:900;text-align:right;">${esc(jobState)}</td>
+      </tr>
+      ${contentType ? `<tr>
+        <td style="color:#6C655A;font-size:12px;padding-top:8px;">Content Type</td>
+        <td style="color:#25221E;font-size:13px;font-weight:900;text-align:right;padding-top:8px;">${esc(contentType)}</td>
+      </tr>` : ""}
+      ${publishedAt ? `<tr>
+        <td style="color:#6C655A;font-size:12px;padding-top:8px;">Finalized</td>
+        <td style="color:#25221E;font-size:13px;font-weight:900;text-align:right;padding-top:8px;">${esc(publishedAt)}</td>
+      </tr>` : ""}
+    </table>
+  </div>
+  <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 0 18px;">
+    ${platformRows}
+  </table>
+  ${failedNote}
+  ${captionBlock}
+  <div style="text-align:center;margin:28px 0 6px;">${ctaButton("Open in The Reach", postUrl)}</div>
+</div>
+<div style="padding:18px 32px;text-align:center;background:#F8F4EC;border-top:1px solid rgba(108,101,90,0.14);">
+  <p style="color:#6C655A;font-size:12px;font-weight:800;margin:0;">Executed by Aldr1dge Hypervisor System - Agent 052</p>
+</div>
+</div>
+</body>
+</html>`;
+}

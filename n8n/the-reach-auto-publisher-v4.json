@@ -3,13 +3,23 @@
   "nodes": [
     {
       "parameters": {
-        "rule": { "interval": [{ "field": "minutes", "minutesInterval": 1 }] }
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
       },
       "id": "trigger-schedule",
       "name": "Every 1 Minute",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [220, 440]
+      "position": [
+        220,
+        440
+      ]
     },
     {
       "parameters": {},
@@ -17,14 +27,22 @@
       "name": "Manual Test",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
-      "position": [220, 660]
+      "position": [
+        220,
+        660
+      ]
     },
     {
       "parameters": {
         "mode": "manual",
         "assignments": {
           "assignments": [
-            { "id": "dry_run_flag", "name": "dry_run", "value": true, "type": "boolean" }
+            {
+              "id": "dry_run_flag",
+              "name": "dry_run",
+              "value": true,
+              "type": "boolean"
+            }
           ]
         },
         "options": {}
@@ -33,7 +51,10 @@
       "name": "Set Dry Run",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [460, 660]
+      "position": [
+        460,
+        660
+      ]
     },
     {
       "parameters": {
@@ -44,14 +65,28 @@
       "name": "Claim Next Job",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [700, 440]
+      "position": [
+        700,
+        440
+      ]
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
           "conditions": [
-            { "id": "cond_has_job", "leftValue": "={{ $json.hasJob }}", "rightValue": "", "operator": { "type": "boolean", "operation": "true" } }
+            {
+              "id": "cond_has_job",
+              "leftValue": "={{ $json.hasJob }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
           ],
           "combinator": "and"
         },
@@ -61,7 +96,10 @@
       "name": "Has Job?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [940, 440]
+      "position": [
+        940,
+        440
+      ]
     },
     {
       "parameters": {},
@@ -69,7 +107,10 @@
       "name": "No More Jobs",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
-      "position": [940, 660]
+      "position": [
+        940,
+        660
+      ]
     },
     {
       "parameters": {
@@ -80,7 +121,10 @@
       "name": "Resolve Media",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1100, 440]
+      "position": [
+        1100,
+        440
+      ]
     },
     {
       "parameters": {
@@ -91,7 +135,10 @@
       "name": "Pre-flight",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1260, 440]
+      "position": [
+        1260,
+        440
+      ]
     },
     {
       "parameters": {
@@ -102,7 +149,10 @@
       "name": "Publish Facebook",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1460, 440],
+      "position": [
+        1460,
+        440
+      ],
       "onError": "continueRegularOutput"
     },
     {
@@ -114,7 +164,10 @@
       "name": "Publish Instagram",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1720, 440],
+      "position": [
+        1720,
+        440
+      ],
       "onError": "continueRegularOutput"
     },
     {
@@ -126,7 +179,10 @@
       "name": "Publish LinkedIn",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1980, 440],
+      "position": [
+        1980,
+        440
+      ],
       "onError": "continueRegularOutput"
     },
     {
@@ -138,7 +194,10 @@
       "name": "Finalize Job",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2240, 440]
+      "position": [
+        2240,
+        440
+      ]
     },
     {
       "parameters": {
@@ -149,14 +208,42 @@
       "name": "Log to audit_log_v2",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2480, 440]
+      "position": [
+        2480,
+        440
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Notify the portal after Finalize + Audit.\n// The portal owns SMTP + Telegram secrets; this workflow only sends the\n// finalized publish payload over HTTPS with the Supabase service-role bearer.\nconst NOTIFY_URL = 'https://reach.ten80ten.com/api/notifications/published';\nconst item = $input.first().json;\n\nif (item.dry_run) return [{ json: item }];\nif (!item.post?.id || !item.job?.id || !item._SUPABASE_SERVICE_ROLE_KEY) return [{ json: item }];\n\ntry {\n  await this.helpers.httpRequest({\n    method: 'POST',\n    url: NOTIFY_URL,\n    headers: {\n      'Content-Type': 'application/json',\n      Authorization: 'Bearer ' + item._SUPABASE_SERVICE_ROLE_KEY,\n    },\n    body: {\n      postId: item.post.id,\n      jobId: item.job.id,\n      jobState: item.jobState,\n      publishedCount: item.publishedCount || 0,\n      failedCount: item.failedCount || 0,\n      platforms: item.audit?.platforms || [],\n      audit: item.audit || null,\n    },\n  });\n} catch (err) {\n  console.error('[PUBLISH NOTIFY] Portal notification failed: ' + err.message);\n}\nreturn [{ json: item }];"
+      },
+      "id": "notify-published",
+      "name": "Notify Published",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2720,
+        440
+      ]
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
           "conditions": [
-            { "id": "cond_has_failures", "leftValue": "={{ $json.hasFailures }}", "rightValue": "", "operator": { "type": "boolean", "operation": "true" } }
+            {
+              "id": "cond_has_failures",
+              "leftValue": "={{ $json.hasFailures }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
           ],
           "combinator": "and"
         },
@@ -166,7 +253,10 @@
       "name": "Has Failures?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [2720, 440]
+      "position": [
+        2960,
+        440
+      ]
     },
     {
       "parameters": {
@@ -177,11 +267,14 @@
       "name": "Send Alert",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2720, 660]
+      "position": [
+        2960,
+        660
+      ]
     },
     {
       "parameters": {
-        "content": "## The Reach Auto-Publisher V4\n\n### Per-client setup (no env vars)\nEvery secret lives in the node code marked `EDIT FOR CLIENT`. Edit before activating:\n- **Claim Next Job**: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY\n- **Publish Facebook**: META_PAGE_ACCESS_TOKEN, FACEBOOK_PAGE_ID\n- **Publish Instagram**: META_PAGE_ACCESS_TOKEN, INSTAGRAM_BUSINESS_ACCOUNT_ID\n- **Publish LinkedIn**: LINKEDIN_ACCESS_TOKEN, LINKEDIN_ORG_URN\n- **Send Alert**: ALERT_WEBHOOK_URL (optional)\n\n### Schedule\nEvery 1 minute — drift ≤ 60s.\n\n### Architecture (claim-based)\n```\nSchedule → Claim → Has Job? → Resolve Media → Pre-flight\n          → Pub FB → Pub IG → Pub LI → Finalize → Audit → Has Failures?\n            → Send Alert (or end)\n            → loop to Claim (drain queue)\n```\n\n### Key fixes vs V3\n- No $env references; all secrets baked in nodes per multi-tenant constraint\n- Resolve Media reads posts.asset_urls (Studio drafts) AND source_vault.rawFiles (legacy)\n- Audit goes to audit_log_v2 not the legacy table\n- Posts get stage='posted' + posted_at + posted_urls in one PATCH (matches the 0026 lockdown trigger)\n- Retry on transient errors with attempts*5min backoff; permanent at 3 attempts\n- TikTok + YouTube nodes removed (not used)\n- Posts get a per-platform live URL written so the kanban Live badge links\n\n### Activation\n1. Import this JSON.\n2. Edit every `REPLACE_WITH_*` constant.\n3. Run **Manual Test** (dry_run=true) — should claim a job and skip all platform calls.\n4. Trigger a real test post in approved_scheduled with a scheduled_at <= now() and watch it go live.\n5. Activate the Schedule Trigger.",
+        "content": "## The Reach Auto-Publisher V4\n\n### Per-client setup (no env vars)\nEvery secret lives in the node code marked `EDIT FOR CLIENT`. Edit before activating:\n- **Claim Next Job**: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY\n- **Publish Facebook**: META_PAGE_ACCESS_TOKEN, FACEBOOK_PAGE_ID\n- **Publish Instagram**: META_PAGE_ACCESS_TOKEN, INSTAGRAM_BUSINESS_ACCOUNT_ID\n- **Publish LinkedIn**: LINKEDIN_ACCESS_TOKEN, LINKEDIN_ORG_URN\n- **Notify Published**: calls https://reach.ten80ten.com/api/notifications/published after Finalize + Audit. App env owns SMTP + Telegram.\n- **Send Alert**: ALERT_WEBHOOK_URL (optional failure-only fallback)\n\n### Schedule\nEvery 1 minute — drift ≤ 60s.\n\n### Architecture (claim-based)\n```\nSchedule → Claim → Has Job? → Resolve Media → Pre-flight\n          → Pub FB → Pub IG → Pub LI → Finalize → Audit → Notify Published → Has Failures?\n            → Send Alert (or end)\n            → loop to Claim (drain queue)\n```\n\n### Key fixes vs V3\n- No $env references; all secrets baked in nodes per multi-tenant constraint\n- Resolve Media reads posts.asset_urls (Studio drafts) AND source_vault.rawFiles (legacy)\n- Audit goes to audit_log_v2 not the legacy table\n- Posts get stage='posted' + posted_at + posted_urls in one PATCH (matches the 0026 lockdown trigger)\n- Retry on transient errors with attempts*5min backoff; permanent at 3 attempts\n- TikTok + YouTube nodes removed (not used)\n- Posts get a per-platform live URL written so the kanban Live badge links\n- Successful/partial publishes notify admins, creative directors, superadmin, and Telegram via the portal endpoint\n- Notification footer: Executed by Aldr1dge Hypervisor System - Agent 052\n\n### Activation\n1. Import this JSON.\n2. Edit every `REPLACE_WITH_*` constant.\n3. Run **Manual Test** (dry_run=true) — should claim a job and skip all platform calls.\n4. Trigger a real test post in approved_scheduled with a scheduled_at <= now() and watch it go live.\n5. Activate the Schedule Trigger.",
         "height": 720,
         "width": 540,
         "color": 5
@@ -190,30 +283,192 @@
       "name": "Setup Note",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [140, -300]
+      "position": [
+        140,
+        -300
+      ]
     }
   ],
   "connections": {
-    "Every 1 Minute": { "main": [[{ "node": "Claim Next Job", "type": "main", "index": 0 }]] },
-    "Manual Test":    { "main": [[{ "node": "Set Dry Run", "type": "main", "index": 0 }]] },
-    "Set Dry Run":    { "main": [[{ "node": "Claim Next Job", "type": "main", "index": 0 }]] },
-    "Claim Next Job": { "main": [[{ "node": "Has Job?", "type": "main", "index": 0 }]] },
-    "Has Job?":       { "main": [
-      [{ "node": "Resolve Media", "type": "main", "index": 0 }],
-      [{ "node": "No More Jobs", "type": "main", "index": 0 }]
-    ]},
-    "Resolve Media":     { "main": [[{ "node": "Pre-flight", "type": "main", "index": 0 }]] },
-    "Pre-flight":        { "main": [[{ "node": "Publish Facebook", "type": "main", "index": 0 }]] },
-    "Publish Facebook":  { "main": [[{ "node": "Publish Instagram", "type": "main", "index": 0 }]] },
-    "Publish Instagram": { "main": [[{ "node": "Publish LinkedIn", "type": "main", "index": 0 }]] },
-    "Publish LinkedIn":  { "main": [[{ "node": "Finalize Job", "type": "main", "index": 0 }]] },
-    "Finalize Job":      { "main": [[{ "node": "Log to audit_log_v2", "type": "main", "index": 0 }]] },
-    "Log to audit_log_v2": { "main": [[{ "node": "Has Failures?", "type": "main", "index": 0 }]] },
-    "Has Failures?":     { "main": [
-      [{ "node": "Send Alert", "type": "main", "index": 0 }],
-      [{ "node": "Claim Next Job", "type": "main", "index": 0 }]
-    ]},
-    "Send Alert":        { "main": [[{ "node": "Claim Next Job", "type": "main", "index": 0 }]] }
+    "Every 1 Minute": {
+      "main": [
+        [
+          {
+            "node": "Claim Next Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Test": {
+      "main": [
+        [
+          {
+            "node": "Set Dry Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Dry Run": {
+      "main": [
+        [
+          {
+            "node": "Claim Next Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim Next Job": {
+      "main": [
+        [
+          {
+            "node": "Has Job?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Job?": {
+      "main": [
+        [
+          {
+            "node": "Resolve Media",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No More Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Media": {
+      "main": [
+        [
+          {
+            "node": "Pre-flight",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pre-flight": {
+      "main": [
+        [
+          {
+            "node": "Publish Facebook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish Facebook": {
+      "main": [
+        [
+          {
+            "node": "Publish Instagram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish Instagram": {
+      "main": [
+        [
+          {
+            "node": "Publish LinkedIn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish LinkedIn": {
+      "main": [
+        [
+          {
+            "node": "Finalize Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finalize Job": {
+      "main": [
+        [
+          {
+            "node": "Log to audit_log_v2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log to audit_log_v2": {
+      "main": [
+        [
+          {
+            "node": "Notify Published",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Failures?": {
+      "main": [
+        [
+          {
+            "node": "Send Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Claim Next Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Alert": {
+      "main": [
+        [
+          {
+            "node": "Claim Next Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Published": {
+      "main": [
+        [
+          {
+            "node": "Has Failures?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
   "pinData": {},
   "settings": {

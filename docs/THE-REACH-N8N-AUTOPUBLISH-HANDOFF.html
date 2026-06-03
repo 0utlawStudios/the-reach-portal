@@ -26,7 +26,31 @@
 
     * { box-sizing: border-box; }
 
-    html { scroll-behavior: smooth; }
+    body,
+    main,
+    section,
+    article,
+    aside,
+    div,
+    p,
+    li,
+    h1,
+    h2,
+    h3,
+    code,
+    label,
+    input,
+    textarea,
+    select {
+      min-width: 0;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      overflow-x: hidden;
+    }
 
     body {
       margin: 0;
@@ -36,6 +60,7 @@
       color: var(--ink);
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       line-height: 1.55;
+      overflow-x: hidden;
     }
 
     .page {
@@ -55,9 +80,13 @@
       border-radius: 28px;
       box-shadow: var(--shadow);
       overflow: hidden;
+      min-width: 0;
     }
 
-    .hero-copy { padding: 40px; }
+    .hero-copy {
+      min-width: 0;
+      padding: 40px;
+    }
 
     .brand {
       color: var(--sun);
@@ -79,12 +108,14 @@
       margin: 0;
       color: var(--stone);
       font-size: 18px;
+      overflow-wrap: anywhere;
     }
 
     .hero-panel {
-      background: #2B2520;
+      background:
+        linear-gradient(180deg, rgba(48, 41, 35, 0.98), rgba(38, 33, 29, 0.98));
       color: var(--cream);
-      padding: 34px;
+      padding: 30px;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
@@ -103,19 +134,86 @@
       color: #E8DED2;
     }
 
+    .hero-panel h2 {
+      font-size: clamp(24px, 2.4vw, 34px);
+      line-height: 1.02;
+      margin-bottom: 8px;
+    }
+
+    .panel-note {
+      margin: 0;
+      color: rgba(248, 244, 236, 0.74);
+      font-size: 14px;
+    }
+
     .facts {
       list-style: none;
       padding: 0;
-      margin: 20px 0 0;
+      margin: 18px 0 0;
       display: grid;
-      gap: 10px;
+      gap: 12px;
     }
 
     .facts li {
-      padding: 11px 12px;
+      padding: 14px;
       border: 1px solid rgba(248, 244, 236, 0.16);
-      border-radius: 14px;
-      background: rgba(248, 244, 236, 0.06);
+      border-radius: 16px;
+      background: rgba(248, 244, 236, 0.075);
+      box-shadow: inset 0 1px 0 rgba(255, 249, 240, 0.07);
+    }
+
+    .fact-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .fact-top strong {
+      color: #FFF9F0;
+      font-size: 15px;
+    }
+
+    .fact-tag {
+      flex: 0 0 auto;
+      border: 1px solid rgba(248, 244, 236, 0.18);
+      border-radius: 999px;
+      padding: 3px 8px;
+      color: rgba(255, 249, 240, 0.82);
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .fact-tag.collect { color: #F3C19F; border-color: rgba(243, 193, 159, 0.32); }
+    .fact-tag.internal { color: #BBD9C8; border-color: rgba(187, 217, 200, 0.34); }
+
+    .facts small {
+      display: block;
+      color: rgba(232, 222, 210, 0.78);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .token-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .hero-panel .token-list code {
+      background: rgba(248, 244, 236, 0.10);
+      color: #FFF9F0;
+      border: 1px solid rgba(248, 244, 236, 0.14);
+      border-radius: 999px;
+      padding: 5px 8px;
+      font-size: 11px;
+      line-height: 1.2;
+      overflow-wrap: anywhere;
+      max-width: 100%;
     }
 
     .notice {
@@ -126,6 +224,7 @@
       border-radius: 16px;
       color: #4A3325;
       font-weight: 750;
+      overflow-wrap: anywhere;
     }
 
     .actions {
@@ -144,6 +243,7 @@
       font-weight: 900;
       cursor: pointer;
       box-shadow: 0 14px 30px rgba(151, 84, 40, 0.26);
+      white-space: normal;
     }
 
     button.secondary { background: linear-gradient(135deg, #5A534B, #3F3933); }
@@ -155,10 +255,12 @@
     }
 
     .status {
+      display: block;
       color: var(--sun);
       font-size: 13px;
       font-weight: 900;
       margin-top: 12px;
+      overflow-wrap: anywhere;
     }
 
     .grid {
@@ -231,7 +333,7 @@
     .step-list li {
       counter-increment: step;
       display: grid;
-      grid-template-columns: 36px minmax(0, 1fr);
+      grid-template-columns: 38px minmax(0, 1fr);
       gap: 12px;
       align-items: start;
       background: rgba(251, 247, 238, 0.72);
@@ -240,16 +342,67 @@
       padding: 14px;
     }
 
-    .step-list li::before {
-      content: counter(step);
+    .step-check {
+      display: block;
+      margin: 0;
+      position: relative;
+      width: 32px;
+      height: 32px;
+    }
+
+    .step-check input {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .step-box {
       width: 32px;
       height: 32px;
       display: grid;
       place-items: center;
-      border-radius: 50%;
-      background: rgba(151, 84, 40, 0.13);
+      border-radius: 10px;
+      background: rgba(251, 247, 238, 0.92);
       color: var(--sun);
+      border: 2px solid rgba(151, 84, 40, 0.42);
       font-weight: 900;
+      transition: background 140ms ease, color 140ms ease, box-shadow 140ms ease;
+    }
+
+    .step-box::before {
+      content: "";
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(151, 84, 40, 0.70);
+      border-radius: 4px;
+      background: transparent;
+    }
+
+    .step-check input:checked + .step-box {
+      background: var(--sun);
+      color: #fff;
+      box-shadow: 0 10px 24px rgba(151, 84, 40, 0.20);
+    }
+
+    .step-check input:checked + .step-box::before {
+      content: "✓";
+      display: grid;
+      place-items: center;
+      width: 18px;
+      height: 18px;
+      border: 0;
+      color: #fff;
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    .step-check input:focus-visible + .step-box {
+      outline: 2px solid rgba(151, 84, 40, 0.42);
+      outline-offset: 3px;
     }
 
     .checklist {
@@ -292,8 +445,23 @@
       margin-bottom: 6px;
     }
 
-    .req { color: var(--bad); }
-    .opt { color: var(--stone); }
+    .req,
+    .opt {
+      margin-left: 6px;
+      letter-spacing: 0.04em;
+      text-transform: none;
+      white-space: nowrap;
+    }
+
+    .req {
+      color: var(--bad);
+      font-weight: 950;
+    }
+
+    .opt {
+      color: rgba(108, 101, 90, 0.56);
+      font-weight: 800;
+    }
 
     input, textarea, select {
       width: 100%;
@@ -324,6 +492,7 @@
       padding: 2px 6px;
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       font-size: 0.92em;
+      overflow-wrap: anywhere;
     }
 
     .preview {
@@ -353,6 +522,32 @@
       .half { grid-column: span 12; }
       .form-grid { grid-template-columns: 1fr; }
     }
+
+    @media (max-width: 520px) {
+      .page {
+        width: calc(100% - 20px);
+        padding-top: 20px;
+      }
+
+      .hero {
+        display: block;
+        min-height: 0;
+      }
+
+      .hero-copy, .hero-panel, .card { padding: 20px; }
+      h1 { font-size: 34px; }
+      .subtitle { font-size: 15px; }
+      .actions {
+        align-items: stretch;
+        flex-direction: column;
+      }
+      .actions button { width: 100%; }
+      .fact-top {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .hero-panel .token-list code { font-size: 10px; }
+    }
   </style>
 </head>
 <body>
@@ -362,7 +557,7 @@
         <div class="brand">The Reach</div>
         <h1>n8n Auto-Publisher Handoff</h1>
         <p class="subtitle">
-          A verified collection form for the SMM assigned to The Reach. The Reach V4 workflow is already uploaded to n8n as an inactive draft:
+          A polished checklist for collecting the access needed to connect The Reach's social accounts to the auto-publisher. The Reach V4 workflow is already uploaded to n8n as an inactive draft:
           <strong>The Reach Auto-Publisher V4</strong>, workflow ID <strong>4lWcpeLvHdd7HGQF</strong>.
         </p>
         <div class="notice">
@@ -377,12 +572,41 @@
       </div>
       <aside class="hero-panel">
         <div>
-          <h2>Verified Required Inputs</h2>
+          <h2>Activation Map</h2>
+          <p class="panel-note">Internal runtime values stay with the implementation team. This page only collects social-platform access.</p>
           <ul class="facts">
-            <li><strong>Claim Next Job:</strong> <code>SUPABASE_SERVICE_ROLE_KEY</code>.</li>
-            <li><strong>Facebook node:</strong> <code>META_PAGE_ACCESS_TOKEN</code> + <code>FACEBOOK_PAGE_ID</code>.</li>
-            <li><strong>Instagram node:</strong> <code>META_PAGE_ACCESS_TOKEN</code> + <code>INSTAGRAM_BUSINESS_ACCOUNT_ID</code>.</li>
-            <li><strong>LinkedIn node:</strong> <code>LINKEDIN_ACCESS_TOKEN</code> + <code>LINKEDIN_ORG_URN</code>.</li>
+            <li>
+              <div class="fact-top">
+                <strong>Supabase Worker</strong>
+                <span class="fact-tag internal">Internal</span>
+              </div>
+              <small>Already in env. Do not collect or paste service-role secrets into this handoff.</small>
+              <div class="token-list"><code>SUPABASE_SERVICE_ROLE_KEY</code></div>
+            </li>
+            <li>
+              <div class="fact-top">
+                <strong>Admin Alerts</strong>
+                <span class="fact-tag internal">Internal</span>
+              </div>
+              <small>The portal sends Telegram and the published-post HTML email after n8n finalizes the job.</small>
+              <div class="token-list"><code>TELEGRAM_BOT_TOKEN</code><code>TELEGRAM_ADMIN_CHAT_ID</code><code>SMTP_*</code></div>
+            </li>
+            <li>
+              <div class="fact-top">
+                <strong>Meta Publishing</strong>
+                <span class="fact-tag collect">Collect</span>
+              </div>
+              <small>One Page token should publish to the Facebook Page and linked Instagram Business account.</small>
+              <div class="token-list"><code>META_PAGE_ACCESS_TOKEN</code><code>FACEBOOK_PAGE_ID</code><code>INSTAGRAM_BUSINESS_ACCOUNT_ID</code></div>
+            </li>
+            <li>
+              <div class="fact-top">
+                <strong>LinkedIn Publishing</strong>
+                <span class="fact-tag collect">Collect</span>
+              </div>
+              <small>Organization posting requires Page admin access plus a valid organization URN.</small>
+              <div class="token-list"><code>LINKEDIN_ACCESS_TOKEN</code><code>LINKEDIN_ORG_URN</code></div>
+            </li>
           </ul>
         </div>
         <p>Anything not listed above is context or future expansion, not a required Reach V4 runtime field.</p>
@@ -394,21 +618,22 @@
         <h2>Truth From The Uploaded V4 Workflow</h2>
         <span class="pill ok">Uploaded to n8n</span>
         <span class="pill warn">Inactive draft</span>
-        <p>The Reach V4 workflow contains 16 nodes. It runs every 1 minute, claims due publish jobs through Supabase RPC, publishes Facebook, Instagram, and LinkedIn, then finalizes post/job status.</p>
+        <p>The Reach V4 workflow contains 17 nodes. It runs every 1 minute, claims due publish jobs through Supabase RPC, publishes Facebook, Instagram, and LinkedIn, finalizes post/job status, then calls the portal notification endpoint.</p>
         <ul>
           <li>n8n workflow ID: <code>4lWcpeLvHdd7HGQF</code>.</li>
           <li>Current status: inactive, because placeholders are still present.</li>
           <li><code>Claim Next Job</code>: calls <code>claim_publish_job</code>.</li>
           <li><code>Finalize Job</code>: writes <code>platform_publish_attempts</code>, <code>posted_at</code>, <code>posted_urls</code>, and <code>publish_jobs</code> retry state.</li>
           <li><code>Log to audit_log_v2</code>: writes the current Reach audit table, not the legacy audit table.</li>
+          <li><code>Notify Published</code>: calls the portal endpoint for Telegram + admin HTML email notifications.</li>
         </ul>
       </article>
 
       <article class="card half">
         <h2>Why It Is Not Active Yet</h2>
-        <span class="pill bad">Needs credentials</span>
-        <p>The uploaded V4 draft still contains these placeholders: <code>REPLACE_WITH_SERVICE_ROLE_KEY</code>, <code>REPLACE_WITH_META_TOKEN</code>, <code>REPLACE_WITH_FACEBOOK_PAGE_ID</code>, <code>REPLACE_WITH_IG_BUSINESS_ACCOUNT_ID</code>, <code>REPLACE_WITH_LINKEDIN_TOKEN</code>, and <code>REPLACE_WITH_LINKEDIN_ORG_URN</code>.</p>
-        <p>Activating it before replacing those values would let the worker claim due jobs and fail platform publishing. This document collects only the missing values required to safely finish activation.</p>
+        <span class="pill bad">Needs platform credentials</span>
+        <p>The Supabase service-role value is already in env and is not part of this handoff. The social publishing values still to collect are: <code>REPLACE_WITH_META_TOKEN</code>, <code>REPLACE_WITH_FACEBOOK_PAGE_ID</code>, <code>REPLACE_WITH_IG_BUSINESS_ACCOUNT_ID</code>, <code>REPLACE_WITH_LINKEDIN_TOKEN</code>, and <code>REPLACE_WITH_LINKEDIN_ORG_URN</code>.</p>
+        <p>This document collects only the remaining external platform values required to safely finish activation.</p>
       </article>
 
       <article class="card">
@@ -416,60 +641,100 @@
         <p class="hint">Use this as the message to Stefani and the SMM. Check items as access is collected. The checklist is saved after refresh.</p>
         <ol class="step-list">
           <li>
+            <label class="step-check" aria-label="Mark Meta admin access request complete">
+              <input data-save id="step_meta_access_request" type="checkbox" />
+              <span class="step-box"></span>
+            </label>
             <div>
               <strong>Ask Stefani for Meta admin access.</strong><br />
-              Ask: "Please add Aldridge/the implementation email to The Reach Meta Business Portfolio with access to the Facebook Page and the linked Instagram Business account. We need enough access to generate or authorize a Page token for publishing."
+              Ask: "Please add me to The Reach Meta Business Portfolio and give me access to the Facebook Page and the linked Instagram account. I need to collect the Page details and help connect the accounts for auto-publishing."
             </div>
           </li>
           <li>
+            <label class="step-check" aria-label="Mark Meta Business settings verification complete">
+              <input data-save id="step_meta_business_settings" type="checkbox" />
+              <span class="step-box"></span>
+            </label>
             <div>
               <strong>Go to Meta Business settings.</strong><br />
-              Open <code>business.facebook.com/settings</code>. Under People, verify the implementation email is added. Under Business assets, verify access to The Reach Facebook Page and The Reach Instagram account.
+              Open <code>business.facebook.com/settings</code>. Under People, verify your email is added. Under Business assets, verify access to The Reach Facebook Page and The Reach Instagram account.
             </div>
           </li>
           <li>
+            <label class="step-check" aria-label="Mark Facebook Page details collected">
+              <input data-save id="step_facebook_page_details" type="checkbox" />
+              <span class="step-box"></span>
+            </label>
             <div>
               <strong>Collect Facebook Page details.</strong><br />
               Get the official Page URL and Page ID. Put the Page ID in <code>FACEBOOK_PAGE_ID</code> below. This is the exact value used by the uploaded V4 Facebook node.
             </div>
           </li>
           <li>
+            <label class="step-check" aria-label="Mark Instagram Business Account ID collected">
+              <input data-save id="step_instagram_business_id" type="checkbox" />
+              <span class="step-box"></span>
+            </label>
             <div>
               <strong>Collect Instagram Business Account ID.</strong><br />
               Confirm the Instagram profile is Business/Creator and linked to the Page. Get the Instagram Business Account ID and put it in <code>INSTAGRAM_BUSINESS_ACCOUNT_ID</code> below.
             </div>
           </li>
           <li>
+            <label class="step-check" aria-label="Mark Meta Page token created">
+              <input data-save id="step_meta_page_token" type="checkbox" />
+              <span class="step-box"></span>
+            </label>
             <div>
               <strong>Create or authorize the Meta Page token.</strong><br />
               Use the Meta app/publishing setup to generate a token that can publish to the Page and linked Instagram account. Put that token in <code>META_PAGE_ACCESS_TOKEN</code>, or enter the vault item name if secrets are stored elsewhere.
             </div>
           </li>
           <li>
+            <label class="step-check" aria-label="Mark LinkedIn Page admin access request complete">
+              <input data-save id="step_linkedin_admin_access" type="checkbox" />
+              <span class="step-box"></span>
+            </label>
             <div>
               <strong>Ask Stefani for LinkedIn Page admin access.</strong><br />
-              Ask: "Please add Aldridge/the implementation email as an admin on The Reach LinkedIn Company Page so we can authorize organization posting."
+              Ask: "Please add me as an admin on The Reach LinkedIn Company Page. I need to collect the organization details and help connect LinkedIn for auto-publishing."
             </div>
           </li>
           <li>
+            <label class="step-check" aria-label="Mark LinkedIn Organization ID collected">
+              <input data-save id="step_linkedin_org_id" type="checkbox" />
+              <span class="step-box"></span>
+            </label>
             <div>
               <strong>Collect LinkedIn Organization ID.</strong><br />
               Open the LinkedIn Company Page admin area. Get the Organization ID and format it as <code>urn:li:organization:YOUR_ORG_ID</code>. Put it in <code>LINKEDIN_ORG_URN</code> below.
             </div>
           </li>
           <li>
+            <label class="step-check" aria-label="Mark LinkedIn access token created">
+              <input data-save id="step_linkedin_token" type="checkbox" />
+              <span class="step-box"></span>
+            </label>
             <div>
               <strong>Create or authorize the LinkedIn access token.</strong><br />
               Use the LinkedIn app/OAuth setup with organization posting permission. Put the token in <code>LINKEDIN_ACCESS_TOKEN</code>, or enter the vault item name.
             </div>
           </li>
           <li>
+            <label class="step-check" aria-label="Mark public media test files prepared">
+              <input data-save id="step_media_test_files" type="checkbox" />
+              <span class="step-box"></span>
+            </label>
             <div>
               <strong>Prepare public media test files.</strong><br />
               V4 resolves ordered media from <code>asset_urls</code> first, then falls back to <code>source_vault.rawFiles</code>. Test media must be reachable by platform APIs.
             </div>
           </li>
           <li>
+            <label class="step-check" aria-label="Mark handoff saved and downloaded">
+              <input data-save id="step_save_handoff" type="checkbox" />
+              <span class="step-box"></span>
+            </label>
             <div>
               <strong>Save this form.</strong><br />
               Fill the boxes below, press <strong>Save + Download TXT</strong>, and send the file named <code>THE_REACH_N8N_AUTOPUBLISH_HANDOFF.txt</code>.
@@ -480,7 +745,7 @@
 
       <article class="card">
         <h2>Collection Form</h2>
-        <p class="hint">Fields marked required are required by the uploaded Reach V4 workflow before it can be safely activated.</p>
+        <p class="hint">Fields marked required are the social-platform values we still need. Supabase service-role secrets are intentionally not requested here.</p>
         <div id="formHost"></div>
       </article>
 
@@ -493,7 +758,7 @@
       <article class="card half">
         <h2>Where Values Go Later</h2>
         <ul>
-          <li><strong>Claim Next Job node:</strong> replace <code>REPLACE_WITH_SERVICE_ROLE_KEY</code>.</li>
+          <li><strong>Claim Next Job node:</strong> uses the implementation-owned Supabase service-role value. Do not collect it from the SMM.</li>
           <li><strong>Publish Facebook node:</strong> replace <code>REPLACE_WITH_META_TOKEN</code> and <code>REPLACE_WITH_FACEBOOK_PAGE_ID</code>.</li>
           <li><strong>Publish Instagram node:</strong> replace <code>REPLACE_WITH_META_TOKEN</code> and <code>REPLACE_WITH_IG_BUSINESS_ACCOUNT_ID</code>.</li>
           <li><strong>Publish LinkedIn node:</strong> replace <code>REPLACE_WITH_LINKEDIN_TOKEN</code> and <code>REPLACE_WITH_LINKEDIN_ORG_URN</code>.</li>
@@ -514,17 +779,17 @@
   </main>
 
   <script>
-    const STORAGE_KEY = "the-reach-n8n-v27-handoff";
+    const STORAGE_KEY = "the-reach-n8n-v4-handoff";
     const FILE_NAME = "THE_REACH_N8N_AUTOPUBLISH_HANDOFF.txt";
 
     const checklistItems = [
-      "Stefani has added the implementation email to Meta Business Portfolio.",
-      "Implementation email has access to The Reach Facebook Page.",
-      "Implementation email has access to the linked The Reach Instagram Business account.",
+      "Stefani has added your email to Meta Business Portfolio.",
+      "Your email has access to The Reach Facebook Page.",
+      "Your email has access to the linked The Reach Instagram Business account.",
       "Facebook Page ID is confirmed and entered as FACEBOOK_PAGE_ID.",
       "Instagram Business Account ID is confirmed and entered as INSTAGRAM_BUSINESS_ACCOUNT_ID.",
       "Meta Page Access Token is available for META_PAGE_ACCESS_TOKEN.",
-      "Stefani has added the implementation email as LinkedIn Company Page admin.",
+      "Stefani has added your email as LinkedIn Company Page admin.",
       "LinkedIn Organization URN is confirmed and entered as LINKEDIN_ORG_URN.",
       "LinkedIn access token is available for LINKEDIN_ACCESS_TOKEN.",
       "One image and one video test asset have public/direct-download links.",
@@ -538,7 +803,7 @@
           ["prepared_by", "Prepared by", "text", false, ""],
           ["prepared_date", "Prepared date", "date", false, ""],
           ["stefani_contact", "Stefani contact email / phone", "text", false, ""],
-          ["implementation_email", "Implementation email Stefani should invite", "email", true, ""],
+          ["publishing_email", "Your email for platform access", "email", true, ""],
           ["approval_owner", "Final publish approval owner", "text", false, ""],
           ["approval_owner_email", "Approval owner email", "email", false, ""]
         ]
@@ -550,15 +815,17 @@
           ["n8n_workflow_name", "n8n workflow name", "text", true, "The Reach Auto-Publisher V4"],
           ["n8n_workflow_id", "n8n workflow ID", "text", true, "4lWcpeLvHdd7HGQF"],
           ["n8n_workflow_status", "n8n workflow status", "text", true, "inactive - placeholders still present"],
-          ["n8n_schedule", "Schedule", "text", false, "Every 1 minute"]
+          ["n8n_schedule", "Schedule", "text", false, "Every 1 minute"],
+          ["n8n_notify_node", "Published notification node", "text", false, "Notify Published -> /api/notifications/published"]
         ]
       },
       {
-        title: "Claim Next Job Node",
-        pills: ["Required", "Reach V4"],
+        title: "Implementation-Owned Runtime Values",
+        pills: ["Already in env", "Do not collect from SMM"],
         fields: [
-          ["supabase_url", "Reach Supabase URL", "text", true, "https://gxmpmdhmxyfqusdzcemt.supabase.co"],
-          ["supabase_service_role_key", "SUPABASE_SERVICE_ROLE_KEY or vault item", "textarea", true, ""],
+          ["supabase_url", "Reach Supabase URL", "text", false, "https://gxmpmdhmxyfqusdzcemt.supabase.co"],
+          ["supabase_service_role_status", "SUPABASE_SERVICE_ROLE_KEY status", "text", false, "Already present in implementation env; do not paste or send this secret in this handoff."],
+          ["admin_alerts_status", "Admin alert status", "text", false, "Telegram + SMTP are portal-owned env values; published alerts go to active admins, creative directors, and superadmin."],
           ["worker_id_note", "Worker ID generated by workflow", "text", false, "n8n-the-reach-<execution id>"],
           ["claim_seconds", "p_claim_seconds", "text", false, "120"]
         ]
@@ -567,7 +834,7 @@
         title: "Meta Access Steps",
         pills: ["Ask Stefani", "Facebook + Instagram"],
         fields: [
-          ["meta_access_request", "Exact request to Stefani", "textarea", false, "Please add the implementation email to The Reach Meta Business Portfolio with access to the Facebook Page and linked Instagram Business account. We need enough access to authorize publishing through the Meta app."],
+          ["meta_access_request", "Exact request to Stefani", "textarea", false, "Please add me to The Reach Meta Business Portfolio and give me access to the Facebook Page and the linked Instagram account. I need to collect the Page details and help connect the accounts for auto-publishing."],
           ["meta_business_name", "Meta Business Portfolio name", "text", false, ""],
           ["meta_business_id", "Meta Business Portfolio ID", "text", false, ""],
           ["fb_page_name", "Facebook Page name", "text", false, ""],
@@ -584,7 +851,7 @@
         title: "LinkedIn Access Steps",
         pills: ["Ask Stefani", "LinkedIn"],
         fields: [
-          ["linkedin_access_request", "Exact request to Stefani", "textarea", false, "Please add the implementation email as an admin on The Reach LinkedIn Company Page so we can authorize organization posting."],
+          ["linkedin_access_request", "Exact request to Stefani", "textarea", false, "Please add me as an admin on The Reach LinkedIn Company Page. I need to collect the organization details and help connect LinkedIn for auto-publishing."],
           ["linkedin_page_name", "LinkedIn Company Page name", "text", false, ""],
           ["linkedin_page_url", "LinkedIn Company Page URL", "url", false, ""],
           ["linkedin_org_id", "LinkedIn Organization ID", "text", true, ""],
@@ -622,7 +889,7 @@
         title: "Do Not Treat As Required",
         pills: ["Hallucination guard"],
         fields: [
-          ["not_required", "Not required by uploaded V4", "textarea", false, "The uploaded V4 file does not require YouTube token, TikTok token, N8N_API_KEY, N8N_URL, Google service account JSON, or Google Drive folder ID. Do not block this handoff on those unless the workflow is upgraded."]
+          ["not_required", "Not required by uploaded V4", "textarea", false, "The uploaded V4 file does not require YouTube token, TikTok token, N8N_API_KEY, N8N_URL, Google service account JSON, Google Drive folder ID, SMTP secrets, or Telegram secrets from the SMM. Portal env owns internal notifications."]
         ]
       }
     ];
@@ -684,7 +951,7 @@
           const [id, label, type, required, placeholder, options] = field;
           const wrap = document.createElement("div");
           wrap.className = type === "textarea" ? "field full" : "field";
-          const req = required ? '<span class="req"> required</span>' : '<span class="opt"> optional</span>';
+          const req = required ? '<span class="req">(required)</span>' : '<span class="opt">(optional)</span>';
           let input = "";
 
           if (type === "textarea") {
@@ -756,14 +1023,16 @@
 
       out += "HALLUCINATION GUARD\n";
       out += "- Required fields are based on the uploaded Reach V4 workflow only.\n";
-      out += "- Reach V4 required runtime placeholders: SUPABASE_SERVICE_ROLE_KEY, META_PAGE_ACCESS_TOKEN, FACEBOOK_PAGE_ID, INSTAGRAM_BUSINESS_ACCOUNT_ID, LINKEDIN_ACCESS_TOKEN, LINKEDIN_ORG_URN.\n";
+      out += "- Reach V4 runtime values: SUPABASE_SERVICE_ROLE_KEY, META_PAGE_ACCESS_TOKEN, FACEBOOK_PAGE_ID, INSTAGRAM_BUSINESS_ACCOUNT_ID, LINKEDIN_ACCESS_TOKEN, LINKEDIN_ORG_URN.\n";
+      out += "- Portal env already owns SUPABASE_SERVICE_ROLE_KEY, SMTP_*, TELEGRAM_BOT_TOKEN, and TELEGRAM_ADMIN_CHAT_ID. Do not ask the SMM to send those internal secrets.\n";
+      out += "- Values to collect here are only the Meta token/Page ID/Instagram Business Account ID and LinkedIn token/organization URN.\n";
       out += "- Reach V4 does not require YouTube token, TikTok token, Google service account JSON, N8N_API_KEY, or N8N_URL for runtime publishing.\n";
       out += "- Do not activate the n8n workflow until every placeholder is replaced and dry-run/manual test passes.\n\n";
 
       out += "EXACT STEFANI REQUESTS\n";
-      out += "1. Ask Stefani to add the implementation email to The Reach Meta Business Portfolio with access to the Facebook Page and linked Instagram Business account.\n";
+      out += "1. Ask Stefani to add your email to The Reach Meta Business Portfolio with access to the Facebook Page and linked Instagram account.\n";
       out += "2. Ask Stefani to confirm the official Facebook Page URL, Facebook Page ID, Instagram handle, and Instagram Business Account ID.\n";
-      out += "3. Ask Stefani to add the implementation email as admin on The Reach LinkedIn Company Page.\n";
+      out += "3. Ask Stefani to add your email as admin on The Reach LinkedIn Company Page.\n";
       out += "4. Ask Stefani to confirm the LinkedIn Company Page URL and Organization ID.\n";
       out += "5. Ask Stefani/SMM to provide one public test image and one public test video link that platform APIs can download.\n\n";
 
@@ -786,7 +1055,8 @@
 
       out += "\n\nWHERE THESE VALUES GO IN THE UPLOADED REACH V4 WORKFLOW\n";
       out += "- n8n workflow ID: 4lWcpeLvHdd7HGQF.\n";
-      out += "- Claim Next Job node: replace REPLACE_WITH_SERVICE_ROLE_KEY.\n";
+      out += "- Claim Next Job node: uses the implementation-owned Supabase service-role value. Do not request this secret from the SMM.\n";
+      out += "- Notify Published node: calls /api/notifications/published after Finalize + Audit; the portal sends Telegram and the HTML email.\n";
       out += "- Publish Facebook node: replace REPLACE_WITH_META_TOKEN and REPLACE_WITH_FACEBOOK_PAGE_ID.\n";
       out += "- Publish Instagram node: replace REPLACE_WITH_META_TOKEN and REPLACE_WITH_IG_BUSINESS_ACCOUNT_ID.\n";
       out += "- Publish LinkedIn node: replace REPLACE_WITH_LINKEDIN_TOKEN and REPLACE_WITH_LINKEDIN_ORG_URN.\n";
