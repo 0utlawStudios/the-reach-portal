@@ -12,6 +12,7 @@ function getAdminClient() {
 }
 
 type AdminClient = ReturnType<typeof getAdminClient>;
+const PROTECTED_ADMIN_ROLES = new Set(["superadmin", "admin", "owner"]);
 
 /** Find an existing auth user by email using paginated listUsers. */
 async function findAuthUserByEmail(admin: AdminClient, email: string) {
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
     const admin = getAdminClient();
     const { data: targetMember, error: targetErr } = await admin
       .from("team_members")
-      .select("id, email")
+      .select("id, email, role, status")
       .eq("id", body.memberId)
       .maybeSingle();
     if (targetErr) {
@@ -67,10 +68,30 @@ export async function POST(request: NextRequest) {
     if (targetEmail !== memberEmail) {
       return NextResponse.json({ error: "Member id/email mismatch" }, { status: 409 });
     }
+    const targetRole = String(targetMember.role || "").toLowerCase();
+    const targetStatus = String(targetMember.status || "").toLowerCase();
 
     // ─── Guard against self-removal (no one can lock themselves out) ───
     if (targetEmail === actorEmail) {
       return NextResponse.json({ error: "You cannot remove yourself" }, { status: 400 });
+    }
+
+    if (PROTECTED_ADMIN_ROLES.has(targetRole) && ctx.role !== "superadmin") {
+      return NextResponse.json({ error: "Only a superadmin can remove an admin-level member" }, { status: 403 });
+    }
+
+    if (targetRole === "superadmin" && targetStatus === "active") {
+      const { data: activeSuperadmins, error: superadminErr } = await admin
+        .from("team_members")
+        .select("id")
+        .eq("role", "superadmin")
+        .eq("status", "active");
+      if (superadminErr) {
+        throw new Error(`Superadmin safety check failed: ${superadminErr.message}`);
+      }
+      if (!activeSuperadmins || activeSuperadmins.length <= 1) {
+        return NextResponse.json({ error: "Cannot remove the last active superadmin" }, { status: 400 });
+      }
     }
 
     const authUser = await findAuthUserByEmail(admin, targetEmail);

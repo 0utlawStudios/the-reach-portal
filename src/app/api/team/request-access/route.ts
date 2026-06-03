@@ -6,6 +6,11 @@ import { consume, getClientIp } from "@/lib/rate-limit";
 export const maxDuration = 10;
 
 const BASELINE_WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
+const GENERIC_RECEIVED_RESPONSE = {
+  success: true,
+  status: "received",
+  message: "If this email can request access, an admin will review it.",
+};
 
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -58,19 +63,14 @@ export async function POST(request: NextRequest) {
     }
 
     if (existingMember) {
-      return NextResponse.json(
-        {
-          error: "This email is already in the team list. Ask an admin to resend the invite or update the account.",
-          status: existingMember.status || "team_member",
-        },
-        { status: 409 },
-      );
+      return NextResponse.json(GENERIC_RECEIVED_RESPONSE);
     }
 
     const { data: pendingReq, error: pendingErr } = await admin
       .from("signup_requests")
       .select("id")
       .eq("email", email)
+      .eq("workspace_id", BASELINE_WORKSPACE_ID)
       .eq("status", "pending")
       .maybeSingle();
     if (pendingErr) {
@@ -79,11 +79,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (pendingReq) {
-      return NextResponse.json({
-        success: true,
-        status: "already_pending",
-        message: "Your request is already pending review.",
-      });
+      return NextResponse.json(GENERIC_RECEIVED_RESPONSE);
     }
 
     const requestRow = {

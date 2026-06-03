@@ -1,4 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "fs";
+import { join } from "path";
+
+const SIGNUP_REQUESTS_WORKSPACE_MIGRATION_SRC = readFileSync(
+  join(process.cwd(), "supabase/migrations/0040_signup_requests_workspace_hardening.sql"),
+  "utf8",
+);
 
 type MockResult = { data?: unknown; error?: { message: string } | null };
 
@@ -106,6 +113,12 @@ beforeEach(() => {
 });
 
 describe("POST /api/team/request-access", () => {
+  it("keeps signup request workspace scope non-null in migration history", () => {
+    expect(SIGNUP_REQUESTS_WORKSPACE_MIGRATION_SRC).toContain("ALTER COLUMN workspace_id SET NOT NULL");
+    expect(SIGNUP_REQUESTS_WORKSPACE_MIGRATION_SRC).toContain("workspace_id = '00000000-0000-0000-0000-000000000001'");
+    expect(SIGNUP_REQUESTS_WORKSPACE_MIGRATION_SRC).not.toContain("workspace_id is null");
+  });
+
   it("saves a new request with the baseline workspace before notifying admins", async () => {
     const res = await POST(makeRequest({
       name: "Hanes Abasola",
@@ -147,12 +160,16 @@ describe("POST /api/team/request-access", () => {
     expect(sendMail).not.toHaveBeenCalled();
   });
 
-  it("returns a real conflict when the email already belongs to the team", async () => {
+  it("returns a generic received response when the email already belongs to the team", async () => {
     tableResults.team_members.maybeSingle = { data: { id: "member-1", status: "active" }, error: null };
 
     const res = await POST(makeRequest({ name: "Aldridge", email: "aldridge@ten80ten.com" }));
 
-    expect(res.status).toBe(409);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({ success: true, status: "received" });
+    expect(JSON.stringify(body)).not.toContain("active");
+    expect(JSON.stringify(body)).not.toContain("team_member");
     expect(operations.some((op) => op.table === "signup_requests" && op.method === "insert")).toBe(false);
     expect(sendMail).not.toHaveBeenCalled();
   });
@@ -164,7 +181,8 @@ describe("POST /api/team/request-access", () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toMatchObject({ success: true, status: "already_pending" });
+    expect(body).toMatchObject({ success: true, status: "received" });
+    expect(JSON.stringify(body)).not.toContain("pending review");
     expect(operations.some((op) => op.table === "signup_requests" && op.method === "insert")).toBe(false);
     expect(sendMail).not.toHaveBeenCalled();
   });
