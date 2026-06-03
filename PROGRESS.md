@@ -3,8 +3,19 @@
 Phase: IN PROGRESS - production-readiness QA and Reach polish
 Last pushed functional SHA: dc4d234 fix: normalize qa cleanup audit actors
 Last verified tracking SHA: a95f1dc docs: record theme schema and production drag qa
-Next: Wait for CI/Vercel on dc4d234, then continue the remaining production QA backlog.
+Next: Wait for CI/Vercel on dc4d234/2ff33f8, then continue the remaining production QA backlog.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
+
+Drive/media production QA slice notes:
+
+- Ran a live production Drive upload proof against `https://thereach.ten80ten.com`.
+- Authenticated as Aldridge and uploaded a tiny PNG through `/api/drive/proxy-upload` to the `media-library` folder. The route returned a Drive file ID and `/api/drive/stream` URL.
+- Verified the Google Drive file metadata directly: image/png, 68 bytes, not trashed, parented under the app-managed media-library folder.
+- Verified `/api/drive/stream` returns HTTP 200 with `image/png` and the expected bytes when called with a Bearer token.
+- Inserted a matching Supabase `media_assets` row with baseline workspace `00000000-0000-0000-0000-000000000001`, folder `Media Library`, and the Drive stream URL, matching what the Media Library UI does after upload.
+- Verified `/api/drive/stream` returns HTTP 200 with a same-origin `Referer` after the media row exists, proving browser media previews can load without exposing arbitrary Drive files.
+- Cleaned up the Supabase `media_assets` test row.
+- Google Drive permanent DELETE returned 404 for shared-drive files even when metadata was readable, so cleanup used Drive PATCH `{ trashed: true }`; both temporary QA image files from the failed and passing run are now trashed.
 
 QA cleanup audit actor normalization slice notes:
 
