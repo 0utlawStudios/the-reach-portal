@@ -2,8 +2,8 @@
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
 Last pushed functional SHA: 03218aa fix: harden pipeline notification boundaries
-Last verified tracking SHA: 1ee4e8f docs: record auth hardening deployment
-Next: Verify GitHub/Vercel for `03218aa`, then run production QA on live auth/invite/request/support/drag/health.
+Last verified tracking SHA: c38f754 docs: record pipeline notification hardening
+Next: Run production QA on live auth/invite/request/support/drag/health.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
 
 Auth audit/avatar boundary hardening slice notes:
@@ -34,7 +34,9 @@ Pipeline notification boundary hardening slice notes:
 - Notification audit rows now pass `p_workspace_id: ctx.workspaceId`.
 - Added static regression coverage for create-card temp/real-id reconciliation and active-workspace notification route guards.
 - Verification passed locally: focused pipeline/notification tests (44), `git diff --check`, `npm run typecheck`, `npm run lint` with the existing AI worker warning only, full `npm test` with 29 files / 259 tests, and `npm run build`.
-- Pushed functional commit `03218aa` to `origin/main`; GitHub CI and Vercel deployment verification are pending.
+- Pushed functional commit `03218aa` and tracking commit `c38f754` to `origin/main`.
+- GitHub CI passed for `c38f754`; Vercel production deployment `https://the-reach-portal-5p3e4ddqo-0utlawstudios-projects.vercel.app` is ready and serving the live domain.
+- Production health after deploy passed: `https://thereach.ten80ten.com/api/health/keep-alive` returned HTTP 200 and `https://thereach.ten80ten.com/api/health/deep-check` returned HTTP 200 with 0 failures and 0 warnings.
 
 Team request lifecycle hardening slice notes:
 
