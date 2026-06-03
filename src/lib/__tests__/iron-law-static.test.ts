@@ -20,6 +20,8 @@ const PIPELINE_SRC = readFileSync(PIPELINE_PATH, "utf8");
 const ASSET_DRAWER_SRC = readFileSync(join(process.cwd(), "src/components/asset-review-drawer.tsx"), "utf8");
 const CONTENT_CARD_SRC = readFileSync(join(process.cwd(), "src/components/content-card.tsx"), "utf8");
 const AUDIT_SRC = readFileSync(join(process.cwd(), "src/lib/audit.ts"), "utf8");
+const DEEP_CHECK_SRC = readFileSync(join(process.cwd(), "src/app/api/health/deep-check/route.ts"), "utf8");
+const POST_SAFETY_MIGRATION_SRC = readFileSync(join(process.cwd(), "supabase/migrations/0015_post_safety.sql"), "utf8");
 const NOTIFICATIONS_SHARED_SRC = readFileSync(join(process.cwd(), "src/app/api/notifications/_shared.ts"), "utf8");
 const NOTIFICATION_ROUTE_SRCS = [
   "approved",
@@ -250,6 +252,14 @@ describe("iron-law guards in audit.ts", () => {
       /from\(['"]post_audit_logs['"]\)\.(insert|update|delete|upsert)/,
     );
     expect(AUDIT_SRC).toMatch(/rpc\(['"]record_audit_event['"]/);
+  });
+
+  it("does not report expected post_hard_deleted audit rows as orphaned health failures", () => {
+    expect(POST_SAFETY_MIGRATION_SRC).toContain("'post_hard_deleted'");
+    expect(DEEP_CHECK_SRC).toContain("const deletedPostAuditIds = new Set");
+    expect(DEEP_CHECK_SRC).toContain('a.action === "post_hard_deleted"');
+    expect(DEEP_CHECK_SRC).toContain("!deletedPostAuditIds.has(a.entity_id)");
+    expect(DEEP_CHECK_SRC).toContain("expectedDeletedPostAudits");
   });
 });
 

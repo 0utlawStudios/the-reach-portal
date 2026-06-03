@@ -411,9 +411,21 @@ export async function GET(req: Request) {
 
     // Audit logs referencing non-existent posts.
     // SEC-007: audit_log_v2 uses entity_id (scoped to entity_type 'post').
+    // IRON-LAW: migration 0015 intentionally writes `post_hard_deleted`
+    // BEFORE a post row is removed. Once that delete audit exists, older audit
+    // rows for the same post are expected historical evidence, not orphaned
+    // corruption.
+    const deletedPostAuditIds = new Set(
+      allAuditLogs
+        .filter((a) => a.entity_type === "post" && a.entity_id && a.action === "post_hard_deleted")
+        .map((a) => a.entity_id),
+    );
     const auditSample = allAuditLogs.slice(0, 200);
     const orphanedAudits = (auditSample || []).filter(
-      (a) => a.entity_type === "post" && a.entity_id && !postIds.has(a.entity_id),
+      (a) => a.entity_type === "post" && a.entity_id && !postIds.has(a.entity_id) && !deletedPostAuditIds.has(a.entity_id),
+    );
+    const expectedDeletedPostAudits = (auditSample || []).filter(
+      (a) => a.entity_type === "post" && a.entity_id && !postIds.has(a.entity_id) && deletedPostAuditIds.has(a.entity_id),
     );
 
     const issues: string[] = [];
@@ -422,8 +434,8 @@ export async function GET(req: Request) {
     if (orphanedAudits.length > 0) issues.push(`${orphanedAudits.length} audit entries referencing deleted posts (sampled 200)`);
 
     checks["10_cross_table_integrity"] = issues.length > 0
-      ? warn(issues.join("; "), { unknownCreators: uniqueUnknown, orphanedMedia: orphanedMedia.length, orphanedAudits: orphanedAudits.length })
-      : pass("All cross-table references valid");
+      ? warn(issues.join("; "), { unknownCreators: uniqueUnknown, orphanedMedia: orphanedMedia.length, orphanedAudits: orphanedAudits.length, expectedDeletedPostAudits: expectedDeletedPostAudits.length })
+      : pass("All cross-table references valid", { expectedDeletedPostAudits: expectedDeletedPostAudits.length });
   } catch (e: unknown) {
     checks["10_cross_table_integrity"] = fail(`Integrity check error: ${errorMessage(e)}`);
   }
