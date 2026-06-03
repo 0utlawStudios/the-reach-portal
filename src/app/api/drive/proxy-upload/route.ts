@@ -11,6 +11,7 @@ import {
   ALLOWED_DRIVE_ROLES,
   isAllowedDriveMediaMime,
   MAX_DRIVE_MEDIA_FILE_SIZE,
+  MAX_DRIVE_PROXY_FILE_SIZE,
   normalizeDriveMimeType,
   VALID_DRIVE_FOLDERS,
 } from "@/lib/drive-policy";
@@ -57,6 +58,12 @@ export async function POST(request: NextRequest) {
     }
     if (file.size > MAX_DRIVE_MEDIA_FILE_SIZE) {
       return jsonResponse({ error: `File exceeds ${MAX_DRIVE_MEDIA_FILE_SIZE / (1024 * 1024)}MB limit.` }, 413);
+    }
+    if (file.size > MAX_DRIVE_PROXY_FILE_SIZE) {
+      return jsonResponse(
+        { error: `File exceeds the ${MAX_DRIVE_PROXY_FILE_SIZE / (1024 * 1024)}MB proxy limit. Use resumable upload.` },
+        413,
+      );
     }
 
     // Resolve subfolder

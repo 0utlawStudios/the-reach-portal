@@ -29,6 +29,7 @@ export const ALLOWED_MEDIA_MIME_TYPES = new Set<string>([
 ]);
 
 export const MAX_DRIVE_MEDIA_FILE_SIZE = 250 * 1024 * 1024;
+export const MAX_DRIVE_PROXY_FILE_SIZE = 4 * 1024 * 1024;
 
 export function normalizeDriveMimeType(value: unknown): string {
   return typeof value === "string" && value.trim()

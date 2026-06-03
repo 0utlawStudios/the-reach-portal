@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { setPublicPermission, getStreamUrl, getFileMetadata } from "@/lib/google-drive";
+import { ensureSubfolder, getRootFolderId, setPublicPermission, getStreamUrl, getFileMetadata } from "@/lib/google-drive";
 import { requireBearerTeamRole } from "@/lib/auth/require";
 import { consume, getClientIp } from "@/lib/rate-limit";
+import { VALID_DRIVE_FOLDERS } from "@/lib/drive-policy";
 
 export const maxDuration = 10;
 
@@ -10,9 +11,8 @@ export const maxDuration = 10;
 // audit logs.
 const DRIVE_FILE_ID_RE = /^[a-zA-Z0-9_-]{20,80}$/;
 
-// Any active team member can finalize — finalize just toggles `public`
-// on a Drive file the caller already produced via proxy-upload. Viewer
-// is fine here.
+// Any active team member can finalize, but the file must already live under
+// one of this app's managed Drive folders before permissions are changed.
 const ALLOWED_FINALIZE_ROLES: ReadonlyArray<string> = [
   "superadmin",
   "admin",
@@ -59,11 +59,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid fileId" }, { status: 400 });
     }
 
+    // Get metadata before changing permissions. A valid-looking file ID is not
+    // enough: the service account may see other files, and this route must not
+    // publicize arbitrary Drive content.
+    const meta = await getFileMetadata(fileId);
+    const rootId = getRootFolderId();
+    const allowedParentIds = await Promise.all(VALID_DRIVE_FOLDERS.map((folder) => ensureSubfolder(folder, rootId)));
+    const belongsToAppFolder = meta.parents.some((parentId) => allowedParentIds.includes(parentId));
+    if (!belongsToAppFolder) {
+      return NextResponse.json({ error: "File is not in an app-managed Drive folder" }, { status: 403 });
+    }
+
     // Set public permission so the file is servable
     await setPublicPermission(fileId);
 
-    // Get file metadata to determine serving URL
-    const meta = await getFileMetadata(fileId);
     const isImage = meta.mimeType.startsWith("image/");
     const isVideo = meta.mimeType.startsWith("video/");
 

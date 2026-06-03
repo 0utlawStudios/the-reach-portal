@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { getAccessToken, getFileMetadata } from "@/lib/google-drive";
+import { ensureSubfolder, getAccessToken, getFileMetadata, getRootFolderId } from "@/lib/google-drive";
+import { VALID_DRIVE_FOLDERS } from "@/lib/drive-policy";
 
 export const maxDuration = 60; // Fluid Compute — stays alive while streaming
 
@@ -38,16 +39,70 @@ export async function OPTIONS(request: NextRequest) {
   return new Response(null, { status: 204, headers: corsHeadersFor(request) });
 }
 
-// SEC-003: Validate the request has SOME form of authentication context.
-// `<img>` and `<video>` tags cannot carry an Authorization header, so we
-// accept EITHER:
-//   (a) a same-origin Referer matching ALLOWED_ORIGINS — proves the request
-//       came from our own page that the user already authenticated into; OR
-//   (b) an `Authorization: Bearer <supabase-jwt>` validated via admin.getUser.
-// Neither present → 401. The CORS narrowing alone wasn't sufficient because
-// it doesn't block a credentialled curl/script.
-async function checkAuth(req: NextRequest): Promise<{ ok: boolean; authed: boolean }> {
-  // (a) Referer check
+function serviceRoleClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceKey) return null;
+  return createClient(url, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
+function sourceReferencesDriveFile(value: unknown, fileId: string): boolean {
+  if (typeof value === "string") return value.includes(fileId);
+  if (Array.isArray(value)) return value.some((item) => sourceReferencesDriveFile(item, fileId));
+  if (value && typeof value === "object") {
+    return Object.values(value as Record<string, unknown>).some((item) => sourceReferencesDriveFile(item, fileId));
+  }
+  return false;
+}
+
+async function isKnownAppDriveFile(fileId: string): Promise<boolean> {
+  const admin = serviceRoleClient();
+  if (!admin) return false;
+
+  const [media, posts] = await Promise.all([
+    admin
+      .from("media_assets")
+      .select("id")
+      .ilike("url", `%${fileId}%`)
+      .limit(1),
+    admin
+      .from("posts")
+      .select("id, thumbnail_url, source_vault")
+      .or(`thumbnail_url.ilike.%${fileId}%`)
+      .limit(1),
+  ]);
+  if (!media.error && media.data && media.data.length > 0) return true;
+  if (!posts.error && posts.data && posts.data.length > 0) return true;
+
+  const { data: sourceRows, error: sourceError } = await admin
+    .from("posts")
+    .select("id, source_vault")
+    .not("source_vault", "is", null)
+    .limit(1000);
+  if (sourceError || !sourceRows) return false;
+  return sourceRows.some((row) => sourceReferencesDriveFile(row.source_vault, fileId));
+}
+
+async function isInAppManagedDriveFolder(fileId: string): Promise<boolean> {
+  try {
+    const [meta, rootId] = await Promise.all([getFileMetadata(fileId), Promise.resolve(getRootFolderId())]);
+    const allowedParentIds = await Promise.all(VALID_DRIVE_FOLDERS.map((folder) => ensureSubfolder(folder, rootId)));
+    return meta.parents.some((parentId) => allowedParentIds.includes(parentId));
+  } catch {
+    return false;
+  }
+}
+
+// SEC-003: Validate the request has a real auth context, or the file is an
+// app-owned Drive file requested by a same-origin media tag. Raw Referer trust
+// is not enough because it can be forged; the referer fallback is constrained
+// to file IDs already referenced by app rows or physically inside app-managed
+// Drive folders.
+async function checkAuth(req: NextRequest, fileId: string): Promise<{ ok: boolean; authed: boolean }> {
+  // Media tag fallback: allowed only for file IDs already present in app data
+  // or physically inside one of the app-managed Drive folders.
   const referer = req.headers.get("referer") || "";
   let refOk = false;
   if (referer) {
@@ -58,17 +113,13 @@ async function checkAuth(req: NextRequest): Promise<{ ok: boolean; authed: boole
     }
   }
 
-  // (b) Bearer-token check
+  // Bearer-token check.
   const token = req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
   let tokenOk = false;
   if (token) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (url && serviceKey) {
+    const admin = serviceRoleClient();
+    if (admin) {
       try {
-        const admin = createClient(url, serviceKey, {
-          auth: { autoRefreshToken: false, persistSession: false },
-        });
         const { data, error } = await admin.auth.getUser(token);
         tokenOk = !error && !!data.user;
       } catch {
@@ -77,7 +128,11 @@ async function checkAuth(req: NextRequest): Promise<{ ok: boolean; authed: boole
     }
   }
 
-  return { ok: refOk || tokenOk, authed: tokenOk };
+  if (tokenOk) return { ok: true, authed: true };
+  return {
+    ok: refOk && (await isKnownAppDriveFile(fileId) || await isInAppManagedDriveFolder(fileId)),
+    authed: false,
+  };
 }
 
 // ─── Stream proxy with Range support ───
@@ -94,14 +149,7 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  // SEC-003: Layered access gate. Previous note here said hard auth was not
-  // possible because <img>/<video> tags can't send Authorization headers.
-  // True — but those tags DO send a Referer, and that referer reliably comes
-  // from our own page (which is already auth-walled at the app layer). So
-  // accept either a same-origin Referer OR an explicit Bearer token. This
-  // blocks the anonymous-curl / hot-link scraping vector while keeping
-  // image/video tags working unchanged inside the app.
-  const auth = await checkAuth(request);
+  const auth = await checkAuth(request, fileId);
   if (!auth.ok) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,

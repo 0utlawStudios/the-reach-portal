@@ -178,7 +178,7 @@ export function getStreamUrl(fileId: string): string {
 // ─── File metadata ───
 
 export async function getFileMetadata(fileId: string) {
-  const res = await driveFetch(`${DRIVE_API}/files/${fileId}?fields=id,name,mimeType,size&supportsAllDrives=true`);
+  const res = await driveFetch(`${DRIVE_API}/files/${fileId}?fields=id,name,mimeType,size,parents&supportsAllDrives=true`);
   if (!res.ok) {
     const err = await res.text();
     throw new Error(`Failed to get file metadata: ${res.status} ${err}`);
@@ -189,5 +189,6 @@ export async function getFileMetadata(fileId: string) {
     name: data.name as string,
     mimeType: data.mimeType as string,
     size: Number(data.size || 0),
+    parents: Array.isArray(data.parents) ? data.parents as string[] : [],
   };
 }
