@@ -1,10 +1,20 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed functional SHA: dc4d234 fix: normalize qa cleanup audit actors
-Last verified tracking SHA: a95f1dc docs: record theme schema and production drag qa
-Next: Wait for CI/Vercel on dc4d234/2ff33f8, then continue the remaining production QA backlog.
+Last pushed functional SHA: 5308a79 fix: ignore expected deleted post audit rows
+Last verified tracking SHA: 69cd0e3 docs: record drive media production qa
+Next: Wait for CI/Vercel on 5308a79, then re-run live deep-check and continue the production QA backlog.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
+
+Health deep-check deleted-post audit slice notes:
+
+- Production keep-alive returned HTTP 200.
+- Production deep-check returned HTTP 200 with 0 failures and 1 warning: cross-table integrity counted audit rows referencing deleted posts.
+- Root cause: migration `0015_post_safety.sql` intentionally writes `post_hard_deleted` audit rows before a post is removed; historical audit rows for the same deleted post are expected evidence, not data corruption.
+- Updated `/api/health/deep-check` to build a set of post IDs with `post_hard_deleted` audit entries and exclude those expected deleted-post audit rows from orphan warnings.
+- Added an iron-law static regression so health checks keep honoring the post-delete audit trigger contract.
+- Verification passed: focused iron-law static test, `git diff --check`, `npm run typecheck`, `npm run lint` with the existing AI worker warning only, full `npm test` with 29 files / 261 tests, and `npm run build`.
+- Pushed functional commit `5308a79` to `origin/main`.
 
 Drive/media production QA slice notes:
 
