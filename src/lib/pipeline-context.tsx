@@ -15,6 +15,7 @@ import { APP_TIMEZONE, formatDateTimeCompact, isValidUuid } from "./utils";
 const MENTION_RE = /@[a-zA-Z][\w.-]*/;
 
 const STORAGE_KEY = "pipeline_cards";
+const BASELINE_WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 const POSTS_SELECT_FULL = "*, publish_jobs(state, platform_publish_attempts(platform, state, external_post_id))";
 const POSTS_SELECT_BASIC = "*";
 
@@ -318,7 +319,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
   const [isEditingOnOpen, setIsEditingOnOpen] = useState(false);
   const [pendingReapproval, setPendingReapproval] = useState<PendingReapproval | null>(null);
   const [pendingKickback, setPendingKickback] = useState<PendingKickback | null>(null);
-  const [workspaceId, setWorkspaceId] = useState<string>("00000000-0000-0000-0000-000000000001");
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const hydrated = useRef(false);
   const postsSelect = useRef(POSTS_SELECT_FULL);
   const workspaceIdRef = useRef<string | null>(null);
@@ -343,6 +344,23 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     recentMutations.current.add(id);
     setTimeout(() => recentMutations.current.delete(id), 10000);
   };
+
+  const activeWorkspaceId = workspaceId || BASELINE_WORKSPACE_ID;
+
+  const postNotification = useCallback(async (path: string, body: Record<string, unknown>) => {
+    const token = accessToken || (await supabase.auth.getSession()).data.session?.access_token;
+    const headers: HeadersInit = { "Content-Type": "application/json" };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(path, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      throw new Error(`${path} failed with HTTP ${res.status}${detail ? `: ${detail.slice(0, 220)}` : ""}`);
+    }
+  }, [accessToken]);
 
   // ─── Initial data load ───
   useEffect(() => {
@@ -373,6 +391,10 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
               }
             }
           } catch { /* continue — workspace_id fallback applies on insert */ }
+          if (!workspaceIdRef.current) {
+            workspaceIdRef.current = BASELINE_WORKSPACE_ID;
+            setWorkspaceId(BASELINE_WORKSPACE_ID);
+          }
 
           // Try full select (with publish_jobs join); fall back if tables missing
           let result = await supabase.from("posts").select(POSTS_SELECT_FULL).order("created_at", { ascending: false });
@@ -393,13 +415,13 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
     }
     load();
-  }, [useSupabase]);
+  }, [useSupabase, provisionResult?.workspaceId, accessToken]);
 
   // ─── Realtime subscription ───
   useEffect(() => {
-    if (!useSupabase || !workspaceIdRef.current) return;
+    if (!useSupabase || !workspaceId) return;
 
-    const wsId = workspaceIdRef.current;
+    const wsId = workspaceId;
     const channel = supabase
       .channel(`posts-realtime-${wsId}`)
       .on(
@@ -421,7 +443,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
         { event: "UPDATE", schema: "public", table: "posts", filter: `workspace_id=eq.${wsId}` },
         (payload) => {
           const updated = dbToCard(payload.new as PostRow);
-          if (recentMutations.current.has(updated.id)) return;
+          recentMutations.current.delete(updated.id);
           setCards((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
           // Also update selectedCard if it's the same post
           setSelectedCard((prev) => (prev?.id === updated.id ? updated : prev));
@@ -574,39 +596,28 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
             }
           }
 
-          supabase.auth.getSession().then(({ data: { session } }) => {
-            const headers: HeadersInit = { "Content-Type": "application/json" };
-            if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
-            fetch("/api/notifications/approved", {
-              method: "POST",
-              headers,
-              body: JSON.stringify({
-                postId: cardId,
-                postTitle: card?.title || "",
-                approvedBy: currentUser.name,
-                createdBy: card?.createdBy || "",
-              }),
-            }).catch((e) => console.error("[pipeline] approved notify failed:", e));
-          }).catch(() => {});
+          postNotification("/api/notifications/approved", {
+            postId: cardId,
+            postTitle: card?.title || "",
+            approvedBy: currentUser.name,
+            createdBy: card?.createdBy || "",
+          }).catch((e) => console.error("[pipeline] approved notify failed:", e));
         }
 
         if (newStage === "awaiting_approval") {
-          supabase.auth.getSession().then(({ data: { session } }) => {
-            const headers: HeadersInit = { "Content-Type": "application/json" };
-            if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
-            fetch("/api/notifications/awaiting-approval", {
-              method: "POST",
-              headers,
-              body: JSON.stringify({ postId: cardId, postTitle: card?.title || "", movedBy: currentUser.name, fromStage }),
-            }).catch((e) => console.error("[pipeline] awaiting-approval notify failed:", e));
-          }).catch(() => {});
+          postNotification("/api/notifications/awaiting-approval", {
+            postId: cardId,
+            postTitle: card?.title || "",
+            movedBy: currentUser.name,
+            fromStage,
+          }).catch((e) => console.error("[pipeline] awaiting-approval notify failed:", e));
         }
       })();
     } else {
       // Local-only mode (no Supabase configured): record the audit locally.
       logAudit(cardId, currentUser.name, "stage_change", `Moved from ${fromLabel} to ${toLabel}`);
     }
-  }, [useSupabase, currentUser.name, addToast]);
+  }, [useSupabase, currentUser.name, addToast, postNotification]);
 
   const requestReapproval = useCallback((cardId: string) => {
     const card = cardsRef.current.find((c) => c.id === cardId);
@@ -657,15 +668,12 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
         // Only fire the audit + notification once the DB write actually committed.
         // Previously these ran unconditionally, which produced phantom emails (DATA-002).
         logAudit(cardId, author, "revision_submitted", `Fix submitted: ${note}`);
-        supabase.auth.getSession().then(({ data: { session } }) => {
-          const headers: HeadersInit = { "Content-Type": "application/json" };
-          if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
-          fetch("/api/notifications/awaiting-approval", {
-            method: "POST",
-            headers,
-            body: JSON.stringify({ postId: cardId, postTitle: card?.title || "", movedBy: author, fromStage: "revision_needed" }),
-          }).catch((e) => console.error("[pipeline] awaiting-approval notify failed:", e));
-        }).catch(() => {});
+        postNotification("/api/notifications/awaiting-approval", {
+          postId: cardId,
+          postTitle: card?.title || "",
+          movedBy: author,
+          fromStage: "revision_needed",
+        }).catch((e) => console.error("[pipeline] awaiting-approval notify failed:", e));
       });
     } else {
       // Local-only path (no Supabase configured or temp id): still record audit locally.
@@ -673,7 +681,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     }
 
     setPendingReapproval(null);
-  }, [useSupabase, selectedCard, currentUser.name, addToast]);
+  }, [useSupabase, selectedCard, currentUser.name, addToast, postNotification]);
 
   const cancelReapproval = useCallback(() => {
     setPendingReapproval(null);
@@ -682,11 +690,20 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
   // ─── Kickback flow (Awaiting Approval → Revision Needed) ───
 
   const requestKickback = useCallback((cardId: string) => {
+    if (useSupabase && !isValidUuid(cardId)) {
+      addToast("Still saving this post. Try requesting revisions again in a moment.", "warning");
+      return;
+    }
     const card = cardsRef.current.find((c) => c.id === cardId);
     if (card) setPendingKickback({ cardId, cardTitle: card.title });
-  }, []);
+  }, [useSupabase, addToast]);
 
   const submitKickback = useCallback((cardId: string, note: string, attachmentUrl?: string) => {
+    if (useSupabase && !isValidUuid(cardId)) {
+      addToast("Still saving this post. Try requesting revisions again in a moment.", "warning");
+      setPendingKickback(null);
+      return;
+    }
     const now = new Date();
     const timestamp = formatDateTimeCompact(now);
     const author = currentUser.name;
@@ -712,32 +729,24 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     const fireNotifications = () => {
       logAudit(cardId, author, "revision_requested", `Kickback: ${note}`);
       // Notify creator + all approvers/creative directors
-      fetch("/api/notifications/revision", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          postId: cardId,
-          postTitle: card?.title ?? "",
-          revisionNote: note,
-          requestedBy: currentUser.email,
-          createdBy: card?.createdBy,
-        }),
-      }).catch(() => {});
+      postNotification("/api/notifications/revision", {
+        postId: cardId,
+        postTitle: card?.title ?? "",
+        revisionNote: note,
+        requestedBy: currentUser.email,
+        createdBy: card?.createdBy,
+      }).catch((e) => console.error("[pipeline] revision notify failed:", e));
 
       // Fire @mention notifications if anyone was tagged. Strict regex so we
       // don't trigger on every "@" in arbitrary text (e.g. pasted emails or URLs).
       if (MENTION_RE.test(note)) {
-        fetch("/api/notifications/mention", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            comment: note,
-            postTitle: card?.title ?? "",
-            postId: cardId,
-            authorName: currentUser.name,
-            authorEmail: currentUser.email,
-          }),
-        }).catch(() => {});
+        postNotification("/api/notifications/mention", {
+          comment: note,
+          postTitle: card?.title ?? "",
+          postId: cardId,
+          authorName: currentUser.name,
+          authorEmail: currentUser.email,
+        }).catch((e) => console.error("[pipeline] mention notify failed:", e));
       }
     };
 
@@ -767,7 +776,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     }
 
     setPendingKickback(null);
-  }, [useSupabase, selectedCard, currentUser.name, currentUser.email, addToast]);
+  }, [useSupabase, selectedCard, currentUser.name, currentUser.email, addToast, postNotification]);
 
   const cancelKickback = useCallback(() => {
     setPendingKickback(null);
@@ -895,8 +904,8 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
   }, [selectedCard, useSupabase, addToast]);
 
   const value = useMemo(
-    () => ({ cards, isLoading, selectedCard, isDrawerOpen, isEditingOnOpen, pendingReapproval, pendingKickback, workspaceId, selectCard, selectCardForEditing, closeDrawer, moveCard, requestReapproval, submitReapproval, cancelReapproval, requestKickback, submitKickback, cancelKickback, updateCard, createCard, deleteCard }),
-    [cards, isLoading, selectedCard, isDrawerOpen, isEditingOnOpen, pendingReapproval, pendingKickback, workspaceId, selectCard, selectCardForEditing, closeDrawer, moveCard, requestReapproval, submitReapproval, cancelReapproval, requestKickback, submitKickback, cancelKickback, updateCard, createCard, deleteCard]
+    () => ({ cards, isLoading, selectedCard, isDrawerOpen, isEditingOnOpen, pendingReapproval, pendingKickback, workspaceId: activeWorkspaceId, selectCard, selectCardForEditing, closeDrawer, moveCard, requestReapproval, submitReapproval, cancelReapproval, requestKickback, submitKickback, cancelKickback, updateCard, createCard, deleteCard }),
+    [cards, isLoading, selectedCard, isDrawerOpen, isEditingOnOpen, pendingReapproval, pendingKickback, activeWorkspaceId, selectCard, selectCardForEditing, closeDrawer, moveCard, requestReapproval, submitReapproval, cancelReapproval, requestKickback, submitKickback, cancelKickback, updateCard, createCard, deleteCard]
   );
 
   return <PipelineContext.Provider value={value}>{children}</PipelineContext.Provider>;

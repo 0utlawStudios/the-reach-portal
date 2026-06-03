@@ -182,6 +182,40 @@ describe("iron-law guards in pipeline-context.tsx", () => {
         "the provision call must be live code (AGENTS.md §1b, §4).",
     ).toBe(false);
   });
+
+  it("subscribes to posts realtime from resolved workspace state, not a stale ref", () => {
+    expect(PIPELINE_SRC).toContain("const [workspaceId, setWorkspaceId] = useState<string | null>(null)");
+    expect(PIPELINE_SRC).toContain("if (!useSupabase || !workspaceId) return");
+    expect(PIPELINE_SRC).toContain("const wsId = workspaceId");
+    expect(PIPELINE_SRC).not.toContain("if (!useSupabase || !workspaceIdRef.current) return");
+    expect(PIPELINE_SRC).not.toContain("const wsId = workspaceIdRef.current");
+  });
+
+  it("treats realtime UPDATE payloads as canonical instead of suppressing peer or publisher updates", () => {
+    expect(PIPELINE_SRC).not.toContain("if (recentMutations.current.has(updated.id)) return");
+    expect(PIPELINE_SRC).toContain("recentMutations.current.delete(updated.id)");
+    expect(PIPELINE_SRC).toContain("stage='posted'");
+  });
+
+  it("guards revision kickbacks against temp IDs before opening or submitting the modal", () => {
+    const requestKickbackMatch = PIPELINE_SRC.match(/const requestKickback[\s\S]{0,500}setPendingKickback/);
+    expect(requestKickbackMatch).not.toBeNull();
+    expect(requestKickbackMatch![0]).toMatch(/useSupabase[\s\S]{0,120}!isValidUuid\s*\(\s*cardId\s*\)/);
+    const submitKickbackMatch = PIPELINE_SRC.match(/const submitKickback[\s\S]{0,500}const now = new Date/);
+    expect(submitKickbackMatch).not.toBeNull();
+    expect(submitKickbackMatch![0]).toMatch(/useSupabase[\s\S]{0,120}!isValidUuid\s*\(\s*cardId\s*\)/);
+  });
+
+  it("sends protected notification routes with bearer auth and checks non-2xx responses", () => {
+    expect(PIPELINE_SRC).toContain("const postNotification = useCallback");
+    expect(PIPELINE_SRC).toContain("headers.Authorization = `Bearer ${token}`");
+    expect(PIPELINE_SRC).toContain("if (!res.ok)");
+    expect(PIPELINE_SRC).toContain('postNotification("/api/notifications/revision"');
+    expect(PIPELINE_SRC).toContain('postNotification("/api/notifications/mention"');
+    expect(ASSET_DRAWER_SRC).toContain("headers.Authorization = `Bearer ${accessToken}`");
+    expect(ASSET_DRAWER_SRC).toContain("if (!res.ok)");
+    expect(ASSET_DRAWER_SRC).toContain("[asset-review-drawer] mention notify failed");
+  });
 });
 
 describe("iron-law guards in audit.ts", () => {

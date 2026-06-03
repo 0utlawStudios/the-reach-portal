@@ -38,7 +38,7 @@ type DrawerTab = "content" | "vault" | "audit";
 export function AssetReviewDrawer() {
   const { selectedCard, isDrawerOpen, isEditingOnOpen, closeDrawer, moveCard, requestReapproval, submitKickback, updateCard, deleteCard, workspaceId } = usePipeline();
   const { addToast } = useToast();
-  const { currentUser } = useAuth();
+  const { currentUser, accessToken } = useAuth();
   const { members } = useTeam();
   const userIsApprover = useMemo(() => {
     const me = members.find((m) => m.email === currentUser.email);
@@ -247,9 +247,11 @@ export function AssetReviewDrawer() {
       // Strict mention test — a pasted email or URL containing "@" must not
       // trigger a mention notification.
       if (!MENTION_RE.test(trimmed)) return;
+      const headers: HeadersInit = { "Content-Type": "application/json" };
+      if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
       fetch("/api/notifications/mention", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           comment: trimmed,
           postTitle: selectedCard.title,
@@ -257,7 +259,12 @@ export function AssetReviewDrawer() {
           authorName: currentUser.name,
           authorEmail: currentUser.email,
         }),
-      }).catch(() => {});
+      }).then(async (res) => {
+        if (!res.ok) {
+          const detail = await res.text().catch(() => "");
+          throw new Error(`/api/notifications/mention failed with HTTP ${res.status}${detail ? `: ${detail.slice(0, 220)}` : ""}`);
+        }
+      }).catch((error) => console.error("[asset-review-drawer] mention notify failed:", error));
     });
     logAudit(selectedCard.id, currentUser.name, "comment_added", trimmed);
     setNewComment("");
