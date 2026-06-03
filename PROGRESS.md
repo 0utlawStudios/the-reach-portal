@@ -1,10 +1,24 @@
 # The Reach Clone Progress
 
-Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed functional SHA: 2190414 docs: fix manual mobile overflow
-Last verified tracking SHA: c745ec1 docs: record cleanup audit system actor fix
-Next: Wait for CI/Vercel on 2190414, then continue the production QA backlog.
-Blockers: None. `supabase status`/local DB diff still require Docker if needed.
+Phase: FINAL PRODUCTION QA PASSED - tracking docs being closed out
+Last pushed functional SHA: baa59c1 fix: format settings queue errors
+Last verified tracking SHA: b62b9bc docs: record manual responsive qa
+Next: Commit and push this tracking update, then report the full edit/QA closeout.
+Blockers: None.
+
+Closeout QA notes:
+
+- GitHub CI passed for `baa59c1` on `main`: lint, typecheck, tests, and build.
+- Vercel production deployment for `baa59c1` is Ready.
+- Live custom domain `https://thereach.ten80ten.com` returns HTTP 200.
+- Live keep-alive returns HTTP 200.
+- Live deep-check returns HTTP 200 with grade `ALL CLEAR`, 40 passed, 0 warnings, and 0 failures.
+- Live auth/invite/request/setup smoke passed with cleanup: request access, reject, invite, resend, token setup, avatar upload, complete setup, workspace provision, remove member, and auth/user cleanup.
+- Live support smoke passed with cleanup: signed support upload, chat create/read, ticket create/list/detail, status patch, post-resolution message, alert check, and self-chat guard.
+- Live pipeline smoke passed with cleanup: fully populated demo card insert, drag status transitions, revision notes, resubmit to awaiting approval, publisher lockdown rejection for manual posted move, `posts` Realtime, `content_plan_rows` Realtime, and cleanup.
+- Live Drive/media smoke passed with cleanup: unauthenticated rejection, unsupported MIME rejection, Google Drive upload to media-library, `/api/drive/stream` partial image response, `media_assets` RLS insert/read, Realtime insert, and Drive/Supabase cleanup.
+- Live UI smoke passed for dashboard, settings/team, support, Brand Kit, create-post modal, mobile/manual overflow, button contrast, default-light/user-dark preference, raised cards, and absence of horizontal overflow.
+- Latest root polish fixed the settings publish queue toast path so Supabase/PostgREST objects no longer render as `[object Object]`.
 
 Client manual responsive QA slice notes:
 

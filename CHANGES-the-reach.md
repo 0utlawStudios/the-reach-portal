@@ -1,5 +1,9 @@
 # The Reach Clone Changes
 
+Latest slice: settings publish queue error formatting is pushed as `baa59c1`. The Settings publish queue now formats Supabase/PostgREST error objects into actionable messages using `message`, `details`, `hint`, and `code` fields instead of rendering opaque `[object Object]` toasts. Verification passed `git diff --check`, `npm run typecheck`, `npm run lint` with the existing AI worker warning only, full `npm test` with 29 files / 261 tests, `npm run build`, GitHub CI for `baa59c1`, Vercel production Ready, live homepage HTTP 200, live keep-alive HTTP 200, and live deep-check `ALL CLEAR` with 40 passed / 0 warnings / 0 failures.
+
+Latest production QA closeout: live auth/invite/request/setup, support inbox/chat, pipeline drag/realtime/demo-card, Drive/media-library upload/stream, dashboard/settings/support/Brand Kit/create-modal UI, mobile/manual overflow, button contrast, default-light/user-dark preference, and health checks have been exercised against production and cleaned up where temporary data was created. No production QA artifacts remain from the auth/support/pipeline/Drive smoke runs.
+
 Latest slice: client manual responsive QA is pushed as `2190414`. The manual no longer overflows on mobile: grid children and cards are min-width bounded, tables scroll inside their panels, long pill/table text can wrap, and the hero signature strip labels fit without clipping. Headless Chrome render QA passed at strict `390x1200` and desktop `1440x1200` with `scrollWidth === innerWidth` and no page-level overflow offenders; content scan still confirms the manual includes the requested competitor/savings, support, mention, 60 TB Drive, platform logic, and Create Post guidance.
 
 Latest slice: cleanup audit actor canonicalization is pushed as `c45846b`. Automated Reach launch/test cleanup removals are now database-canonical system rows, not just UI-normalized rows: migration `0045` sets `metadata.user_name = SYSTEM`, clears `actor_user_id`, and sets `actor_role = system` for the known launch cleanup, cloned Ten80Ten cleanup, and `qa-*` cleanup detail strings. Production SQL verification confirmed the screenshot rows now have `actor_role=system`, `actor_user_id=null`, and `user_name=SYSTEM`; the real manual removal for `themanekinekogirl@gmail.com` remains attributed to Aldridge. Verification passed focused static test, `git diff --check`, typecheck, lint, full test suite, build, remote migration list, and live health deep-check with `ALL CLEAR`.
@@ -28,6 +32,7 @@ Latest slice: audit cleanup actor normalization now resolves known cloned/test l
 
 ## Edited
 
+- Settings publish queue error handling: `src/components/pages/settings-page.tsx` now formats unknown client errors from the publish queue load/retry paths without collapsing Supabase error objects into `[object Object]`.
 - Team removal hierarchy: `/api/team/remove-member` now blocks admin-level removal by non-superadmins, prevents deleting the last active superadmin, and preserves the existing stale id/email and self-removal safeguards.
 - Client manual responsive layout: `docs/THE-REACH-SMM-CLIENT-MANUAL.html` now contains wide tables and hero/meta content on mobile, avoids horizontal page overflow, and keeps the signature strip readable.
 - Cleanup audit actor canonicalization: migration `0045` makes automated Reach launch/test cleanup removals true system audit rows by setting `metadata.user_name = SYSTEM`, `actor_user_id = NULL`, and `actor_role = system` while leaving real manual removals attributed to the human actor.
@@ -126,6 +131,12 @@ Latest slice: audit cleanup actor normalization now resolves known cloned/test l
 
 ## Verification
 
+- Latest production closeout passed for `baa59c1`: GitHub CI success, Vercel production Ready, homepage HTTP 200, keep-alive HTTP 200, and deep-check HTTP 200 with `ALL CLEAR`, 40 passed, 0 warnings, and 0 failures.
+- Live auth/invite/request/setup smoke passed with cleanup: request access, duplicate-safe handling, reject, invite, resend, invite token setup, avatar upload, complete setup, provision, remove member, and auth row cleanup.
+- Live support inbox/chat smoke passed with cleanup: support upload signing, attachment upload, chat create/read, ticket create/list/detail, status update, post-resolution message, alert check, and self-chat guard.
+- Live pipeline/realtime smoke passed with cleanup: fully populated draggable demo post, status moves, revision notes, resubmit, publisher lockdown rejection, `posts` Realtime, `content_plan_rows` Realtime, and row cleanup.
+- Live Drive/media smoke passed with cleanup: unauthenticated rejection, unsupported MIME rejection, media-library Drive upload, `/api/drive/stream` partial image response, `media_assets` RLS insert/read, Realtime insert, Drive cleanup, and Supabase cleanup.
+- Live UI QA passed for dashboard, settings/team, support, Brand Kit, create-post modal, button readability, raised cards, default-light/user-dark preference behavior, and mobile/manual overflow.
 - Pipeline notification boundary hardening passed focused pipeline/notification tests with 44 tests, `git diff --check`, `npm run typecheck`, `npm run lint` with only the existing AI worker warning, full `npm test` with 29 files / 259 tests, and `npm run build`.
 - Pipeline notification deployment verification passed: GitHub CI completed successfully for tracking commit `c38f754`, Vercel production is ready, keep-alive returns HTTP 200, and deep-check returns HTTP 200 with 0 failures and 0 warnings.
 - Team theme preference schema passed `supabase db push --yes`, focused setup static test, `git diff --check`, `npm run typecheck`, `npm run lint` with only the existing AI worker warning, full `npm test` with 29 files / 260 tests, and `npm run build`.
