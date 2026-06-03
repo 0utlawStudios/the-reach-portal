@@ -1251,6 +1251,25 @@ function publishQueueStateBadge(state: string): { label: string; cls: string } {
   }
 }
 
+function formatClientError(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (err && typeof err === "object") {
+    const record = err as Record<string, unknown>;
+    const message = typeof record.message === "string" ? record.message : null;
+    const details = typeof record.details === "string" ? record.details : null;
+    const hint = typeof record.hint === "string" ? record.hint : null;
+    const code = typeof record.code === "string" ? `code ${record.code}` : null;
+    const parts = [message, details, hint, code].filter(Boolean);
+    if (parts.length > 0) return parts.join(" — ");
+    try {
+      return JSON.stringify(record);
+    } catch {
+      return Object.prototype.toString.call(err);
+    }
+  }
+  return String(err);
+}
+
 function PublishQueuePanel({ addToast }: { addToast: (msg: string, kind?: "info" | "success" | "error" | "warning") => void }) {
   const [rows, setRows] = useState<PublishQueueRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1267,7 +1286,7 @@ function PublishQueuePanel({ addToast }: { addToast: (msg: string, kind?: "info"
       if (error) throw error;
       setRows((data || []) as PublishQueueRow[]);
     } catch (err) {
-      if (!silent) addToast(`Couldn't load queue: ${err instanceof Error ? err.message : String(err)}`, "error");
+      if (!silent) addToast(`Couldn't load queue: ${formatClientError(err)}`, "error");
     } finally {
       if (!silent) setRefreshing(false);
       setLoading(false);
@@ -1292,7 +1311,7 @@ function PublishQueuePanel({ addToast }: { addToast: (msg: string, kind?: "info"
       addToast("Job reset to pending. n8n will pick it up on the next tick.", "success");
       await load(true);
     } catch (err) {
-      addToast(`Retry failed: ${err instanceof Error ? err.message : String(err)}`, "error");
+      addToast(`Retry failed: ${formatClientError(err)}`, "error");
     } finally {
       setRetrying(null);
     }
