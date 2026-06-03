@@ -362,11 +362,11 @@
         <div class="brand">The Reach</div>
         <h1>n8n Auto-Publisher Handoff</h1>
         <p class="subtitle">
-          A verified collection form for the SMM assigned to The Reach. It is based on the workflow file
-          <strong>Ten80Ten SMM App Auto-Publisher V2.7.json</strong>, not guesses.
+          A verified collection form for the SMM assigned to The Reach. The Reach V4 workflow is already uploaded to n8n as an inactive draft:
+          <strong>The Reach Auto-Publisher V4</strong>, workflow ID <strong>4lWcpeLvHdd7HGQF</strong>.
         </p>
         <div class="notice">
-          Current V2.7 is a credentials handoff source only. Do not activate it unchanged against The Reach production until it is patched for the current Reach publish contract.
+          Do not activate the V4 workflow until the remaining placeholders are replaced. The n8n API key was enough to upload the workflow, but it does not create the Meta or LinkedIn publishing tokens.
         </div>
         <div class="actions">
           <button type="button" onclick="downloadTxt()">Save + Download TXT</button>
@@ -379,34 +379,36 @@
         <div>
           <h2>Verified Required Inputs</h2>
           <ul class="facts">
-            <li><strong>n8n Supabase credential:</strong> Reach Supabase URL + service role key.</li>
-            <li><strong>Facebook node:</strong> <code>FB_TOKEN</code> + <code>FB_PAGE</code>.</li>
-            <li><strong>Instagram node:</strong> <code>IG_TOKEN</code> + <code>IG_USER</code>.</li>
-            <li><strong>LinkedIn node:</strong> <code>LI_TOKEN</code> + <code>LI_ORG</code>.</li>
+            <li><strong>Claim Next Job:</strong> <code>SUPABASE_SERVICE_ROLE_KEY</code>.</li>
+            <li><strong>Facebook node:</strong> <code>META_PAGE_ACCESS_TOKEN</code> + <code>FACEBOOK_PAGE_ID</code>.</li>
+            <li><strong>Instagram node:</strong> <code>META_PAGE_ACCESS_TOKEN</code> + <code>INSTAGRAM_BUSINESS_ACCOUNT_ID</code>.</li>
+            <li><strong>LinkedIn node:</strong> <code>LINKEDIN_ACCESS_TOKEN</code> + <code>LINKEDIN_ORG_URN</code>.</li>
           </ul>
         </div>
-        <p>Anything not listed above is context or future expansion, not a required V2.7 runtime field.</p>
+        <p>Anything not listed above is context or future expansion, not a required Reach V4 runtime field.</p>
       </aside>
     </section>
 
     <section class="grid">
       <article class="card dark-card half">
-        <h2>Truth From The Workflow</h2>
-        <p>The supplied V2.7 workflow contains 14 nodes. It runs every 5 minutes, reads <code>posts</code> from Supabase, filters due posts in CST, then publishes Facebook, Instagram, and LinkedIn.</p>
+        <h2>Truth From The Uploaded V4 Workflow</h2>
+        <span class="pill ok">Uploaded to n8n</span>
+        <span class="pill warn">Inactive draft</span>
+        <p>The Reach V4 workflow contains 16 nodes. It runs every 1 minute, claims due publish jobs through Supabase RPC, publishes Facebook, Instagram, and LinkedIn, then finalizes post/job status.</p>
         <ul>
-          <li><code>Get Scheduled Posts</code>: Supabase getAll on <code>posts</code>.</li>
-          <li>Filter: <code>stage=eq.approved_scheduled</code>, <code>scheduled_date</code> and <code>scheduled_time</code> present.</li>
-          <li><code>Publish Facebook</code>: Graph API v21, images/videos/reels.</li>
-          <li><code>Publish Instagram</code>: Graph API v21, image/video/reel/carousel.</li>
-          <li><code>Publish LinkedIn</code>: legacy <code>/v2/ugcPosts</code>, image only.</li>
+          <li>n8n workflow ID: <code>4lWcpeLvHdd7HGQF</code>.</li>
+          <li>Current status: inactive, because placeholders are still present.</li>
+          <li><code>Claim Next Job</code>: calls <code>claim_publish_job</code>.</li>
+          <li><code>Finalize Job</code>: writes <code>platform_publish_attempts</code>, <code>posted_at</code>, <code>posted_urls</code>, and <code>publish_jobs</code> retry state.</li>
+          <li><code>Log to audit_log_v2</code>: writes the current Reach audit table, not the legacy audit table.</li>
         </ul>
       </article>
 
       <article class="card half">
-        <h2>Safety Notes</h2>
-        <span class="pill bad">Must patch before live</span>
-        <p>V2.7 marks a post as <code>posted</code> before platform publishing starts. The current Reach app is stricter: a post should move to Posted only after platform API success with <code>posted_at</code> and posted URLs.</p>
-        <p>V2.7 also logs to legacy <code>post_audit_logs</code>. The current app uses <code>audit_log_v2</code>. This handoff gathers access only; the workflow wiring should be updated later.</p>
+        <h2>Why It Is Not Active Yet</h2>
+        <span class="pill bad">Needs credentials</span>
+        <p>The uploaded V4 draft still contains these placeholders: <code>REPLACE_WITH_SERVICE_ROLE_KEY</code>, <code>REPLACE_WITH_META_TOKEN</code>, <code>REPLACE_WITH_FACEBOOK_PAGE_ID</code>, <code>REPLACE_WITH_IG_BUSINESS_ACCOUNT_ID</code>, <code>REPLACE_WITH_LINKEDIN_TOKEN</code>, and <code>REPLACE_WITH_LINKEDIN_ORG_URN</code>.</p>
+        <p>Activating it before replacing those values would let the worker claim due jobs and fail platform publishing. This document collects only the missing values required to safely finish activation.</p>
       </article>
 
       <article class="card">
@@ -428,19 +430,19 @@
           <li>
             <div>
               <strong>Collect Facebook Page details.</strong><br />
-              Get the official Page URL and Page ID. Put the Page ID in <code>FB_PAGE</code> below. This is the exact value used by the V2.7 Facebook node.
+              Get the official Page URL and Page ID. Put the Page ID in <code>FACEBOOK_PAGE_ID</code> below. This is the exact value used by the uploaded V4 Facebook node.
             </div>
           </li>
           <li>
             <div>
               <strong>Collect Instagram Business Account ID.</strong><br />
-              Confirm the Instagram profile is Business/Creator and linked to the Page. Get the Instagram Business Account ID and put it in <code>IG_USER</code> below.
+              Confirm the Instagram profile is Business/Creator and linked to the Page. Get the Instagram Business Account ID and put it in <code>INSTAGRAM_BUSINESS_ACCOUNT_ID</code> below.
             </div>
           </li>
           <li>
             <div>
               <strong>Create or authorize the Meta Page token.</strong><br />
-              Use the Meta app/publishing setup to generate a token that can publish to the Page and linked Instagram account. Put that token in <code>FB_TOKEN</code> and <code>IG_TOKEN</code>, or enter the vault item name if secrets are stored elsewhere.
+              Use the Meta app/publishing setup to generate a token that can publish to the Page and linked Instagram account. Put that token in <code>META_PAGE_ACCESS_TOKEN</code>, or enter the vault item name if secrets are stored elsewhere.
             </div>
           </li>
           <li>
@@ -452,19 +454,19 @@
           <li>
             <div>
               <strong>Collect LinkedIn Organization ID.</strong><br />
-              Open the LinkedIn Company Page admin area. Get the Organization ID and format it as <code>urn:li:organization:YOUR_ORG_ID</code>. Put it in <code>LI_ORG</code> below.
+              Open the LinkedIn Company Page admin area. Get the Organization ID and format it as <code>urn:li:organization:YOUR_ORG_ID</code>. Put it in <code>LINKEDIN_ORG_URN</code> below.
             </div>
           </li>
           <li>
             <div>
               <strong>Create or authorize the LinkedIn access token.</strong><br />
-              Use the LinkedIn app/OAuth setup with organization posting permission. Put the token in <code>LI_TOKEN</code>, or enter the vault item name.
+              Use the LinkedIn app/OAuth setup with organization posting permission. Put the token in <code>LINKEDIN_ACCESS_TOKEN</code>, or enter the vault item name.
             </div>
           </li>
           <li>
             <div>
               <strong>Prepare public media test files.</strong><br />
-              V2.7 reads <code>source_vault.rawFiles</code> and converts Google Drive share links to direct download links. Test media must be reachable by platform APIs. Confirm "Anyone with the link" access for test files.
+              V4 resolves ordered media from <code>asset_urls</code> first, then falls back to <code>source_vault.rawFiles</code>. Test media must be reachable by platform APIs.
             </div>
           </li>
           <li>
@@ -478,7 +480,7 @@
 
       <article class="card">
         <h2>Collection Form</h2>
-        <p class="hint">Fields marked required are required by V2.7 or needed to configure the V2.7 n8n Supabase credential.</p>
+        <p class="hint">Fields marked required are required by the uploaded Reach V4 workflow before it can be safely activated.</p>
         <div id="formHost"></div>
       </article>
 
@@ -491,11 +493,11 @@
       <article class="card half">
         <h2>Where Values Go Later</h2>
         <ul>
-          <li><strong>n8n credential:</strong> create a Supabase credential for The Reach and apply it to <code>Get Scheduled Posts</code>, <code>Mark as Posted</code>, and <code>Log to Audit Trail</code>.</li>
-          <li><strong>Publish Facebook node:</strong> paste <code>FB_TOKEN</code> and <code>FB_PAGE</code>.</li>
-          <li><strong>Publish Instagram node:</strong> paste <code>IG_TOKEN</code> and <code>IG_USER</code>.</li>
-          <li><strong>Publish LinkedIn node:</strong> paste <code>LI_TOKEN</code> and <code>LI_ORG</code>.</li>
-          <li><strong>Before live:</strong> patch V2.7 to match Reach's current posted/audit contract.</li>
+          <li><strong>Claim Next Job node:</strong> replace <code>REPLACE_WITH_SERVICE_ROLE_KEY</code>.</li>
+          <li><strong>Publish Facebook node:</strong> replace <code>REPLACE_WITH_META_TOKEN</code> and <code>REPLACE_WITH_FACEBOOK_PAGE_ID</code>.</li>
+          <li><strong>Publish Instagram node:</strong> replace <code>REPLACE_WITH_META_TOKEN</code> and <code>REPLACE_WITH_IG_BUSINESS_ACCOUNT_ID</code>.</li>
+          <li><strong>Publish LinkedIn node:</strong> replace <code>REPLACE_WITH_LINKEDIN_TOKEN</code> and <code>REPLACE_WITH_LINKEDIN_ORG_URN</code>.</li>
+          <li><strong>After values are replaced:</strong> run Manual Test with <code>dry_run=true</code>, then activate the 1-minute schedule only after the first real test succeeds.</li>
         </ul>
       </article>
 
@@ -519,14 +521,14 @@
       "Stefani has added the implementation email to Meta Business Portfolio.",
       "Implementation email has access to The Reach Facebook Page.",
       "Implementation email has access to the linked The Reach Instagram Business account.",
-      "Facebook Page ID is confirmed and entered as FB_PAGE.",
-      "Instagram Business Account ID is confirmed and entered as IG_USER.",
-      "Meta Page Access Token is available for FB_TOKEN and IG_TOKEN.",
+      "Facebook Page ID is confirmed and entered as FACEBOOK_PAGE_ID.",
+      "Instagram Business Account ID is confirmed and entered as INSTAGRAM_BUSINESS_ACCOUNT_ID.",
+      "Meta Page Access Token is available for META_PAGE_ACCESS_TOKEN.",
       "Stefani has added the implementation email as LinkedIn Company Page admin.",
-      "LinkedIn Organization URN is confirmed and entered as LI_ORG.",
-      "LinkedIn access token is available for LI_TOKEN.",
+      "LinkedIn Organization URN is confirmed and entered as LINKEDIN_ORG_URN.",
+      "LinkedIn access token is available for LINKEDIN_ACCESS_TOKEN.",
       "One image and one video test asset have public/direct-download links.",
-      "V2.7 workflow will not be activated unchanged until patched for Reach posted/audit safety."
+      "The uploaded V4 workflow remains inactive until every placeholder is replaced and dry-run succeeds."
     ];
 
     const sections = [
@@ -542,13 +544,23 @@
         ]
       },
       {
-        title: "n8n Supabase Credential",
-        pills: ["Required", "V2.7 Supabase nodes"],
+        title: "n8n Uploaded Workflow",
+        pills: ["Already in n8n", "Inactive draft"],
+        fields: [
+          ["n8n_workflow_name", "n8n workflow name", "text", true, "The Reach Auto-Publisher V4"],
+          ["n8n_workflow_id", "n8n workflow ID", "text", true, "4lWcpeLvHdd7HGQF"],
+          ["n8n_workflow_status", "n8n workflow status", "text", true, "inactive - placeholders still present"],
+          ["n8n_schedule", "Schedule", "text", false, "Every 1 minute"]
+        ]
+      },
+      {
+        title: "Claim Next Job Node",
+        pills: ["Required", "Reach V4"],
         fields: [
           ["supabase_url", "Reach Supabase URL", "text", true, "https://gxmpmdhmxyfqusdzcemt.supabase.co"],
-          ["supabase_service_role_key", "Reach Supabase service role key or vault item", "textarea", true, ""],
-          ["n8n_credential_name", "n8n credential name to create", "text", true, "The Reach Supabase Service Role"],
-          ["supabase_nodes", "Apply credential to these nodes", "textarea", false, "Get Scheduled Posts, Mark as Posted, Log to Audit Trail"]
+          ["supabase_service_role_key", "SUPABASE_SERVICE_ROLE_KEY or vault item", "textarea", true, ""],
+          ["worker_id_note", "Worker ID generated by workflow", "text", false, "n8n-the-reach-<execution id>"],
+          ["claim_seconds", "p_claim_seconds", "text", false, "120"]
         ]
       },
       {
@@ -560,11 +572,11 @@
           ["meta_business_id", "Meta Business Portfolio ID", "text", false, ""],
           ["fb_page_name", "Facebook Page name", "text", false, ""],
           ["fb_page_url", "Facebook Page URL", "url", false, ""],
-          ["fb_page_id", "FB_PAGE / Facebook Page ID", "text", true, ""],
+          ["fb_page_id", "FACEBOOK_PAGE_ID", "text", true, ""],
           ["ig_handle", "Instagram handle", "text", false, ""],
           ["ig_profile_url", "Instagram profile URL", "url", false, ""],
-          ["ig_business_id", "IG_USER / Instagram Business Account ID", "text", true, ""],
-          ["meta_token", "FB_TOKEN and IG_TOKEN / Meta Page Access Token or vault item", "textarea", true, ""],
+          ["ig_business_id", "INSTAGRAM_BUSINESS_ACCOUNT_ID", "text", true, ""],
+          ["meta_token", "META_PAGE_ACCESS_TOKEN or vault item", "textarea", true, ""],
           ["meta_permissions_notes", "Permission/scope notes", "textarea", false, "Token must be able to publish to the Facebook Page and linked Instagram Business account."]
         ]
       },
@@ -576,9 +588,9 @@
           ["linkedin_page_name", "LinkedIn Company Page name", "text", false, ""],
           ["linkedin_page_url", "LinkedIn Company Page URL", "url", false, ""],
           ["linkedin_org_id", "LinkedIn Organization ID", "text", true, ""],
-          ["linkedin_org_urn", "LI_ORG / LinkedIn Organization URN", "text", true, "urn:li:organization:"],
-          ["linkedin_token", "LI_TOKEN / LinkedIn access token or vault item", "textarea", true, ""],
-          ["linkedin_permission_notes", "Permission notes", "textarea", false, "V2.7 node expects organization posting access and uses legacy /v2/ugcPosts image publishing."]
+          ["linkedin_org_urn", "LINKEDIN_ORG_URN", "text", true, "urn:li:organization:"],
+          ["linkedin_token", "LINKEDIN_ACCESS_TOKEN or vault item", "textarea", true, ""],
+          ["linkedin_permission_notes", "Permission notes", "textarea", false, "V4 uses LinkedIn /rest/posts with LinkedIn-Version 202411."]
         ]
       },
       {
@@ -594,7 +606,7 @@
       },
       {
         title: "Portal Test Post",
-        pills: ["Approved scheduled row", "V2.7 filter"],
+        pills: ["Approved scheduled row", "Reach V4 pre-flight"],
         fields: [
           ["test_post_title", "Test post title", "text", true, ""],
           ["test_post_platforms", "Portal platforms array", "text", true, "facebook, instagram, linkedin"],
@@ -602,7 +614,7 @@
           ["test_post_caption", "Caption", "textarea", true, ""],
           ["scheduled_date", "scheduled_date", "date", true, ""],
           ["scheduled_time", "scheduled_time", "time", true, ""],
-          ["source_vault_note", "source_vault.rawFiles note", "textarea", false, "V2.7 expects rawFiles with url and usageType=master or first file fallback."],
+          ["source_vault_note", "Media source note", "textarea", false, "V4 resolves post.asset_urls first, then source_vault.rawFiles with usageType=master or first file fallback."],
           ["delete_after_test", "Delete test post after validation?", "select", false, "yes", ["yes", "no"]]
         ]
       },
@@ -610,7 +622,7 @@
         title: "Do Not Treat As Required",
         pills: ["Hallucination guard"],
         fields: [
-          ["not_required", "Not required by supplied V2.7", "textarea", false, "The supplied V2.7 file does not require YouTube token, TikTok token, N8N_API_KEY, N8N_URL, Google service account JSON, or Google Drive folder ID. Do not block this handoff on those unless the workflow is upgraded."]
+          ["not_required", "Not required by uploaded V4", "textarea", false, "The uploaded V4 file does not require YouTube token, TikTok token, N8N_API_KEY, N8N_URL, Google service account JSON, or Google Drive folder ID. Do not block this handoff on those unless the workflow is upgraded."]
         ]
       }
     ];
@@ -724,7 +736,7 @@
 
       const box = document.getElementById("validation");
       if (missing.length === 0) {
-        box.innerHTML = '<span class="ok-text">All required V2.7 handoff fields are filled.</span>';
+        box.innerHTML = '<span class="ok-text">All required Reach V4 handoff fields are filled.</span>';
       } else {
         box.innerHTML = '<span class="bad-text">' + missing.length + " required field(s) missing:</span><br>" +
           missing.map((field) => "- " + escapeHtml(field.section) + ": " + escapeHtml(field.label)).join("<br>");
@@ -737,15 +749,16 @@
       out += "THE_REACH_N8N_AUTOPUBLISH_HANDOFF.txt\n";
       out += "Generated: " + new Date().toISOString() + "\n";
       out += "Client: The Reach\n";
-      out += "Source workflow inspected: /Users/ace/Downloads/Ten80Ten SMM App Auto-Publisher V2.7.json\n";
-      out += "Workflow name: Ten80Ten SMM App Auto-Publisher V2.7\n";
-      out += "Workflow SHA-256: 6ac8e0a082222466ec259d15a6d956952a07d22692568ad125dbafb6d19e0041\n\n";
+      out += "Uploaded n8n workflow: The Reach Auto-Publisher V4\n";
+      out += "n8n workflow ID: 4lWcpeLvHdd7HGQF\n";
+      out += "n8n workflow status: inactive draft, placeholders still present\n";
+      out += "Local workflow source: /Users/ace/Documents/CURSOR MAIN/THE REACH SMM PORTAL/n8n/the-reach-auto-publisher-v4.json\n\n";
 
       out += "HALLUCINATION GUARD\n";
-      out += "- Required fields are based on the supplied V2.7 workflow only.\n";
-      out += "- V2.7 required runtime values: Supabase URL/service role credential, FB_TOKEN, FB_PAGE, IG_TOKEN, IG_USER, LI_TOKEN, LI_ORG.\n";
-      out += "- V2.7 does not require YouTube, TikTok, Google service account JSON, N8N_API_KEY, or N8N_URL.\n";
-      out += "- Do not activate V2.7 unchanged against Reach production until posted/audit behavior is patched.\n\n";
+      out += "- Required fields are based on the uploaded Reach V4 workflow only.\n";
+      out += "- Reach V4 required runtime placeholders: SUPABASE_SERVICE_ROLE_KEY, META_PAGE_ACCESS_TOKEN, FACEBOOK_PAGE_ID, INSTAGRAM_BUSINESS_ACCOUNT_ID, LINKEDIN_ACCESS_TOKEN, LINKEDIN_ORG_URN.\n";
+      out += "- Reach V4 does not require YouTube token, TikTok token, Google service account JSON, N8N_API_KEY, or N8N_URL for runtime publishing.\n";
+      out += "- Do not activate the n8n workflow until every placeholder is replaced and dry-run/manual test passes.\n\n";
 
       out += "EXACT STEFANI REQUESTS\n";
       out += "1. Ask Stefani to add the implementation email to The Reach Meta Business Portfolio with access to the Facebook Page and linked Instagram Business account.\n";
@@ -771,13 +784,14 @@
         });
       });
 
-      out += "\n\nWHERE THESE VALUES GO IN V2.7\n";
-      out += "- Create n8n Supabase credential using Reach Supabase URL + service role key.\n";
-      out += "- Apply that credential to Supabase nodes: Get Scheduled Posts, Mark as Posted, Log to Audit Trail.\n";
-      out += "- Publish Facebook node: const FB_TOKEN = Meta Page token; const FB_PAGE = Facebook Page ID.\n";
-      out += "- Publish Instagram node: const IG_TOKEN = same Meta Page token; const IG_USER = Instagram Business Account ID.\n";
-      out += "- Publish LinkedIn node: const LI_TOKEN = LinkedIn access token; const LI_ORG = urn:li:organization:ORG_ID.\n";
-      out += "- Run Manual Test first. Do not activate schedule until Reach-specific posted/audit patch is applied.\n";
+      out += "\n\nWHERE THESE VALUES GO IN THE UPLOADED REACH V4 WORKFLOW\n";
+      out += "- n8n workflow ID: 4lWcpeLvHdd7HGQF.\n";
+      out += "- Claim Next Job node: replace REPLACE_WITH_SERVICE_ROLE_KEY.\n";
+      out += "- Publish Facebook node: replace REPLACE_WITH_META_TOKEN and REPLACE_WITH_FACEBOOK_PAGE_ID.\n";
+      out += "- Publish Instagram node: replace REPLACE_WITH_META_TOKEN and REPLACE_WITH_IG_BUSINESS_ACCOUNT_ID.\n";
+      out += "- Publish LinkedIn node: replace REPLACE_WITH_LINKEDIN_TOKEN and REPLACE_WITH_LINKEDIN_ORG_URN.\n";
+      out += "- Send Alert node: ALERT_WEBHOOK_URL is optional and can remain blank.\n";
+      out += "- Run Manual Test / dry-run first. Activate the 1-minute schedule only after the first real controlled publish test succeeds.\n";
 
       return out;
     }
