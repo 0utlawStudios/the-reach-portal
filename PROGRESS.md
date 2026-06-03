@@ -1,10 +1,22 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed functional SHA: 5308a79 fix: ignore expected deleted post audit rows
-Last verified tracking SHA: 69cd0e3 docs: record drive media production qa
-Next: Wait for CI/Vercel on 5308a79, then re-run live deep-check and continue the production QA backlog.
+Last pushed functional SHA: c45846b fix: canonicalize cleanup audit system actors
+Last verified tracking SHA: 898bcd9 docs: record deep health audit fix
+Next: Wait for CI/Vercel on c45846b, then continue the production QA backlog.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
+
+Cleanup audit system actor canonicalization slice notes:
+
+- Treated the latest audit screenshot as an additive QA item while continuing the active production-readiness goal.
+- Direct production `v_audit_log_with_actor` verification already returned `SYSTEM` for the launch cleanup rows shown in the screenshot.
+- Root hardening added migration `0045_reach_cleanup_audit_system_role.sql` so automated Reach launch/test cleanup removals are canonical system rows in the database, not just display-normalized rows.
+- The migration sets `metadata.user_name = SYSTEM`, `actor_user_id = NULL`, and `actor_role = 'system'` for known `Reach launch cleanup removed ...`, cloned Ten80Ten cleanup emails, and automated `qa-*` cleanup detail strings.
+- Production Supabase `db push` applied migration `0045`, and `supabase migration list` shows local/remote `0045`.
+- Production SQL verification passed through `supabase db query --linked`: all cleanup removal rows now have `actor_role = system`, `actor_user_id = null`, and `user_name = SYSTEM`; the unrelated manual `themanekinekogirl@gmail.com` removal remains attributed to `aldridge@ten80ten.com`.
+- Production health passed after the prior deep-check fix: keep-alive returned HTTP 200 and deep-check returned HTTP 200 with grade `ALL CLEAR`, 0 failures, and 0 warnings.
+- Verification passed: focused setup static test, `git diff --check`, `npm run typecheck`, `npm run lint` with the existing AI worker warning only, full `npm test` with 29 files / 261 tests, and `npm run build`.
+- Pushed functional commit `c45846b` to `origin/main`.
 
 Health deep-check deleted-post audit slice notes:
 
