@@ -2,6 +2,14 @@
 
 ## Edited
 
+- Auth access revalidation: authenticated sessions now re-check team/workspace access on same-user token refresh, focus, visibility recovery, and a 60-second visible-tab interval so revoked/pending users do not keep stale workspace access until manual reload.
+- Team/request Realtime invalidation: Settings now subscribes to `team_members` and `signup_requests` changes and reloads through the normal RLS-protected SELECT paths.
+- Supabase Realtime access contract: added and applied migration `0037_reach_team_access_realtime.sql`; production now publishes `team_members` and `signup_requests` with full replica identity.
+- Access request approval hardening: approval now validates role/email, blocks duplicate team emails, checks orphan Auth/workspace cleanup errors, finalizes the `signup_requests` status before any invite email is sent, and rolls back new Auth/team state if finalization fails.
+- Access request rejection hardening: failed reject status updates now return a real error instead of silently succeeding.
+- Member removal hardening: workspace/team access revocation remains successful even if Supabase Auth deletion fails after access has already been revoked; the API reports `authCleanupPending` for retry via reinvite cleanup.
+- Launch cleanup audit label: the production audit rows for `Reach launch cleanup removed ...` now store `SYSTEM` as actor, and the app also renders those launch cleanup entries as `SYSTEM` defensively.
+- Auth/team regression tests: added focused approve-request coverage for ordered approval, rollback on request-finalization failure, invalid role blocking, and reject failure reporting; added remove-member coverage for post-revoke Auth cleanup failure.
 - Request-access persistence hardening: `/api/team/request-access` now treats the Supabase insert as authoritative, returns a real error when saving fails, stores the baseline workspace UUID, and no longer shows a fake success when no request row exists.
 - Request-access notification hardening: admin email is sent only after a saved row; SMTP failure reports `emailSent: false` without losing the request.
 - Team request visibility: Settings now refreshes pending access requests on focus, visibility, and a 60-second visible-tab interval, and explicitly refreshes team/request rows after invite, approve/reject, and resend actions.
@@ -73,6 +81,8 @@
 
 ## Verification
 
+- Auth/team access hardening passed focused auth/team/audit tests with 39 tests, `npm run typecheck`, `git diff --check`, `npm run lint` with only existing warnings, full `npm test` with 28 files / 243 tests, and `npm run build`.
+- Production Supabase access verification passed: `team_members` and `signup_requests` are both in `supabase_realtime`; production launch-cleanup audit rows now return `metadata.user_name: SYSTEM`.
 - Request-access root fix passed focused team/auth tests, `npm run typecheck`, `npm run lint` with only existing warnings, full `npm test` with 27 files / 237 tests, and `npm run build`; commit `f79b594` was pushed, GitHub CI passed, and Vercel production is ready.
 - Production request-access proof passed on `https://thereach.ten80ten.com`: a controlled QA request returned HTTP 200, created one pending `signup_requests` row with the baseline workspace UUID, sent one admin notification, and was then deleted; production pending request count is back to 0 after cleanup.
 - Support Inbox production smoke passed on `https://thereach.ten80ten.com`: admin list HTTP 200, thread detail HTTP 200, own support list HTTP 200, own live-chat empty state HTTP 200, self-chat guard HTTP 400, and inactive-recipient guard HTTP 400. Positive admin-to-teammate chat is intentionally blocked until a second user is reinvited and active.

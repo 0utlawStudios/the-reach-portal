@@ -10,11 +10,14 @@ const CALENDAR_SRC = readFileSync(join(process.cwd(), "src/components/pages/cale
 const DASHBOARD_SRC = readFileSync(join(process.cwd(), "src/components/pages/dashboard-page.tsx"), "utf8");
 const SUPPORT_WIDGET_SRC = readFileSync(join(process.cwd(), "src/components/support/support-widget.tsx"), "utf8");
 const SUPPORT_ALERT_SRC = readFileSync(join(process.cwd(), "src/lib/support/use-support-alert.ts"), "utf8");
+const AUTH_CONTEXT_SRC = readFileSync(join(process.cwd(), "src/lib/auth-context.tsx"), "utf8");
+const AUDIT_SRC = readFileSync(join(process.cwd(), "src/lib/audit.ts"), "utf8");
 const TEAM_CONTEXT_SRC = readFileSync(join(process.cwd(), "src/lib/team-context.tsx"), "utf8");
 const PRESENCE_SRC = readFileSync(join(process.cwd(), "src/lib/use-presence.tsx"), "utf8");
 const IO_MIGRATION_SRC = readFileSync(join(process.cwd(), "supabase/migrations/0030_supabase_io_hardening.sql"), "utf8");
 const SUPPORT_ALERT_MIGRATION_SRC = readFileSync(join(process.cwd(), "supabase/migrations/0031_support_alert_indexes.sql"), "utf8");
-const TEAM_REALTIME_TRIM_MIGRATION_SRC = readFileSync(join(process.cwd(), "supabase/migrations/0032_trim_team_members_realtime.sql"), "utf8");
+const TEAM_ACCESS_REALTIME_MIGRATION_SRC = readFileSync(join(process.cwd(), "supabase/migrations/0037_reach_team_access_realtime.sql"), "utf8");
+const AUDIT_ACTOR_CLEANUP_MIGRATION_SRC = readFileSync(join(process.cwd(), "supabase/migrations/0038_reach_launch_audit_actor_cleanup.sql"), "utf8");
 
 describe("invite setup flow hardening", () => {
   it("activates invitations through the server route, not a client-side team_members update", () => {
@@ -69,10 +72,23 @@ describe("Supabase IO hardening", () => {
     expect(SUPPORT_ALERT_MIGRATION_SRC).toContain("support_threads_admin_untouched_open_ticket_idx");
   });
 
-  it("keeps team freshness off permanent Realtime polling", () => {
+  it("keeps team and request access state fresh through revalidation and realtime invalidation", () => {
+    expect(AUTH_CONTEXT_SRC).toContain("const ACCESS_REVALIDATE_MS = 60 * 1000");
+    expect(AUTH_CONTEXT_SRC).toContain("applyAccessState(session)");
+    expect(AUTH_CONTEXT_SRC).toContain("provisionWorkspace(session.access_token)");
     expect(TEAM_CONTEXT_SRC).toContain("const TEAM_REFRESH_MS = 5 * 60 * 1000");
-    expect(TEAM_CONTEXT_SRC).not.toContain("team-realtime");
-    expect(TEAM_REALTIME_TRIM_MIGRATION_SRC).toContain("ALTER PUBLICATION supabase_realtime DROP TABLE public.team_members");
+    expect(TEAM_CONTEXT_SRC).toContain('channel("team-access-sync")');
+    expect(TEAM_CONTEXT_SRC).toContain('table: "team_members"');
+    expect(TEAM_CONTEXT_SRC).toContain('table: "signup_requests"');
+    expect(TEAM_ACCESS_REALTIME_MIGRATION_SRC).toContain("ALTER PUBLICATION supabase_realtime ADD TABLE public.team_members");
+    expect(TEAM_ACCESS_REALTIME_MIGRATION_SRC).toContain("ALTER PUBLICATION supabase_realtime ADD TABLE public.signup_requests");
+  });
+
+  it("shows launch cleanup audit entries as system activity, not Aldridge's personal action", () => {
+    expect(AUDIT_SRC).toContain('details.startsWith("Reach launch cleanup removed ")');
+    expect(AUDIT_SRC).toContain('return "SYSTEM"');
+    expect(AUDIT_ACTOR_CLEANUP_MIGRATION_SRC).toContain("metadata->>'details' LIKE 'Reach launch cleanup removed %'");
+    expect(AUDIT_ACTOR_CLEANUP_MIGRATION_SRC).toContain("to_jsonb('SYSTEM'::text)");
   });
 });
 

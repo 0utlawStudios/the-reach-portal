@@ -101,12 +101,15 @@ export async function POST(request: NextRequest) {
     }
 
     let authDeleted = false;
+    let authCleanupError: string | null = null;
     if (authUser?.id) {
       const { error: authDeleteErr } = await admin.auth.admin.deleteUser(authUser.id);
       if (authDeleteErr) {
-        throw new Error(`Auth user cleanup failed: ${authDeleteErr.message}`);
+        authCleanupError = authDeleteErr.message;
+        console.error("[remove-member] auth user cleanup failed after access revoke:", authDeleteErr.message);
+      } else {
+        authDeleted = true;
       }
-      authDeleted = true;
     }
 
     // ─── Audit log ───
@@ -115,11 +118,20 @@ export async function POST(request: NextRequest) {
         p_entity_type: "team",
         p_action: "member_removed",
         p_entity_id: null,
-        p_metadata: { user_name: actorEmail, details: `Removed ${targetEmail} from team, workspace access, and auth` },
+        p_metadata: {
+          user_name: actorEmail,
+          details: authCleanupError
+            ? `Removed ${targetEmail} from team and workspace access; auth cleanup needs retry: ${authCleanupError}`
+            : `Removed ${targetEmail} from team, workspace access, and auth`,
+        },
       });
     } catch { /* best-effort */ }
 
-    return NextResponse.json({ success: true, authDeleted });
+    return NextResponse.json({
+      success: true,
+      authDeleted,
+      authCleanupPending: Boolean(authCleanupError),
+    });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[remove-member]", message);

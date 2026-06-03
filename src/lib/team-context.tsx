@@ -170,12 +170,10 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     };
   }, [useDb, refreshPendingRequests]);
 
-  // ─── Low-cost freshness for team changes ───
-  // Team membership changes are rare and every local mutation already calls
-  // refreshMembers(). A permanent postgres_changes subscription costs a
-  // Realtime polling slot in every authenticated browser tab, which showed up
-  // as the dominant production query family in Supabase Observability.
-  // Refresh on focus/visibility and a slow visible-tab interval instead.
+  // ─── Team freshness fallback ───
+  // Realtime below invalidates Settings immediately. Focus/visibility and a
+  // slow visible-tab interval remain as a fallback if a browser drops the
+  // websocket or wakes from sleep.
   useEffect(() => {
     if (!useDb) return;
     const refreshIfVisible = () => {
@@ -194,6 +192,29 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       window.clearInterval(interval);
     };
   }, [useDb, refreshMembers]);
+
+  // Auth/team state must not drift while admins are inviting, approving, or
+  // removing people. Realtime events are used only as invalidation signals; the
+  // canonical data still comes from normal RLS-protected SELECTs above.
+  useEffect(() => {
+    if (!useDb) return;
+    const channel = supabase
+      .channel("team-access-sync")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "team_members" },
+        () => { void refreshMembers(); },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "signup_requests" },
+        () => { refreshPendingRequests(); },
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [useDb, refreshMembers, refreshPendingRequests]);
 
   // PERF-015: 500ms debounce — saveState fires synchronous JSON.stringify on
   // the whole team list. A realtime sync burst (5+ INSERT/UPDATE events in
@@ -261,7 +282,12 @@ export function TeamProvider({ children }: { children: ReactNode }) {
             setMembers((prev) => prev.some((m) => m.id === id) ? prev : [...prev, previousMember]);
             addToast(`Remove failed: ${data.error || "member was restored"}.`, "error");
           } else if (res.ok) {
-            addToast(`${email} removed from team, workspace access, and auth.`, "success");
+            addToast(
+              data.authCleanupPending
+                ? `${email} removed from workspace access. Auth cleanup will be retried by reinvite.`
+                : `${email} removed from team, workspace access, and auth.`,
+              data.authCleanupPending ? "info" : "success",
+            );
           }
           void refreshMembers();
         }).catch(() => {

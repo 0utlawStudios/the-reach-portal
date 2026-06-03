@@ -117,6 +117,21 @@ describe("POST /api/team/remove-member", () => {
     expect(operations.some((op) => op.table === "workspace_members")).toBe(false);
   });
 
+  it("does not restore access when only auth cleanup fails after workspace/team removal", async () => {
+    deleteUserResult = { data: null, error: { message: "auth service unavailable" } };
+
+    const res = await POST(makeRequest({ memberId: "member-row-1", memberEmail: "member@example.com" }));
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({ success: true, authDeleted: false, authCleanupPending: true });
+    expect(operations).toEqual(expect.arrayContaining([
+      { table: "workspace_members", method: "delete", filters: [["user_id", "user-1"]] },
+      { table: "team_members", method: "delete", filters: [["id", "member-row-1"], ["email", "member@example.com"]] },
+      { table: "auth.users", method: "deleteUser", id: "user-1" },
+    ]));
+  });
+
   it("rejects stale UI payloads when the id and email point to different members", async () => {
     tableResults.team_members.maybeSingle = { data: { id: "member-row-3", email: "other@example.com" }, error: null };
     const res = await POST(makeRequest({ memberId: "member-row-3", memberEmail: "member@example.com" }));

@@ -1,9 +1,24 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: f79b594 fix: make access requests authoritative
+Last pushed SHA: pending auth/team access hardening slice
 Next: Continue production QA backlog: Settings/Profile polish, pipeline realtime QA, Support Inbox/chat regression checks, and full production QA.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
+
+Auth / team access hardening slice notes:
+
+- Treated the latest auth/team complaint as a root-cause hardening pass, not a redirect from the active goal.
+- Kept `src/lib/pipeline-context.tsx` untouched.
+- Patched authenticated sessions to revalidate workspace/team access on same-user Supabase token refresh, browser focus, visibility recovery, and every 60 seconds while visible. Removed/revoked users should no longer keep a stale active gate until a full reload.
+- Patched Settings team state to use Supabase Realtime invalidation for `team_members` and `signup_requests`, then reload through the existing RLS-protected SELECT paths.
+- Added and applied migration `0037_reach_team_access_realtime.sql`; production Realtime publication now includes `team_members` and `signup_requests`, and both tables use `REPLICA IDENTITY FULL`.
+- Hardened request approval ordering: approval now validates role/email, rejects duplicate team emails, cleans orphan Auth/workspace rows with checked errors, creates Auth + team row, finalizes the request, and only then sends/copies the invite link. If request finalization fails, the newly-created team/Auth state is rolled back.
+- Hardened request rejection so a failed status update returns a real error instead of fake success.
+- Hardened member removal so team/workspace access revocation stays successful even if Supabase Auth deletion fails after access has already been removed. The API reports `authCleanupPending` and reinvite cleanup can retry stale Auth cleanup later.
+- Fixed the production launch-cleanup audit rows shown in Settings: the three `Reach launch cleanup removed ...` entries now store `metadata.user_name = SYSTEM`.
+- Added app-side audit display guard so future `Reach launch cleanup removed ...` member-removal rows display as `SYSTEM` even if metadata is written incorrectly.
+- Verification passed: focused auth/team/audit tests with 39 tests, `npm run typecheck`, `git diff --check`, full `npm run lint` with only existing warnings, full `npm test` with 28 files / 243 tests, and `npm run build`.
+- Production Supabase verification passed: `team_members` and `signup_requests` are in `supabase_realtime`; the screenshot cleanup audit rows now read `SYSTEM`.
 
 Request-access / team refresh root-fix notes:
 

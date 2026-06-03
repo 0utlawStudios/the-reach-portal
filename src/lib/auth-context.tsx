@@ -48,6 +48,7 @@ const DEFAULT_USER: UserProfile = {
   email: "",
   initials: "G",
 };
+const ACCESS_REVALIDATE_MS = 60 * 1000;
 
 /** Build a profile from auth metadata, with proper capitalization */
 function buildProfile(email: string, meta: Record<string, unknown>): UserProfile {
@@ -129,6 +130,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // lock). For the same identity these events carry no new information,
   // so we keep the dashboard mounted and just refresh the access token.
   const provisionedEmailRef = useRef<string | null>(null);
+  const currentUserRef = useRef<UserProfile>(DEFAULT_USER);
+
+  useEffect(() => {
+    currentUserRef.current = currentUser;
+  }, [currentUser]);
+
+  const applyAccessState = useCallback(async (session: NonNullable<Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"]>) => {
+    const email = session.user.email || "";
+    if (!email) return;
+    const meta = session.user.user_metadata || {};
+    const fallbackProfile = currentUserRef.current.email.toLowerCase() === email.toLowerCase()
+      ? currentUserRef.current
+      : buildProfile(email, meta);
+    const [enriched, provisioned] = await Promise.all([
+      enrichFromTeamMembers(email, fallbackProfile),
+      provisionWorkspace(session.access_token),
+    ]);
+    setAccessToken(session.access_token);
+    setCurrentUser((prev) =>
+      enriched.name === prev.name &&
+      enriched.email === prev.email &&
+      enriched.role === prev.role &&
+      enriched.avatar === prev.avatar
+        ? prev
+        : enriched
+    );
+    setProvisionResult(provisioned.result);
+    setProvisionStatus(provisioned.status);
+    setProvisionMessage(provisioned.message);
+    provisionedEmailRef.current = provisioned.status === "active" ? email : null;
+  }, []);
 
   // Check for existing Supabase session on mount
   useEffect(() => {
@@ -182,6 +214,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           (provisionedEmailRef.current !== null && email === provisionedEmailRef.current);
         if (isReEmitForSameUser) {
           setAccessToken(session.access_token);
+          void applyAccessState(session).catch((err) => console.error("[auth] access refresh failed:", err));
           return;
         }
         const meta = session.user.user_metadata || {};
@@ -223,7 +256,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return () => { subscription.unsubscribe(); };
-  }, []);
+  }, [applyAccessState]);
+
+  useEffect(() => {
+    if (!hydrated || !isAuthenticated) return;
+    const refreshIfVisible = () => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      supabase.auth.getSession()
+        .then(({ data: { session } }) => {
+          if (session?.user) return applyAccessState(session);
+        })
+        .catch((err) => console.error("[auth] scheduled access refresh failed:", err));
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refreshIfVisible();
+    };
+    window.addEventListener("focus", refreshIfVisible);
+    document.addEventListener("visibilitychange", onVisible);
+    const interval = window.setInterval(refreshIfVisible, ACCESS_REVALIDATE_MS);
+    return () => {
+      window.removeEventListener("focus", refreshIfVisible);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.clearInterval(interval);
+    };
+  }, [hydrated, isAuthenticated, applyAccessState]);
 
   const login = useCallback(async (email: string, password: string): Promise<string | null> => {
     const { data, error } = await supabase.auth.signInWithPassword({

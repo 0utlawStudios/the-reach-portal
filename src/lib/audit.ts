@@ -41,15 +41,24 @@ type AuditLogV2Row = {
   created_at: string;
 };
 
-function toAuditEntry(row: AuditLogV2Row): AuditEntry {
+function resolveAuditActorName(row: AuditLogV2Row): string {
   const m = row.metadata || {};
-  const name = row.actor_name
+  const details = typeof m.details === "string" ? m.details : "";
+  if (row.action === "member_removed" && details.startsWith("Reach launch cleanup removed ")) {
+    return "SYSTEM";
+  }
+  return row.actor_name
     || m.user_name
     || m.movedBy
     || m.approvedBy
     || m.changedBy
     || row.actor_role
     || "Unknown";
+}
+
+function toAuditEntry(row: AuditLogV2Row): AuditEntry {
+  const m = row.metadata || {};
+  const name = resolveAuditActorName(row);
   return {
     id: row.id,
     post_id: row.entity_id || "",
