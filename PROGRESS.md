@@ -2,8 +2,8 @@
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
 Last pushed functional SHA: fbd198c fix: harden auth audit avatar boundaries
-Last verified tracking SHA: 29a4911 docs: record team hardening deployment
-Next: Verify GitHub/Vercel for `fbd198c`, then continue pipeline realtime/notification hardening and production QA.
+Last verified tracking SHA: 2801590 docs: record auth boundary hardening
+Next: Continue pipeline realtime/notification hardening and production QA.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
 
 Auth audit/avatar boundary hardening slice notes:
@@ -20,7 +20,9 @@ Auth audit/avatar boundary hardening slice notes:
 - Removed the duplicate client-side Settings invite audit write; invite audit rows are now server-authored only.
 - Added `p_workspace_id` to server team/auth audit calls where the route has a verified workspace context.
 - Verification passed locally: focused auth/team/setup tests (51), `git diff --check`, `npm run typecheck`, `npm run lint` with the existing AI worker warning only, full `npm test` with 29 files / 257 tests, and `npm run build`.
-- Pushed functional commit `fbd198c` to `origin/main`; GitHub CI and Vercel deployment verification are pending.
+- Pushed functional commit `fbd198c` and tracking commit `2801590` to `origin/main`.
+- GitHub CI passed for `2801590`; Vercel production deployment `https://the-reach-portal-6k7uvq29d-0utlawstudios-projects.vercel.app` is ready and serving the live domain.
+- Production health after deploy passed: `https://thereach.ten80ten.com/api/health/keep-alive` returned HTTP 200 and `https://thereach.ten80ten.com/api/health/deep-check` returned HTTP 200 with 0 failures and 0 warnings.
 
 Team request lifecycle hardening slice notes:
 
