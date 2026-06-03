@@ -557,11 +557,10 @@
         <div class="brand">The Reach</div>
         <h1>n8n Auto-Publisher Handoff</h1>
         <p class="subtitle">
-          A polished checklist for collecting the access needed to connect The Reach's social accounts to the auto-publisher. The Reach V4 workflow is already uploaded to n8n as an inactive draft:
-          <strong>The Reach Auto-Publisher V4</strong>, workflow ID <strong>4lWcpeLvHdd7HGQF</strong>.
+          A focused checklist for collecting only the social account values needed to connect The Reach's accounts to auto-publishing.
         </p>
         <div class="notice">
-          Do not activate the V4 workflow until the remaining placeholders are replaced. The n8n API key was enough to upload the workflow, but it does not create the Meta or LinkedIn publishing tokens.
+          Do not send Supabase, SMTP, Telegram, Google Drive, or n8n keys. We already own those. This page is only for Facebook, Instagram, LinkedIn, and one public test media link.
         </div>
         <div class="actions">
           <button type="button" onclick="downloadTxt()">Save + Download TXT</button>
@@ -572,68 +571,64 @@
       </div>
       <aside class="hero-panel">
         <div>
-          <h2>Activation Map</h2>
-          <p class="panel-note">Internal runtime values stay with the implementation team. This page only collects social-platform access.</p>
+          <h2>Only Fetch These</h2>
+          <p class="panel-note">Everything below is needed to turn on the existing auto-publisher.</p>
           <ul class="facts">
             <li>
               <div class="fact-top">
-                <strong>Supabase Worker</strong>
-                <span class="fact-tag internal">Internal</span>
+                <strong>Facebook</strong>
+                <span class="fact-tag collect">Fetch</span>
               </div>
-              <small>Already in env. Do not collect or paste service-role secrets into this handoff.</small>
-              <div class="token-list"><code>SUPABASE_SERVICE_ROLE_KEY</code></div>
+              <small>Page URL, Page ID, and a Meta Page token or secure vault item name.</small>
+              <div class="token-list"><code>FACEBOOK_PAGE_ID</code><code>META_PAGE_ACCESS_TOKEN</code></div>
             </li>
             <li>
               <div class="fact-top">
-                <strong>Admin Alerts</strong>
-                <span class="fact-tag internal">Internal</span>
+                <strong>Instagram</strong>
+                <span class="fact-tag collect">Fetch</span>
               </div>
-              <small>The portal sends Telegram and the published-post HTML email after n8n finalizes the job.</small>
-              <div class="token-list"><code>TELEGRAM_BOT_TOKEN</code><code>TELEGRAM_ADMIN_CHAT_ID</code><code>SMTP_*</code></div>
+              <small>Business account ID for the Instagram account linked to the Facebook Page.</small>
+              <div class="token-list"><code>INSTAGRAM_BUSINESS_ACCOUNT_ID</code></div>
             </li>
             <li>
               <div class="fact-top">
-                <strong>Meta Publishing</strong>
-                <span class="fact-tag collect">Collect</span>
+                <strong>LinkedIn</strong>
+                <span class="fact-tag collect">Fetch</span>
               </div>
-              <small>One Page token should publish to the Facebook Page and linked Instagram Business account.</small>
-              <div class="token-list"><code>META_PAGE_ACCESS_TOKEN</code><code>FACEBOOK_PAGE_ID</code><code>INSTAGRAM_BUSINESS_ACCOUNT_ID</code></div>
+              <small>Company Page URL, organization URN, and access token or secure vault item name.</small>
+              <div class="token-list"><code>LINKEDIN_ORG_URN</code><code>LINKEDIN_ACCESS_TOKEN</code></div>
             </li>
             <li>
               <div class="fact-top">
-                <strong>LinkedIn Publishing</strong>
-                <span class="fact-tag collect">Collect</span>
+                <strong>Test Media</strong>
+                <span class="fact-tag collect">Fetch</span>
               </div>
-              <small>Organization posting requires Page admin access plus a valid organization URN.</small>
-              <div class="token-list"><code>LINKEDIN_ACCESS_TOKEN</code><code>LINKEDIN_ORG_URN</code></div>
+              <small>One public image link that opens without login.</small>
+              <div class="token-list"><code>PUBLIC_TEST_IMAGE_URL</code></div>
             </li>
           </ul>
         </div>
-        <p>Anything not listed above is context or future expansion, not a required Reach V4 runtime field.</p>
+        <p>If a value is not listed here, do not collect it for this handoff.</p>
       </aside>
     </section>
 
     <section class="grid">
       <article class="card dark-card half">
-        <h2>Truth From The Uploaded V4 Workflow</h2>
-        <span class="pill ok">Uploaded to n8n</span>
-        <span class="pill warn">Inactive draft</span>
-        <p>The Reach V4 workflow contains 17 nodes. It runs every 1 minute, claims due publish jobs through Supabase RPC, publishes Facebook, Instagram, and LinkedIn, finalizes post/job status, then calls the portal notification endpoint.</p>
+        <h2>Ask Stefani For Access</h2>
+        <span class="pill ok">Copy-ready</span>
+        <p>Use plain language. Ask for your own access so you can collect the platform values cleanly.</p>
         <ul>
-          <li>n8n workflow ID: <code>4lWcpeLvHdd7HGQF</code>.</li>
-          <li>Current status: inactive, because placeholders are still present.</li>
-          <li><code>Claim Next Job</code>: calls <code>claim_publish_job</code>.</li>
-          <li><code>Finalize Job</code>: writes <code>platform_publish_attempts</code>, <code>posted_at</code>, <code>posted_urls</code>, and <code>publish_jobs</code> retry state.</li>
-          <li><code>Log to audit_log_v2</code>: writes the current Reach audit table, not the legacy audit table.</li>
-          <li><code>Notify Published</code>: calls the portal endpoint for Telegram + admin HTML email notifications.</li>
+          <li>"Please add me to The Reach Meta Business Portfolio and give me access to the Facebook Page and linked Instagram account."</li>
+          <li>"Please add me as an admin on The Reach LinkedIn Company Page."</li>
+          <li>"Please send one public test image link that opens without login."</li>
         </ul>
       </article>
 
       <article class="card half">
-        <h2>Why It Is Not Active Yet</h2>
-        <span class="pill bad">Needs platform credentials</span>
-        <p>The Supabase service-role value is already in env and is not part of this handoff. The social publishing values still to collect are: <code>REPLACE_WITH_META_TOKEN</code>, <code>REPLACE_WITH_FACEBOOK_PAGE_ID</code>, <code>REPLACE_WITH_IG_BUSINESS_ACCOUNT_ID</code>, <code>REPLACE_WITH_LINKEDIN_TOKEN</code>, and <code>REPLACE_WITH_LINKEDIN_ORG_URN</code>.</p>
-        <p>This document collects only the remaining external platform values required to safely finish activation.</p>
+        <h2>Do Not Collect</h2>
+        <span class="pill bad">Avoid noise</span>
+        <p>Do not ask for Supabase keys, SMTP keys, Telegram keys, n8n API keys, Google Drive credentials, workflow IDs, schedules, or internal portal settings.</p>
+        <p>We only need the fields in the form below.</p>
       </article>
 
       <article class="card">
@@ -745,7 +740,7 @@
 
       <article class="card">
         <h2>Collection Form</h2>
-        <p class="hint">Fields marked required are the social-platform values we still need. Supabase service-role secrets are intentionally not requested here.</p>
+        <p class="hint">Fill only these fields and download the TXT. No internal keys.</p>
         <div id="formHost"></div>
       </article>
 
@@ -756,13 +751,11 @@
       </article>
 
       <article class="card half">
-        <h2>Where Values Go Later</h2>
+        <h2>After You Send It</h2>
         <ul>
-          <li><strong>Claim Next Job node:</strong> uses the implementation-owned Supabase service-role value. Do not collect it from the SMM.</li>
-          <li><strong>Publish Facebook node:</strong> replace <code>REPLACE_WITH_META_TOKEN</code> and <code>REPLACE_WITH_FACEBOOK_PAGE_ID</code>.</li>
-          <li><strong>Publish Instagram node:</strong> replace <code>REPLACE_WITH_META_TOKEN</code> and <code>REPLACE_WITH_IG_BUSINESS_ACCOUNT_ID</code>.</li>
-          <li><strong>Publish LinkedIn node:</strong> replace <code>REPLACE_WITH_LINKEDIN_TOKEN</code> and <code>REPLACE_WITH_LINKEDIN_ORG_URN</code>.</li>
-          <li><strong>After values are replaced:</strong> run Manual Test with <code>dry_run=true</code>, then activate the 1-minute schedule only after the first real test succeeds.</li>
+          <li>We plug the values into the existing auto-publisher.</li>
+          <li>We run a controlled test publish first.</li>
+          <li>We turn on automation only after the test succeeds.</li>
         </ul>
       </article>
 
@@ -792,104 +785,37 @@
       "Stefani has added your email as LinkedIn Company Page admin.",
       "LinkedIn Organization URN is confirmed and entered as LINKEDIN_ORG_URN.",
       "LinkedIn access token is available for LINKEDIN_ACCESS_TOKEN.",
-      "One image and one video test asset have public/direct-download links.",
-      "The uploaded V4 workflow remains inactive until every placeholder is replaced and dry-run succeeds."
+      "One public test image link opens without login."
     ];
 
     const sections = [
       {
-        title: "People And Approval",
+        title: "Meta And Instagram",
+        pills: ["Facebook", "Instagram"],
         fields: [
-          ["prepared_by", "Prepared by", "text", false, ""],
-          ["prepared_date", "Prepared date", "date", false, ""],
-          ["stefani_contact", "Stefani contact email / phone", "text", false, ""],
-          ["publishing_email", "Your email for platform access", "email", true, ""],
-          ["approval_owner", "Final publish approval owner", "text", false, ""],
-          ["approval_owner_email", "Approval owner email", "email", false, ""]
-        ]
-      },
-      {
-        title: "n8n Uploaded Workflow",
-        pills: ["Already in n8n", "Inactive draft"],
-        fields: [
-          ["n8n_workflow_name", "n8n workflow name", "text", true, "The Reach Auto-Publisher V4"],
-          ["n8n_workflow_id", "n8n workflow ID", "text", true, "4lWcpeLvHdd7HGQF"],
-          ["n8n_workflow_status", "n8n workflow status", "text", true, "inactive - placeholders still present"],
-          ["n8n_schedule", "Schedule", "text", false, "Every 1 minute"],
-          ["n8n_notify_node", "Published notification node", "text", false, "Notify Published -> /api/notifications/published"]
-        ]
-      },
-      {
-        title: "Implementation-Owned Runtime Values",
-        pills: ["Already in env", "Do not collect from SMM"],
-        fields: [
-          ["supabase_url", "Reach Supabase URL", "text", false, "https://gxmpmdhmxyfqusdzcemt.supabase.co"],
-          ["supabase_service_role_status", "SUPABASE_SERVICE_ROLE_KEY status", "text", false, "Already present in implementation env; do not paste or send this secret in this handoff."],
-          ["admin_alerts_status", "Admin alert status", "text", false, "Telegram + SMTP are portal-owned env values; published alerts go to active admins, creative directors, and superadmin."],
-          ["worker_id_note", "Worker ID generated by workflow", "text", false, "n8n-the-reach-<execution id>"],
-          ["claim_seconds", "p_claim_seconds", "text", false, "120"]
-        ]
-      },
-      {
-        title: "Meta Access Steps",
-        pills: ["Ask Stefani", "Facebook + Instagram"],
-        fields: [
-          ["meta_access_request", "Exact request to Stefani", "textarea", false, "Please add me to The Reach Meta Business Portfolio and give me access to the Facebook Page and the linked Instagram account. I need to collect the Page details and help connect the accounts for auto-publishing."],
-          ["meta_business_name", "Meta Business Portfolio name", "text", false, ""],
-          ["meta_business_id", "Meta Business Portfolio ID", "text", false, ""],
-          ["fb_page_name", "Facebook Page name", "text", false, ""],
-          ["fb_page_url", "Facebook Page URL", "url", false, ""],
+          ["publishing_email", "Your email Stefani added", "email", true, ""],
+          ["fb_page_url", "Facebook Page URL", "url", true, ""],
           ["fb_page_id", "FACEBOOK_PAGE_ID", "text", true, ""],
-          ["ig_handle", "Instagram handle", "text", false, ""],
-          ["ig_profile_url", "Instagram profile URL", "url", false, ""],
+          ["ig_handle", "Instagram handle", "text", true, ""],
           ["ig_business_id", "INSTAGRAM_BUSINESS_ACCOUNT_ID", "text", true, ""],
-          ["meta_token", "META_PAGE_ACCESS_TOKEN or vault item", "textarea", true, ""],
-          ["meta_permissions_notes", "Permission/scope notes", "textarea", false, "Token must be able to publish to the Facebook Page and linked Instagram Business account."]
+          ["meta_token", "META_PAGE_ACCESS_TOKEN or secure vault item name", "textarea", true, ""]
         ]
       },
       {
-        title: "LinkedIn Access Steps",
-        pills: ["Ask Stefani", "LinkedIn"],
+        title: "LinkedIn",
+        pills: ["Company Page"],
         fields: [
-          ["linkedin_access_request", "Exact request to Stefani", "textarea", false, "Please add me as an admin on The Reach LinkedIn Company Page. I need to collect the organization details and help connect LinkedIn for auto-publishing."],
-          ["linkedin_page_name", "LinkedIn Company Page name", "text", false, ""],
-          ["linkedin_page_url", "LinkedIn Company Page URL", "url", false, ""],
-          ["linkedin_org_id", "LinkedIn Organization ID", "text", true, ""],
+          ["linkedin_page_url", "LinkedIn Company Page URL", "url", true, ""],
           ["linkedin_org_urn", "LINKEDIN_ORG_URN", "text", true, "urn:li:organization:"],
-          ["linkedin_token", "LINKEDIN_ACCESS_TOKEN or vault item", "textarea", true, ""],
-          ["linkedin_permission_notes", "Permission notes", "textarea", false, "V4 uses LinkedIn /rest/posts with LinkedIn-Version 202411."]
+          ["linkedin_token", "LINKEDIN_ACCESS_TOKEN or secure vault item name", "textarea", true, ""]
         ]
       },
       {
-        title: "Media Test Files",
-        pills: ["Required for test", "Drive public link"],
+        title: "Test Media",
+        pills: ["Public link"],
         fields: [
           ["test_image_url", "Public test image URL", "url", true, ""],
-          ["test_video_url", "Public test video URL", "url", false, ""],
-          ["test_carousel_urls", "Public carousel image URLs", "textarea", false, ""],
-          ["media_access_confirmed", "Media access confirmation", "textarea", true, "Each test file is reachable by anyone with the link and can be downloaded by platform APIs."],
-          ["media_notes", "Media notes", "textarea", false, ""]
-        ]
-      },
-      {
-        title: "Portal Test Post",
-        pills: ["Approved scheduled row", "Reach V4 pre-flight"],
-        fields: [
-          ["test_post_title", "Test post title", "text", true, ""],
-          ["test_post_platforms", "Portal platforms array", "text", true, "facebook, instagram, linkedin"],
-          ["test_post_content_type", "Content type", "select", true, "image", ["image", "video", "reel", "carousel"]],
-          ["test_post_caption", "Caption", "textarea", true, ""],
-          ["scheduled_date", "scheduled_date", "date", true, ""],
-          ["scheduled_time", "scheduled_time", "time", true, ""],
-          ["source_vault_note", "Media source note", "textarea", false, "V4 resolves post.asset_urls first, then source_vault.rawFiles with usageType=master or first file fallback."],
-          ["delete_after_test", "Delete test post after validation?", "select", false, "yes", ["yes", "no"]]
-        ]
-      },
-      {
-        title: "Do Not Treat As Required",
-        pills: ["Hallucination guard"],
-        fields: [
-          ["not_required", "Not required by uploaded V4", "textarea", false, "The uploaded V4 file does not require YouTube token, TikTok token, N8N_API_KEY, N8N_URL, Google service account JSON, Google Drive folder ID, SMTP secrets, or Telegram secrets from the SMM. Portal env owns internal notifications."]
+          ["media_access_confirmed", "Confirm the image opens without login", "textarea", true, "Paste yes + any note. The link must open or download without a password."]
         ]
       }
     ];
@@ -951,7 +877,6 @@
           const [id, label, type, required, placeholder, options] = field;
           const wrap = document.createElement("div");
           wrap.className = type === "textarea" ? "field full" : "field";
-          const req = required ? '<span class="req">(required)</span>' : '<span class="opt">(optional)</span>';
           let input = "";
 
           if (type === "textarea") {
@@ -962,7 +887,7 @@
             input = '<input data-save id="' + id + '" type="' + type + '" placeholder="' + escapeAttr(placeholder || "") + '">';
           }
 
-          wrap.innerHTML = '<label for="' + id + '">' + escapeHtml(label) + req + "</label>" + input;
+          wrap.innerHTML = '<label for="' + id + '">' + escapeHtml(label) + "</label>" + input;
           grid.appendChild(wrap);
         });
 
@@ -1016,25 +941,21 @@
       out += "THE_REACH_N8N_AUTOPUBLISH_HANDOFF.txt\n";
       out += "Generated: " + new Date().toISOString() + "\n";
       out += "Client: The Reach\n";
-      out += "Uploaded n8n workflow: The Reach Auto-Publisher V4\n";
-      out += "n8n workflow ID: 4lWcpeLvHdd7HGQF\n";
-      out += "n8n workflow status: inactive draft, placeholders still present\n";
-      out += "Local workflow source: /Users/ace/Documents/CURSOR MAIN/THE REACH SMM PORTAL/n8n/the-reach-auto-publisher-v4.json\n\n";
+      out += "Purpose: social account values for auto-publishing.\n\n";
 
-      out += "HALLUCINATION GUARD\n";
-      out += "- Required fields are based on the uploaded Reach V4 workflow only.\n";
-      out += "- Reach V4 runtime values: SUPABASE_SERVICE_ROLE_KEY, META_PAGE_ACCESS_TOKEN, FACEBOOK_PAGE_ID, INSTAGRAM_BUSINESS_ACCOUNT_ID, LINKEDIN_ACCESS_TOKEN, LINKEDIN_ORG_URN.\n";
-      out += "- Portal env already owns SUPABASE_SERVICE_ROLE_KEY, SMTP_*, TELEGRAM_BOT_TOKEN, and TELEGRAM_ADMIN_CHAT_ID. Do not ask the SMM to send those internal secrets.\n";
-      out += "- Values to collect here are only the Meta token/Page ID/Instagram Business Account ID and LinkedIn token/organization URN.\n";
-      out += "- Reach V4 does not require YouTube token, TikTok token, Google service account JSON, N8N_API_KEY, or N8N_URL for runtime publishing.\n";
-      out += "- Do not activate the n8n workflow until every placeholder is replaced and dry-run/manual test passes.\n\n";
+      out += "DO NOT INCLUDE\n";
+      out += "- Supabase keys\n";
+      out += "- SMTP keys\n";
+      out += "- Telegram keys\n";
+      out += "- n8n keys or workflow settings\n";
+      out += "- Google Drive credentials\n\n";
 
-      out += "EXACT STEFANI REQUESTS\n";
+      out += "ASK STEFANI\n";
       out += "1. Ask Stefani to add your email to The Reach Meta Business Portfolio with access to the Facebook Page and linked Instagram account.\n";
-      out += "2. Ask Stefani to confirm the official Facebook Page URL, Facebook Page ID, Instagram handle, and Instagram Business Account ID.\n";
+      out += "2. Ask Stefani for the official Facebook Page URL, Facebook Page ID, Instagram handle, and Instagram Business Account ID.\n";
       out += "3. Ask Stefani to add your email as admin on The Reach LinkedIn Company Page.\n";
-      out += "4. Ask Stefani to confirm the LinkedIn Company Page URL and Organization ID.\n";
-      out += "5. Ask Stefani/SMM to provide one public test image and one public test video link that platform APIs can download.\n\n";
+      out += "4. Ask Stefani for the LinkedIn Company Page URL and Organization ID.\n";
+      out += "5. Ask for one public test image link that opens without login.\n\n";
 
       out += "CHECKLIST\n";
       checklistItems.forEach((item, index) => {
@@ -1046,22 +967,15 @@
         out += "\n\n" + section.title.toUpperCase() + "\n";
         out += "-".repeat(section.title.length) + "\n";
         section.fields.forEach((field) => {
-          const [id, label, , required] = field;
+          const [id, label] = field;
           const el = document.getElementById(id);
           const value = el ? String(el.value || "").trim() : "";
-          out += (required ? "[REQUIRED] " : "[optional] ") + label + ": " + value + "\n";
+          out += label + ": " + value + "\n";
         });
       });
 
-      out += "\n\nWHERE THESE VALUES GO IN THE UPLOADED REACH V4 WORKFLOW\n";
-      out += "- n8n workflow ID: 4lWcpeLvHdd7HGQF.\n";
-      out += "- Claim Next Job node: uses the implementation-owned Supabase service-role value. Do not request this secret from the SMM.\n";
-      out += "- Notify Published node: calls /api/notifications/published after Finalize + Audit; the portal sends Telegram and the HTML email.\n";
-      out += "- Publish Facebook node: replace REPLACE_WITH_META_TOKEN and REPLACE_WITH_FACEBOOK_PAGE_ID.\n";
-      out += "- Publish Instagram node: replace REPLACE_WITH_META_TOKEN and REPLACE_WITH_IG_BUSINESS_ACCOUNT_ID.\n";
-      out += "- Publish LinkedIn node: replace REPLACE_WITH_LINKEDIN_TOKEN and REPLACE_WITH_LINKEDIN_ORG_URN.\n";
-      out += "- Send Alert node: ALERT_WEBHOOK_URL is optional and can remain blank.\n";
-      out += "- Run Manual Test / dry-run first. Activate the 1-minute schedule only after the first real controlled publish test succeeds.\n";
+      out += "\n\nNEXT STEP\n";
+      out += "Send this TXT file back to the implementation team. They will plug the values into the existing auto-publisher and run the first controlled test.\n";
 
       return out;
     }
