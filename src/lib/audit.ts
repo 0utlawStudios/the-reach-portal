@@ -52,6 +52,7 @@ const LAUNCH_CLEANUP_EMAILS = new Set([
 
 function isLaunchCleanupRemoval(details: string): boolean {
   if (details.startsWith("Reach launch cleanup removed ")) return true;
+  if (/^Removed qa-(invite|request)-\d+@example\.com from team, workspace access, and auth$/.test(details)) return true;
   const removed = details.match(/^Removed ([^ ]+) from team, workspace access, and auth$/);
   const email = removed?.[1]?.toLowerCase();
   return !!email && LAUNCH_CLEANUP_EMAILS.has(email);
