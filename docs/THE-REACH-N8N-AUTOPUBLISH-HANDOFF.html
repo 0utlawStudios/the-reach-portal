@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Reach n8n Auto-Publisher Handoff</title>
+  <style>
+    :root {
+      --sand: #E1DFD5;
+      --cream: #F8F4EC;
+      --card: #EFEAE0;
+      --card-hi: #FBF7EE;
+      --stone: #6C655A;
+      --stone-2: #4B463E;
+      --sun: #975428;
+      --sun-dark: #783F1E;
+      --ink: #25221E;
+      --line: rgba(108, 101, 90, 0.28);
+      --line-strong: rgba(108, 101, 90, 0.42);
+      --ok: #2F7355;
+      --warn: #9A6422;
+      --bad: #A53D2C;
+      --shadow: 0 24px 70px rgba(37, 34, 30, 0.16);
+      --shadow-soft: 0 14px 34px rgba(37, 34, 30, 0.10);
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at top left, rgba(151, 84, 40, 0.10), transparent 34rem),
+        linear-gradient(135deg, #E7E4DA 0%, var(--sand) 52%, #D7D3C8 100%);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }
+
+    .page {
+      width: min(1220px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 42px 0 84px;
+    }
+
+    .hero {
+      min-height: 360px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+      gap: 30px;
+      align-items: stretch;
+      background: linear-gradient(135deg, rgba(251, 247, 238, 0.96), rgba(231, 225, 214, 0.92));
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .hero-copy { padding: 40px; }
+
+    .brand {
+      color: var(--sun);
+      letter-spacing: 0.34em;
+      text-transform: uppercase;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    h1 {
+      margin: 18px 0 12px;
+      font-size: clamp(38px, 5.5vw, 72px);
+      line-height: 0.94;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      max-width: 760px;
+      margin: 0;
+      color: var(--stone);
+      font-size: 18px;
+    }
+
+    .hero-panel {
+      background: #2B2520;
+      color: var(--cream);
+      padding: 34px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-width: 0;
+    }
+
+    .hero-panel h2,
+    .dark-card h2 {
+      color: #FFF9F0;
+    }
+
+    .hero-panel p,
+    .hero-panel li,
+    .dark-card p,
+    .dark-card li {
+      color: #E8DED2;
+    }
+
+    .facts {
+      list-style: none;
+      padding: 0;
+      margin: 20px 0 0;
+      display: grid;
+      gap: 10px;
+    }
+
+    .facts li {
+      padding: 11px 12px;
+      border: 1px solid rgba(248, 244, 236, 0.16);
+      border-radius: 14px;
+      background: rgba(248, 244, 236, 0.06);
+    }
+
+    .notice {
+      margin-top: 22px;
+      padding: 16px 18px;
+      background: rgba(151, 84, 40, 0.10);
+      border: 1px solid rgba(151, 84, 40, 0.30);
+      border-radius: 16px;
+      color: #4A3325;
+      font-weight: 750;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 22px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 18px;
+      background: linear-gradient(135deg, var(--sun), var(--sun-dark));
+      color: #FFF7ED;
+      font-weight: 900;
+      cursor: pointer;
+      box-shadow: 0 14px 30px rgba(151, 84, 40, 0.26);
+    }
+
+    button.secondary { background: linear-gradient(135deg, #5A534B, #3F3933); }
+    button.light {
+      background: var(--card-hi);
+      color: var(--stone-2);
+      border: 1px solid var(--line);
+      box-shadow: none;
+    }
+
+    .status {
+      color: var(--sun);
+      font-size: 13px;
+      font-weight: 900;
+      margin-top: 12px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 20px;
+      margin-top: 24px;
+    }
+
+    .card {
+      grid-column: span 12;
+      background: rgba(239, 234, 224, 0.94);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      box-shadow: var(--shadow-soft);
+      padding: 26px;
+      min-width: 0;
+    }
+
+    .dark-card { background: #2B2520; color: var(--cream); }
+    .half { grid-column: span 6; }
+
+    h2 {
+      margin: 0 0 8px;
+      font-size: clamp(22px, 2.5vw, 30px);
+      line-height: 1.1;
+    }
+
+    h3 {
+      margin: 26px 0 12px;
+      color: var(--sun);
+      font-size: 13px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    p, li, label, .hint { color: var(--stone); }
+
+    .hint {
+      margin-top: 0;
+      font-size: 14px;
+    }
+
+    .pill {
+      display: inline-flex;
+      margin: 5px 7px 10px 0;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(151, 84, 40, 0.12);
+      color: var(--sun);
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .pill.ok { background: rgba(47, 115, 85, 0.12); color: var(--ok); }
+    .pill.warn { background: rgba(154, 100, 34, 0.14); color: var(--warn); }
+    .pill.bad { background: rgba(165, 61, 44, 0.12); color: var(--bad); }
+
+    .step-list {
+      counter-reset: step;
+      list-style: none;
+      padding: 0;
+      margin: 16px 0 0;
+      display: grid;
+      gap: 12px;
+    }
+
+    .step-list li {
+      counter-increment: step;
+      display: grid;
+      grid-template-columns: 36px minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+      background: rgba(251, 247, 238, 0.72);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px;
+    }
+
+    .step-list li::before {
+      content: counter(step);
+      width: 32px;
+      height: 32px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: rgba(151, 84, 40, 0.13);
+      color: var(--sun);
+      font-weight: 900;
+    }
+
+    .checklist {
+      list-style: none;
+      margin: 12px 0 0;
+      padding: 0;
+    }
+
+    .checklist li {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(108, 101, 90, 0.14);
+    }
+
+    .checklist input {
+      width: 18px;
+      height: 18px;
+      margin-top: 3px;
+      accent-color: var(--sun);
+      flex: 0 0 auto;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 14px;
+    }
+
+    .field.full { grid-column: 1 / -1; }
+
+    label {
+      display: block;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .req { color: var(--bad); }
+    .opt { color: var(--stone); }
+
+    input, textarea, select {
+      width: 100%;
+      border: 1px solid var(--line-strong);
+      background: var(--card-hi);
+      color: var(--ink);
+      border-radius: 13px;
+      padding: 11px 12px;
+      font: inherit;
+      outline: none;
+      box-shadow: inset 0 1px 5px rgba(37, 34, 30, 0.06);
+    }
+
+    textarea {
+      min-height: 92px;
+      resize: vertical;
+    }
+
+    input:focus, textarea:focus, select:focus {
+      border-color: var(--sun);
+      box-shadow: 0 0 0 3px rgba(151, 84, 40, 0.14);
+    }
+
+    code {
+      background: rgba(151, 84, 40, 0.10);
+      color: #5D321B;
+      border-radius: 8px;
+      padding: 2px 6px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.92em;
+    }
+
+    .preview {
+      min-height: 520px;
+      white-space: pre;
+      overflow: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .validation {
+      padding: 15px;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: rgba(251, 247, 238, 0.78);
+    }
+
+    .ok-text { color: var(--ok); font-weight: 900; }
+    .bad-text { color: var(--bad); font-weight: 900; }
+
+    a { color: var(--sun); font-weight: 850; }
+
+    @media (max-width: 900px) {
+      .hero { grid-template-columns: 1fr; }
+      .hero-copy, .hero-panel { padding: 26px; }
+      .half { grid-column: span 12; }
+      .form-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="brand">The Reach</div>
+        <h1>n8n Auto-Publisher Handoff</h1>
+        <p class="subtitle">
+          A verified collection form for the SMM assigned to The Reach. It is based on the workflow file
+          <strong>Ten80Ten SMM App Auto-Publisher V2.7.json</strong>, not guesses.
+        </p>
+        <div class="notice">
+          Current V2.7 is a credentials handoff source only. Do not activate it unchanged against The Reach production until it is patched for the current Reach publish contract.
+        </div>
+        <div class="actions">
+          <button type="button" onclick="downloadTxt()">Save + Download TXT</button>
+          <button type="button" class="secondary" onclick="copyTxt()">Copy TXT</button>
+          <button type="button" class="light" onclick="clearSaved()">Clear Saved Data</button>
+        </div>
+        <div id="status" class="status">Autosave ready.</div>
+      </div>
+      <aside class="hero-panel">
+        <div>
+          <h2>Verified Required Inputs</h2>
+          <ul class="facts">
+            <li><strong>n8n Supabase credential:</strong> Reach Supabase URL + service role key.</li>
+            <li><strong>Facebook node:</strong> <code>FB_TOKEN</code> + <code>FB_PAGE</code>.</li>
+            <li><strong>Instagram node:</strong> <code>IG_TOKEN</code> + <code>IG_USER</code>.</li>
+            <li><strong>LinkedIn node:</strong> <code>LI_TOKEN</code> + <code>LI_ORG</code>.</li>
+          </ul>
+        </div>
+        <p>Anything not listed above is context or future expansion, not a required V2.7 runtime field.</p>
+      </aside>
+    </section>
+
+    <section class="grid">
+      <article class="card dark-card half">
+        <h2>Truth From The Workflow</h2>
+        <p>The supplied V2.7 workflow contains 14 nodes. It runs every 5 minutes, reads <code>posts</code> from Supabase, filters due posts in CST, then publishes Facebook, Instagram, and LinkedIn.</p>
+        <ul>
+          <li><code>Get Scheduled Posts</code>: Supabase getAll on <code>posts</code>.</li>
+          <li>Filter: <code>stage=eq.approved_scheduled</code>, <code>scheduled_date</code> and <code>scheduled_time</code> present.</li>
+          <li><code>Publish Facebook</code>: Graph API v21, images/videos/reels.</li>
+          <li><code>Publish Instagram</code>: Graph API v21, image/video/reel/carousel.</li>
+          <li><code>Publish LinkedIn</code>: legacy <code>/v2/ugcPosts</code>, image only.</li>
+        </ul>
+      </article>
+
+      <article class="card half">
+        <h2>Safety Notes</h2>
+        <span class="pill bad">Must patch before live</span>
+        <p>V2.7 marks a post as <code>posted</code> before platform publishing starts. The current Reach app is stricter: a post should move to Posted only after platform API success with <code>posted_at</code> and posted URLs.</p>
+        <p>V2.7 also logs to legacy <code>post_audit_logs</code>. The current app uses <code>audit_log_v2</code>. This handoff gathers access only; the workflow wiring should be updated later.</p>
+      </article>
+
+      <article class="card">
+        <h2>Exact SMM Checklist</h2>
+        <p class="hint">Use this as the message to Stefani and the SMM. Check items as access is collected. The checklist is saved after refresh.</p>
+        <ol class="step-list">
+          <li>
+            <div>
+              <strong>Ask Stefani for Meta admin access.</strong><br />
+              Ask: "Please add Aldridge/the implementation email to The Reach Meta Business Portfolio with access to the Facebook Page and the linked Instagram Business account. We need enough access to generate or authorize a Page token for publishing."
+            </div>
+          </li>
+          <li>
+            <div>
+              <strong>Go to Meta Business settings.</strong><br />
+              Open <code>business.facebook.com/settings</code>. Under People, verify the implementation email is added. Under Business assets, verify access to The Reach Facebook Page and The Reach Instagram account.
+            </div>
+          </li>
+          <li>
+            <div>
+              <strong>Collect Facebook Page details.</strong><br />
+              Get the official Page URL and Page ID. Put the Page ID in <code>FB_PAGE</code> below. This is the exact value used by the V2.7 Facebook node.
+            </div>
+          </li>
+          <li>
+            <div>
+              <strong>Collect Instagram Business Account ID.</strong><br />
+              Confirm the Instagram profile is Business/Creator and linked to the Page. Get the Instagram Business Account ID and put it in <code>IG_USER</code> below.
+            </div>
+          </li>
+          <li>
+            <div>
+              <strong>Create or authorize the Meta Page token.</strong><br />
+              Use the Meta app/publishing setup to generate a token that can publish to the Page and linked Instagram account. Put that token in <code>FB_TOKEN</code> and <code>IG_TOKEN</code>, or enter the vault item name if secrets are stored elsewhere.
+            </div>
+          </li>
+          <li>
+            <div>
+              <strong>Ask Stefani for LinkedIn Page admin access.</strong><br />
+              Ask: "Please add Aldridge/the implementation email as an admin on The Reach LinkedIn Company Page so we can authorize organization posting."
+            </div>
+          </li>
+          <li>
+            <div>
+              <strong>Collect LinkedIn Organization ID.</strong><br />
+              Open the LinkedIn Company Page admin area. Get the Organization ID and format it as <code>urn:li:organization:YOUR_ORG_ID</code>. Put it in <code>LI_ORG</code> below.
+            </div>
+          </li>
+          <li>
+            <div>
+              <strong>Create or authorize the LinkedIn access token.</strong><br />
+              Use the LinkedIn app/OAuth setup with organization posting permission. Put the token in <code>LI_TOKEN</code>, or enter the vault item name.
+            </div>
+          </li>
+          <li>
+            <div>
+              <strong>Prepare public media test files.</strong><br />
+              V2.7 reads <code>source_vault.rawFiles</code> and converts Google Drive share links to direct download links. Test media must be reachable by platform APIs. Confirm "Anyone with the link" access for test files.
+            </div>
+          </li>
+          <li>
+            <div>
+              <strong>Save this form.</strong><br />
+              Fill the boxes below, press <strong>Save + Download TXT</strong>, and send the file named <code>THE_REACH_N8N_AUTOPUBLISH_HANDOFF.txt</code>.
+            </div>
+          </li>
+        </ol>
+      </article>
+
+      <article class="card">
+        <h2>Collection Form</h2>
+        <p class="hint">Fields marked required are required by V2.7 or needed to configure the V2.7 n8n Supabase credential.</p>
+        <div id="formHost"></div>
+      </article>
+
+      <article class="card half">
+        <h2>Completion Status</h2>
+        <div id="validation" class="validation">Checking required fields...</div>
+        <ul class="checklist" id="checklist"></ul>
+      </article>
+
+      <article class="card half">
+        <h2>Where Values Go Later</h2>
+        <ul>
+          <li><strong>n8n credential:</strong> create a Supabase credential for The Reach and apply it to <code>Get Scheduled Posts</code>, <code>Mark as Posted</code>, and <code>Log to Audit Trail</code>.</li>
+          <li><strong>Publish Facebook node:</strong> paste <code>FB_TOKEN</code> and <code>FB_PAGE</code>.</li>
+          <li><strong>Publish Instagram node:</strong> paste <code>IG_TOKEN</code> and <code>IG_USER</code>.</li>
+          <li><strong>Publish LinkedIn node:</strong> paste <code>LI_TOKEN</code> and <code>LI_ORG</code>.</li>
+          <li><strong>Before live:</strong> patch V2.7 to match Reach's current posted/audit contract.</li>
+        </ul>
+      </article>
+
+      <article class="card">
+        <h2>TXT Preview</h2>
+        <p class="hint">This is exactly what downloads. File name: <strong>THE_REACH_N8N_AUTOPUBLISH_HANDOFF.txt</strong>.</p>
+        <textarea id="preview" class="preview" readonly></textarea>
+        <div class="actions">
+          <button type="button" onclick="downloadTxt()">Save + Download TXT</button>
+          <button type="button" class="secondary" onclick="copyTxt()">Copy TXT</button>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    const STORAGE_KEY = "the-reach-n8n-v27-handoff";
+    const FILE_NAME = "THE_REACH_N8N_AUTOPUBLISH_HANDOFF.txt";
+
+    const checklistItems = [
+      "Stefani has added the implementation email to Meta Business Portfolio.",
+      "Implementation email has access to The Reach Facebook Page.",
+      "Implementation email has access to the linked The Reach Instagram Business account.",
+      "Facebook Page ID is confirmed and entered as FB_PAGE.",
+      "Instagram Business Account ID is confirmed and entered as IG_USER.",
+      "Meta Page Access Token is available for FB_TOKEN and IG_TOKEN.",
+      "Stefani has added the implementation email as LinkedIn Company Page admin.",
+      "LinkedIn Organization URN is confirmed and entered as LI_ORG.",
+      "LinkedIn access token is available for LI_TOKEN.",
+      "One image and one video test asset have public/direct-download links.",
+      "V2.7 workflow will not be activated unchanged until patched for Reach posted/audit safety."
+    ];
+
+    const sections = [
+      {
+        title: "People And Approval",
+        fields: [
+          ["prepared_by", "Prepared by", "text", false, ""],
+          ["prepared_date", "Prepared date", "date", false, ""],
+          ["stefani_contact", "Stefani contact email / phone", "text", false, ""],
+          ["implementation_email", "Implementation email Stefani should invite", "email", true, ""],
+          ["approval_owner", "Final publish approval owner", "text", false, ""],
+          ["approval_owner_email", "Approval owner email", "email", false, ""]
+        ]
+      },
+      {
+        title: "n8n Supabase Credential",
+        pills: ["Required", "V2.7 Supabase nodes"],
+        fields: [
+          ["supabase_url", "Reach Supabase URL", "text", true, "https://gxmpmdhmxyfqusdzcemt.supabase.co"],
+          ["supabase_service_role_key", "Reach Supabase service role key or vault item", "textarea", true, ""],
+          ["n8n_credential_name", "n8n credential name to create", "text", true, "The Reach Supabase Service Role"],
+          ["supabase_nodes", "Apply credential to these nodes", "textarea", false, "Get Scheduled Posts, Mark as Posted, Log to Audit Trail"]
+        ]
+      },
+      {
+        title: "Meta Access Steps",
+        pills: ["Ask Stefani", "Facebook + Instagram"],
+        fields: [
+          ["meta_access_request", "Exact request to Stefani", "textarea", false, "Please add the implementation email to The Reach Meta Business Portfolio with access to the Facebook Page and linked Instagram Business account. We need enough access to authorize publishing through the Meta app."],
+          ["meta_business_name", "Meta Business Portfolio name", "text", false, ""],
+          ["meta_business_id", "Meta Business Portfolio ID", "text", false, ""],
+          ["fb_page_name", "Facebook Page name", "text", false, ""],
+          ["fb_page_url", "Facebook Page URL", "url", false, ""],
+          ["fb_page_id", "FB_PAGE / Facebook Page ID", "text", true, ""],
+          ["ig_handle", "Instagram handle", "text", false, ""],
+          ["ig_profile_url", "Instagram profile URL", "url", false, ""],
+          ["ig_business_id", "IG_USER / Instagram Business Account ID", "text", true, ""],
+          ["meta_token", "FB_TOKEN and IG_TOKEN / Meta Page Access Token or vault item", "textarea", true, ""],
+          ["meta_permissions_notes", "Permission/scope notes", "textarea", false, "Token must be able to publish to the Facebook Page and linked Instagram Business account."]
+        ]
+      },
+      {
+        title: "LinkedIn Access Steps",
+        pills: ["Ask Stefani", "LinkedIn"],
+        fields: [
+          ["linkedin_access_request", "Exact request to Stefani", "textarea", false, "Please add the implementation email as an admin on The Reach LinkedIn Company Page so we can authorize organization posting."],
+          ["linkedin_page_name", "LinkedIn Company Page name", "text", false, ""],
+          ["linkedin_page_url", "LinkedIn Company Page URL", "url", false, ""],
+          ["linkedin_org_id", "LinkedIn Organization ID", "text", true, ""],
+          ["linkedin_org_urn", "LI_ORG / LinkedIn Organization URN", "text", true, "urn:li:organization:"],
+          ["linkedin_token", "LI_TOKEN / LinkedIn access token or vault item", "textarea", true, ""],
+          ["linkedin_permission_notes", "Permission notes", "textarea", false, "V2.7 node expects organization posting access and uses legacy /v2/ugcPosts image publishing."]
+        ]
+      },
+      {
+        title: "Media Test Files",
+        pills: ["Required for test", "Drive public link"],
+        fields: [
+          ["test_image_url", "Public test image URL", "url", true, ""],
+          ["test_video_url", "Public test video URL", "url", false, ""],
+          ["test_carousel_urls", "Public carousel image URLs", "textarea", false, ""],
+          ["media_access_confirmed", "Media access confirmation", "textarea", true, "Each test file is reachable by anyone with the link and can be downloaded by platform APIs."],
+          ["media_notes", "Media notes", "textarea", false, ""]
+        ]
+      },
+      {
+        title: "Portal Test Post",
+        pills: ["Approved scheduled row", "V2.7 filter"],
+        fields: [
+          ["test_post_title", "Test post title", "text", true, ""],
+          ["test_post_platforms", "Portal platforms array", "text", true, "facebook, instagram, linkedin"],
+          ["test_post_content_type", "Content type", "select", true, "image", ["image", "video", "reel", "carousel"]],
+          ["test_post_caption", "Caption", "textarea", true, ""],
+          ["scheduled_date", "scheduled_date", "date", true, ""],
+          ["scheduled_time", "scheduled_time", "time", true, ""],
+          ["source_vault_note", "source_vault.rawFiles note", "textarea", false, "V2.7 expects rawFiles with url and usageType=master or first file fallback."],
+          ["delete_after_test", "Delete test post after validation?", "select", false, "yes", ["yes", "no"]]
+        ]
+      },
+      {
+        title: "Do Not Treat As Required",
+        pills: ["Hallucination guard"],
+        fields: [
+          ["not_required", "Not required by supplied V2.7", "textarea", false, "The supplied V2.7 file does not require YouTube token, TikTok token, N8N_API_KEY, N8N_URL, Google service account JSON, or Google Drive folder ID. Do not block this handoff on those unless the workflow is upgraded."]
+        ]
+      }
+    ];
+
+    const state = loadState();
+
+    function loadState() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+      } catch {
+        return {};
+      }
+    }
+
+    function saveState() {
+      document.querySelectorAll("[data-save]").forEach((el) => {
+        state[el.id] = el.type === "checkbox" ? el.checked : el.value;
+      });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      updatePreview();
+      validateRequired();
+      setStatus("Saved locally. This data will remain after refresh in this browser.");
+    }
+
+    function setStatus(text) {
+      document.getElementById("status").textContent = text;
+    }
+
+    function renderChecklist() {
+      const host = document.getElementById("checklist");
+      checklistItems.forEach((item, index) => {
+        const id = "check_" + index;
+        const li = document.createElement("li");
+        li.innerHTML = '<input data-save id="' + id + '" type="checkbox"><span>' + escapeHtml(item) + "</span>";
+        host.appendChild(li);
+      });
+    }
+
+    function renderForms() {
+      const host = document.getElementById("formHost");
+      sections.forEach((section) => {
+        const sectionEl = document.createElement("section");
+        sectionEl.innerHTML = "<h3>" + escapeHtml(section.title) + "</h3>";
+
+        if (section.pills) {
+          section.pills.forEach((pillText) => {
+            const pill = document.createElement("span");
+            pill.className = "pill";
+            if (/required/i.test(pillText)) pill.className += " bad";
+            pill.textContent = pillText;
+            sectionEl.appendChild(pill);
+          });
+        }
+
+        const grid = document.createElement("div");
+        grid.className = "form-grid";
+
+        section.fields.forEach((field) => {
+          const [id, label, type, required, placeholder, options] = field;
+          const wrap = document.createElement("div");
+          wrap.className = type === "textarea" ? "field full" : "field";
+          const req = required ? '<span class="req"> required</span>' : '<span class="opt"> optional</span>';
+          let input = "";
+
+          if (type === "textarea") {
+            input = '<textarea data-save id="' + id + '" placeholder="' + escapeAttr(placeholder || "") + '"></textarea>';
+          } else if (type === "select") {
+            input = '<select data-save id="' + id + '">' + (options || []).map((option) => '<option value="' + escapeAttr(option) + '">' + escapeHtml(option) + "</option>").join("") + "</select>";
+          } else {
+            input = '<input data-save id="' + id + '" type="' + type + '" placeholder="' + escapeAttr(placeholder || "") + '">';
+          }
+
+          wrap.innerHTML = '<label for="' + id + '">' + escapeHtml(label) + req + "</label>" + input;
+          grid.appendChild(wrap);
+        });
+
+        sectionEl.appendChild(grid);
+        host.appendChild(sectionEl);
+      });
+
+      document.querySelectorAll("[data-save]").forEach((el) => {
+        if (el.type === "checkbox") {
+          el.checked = !!state[el.id];
+        } else if (state[el.id] !== undefined) {
+          el.value = state[el.id];
+        } else if (el.placeholder) {
+          el.value = el.placeholder;
+        }
+
+        el.addEventListener("input", saveState);
+        el.addEventListener("change", saveState);
+      });
+    }
+
+    function requiredFields() {
+      return sections.flatMap((section) => {
+        return section.fields
+          .filter((field) => field[3] === true)
+          .map((field) => ({ id: field[0], label: field[1], section: section.title }));
+      });
+    }
+
+    function validateRequired() {
+      const missing = requiredFields().filter((field) => {
+        const el = document.getElementById(field.id);
+        const value = el ? String(el.value || "").trim() : "";
+        if (!value) return true;
+        if (/^(YOUR_|REPLACE_WITH_|urn:li:organization:$)/.test(value)) return true;
+        return false;
+      });
+
+      const box = document.getElementById("validation");
+      if (missing.length === 0) {
+        box.innerHTML = '<span class="ok-text">All required V2.7 handoff fields are filled.</span>';
+      } else {
+        box.innerHTML = '<span class="bad-text">' + missing.length + " required field(s) missing:</span><br>" +
+          missing.map((field) => "- " + escapeHtml(field.section) + ": " + escapeHtml(field.label)).join("<br>");
+      }
+      return missing;
+    }
+
+    function buildTxt() {
+      let out = "";
+      out += "THE_REACH_N8N_AUTOPUBLISH_HANDOFF.txt\n";
+      out += "Generated: " + new Date().toISOString() + "\n";
+      out += "Client: The Reach\n";
+      out += "Source workflow inspected: /Users/ace/Downloads/Ten80Ten SMM App Auto-Publisher V2.7.json\n";
+      out += "Workflow name: Ten80Ten SMM App Auto-Publisher V2.7\n";
+      out += "Workflow SHA-256: 6ac8e0a082222466ec259d15a6d956952a07d22692568ad125dbafb6d19e0041\n\n";
+
+      out += "HALLUCINATION GUARD\n";
+      out += "- Required fields are based on the supplied V2.7 workflow only.\n";
+      out += "- V2.7 required runtime values: Supabase URL/service role credential, FB_TOKEN, FB_PAGE, IG_TOKEN, IG_USER, LI_TOKEN, LI_ORG.\n";
+      out += "- V2.7 does not require YouTube, TikTok, Google service account JSON, N8N_API_KEY, or N8N_URL.\n";
+      out += "- Do not activate V2.7 unchanged against Reach production until posted/audit behavior is patched.\n\n";
+
+      out += "EXACT STEFANI REQUESTS\n";
+      out += "1. Ask Stefani to add the implementation email to The Reach Meta Business Portfolio with access to the Facebook Page and linked Instagram Business account.\n";
+      out += "2. Ask Stefani to confirm the official Facebook Page URL, Facebook Page ID, Instagram handle, and Instagram Business Account ID.\n";
+      out += "3. Ask Stefani to add the implementation email as admin on The Reach LinkedIn Company Page.\n";
+      out += "4. Ask Stefani to confirm the LinkedIn Company Page URL and Organization ID.\n";
+      out += "5. Ask Stefani/SMM to provide one public test image and one public test video link that platform APIs can download.\n\n";
+
+      out += "CHECKLIST\n";
+      checklistItems.forEach((item, index) => {
+        const checked = document.getElementById("check_" + index)?.checked ? "x" : " ";
+        out += "[" + checked + "] " + item + "\n";
+      });
+
+      sections.forEach((section) => {
+        out += "\n\n" + section.title.toUpperCase() + "\n";
+        out += "-".repeat(section.title.length) + "\n";
+        section.fields.forEach((field) => {
+          const [id, label, , required] = field;
+          const el = document.getElementById(id);
+          const value = el ? String(el.value || "").trim() : "";
+          out += (required ? "[REQUIRED] " : "[optional] ") + label + ": " + value + "\n";
+        });
+      });
+
+      out += "\n\nWHERE THESE VALUES GO IN V2.7\n";
+      out += "- Create n8n Supabase credential using Reach Supabase URL + service role key.\n";
+      out += "- Apply that credential to Supabase nodes: Get Scheduled Posts, Mark as Posted, Log to Audit Trail.\n";
+      out += "- Publish Facebook node: const FB_TOKEN = Meta Page token; const FB_PAGE = Facebook Page ID.\n";
+      out += "- Publish Instagram node: const IG_TOKEN = same Meta Page token; const IG_USER = Instagram Business Account ID.\n";
+      out += "- Publish LinkedIn node: const LI_TOKEN = LinkedIn access token; const LI_ORG = urn:li:organization:ORG_ID.\n";
+      out += "- Run Manual Test first. Do not activate schedule until Reach-specific posted/audit patch is applied.\n";
+
+      return out;
+    }
+
+    function updatePreview() {
+      document.getElementById("preview").value = buildTxt();
+    }
+
+    function downloadTxt() {
+      saveState();
+      validateRequired();
+      const blob = new Blob([buildTxt()], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = FILE_NAME;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setStatus("Downloaded " + FILE_NAME + " and saved locally.");
+    }
+
+    async function copyTxt() {
+      saveState();
+      try {
+        await navigator.clipboard.writeText(buildTxt());
+        setStatus("Copied TXT to clipboard.");
+      } catch {
+        const temp = document.createElement("textarea");
+        temp.value = buildTxt();
+        document.body.appendChild(temp);
+        temp.select();
+        document.execCommand("copy");
+        temp.remove();
+        setStatus("Copied TXT to clipboard.");
+      }
+    }
+
+    function clearSaved() {
+      if (!confirm("Clear saved handoff data from this browser?")) return;
+      localStorage.removeItem(STORAGE_KEY);
+      location.reload();
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;"
+      }[char]));
+    }
+
+    function escapeAttr(value) {
+      return escapeHtml(value).replace(/`/g, "&#096;");
+    }
+
+    renderChecklist();
+    renderForms();
+    saveState();
+  </script>
+</body>
+</html>
