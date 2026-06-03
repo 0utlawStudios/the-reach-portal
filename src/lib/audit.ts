@@ -41,10 +41,26 @@ type AuditLogV2Row = {
   created_at: string;
 };
 
+const LAUNCH_CLEANUP_EMAILS = new Set([
+  "alex@ten80ten.com",
+  "carlo@ten80ten.com",
+  "christer@ten80ten.com",
+  "hanes@ten80ten.com",
+  "muaaz.ten80ten@gmail.com",
+  "shang.ten80ten@gmail.com",
+]);
+
+function isLaunchCleanupRemoval(details: string): boolean {
+  if (details.startsWith("Reach launch cleanup removed ")) return true;
+  const removed = details.match(/^Removed ([^ ]+) from team, workspace access, and auth$/);
+  const email = removed?.[1]?.toLowerCase();
+  return !!email && LAUNCH_CLEANUP_EMAILS.has(email);
+}
+
 function resolveAuditActorName(row: AuditLogV2Row): string {
   const m = row.metadata || {};
   const details = typeof m.details === "string" ? m.details : "";
-  if (row.action === "member_removed" && details.startsWith("Reach launch cleanup removed ")) {
+  if (row.action === "member_removed" && isLaunchCleanupRemoval(details)) {
     return "SYSTEM";
   }
   return row.actor_name

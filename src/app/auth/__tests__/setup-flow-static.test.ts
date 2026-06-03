@@ -18,6 +18,7 @@ const IO_MIGRATION_SRC = readFileSync(join(process.cwd(), "supabase/migrations/0
 const SUPPORT_ALERT_MIGRATION_SRC = readFileSync(join(process.cwd(), "supabase/migrations/0031_support_alert_indexes.sql"), "utf8");
 const TEAM_ACCESS_REALTIME_MIGRATION_SRC = readFileSync(join(process.cwd(), "supabase/migrations/0037_reach_team_access_realtime.sql"), "utf8");
 const AUDIT_ACTOR_CLEANUP_MIGRATION_SRC = readFileSync(join(process.cwd(), "supabase/migrations/0038_reach_launch_audit_actor_cleanup.sql"), "utf8");
+const AUDIT_ACTOR_NORMALIZATION_MIGRATION_SRC = readFileSync(join(process.cwd(), "supabase/migrations/0039_reach_cleanup_audit_actor_normalization.sql"), "utf8");
 
 describe("invite setup flow hardening", () => {
   it("activates invitations through the server route, not a client-side team_members update", () => {
@@ -86,9 +87,13 @@ describe("Supabase IO hardening", () => {
 
   it("shows launch cleanup audit entries as system activity, not Aldridge's personal action", () => {
     expect(AUDIT_SRC).toContain('details.startsWith("Reach launch cleanup removed ")');
+    expect(AUDIT_SRC).toContain("LAUNCH_CLEANUP_EMAILS");
+    expect(AUDIT_SRC).toContain("Removed ([^ ]+) from team, workspace access, and auth");
     expect(AUDIT_SRC).toContain('return "SYSTEM"');
     expect(AUDIT_ACTOR_CLEANUP_MIGRATION_SRC).toContain("metadata->>'details' LIKE 'Reach launch cleanup removed %'");
     expect(AUDIT_ACTOR_CLEANUP_MIGRATION_SRC).toContain("to_jsonb('SYSTEM'::text)");
+    expect(AUDIT_ACTOR_NORMALIZATION_MIGRATION_SRC).toContain("'Removed alex@ten80ten.com from team, workspace access, and auth'");
+    expect(AUDIT_ACTOR_NORMALIZATION_MIGRATION_SRC).toContain("to_jsonb('SYSTEM'::text)");
   });
 });
 
