@@ -1,10 +1,26 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed functional SHA: fc70b21 fix: harden team request lifecycle
-Last verified tracking SHA: 5a31bcb docs: record team request hardening slice
-Next: Continue UI/accessibility and full production QA backlog.
+Last pushed functional SHA: fbd198c fix: harden auth audit avatar boundaries
+Last verified tracking SHA: 29a4911 docs: record team hardening deployment
+Next: Verify GitHub/Vercel for `fbd198c`, then continue pipeline realtime/notification hardening and production QA.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
+
+Auth audit/avatar boundary hardening slice notes:
+
+- Treated the latest audit screenshot as an additive root-cause task while keeping the production-readiness goal active.
+- Verified production `v_audit_log_with_actor` directly after migration: launch cleanup rows for Shang, Hanes, Christer, Muaaz, Carlo, and Alex return `actor_name: SYSTEM` and `metadata.user_name: SYSTEM`; the unrelated ordinary removal for `themanekinekogirl@gmail.com` remains attributed to Aldridge.
+- Added and applied migration `0041_auth_audit_avatar_hardening.sql` to the linked Reach Supabase project. Remote migration list now shows `0041`.
+- Hardened canonical email identity by lowercasing `team_members.email` and `signup_requests.email`, adding a lower(email) unique index for team members, and adding a workspace-scoped partial unique index for pending access requests.
+- Hardened audit workspace scope: historical null-workspace audit rows were backfilled to the baseline workspace, `audit_log_v2.workspace_id` is now `NOT NULL`, `record_audit_event()` keeps its original RPC signature while defaulting missing workspace scope to baseline, and `v_audit_log_with_actor` is workspace-scoped for authenticated users.
+- Hardened avatar storage: anonymous public writes to `avatars` are removed; authenticated writes are limited to `profiles/<auth.uid()>` and `kickback/<auth.uid()>` prefixes. Production anon upload proof returned an RLS failure.
+- Hardened invite setup: `/auth/setup` uploads profile photos to `profiles/<user.id>/...`, and `/api/auth/complete-setup` only activates pending users with a Supabase avatar URL owned by the authenticated account.
+- Hardened profile/revision uploads to the new storage policy by moving Settings avatars to `profiles/<auth.uid()>/...` and kickback attachments to `kickback/<auth.uid()>/...`.
+- Hardened request-access anti-enumeration further: newly saved requests, existing team emails, duplicate pending requests, and duplicate insert races now all return the same generic accepted response while preserving server-side save/email/audit behavior.
+- Removed the duplicate client-side Settings invite audit write; invite audit rows are now server-authored only.
+- Added `p_workspace_id` to server team/auth audit calls where the route has a verified workspace context.
+- Verification passed locally: focused auth/team/setup tests (51), `git diff --check`, `npm run typecheck`, `npm run lint` with the existing AI worker warning only, full `npm test` with 29 files / 257 tests, and `npm run build`.
+- Pushed functional commit `fbd198c` to `origin/main`; GitHub CI and Vercel deployment verification are pending.
 
 Team request lifecycle hardening slice notes:
 

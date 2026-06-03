@@ -1,5 +1,7 @@
 # The Reach Clone Changes
 
+Latest slice: auth/audit/avatar boundary hardening is pushed as `fbd198c`. Request-access accepted responses are now generic for new, existing, duplicate, and duplicate-race paths; pending access uniqueness is enforced in Supabase by workspace/lower(email); setup/profile/kickback uploads are scoped to authenticated user storage prefixes; complete setup requires a user-owned Supabase profile photo; audit rows are baseline-workspace scoped; and duplicate client-side invite audit writes are removed. Verification passed `supabase db push --yes`, production migration list `0041`, production audit rows returning `SYSTEM`, anonymous avatar upload blocked by RLS, focused tests, `git diff --check`, `npm run typecheck`, `npm run lint`, full `npm test`, and `npm run build`.
+
 Latest slice: team request lifecycle hardening is pushed as `fc70b21` with tracking commit `5a31bcb`. Request-access no longer leaks whether an email is already on the team or already pending, `signup_requests.workspace_id` is now baseline-scoped and `NOT NULL`, admins cannot remove admin-level users, and the last active superadmin cannot be removed. Production audit rows for launch cleanup removals were rechecked and return `SYSTEM`. Verification passed `supabase db push --yes`, focused tests, `git diff --check`, `npm run typecheck`, `npm run lint`, full `npm test`, `npm run build`, GitHub CI, Vercel deployment `dpl_DwaXA8Hup6QdfeKN6t43f7x69bAe`, keep-alive HTTP 200, and deep-check HTTP 200 with 0 failures and 0 warnings.
 
 Latest slice: Drive media access is hardened. Stream fallback is limited to app-known/app-managed Drive files, finalize verifies Drive parent folders before public permissions, and proxy upload rejects files above 4 MB before buffering. Verification passed focused Drive tests, `npm run typecheck`, `git diff --check`, `npm run lint`, full `npm test`, and `npm run build`.
@@ -11,6 +13,12 @@ Latest slice: audit cleanup actor normalization now resolves known cloned/test l
 ## Edited
 
 - Team removal hierarchy: `/api/team/remove-member` now blocks admin-level removal by non-superadmins, prevents deleting the last active superadmin, and preserves the existing stale id/email and self-removal safeguards.
+- Auth/audit/avatar boundary hardening: migration `0041` lowercases team/request emails, enforces workspace/lower(email) uniqueness for pending requests, makes `audit_log_v2.workspace_id` baseline-scoped and `NOT NULL`, preserves the existing `record_audit_event()` RPC signature while adding a baseline fallback, and scopes the audit view to active workspace members.
+- Avatar storage RLS: public writes to `avatars` are removed; authenticated writes are restricted to `profiles/<auth.uid()>` and `kickback/<auth.uid()>` prefixes while public reads remain for avatar URLs.
+- Invite setup avatar ownership: `/auth/setup` uploads profile photos under `profiles/<user.id>/...`, and `/api/auth/complete-setup` rejects pending activation unless the submitted Supabase avatar URL belongs to the authenticated user.
+- Profile/revision upload alignment: Settings avatar uploads and revision kickback attachments now use authenticated user-owned storage prefixes that satisfy the hardened storage policies.
+- Request-access response hardening: successful new requests, existing team emails, duplicate pending requests, and duplicate insert races all return the same generic accepted response; server-side save, admin email notification, and audit logging still run for genuinely new requests.
+- Invite audit deduplication: Settings no longer writes a second client-side invite audit row; invite, resend, approve, remove, setup, role update, and email-change audit writes carry explicit workspace scope from the verified route context.
 - Request-access anti-enumeration: existing team emails and duplicate pending requests now return a generic received response instead of exposing team/request state to unauthenticated callers.
 - Signup request workspace hardening: migration `0040` backfills `signup_requests.workspace_id`, sets the baseline default, enforces `NOT NULL`, and uses a workspace-scoped admin SELECT policy.
 - Audit actor verification: production `v_audit_log_with_actor` now returns `SYSTEM` for the launch cleanup member-removal rows shown in the Settings audit screenshot.
@@ -93,6 +101,8 @@ Latest slice: audit cleanup actor normalization now resolves known cloned/test l
 
 ## Verification
 
+- Auth/audit/avatar hardening passed focused auth/team/setup tests with 51 tests, `git diff --check`, `npm run typecheck`, `npm run lint` with only the existing AI worker warning, full `npm test` with 29 files / 257 tests, and `npm run build`.
+- Production Supabase hardening verification passed: `supabase db push --yes` applied migration `0041`, remote migration list shows `0041`, launch cleanup audit rows return `SYSTEM`, and unauthenticated avatar upload now fails with an RLS policy error.
 - Auth/team access hardening passed focused auth/team/audit tests with 39 tests, `npm run typecheck`, `git diff --check`, `npm run lint` with only existing warnings, full `npm test` with 28 files / 243 tests, and `npm run build`.
 - Production Supabase access verification passed: `team_members` and `signup_requests` are both in `supabase_realtime`; production launch-cleanup audit rows now return `metadata.user_name: SYSTEM`.
 - Request-access root fix passed focused team/auth tests, `npm run typecheck`, `npm run lint` with only existing warnings, full `npm test` with 27 files / 237 tests, and `npm run build`; commit `f79b594` was pushed, GitHub CI passed, and Vercel production is ready.
