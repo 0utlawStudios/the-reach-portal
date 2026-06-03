@@ -23,6 +23,7 @@ const AUTH_AUDIT_AVATAR_MIGRATION_SRC = readFileSync(join(process.cwd(), "supaba
 const THEME_PREFERENCE_MIGRATION_SRC = readFileSync(join(process.cwd(), "supabase/migrations/0042_team_theme_preference.sql"), "utf8");
 const QA_AUDIT_NORMALIZATION_MIGRATION_SRC = readFileSync(join(process.cwd(), "supabase/migrations/0043_qa_cleanup_audit_actor_normalization.sql"), "utf8");
 const QA_AUDIT_LIKE_FIX_MIGRATION_SRC = readFileSync(join(process.cwd(), "supabase/migrations/0044_qa_cleanup_audit_actor_like_fix.sql"), "utf8");
+const CLEANUP_AUDIT_SYSTEM_ROLE_MIGRATION_SRC = readFileSync(join(process.cwd(), "supabase/migrations/0045_reach_cleanup_audit_system_role.sql"), "utf8");
 const THEME_CONTEXT_SRC = readFileSync(join(process.cwd(), "src/lib/theme-context.tsx"), "utf8");
 
 describe("invite setup flow hardening", () => {
@@ -111,6 +112,10 @@ describe("Supabase IO hardening", () => {
     expect(QA_AUDIT_NORMALIZATION_MIGRATION_SRC).toContain("Removed qa-(invite|request)-[0-9]+@example\\\\.com");
     expect(QA_AUDIT_LIKE_FIX_MIGRATION_SRC).toContain("LIKE 'Removed qa-%@example.com from team, workspace access, and auth'");
     expect(QA_AUDIT_NORMALIZATION_MIGRATION_SRC).toContain("to_jsonb('SYSTEM'::text)");
+    expect(CLEANUP_AUDIT_SYSTEM_ROLE_MIGRATION_SRC).toContain("actor_user_id = NULL");
+    expect(CLEANUP_AUDIT_SYSTEM_ROLE_MIGRATION_SRC).toContain("actor_role = 'system'");
+    expect(CLEANUP_AUDIT_SYSTEM_ROLE_MIGRATION_SRC).toContain("metadata->>'details' LIKE 'Reach launch cleanup removed %'");
+    expect(CLEANUP_AUDIT_SYSTEM_ROLE_MIGRATION_SRC).toContain("'Removed hanes@ten80ten.com from team, workspace access, and auth'");
   });
 
   it("keeps default light mode backed by a real team_members preference column", () => {
