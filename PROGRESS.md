@@ -1,8 +1,9 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: fc70b21 fix: harden team request lifecycle
-Next: Verify GitHub/Vercel deployment for `fc70b21`, then continue UI/accessibility and full production QA.
+Last pushed functional SHA: fc70b21 fix: harden team request lifecycle
+Last verified tracking SHA: 5a31bcb docs: record team request hardening slice
+Next: Continue UI/accessibility and full production QA backlog.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
 
 Team request lifecycle hardening slice notes:
@@ -15,7 +16,10 @@ Team request lifecycle hardening slice notes:
 - Hardened `/api/team/request-access`: existing team emails and duplicate pending requests now return a generic received response instead of leaking membership/request status; the duplicate lookup is scoped to the baseline workspace.
 - Hardened `/api/team/remove-member`: admins cannot remove admin-level members, superadmins cannot remove the last active superadmin, stale id/email mismatches still fail before cleanup, and self-removal remains blocked.
 - Verification passed: `supabase db push --yes`, focused team/request tests, `git diff --check`, `npm run typecheck`, `npm run lint` with one existing AI worker warning, full `npm test` with 29 files / 253 tests, and `npm run build`.
-- Pushed commit `fc70b21` to `origin/main`; GitHub/Vercel deployment verification is next.
+- Pushed commit `fc70b21` to `origin/main`; GitHub CI passed.
+- Pushed tracking commit `5a31bcb` to `origin/main`; GitHub CI passed.
+- Vercel production deployment `dpl_DwaXA8Hup6QdfeKN6t43f7x69bAe` is ready and aliased to `https://thereach.ten80ten.com`.
+- Production health passed after deployment: `/api/health/keep-alive` returned HTTP 200 and `/api/health/deep-check` returned HTTP 200 with 0 failures and 0 warnings.
 
 QA swarm / audit normalization slice notes:
 
