@@ -1,10 +1,23 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed functional SHA: 03218aa fix: harden pipeline notification boundaries
-Last verified tracking SHA: c38f754 docs: record pipeline notification hardening
-Next: Run production QA on live auth/invite/request/support/drag/health.
+Last pushed functional SHA: 5471140 fix: bind team theme preference schema
+Last verified tracking SHA: 30c7f68 docs: record pipeline deployment
+Next: Wait for CI/Vercel on 5471140, then continue the remaining production QA backlog.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
+
+Production browser QA and theme-preference schema slice notes:
+
+- Treated the latest audit screenshot as an additive QA item, not a redirect; production `v_audit_log_with_actor` was already verified to render launch-cleanup removals as `SYSTEM`.
+- Fixed the Playwright production session setup by using the versioned navigation keys (`pt_v2_nav_page`, `pt_v2_nav_sidebar`, `pt_v2_nav_sidebar_pinned`). Production now loads the actual Content Pipeline board under an authenticated Aldridge session.
+- Ran a live one-screen drag proof on `https://thereach.ten80ten.com`: a temporary `awaiting_approval` post was dragged through the UI to `ideas`, Supabase recorded `stage='ideas'`, the card appeared in the Ideas column, and the temporary post row was deleted.
+- Ran a live two-screen Realtime proof on `https://thereach.ten80ten.com`: screen A dragged a temporary post from Awaiting Approval to Ideas, Supabase recorded `stage='ideas'`, screen B observed the same card in Ideas without reload, and the temporary post row was deleted.
+- The two-screen run surfaced a hidden production `400` request to `/rest/v1/team_members`; root cause was the code-bound `team_members.theme_preference` read/write with no matching schema column.
+- Added and applied migration `0042_team_theme_preference.sql` to Reach Supabase. `team_members.theme_preference` now exists, defaults to `light`, is `NOT NULL`, and is constrained to `light` or `dark`.
+- Added static regression coverage proving the default-light theme context remains backed by the real `team_members.theme_preference` column.
+- Live production recheck after migration passed: authenticated pipeline load returned no failed `team_members` responses and no other failed browser requests were captured.
+- Verification passed locally: `supabase db push --yes`, focused setup static test, `git diff --check`, `npm run typecheck`, `npm run lint` with the existing AI worker warning only, full `npm test` with 29 files / 260 tests, and `npm run build`.
+- Pushed functional commit `5471140` to `origin/main`.
 
 Auth audit/avatar boundary hardening slice notes:
 
