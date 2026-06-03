@@ -1,9 +1,20 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: bbff2e1 fix: harden reach access lifecycle
-Next: Continue production QA backlog: Settings/Profile polish, pipeline realtime QA, Support Inbox/chat regression checks, and full production QA.
+Last pushed SHA: b0da6c7 fix: normalize launch cleanup audit actors
+Next: Fix pipeline realtime subscription/notification/dedup risks found by QA swarm, then continue Drive/security hardening and full production QA.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
+
+QA swarm / audit normalization slice notes:
+
+- Treated the latest audit screenshot as an additive QA item while keeping the production-readiness goal active.
+- Spawned three read-only QA agents for pipeline, brand/dashboard UI, and auth/support/media/ops; captured their findings as backlog items for the next slices.
+- Root cause for the screenshot: migration `0038` only normalized the newer `Reach launch cleanup removed ...` rows. Earlier cleanup rows used `Removed <email> from team, workspace access, and auth`, so the audit view still showed `aldridge@ten80ten.com`.
+- Added migration `0039_reach_cleanup_audit_actor_normalization.sql` and applied it to production Supabase project `gxmpmdhmxyfqusdzcemt`.
+- Added the app-side audit guard for known cloned/test cleanup emails in both cleanup wording formats, while leaving ordinary member removals attributed to the real actor.
+- Production verification passed through `v_audit_log_with_actor`: cloned/test cleanup rows for Christer, Alex, Carlo, Muaaz, Hanes, and Shang now resolve to `SYSTEM`; the unrelated `themanekinekogirl@gmail.com` removal still resolves to Aldridge because it was not a launch clone/test cleanup row.
+- Verification passed: focused setup/static test, `npm run typecheck`, `git diff --check`, `npm run lint` with only existing warnings, `npm run build`, `supabase db push`, and remote migration list showing `0039`.
+- Pushed commit `b0da6c7` to `origin/main`; GitHub CI is running.
 
 Auth / team access hardening slice notes:
 

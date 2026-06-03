@@ -1,5 +1,7 @@
 # The Reach Clone Changes
 
+Latest slice: audit cleanup actor normalization now resolves known cloned/test launch cleanup removals to `SYSTEM` in both historical detail formats. Verification passed focused setup/static tests, `npm run typecheck`, `git diff --check`, `npm run lint` with only existing warnings, `npm run build`, `supabase db push`, remote migration list `0039`, and production `v_audit_log_with_actor` checks.
+
 ## Edited
 
 - Auth access revalidation: authenticated sessions now re-check team/workspace access on same-user token refresh, focus, visibility recovery, and a 60-second visible-tab interval so revoked/pending users do not keep stale workspace access until manual reload.
