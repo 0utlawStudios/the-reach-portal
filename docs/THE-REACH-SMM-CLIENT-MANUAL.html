@@ -105,6 +105,14 @@
     align-items: stretch;
   }
 
+  .hero-grid > *,
+  section > .section-head > *,
+  .grid-2 > *,
+  .grid-3 > *,
+  .grid-4 > * {
+    min-width: 0;
+  }
+
   h1, h2, h3, h4 {
     color: var(--stone-2);
     margin: 0;
@@ -131,6 +139,7 @@
     flex-wrap: wrap;
     gap: 10px;
     align-items: center;
+    min-width: 0;
   }
 
   .pill, .mini-pill {
@@ -142,6 +151,8 @@
     font-size: 12px;
     font-weight: 700;
     white-space: nowrap;
+    max-width: 100%;
+    overflow-wrap: anywhere;
   }
 
   .mini-pill {
@@ -156,6 +167,8 @@
     background: rgba(251, 250, 246, 0.58);
     border-radius: 18px;
     box-shadow: var(--shadow);
+    max-width: 100%;
+    min-width: 0;
   }
 
   .hero-card, .card, .table-card {
@@ -367,13 +380,22 @@
     overflow: hidden;
   }
 
-  .table-card { overflow: hidden; }
+  .table-card {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .table-card table {
+    min-width: 640px;
+  }
 
   th, td {
     text-align: left;
     vertical-align: top;
     padding: 13px 14px;
     border-bottom: 1px solid var(--line);
+    overflow-wrap: anywhere;
   }
 
   th {
@@ -417,6 +439,8 @@
     border-right: 1px solid var(--line);
     border-bottom: 1px solid var(--line);
     min-height: 64px;
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
 
   .compare > div:nth-child(4n) { border-right: 0; }
@@ -451,10 +475,14 @@
     min-height: 78px;
     display: grid;
     place-items: center;
+    min-width: 0;
+    padding: 0 10px;
     background: rgba(251, 250, 246, 0.56);
     color: var(--stone-2);
     font-family: "Bradford", Georgia, "Times New Roman", serif;
-    font-size: clamp(18px, 2.5vw, 28px);
+    font-size: clamp(18px, 2vw, 24px);
+    text-align: center;
+    overflow-wrap: anywhere;
   }
 
   .signature-strip div:nth-child(2) { background: rgba(151, 84, 40, 0.12); color: var(--sun); }
@@ -504,20 +532,22 @@
     .hero { padding-top: 38px; }
     .hero-card { padding: 16px; }
     .workflow { grid-template-columns: repeat(5, 180px); }
-    .compare { grid-template-columns: 1fr; }
+    .compare { grid-template-columns: 1fr; overflow-x: hidden; }
     .compare > div { border-right: 0; }
     .compare .head:not(:first-child) { display: none; }
     .signature-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
 
   @media (max-width: 560px) {
-    .shell, .toc-inner { width: min(100% - 22px, 1160px); }
+    .shell, .toc-inner { width: min(1160px, calc(100% - 22px)); }
     .hero { padding-top: 28px; }
     .wordmark { font-size: 15px; letter-spacing: 0.30em; }
     h1 { margin-top: 20px; }
     .metric-grid { grid-template-columns: 1fr; }
     section { padding: 38px 0; }
     .bar-row { grid-template-columns: 86px minmax(90px, 1fr) 34px; gap: 7px; }
+    .pill { white-space: normal; }
+    .table-card table { min-width: 560px; }
     th, td { padding: 11px; }
   }
 </style>
