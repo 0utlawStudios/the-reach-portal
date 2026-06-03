@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>The Reach n8n Auto-Publisher Handoff</title>
+  <title>The Reach Social Account Access Handoff</title>
   <style>
     :root {
       --sand: #E1DFD5;
@@ -562,12 +562,12 @@
     <section class="hero">
       <div class="hero-copy">
         <div class="brand">The Reach</div>
-        <h1>n8n Auto-Publisher Handoff</h1>
+        <h1>Social Account Access Handoff</h1>
         <p class="subtitle">
-          A focused checklist for collecting only the social account values needed to connect The Reach's accounts to auto-publishing.
+          A simple checklist for the person helping collect The Reach's Facebook, Instagram, and LinkedIn access details.
         </p>
         <div class="notice">
-          Do not send Supabase, SMTP, Telegram, Google Drive, or n8n keys. We already own those. This page is only for Facebook, Instagram, LinkedIn, and one public test media link.
+          Do not send passwords, secret keys, or technical settings. This page only asks for social account access details.
         </div>
         <div class="actions">
           <button type="button" onclick="downloadTxt()">Save + Download TXT</button>
@@ -578,69 +578,60 @@
       </div>
       <aside class="hero-panel">
         <div>
-          <h2>Only Fetch These</h2>
-          <p class="panel-note">Everything below is needed to turn on the existing auto-publisher.</p>
+          <h2>Only Send These</h2>
+          <p class="panel-note">If it is not listed here, do not collect it for this handoff.</p>
           <ul class="facts">
             <li>
               <div class="fact-top">
                 <strong>Facebook</strong>
-                <span class="fact-tag collect">Fetch</span>
+                <span class="fact-tag collect">Send</span>
               </div>
-              <small>Page URL, Page ID, and a Meta Page token or secure vault item name.</small>
-              <div class="token-list"><code>FACEBOOK_PAGE_ID</code><code>META_PAGE_ACCESS_TOKEN</code></div>
+              <small>The official Facebook Page URL and Facebook Page ID.</small>
+              <div class="token-list"><code>FACEBOOK_PAGE_ID</code></div>
             </li>
             <li>
               <div class="fact-top">
                 <strong>Instagram</strong>
-                <span class="fact-tag collect">Fetch</span>
+                <span class="fact-tag collect">Send</span>
               </div>
-              <small>Business account ID for the Instagram account linked to the Facebook Page.</small>
+              <small>The Instagram @handle and Instagram Business Account ID.</small>
               <div class="token-list"><code>INSTAGRAM_BUSINESS_ACCOUNT_ID</code></div>
             </li>
             <li>
               <div class="fact-top">
                 <strong>LinkedIn</strong>
-                <span class="fact-tag collect">Fetch</span>
+                <span class="fact-tag collect">Send</span>
               </div>
-              <small>Company Page URL, organization URN, and access token or secure vault item name.</small>
-              <div class="token-list"><code>LINKEDIN_ORG_URN</code><code>LINKEDIN_ACCESS_TOKEN</code></div>
-            </li>
-            <li>
-              <div class="fact-top">
-                <strong>Test Media</strong>
-                <span class="fact-tag collect">Fetch</span>
-              </div>
-              <small>One public image link that opens without login.</small>
-              <div class="token-list"><code>PUBLIC_TEST_IMAGE_URL</code></div>
+              <small>The LinkedIn Company Page URL and numeric Organization ID.</small>
+              <div class="token-list"><code>LINKEDIN_ORG_ID</code></div>
             </li>
           </ul>
         </div>
-        <p>If a value is not listed here, do not collect it for this handoff.</p>
+        <p>Our team will finish the technical setup after this form is returned.</p>
       </aside>
     </section>
 
     <section class="grid">
       <article class="card dark-card half">
-        <h2>Ask Stefani For Access</h2>
+        <h2>Messages To Send Stefani</h2>
         <span class="pill ok">Copy-ready</span>
-        <p>Use plain language. Ask for your own access so you can collect the platform values cleanly.</p>
+        <p>Copy these messages. Replace nothing except your own name if needed.</p>
         <ul>
-          <li>"Please add me to The Reach Meta Business Portfolio and give me access to the Facebook Page and linked Instagram account."</li>
+          <li>"Please add me to The Reach Meta business account and give me access to the Facebook Page and the linked Instagram account."</li>
           <li>"Please add me as an admin on The Reach LinkedIn Company Page."</li>
-          <li>"Please send one public test image link that opens without login."</li>
         </ul>
       </article>
 
       <article class="card half">
         <h2>Do Not Collect</h2>
         <span class="pill bad">Avoid noise</span>
-        <p>Do not ask for Supabase keys, SMTP keys, Telegram keys, n8n API keys, Google Drive credentials, workflow IDs, schedules, or internal portal settings.</p>
+        <p>Do not ask for passwords, secret keys, technical settings, Google Drive credentials, or anything not shown in the form.</p>
         <p>We only need the fields in the form below.</p>
       </article>
 
       <article class="card">
-        <h2>Exact SMM Checklist</h2>
-        <p class="hint">Use this as the message to Stefani and the SMM. Check items as access is collected. The checklist is saved after refresh.</p>
+        <h2>Step-By-Step Checklist</h2>
+        <p class="hint">Check each item as you finish it. This checklist stays saved even if you refresh the page.</p>
         <ol class="step-list">
           <li>
             <label class="step-check" aria-label="Mark Meta admin access request complete">
@@ -649,7 +640,7 @@
             </label>
             <div>
               <strong>Ask Stefani for Meta admin access.</strong><br />
-              Ask: "Please add me to The Reach Meta Business Portfolio and give me access to the Facebook Page and the linked Instagram account. I need to collect the Page details and help connect the accounts for auto-publishing."
+              Send: "Please add me to The Reach Meta business account and give me access to the Facebook Page and the linked Instagram account."
             </div>
           </li>
           <li>
@@ -659,7 +650,7 @@
             </label>
             <div>
               <strong>Go to Meta Business settings.</strong><br />
-              Open <code>business.facebook.com/settings</code>. Under People, verify your email is added. Under Business assets, verify access to The Reach Facebook Page and The Reach Instagram account.
+              Open <code>business.facebook.com/settings</code>. Confirm you can see The Reach Facebook Page and The Reach Instagram account. If you cannot see both, ask Stefani to update your access.
             </div>
           </li>
           <li>
@@ -669,7 +660,7 @@
             </label>
             <div>
               <strong>Collect Facebook Page details.</strong><br />
-              Get the official Page URL and Page ID. Put the Page ID in <code>FACEBOOK_PAGE_ID</code> below. This is the exact value used by the uploaded V4 Facebook node.
+              Copy the official Facebook Page URL and the Facebook Page ID. Paste them in the form below.
             </div>
           </li>
           <li>
@@ -679,17 +670,7 @@
             </label>
             <div>
               <strong>Collect Instagram Business Account ID.</strong><br />
-              Confirm the Instagram profile is Business/Creator and linked to the Page. Get the Instagram Business Account ID and put it in <code>INSTAGRAM_BUSINESS_ACCOUNT_ID</code> below.
-            </div>
-          </li>
-          <li>
-            <label class="step-check" aria-label="Mark Meta Page token created">
-              <input data-save id="step_meta_page_token" type="checkbox" />
-              <span class="step-box"></span>
-            </label>
-            <div>
-              <strong>Create or authorize the Meta Page token.</strong><br />
-              Use the Meta app/publishing setup to generate a token that can publish to the Page and linked Instagram account. Put that token in <code>META_PAGE_ACCESS_TOKEN</code>, or enter the vault item name if secrets are stored elsewhere.
+              Copy the Instagram @handle and the Instagram Business Account ID. Paste them in the form below.
             </div>
           </li>
           <li>
@@ -699,7 +680,7 @@
             </label>
             <div>
               <strong>Ask Stefani for LinkedIn Page admin access.</strong><br />
-              Ask: "Please add me as an admin on The Reach LinkedIn Company Page. I need to collect the organization details and help connect LinkedIn for auto-publishing."
+              Send: "Please add me as an admin on The Reach LinkedIn Company Page."
             </div>
           </li>
           <li>
@@ -709,27 +690,7 @@
             </label>
             <div>
               <strong>Collect LinkedIn Organization ID.</strong><br />
-              Open the LinkedIn Company Page admin area. Get the Organization ID and format it as <code>urn:li:organization:YOUR_ORG_ID</code>. Put it in <code>LINKEDIN_ORG_URN</code> below.
-            </div>
-          </li>
-          <li>
-            <label class="step-check" aria-label="Mark LinkedIn access token created">
-              <input data-save id="step_linkedin_token" type="checkbox" />
-              <span class="step-box"></span>
-            </label>
-            <div>
-              <strong>Create or authorize the LinkedIn access token.</strong><br />
-              Use the LinkedIn app/OAuth setup with organization posting permission. Put the token in <code>LINKEDIN_ACCESS_TOKEN</code>, or enter the vault item name.
-            </div>
-          </li>
-          <li>
-            <label class="step-check" aria-label="Mark public media test files prepared">
-              <input data-save id="step_media_test_files" type="checkbox" />
-              <span class="step-box"></span>
-            </label>
-            <div>
-              <strong>Prepare public media test files.</strong><br />
-              V4 resolves ordered media from <code>asset_urls</code> first, then falls back to <code>source_vault.rawFiles</code>. Test media must be reachable by platform APIs.
+              Copy the LinkedIn Company Page URL and Organization ID. The Organization ID is usually a number. Paste both in the form below.
             </div>
           </li>
           <li>
@@ -739,7 +700,7 @@
             </label>
             <div>
               <strong>Save this form.</strong><br />
-              Fill the boxes below, press <strong>Save + Download TXT</strong>, and send the file named <code>THE_REACH_N8N_AUTOPUBLISH_HANDOFF.txt</code>.
+              Fill the boxes below, press <strong>Save + Download TXT</strong>, and send the file named <code>THE_REACH_SOCIAL_ACCESS_HANDOFF.txt</code>.
             </div>
           </li>
         </ol>
@@ -747,7 +708,7 @@
 
       <article class="card">
         <h2>Collection Form</h2>
-        <p class="hint">Fill only these fields and download the TXT. No internal keys.</p>
+        <p class="hint">Fill only these fields. Leave no blanks. Then download the TXT and send it back.</p>
         <div id="formHost"></div>
       </article>
 
@@ -760,15 +721,15 @@
       <article class="card half">
         <h2>After You Send It</h2>
         <ul>
-          <li>We plug the values into the existing auto-publisher.</li>
-          <li>We run a controlled test publish first.</li>
-          <li>We turn on automation only after the test succeeds.</li>
+          <li>Our team uses these details to finish the setup.</li>
+          <li>Our team runs the first test.</li>
+          <li>You do not need to change any technical settings.</li>
         </ul>
       </article>
 
       <article class="card">
         <h2>TXT Preview</h2>
-        <p class="hint">This is exactly what downloads. File name: <strong>THE_REACH_N8N_AUTOPUBLISH_HANDOFF.txt</strong>.</p>
+        <p class="hint">This is exactly what downloads. File name: <strong>THE_REACH_SOCIAL_ACCESS_HANDOFF.txt</strong>.</p>
         <textarea id="preview" class="preview" readonly></textarea>
         <div class="actions">
           <button type="button" onclick="downloadTxt()">Save + Download TXT</button>
@@ -780,49 +741,38 @@
 
   <script>
     const STORAGE_KEY = "the-reach-n8n-v4-handoff";
-    const FILE_NAME = "THE_REACH_N8N_AUTOPUBLISH_HANDOFF.txt";
+    const FILE_NAME = "THE_REACH_SOCIAL_ACCESS_HANDOFF.txt";
 
     const checklistItems = [
-      "Stefani has added your email to Meta Business Portfolio.",
+      "Stefani has added your email to The Reach Meta business account.",
       "Your email has access to The Reach Facebook Page.",
       "Your email has access to the linked The Reach Instagram Business account.",
-      "Facebook Page ID is confirmed and entered as FACEBOOK_PAGE_ID.",
-      "Instagram Business Account ID is confirmed and entered as INSTAGRAM_BUSINESS_ACCOUNT_ID.",
-      "Meta Page Access Token is available for META_PAGE_ACCESS_TOKEN.",
+      "Facebook Page URL and Page ID are filled in.",
+      "Instagram handle and Business Account ID are filled in.",
       "Stefani has added your email as LinkedIn Company Page admin.",
-      "LinkedIn Organization URN is confirmed and entered as LINKEDIN_ORG_URN.",
-      "LinkedIn access token is available for LINKEDIN_ACCESS_TOKEN.",
-      "One public test image link opens without login."
+      "LinkedIn Company Page URL and Organization ID are filled in."
     ];
 
     const sections = [
       {
         title: "Meta And Instagram",
         pills: ["Facebook", "Instagram"],
+        note: "If you cannot find an ID, ask Stefani to send it. The Instagram Business Account ID is an ID number, not the @handle.",
         fields: [
           ["publishing_email", "Your email Stefani added", "email", true, ""],
           ["fb_page_url", "Facebook Page URL", "url", true, ""],
-          ["fb_page_id", "FACEBOOK_PAGE_ID", "text", true, ""],
+          ["fb_page_id", "Facebook Page ID", "text", true, ""],
           ["ig_handle", "Instagram handle", "text", true, ""],
-          ["ig_business_id", "INSTAGRAM_BUSINESS_ACCOUNT_ID", "text", true, ""],
-          ["meta_token", "META_PAGE_ACCESS_TOKEN or secure vault item name", "textarea", true, ""]
+          ["ig_business_id", "Instagram Business Account ID", "text", true, ""]
         ]
       },
       {
         title: "LinkedIn",
         pills: ["Company Page"],
+        note: "If you cannot find the Organization ID, ask Stefani to send it. We need the number from the LinkedIn Company Page admin area.",
         fields: [
           ["linkedin_page_url", "LinkedIn Company Page URL", "url", true, ""],
-          ["linkedin_org_urn", "LINKEDIN_ORG_URN", "text", true, "urn:li:organization:"],
-          ["linkedin_token", "LINKEDIN_ACCESS_TOKEN or secure vault item name", "textarea", true, ""]
-        ]
-      },
-      {
-        title: "Test Media",
-        pills: ["Public link"],
-        note: "Paste one image link only. Before sending, open the link in a private/incognito window. If it asks for login or permission, it is not usable.",
-        fields: [
-          ["test_image_url", "Public image URL that opens without login", "url", true, ""]
+          ["linkedin_org_id", "LinkedIn Organization ID", "text", true, ""]
         ]
       }
     ];
@@ -914,8 +864,6 @@
           el.checked = !!state[el.id];
         } else if (state[el.id] !== undefined) {
           el.value = state[el.id];
-        } else if (el.placeholder) {
-          el.value = el.placeholder;
         }
 
         el.addEventListener("input", saveState);
@@ -936,13 +884,13 @@
         const el = document.getElementById(field.id);
         const value = el ? String(el.value || "").trim() : "";
         if (!value) return true;
-        if (/^(YOUR_|REPLACE_WITH_|urn:li:organization:$)/.test(value)) return true;
+        if (/^(YOUR_|REPLACE_WITH_)$/i.test(value)) return true;
         return false;
       });
 
       const box = document.getElementById("validation");
       if (missing.length === 0) {
-        box.innerHTML = '<span class="ok-text">All required Reach V4 handoff fields are filled.</span>';
+        box.innerHTML = '<span class="ok-text">All required access details are filled.</span>';
       } else {
         box.innerHTML = '<span class="bad-text">' + missing.length + " required field(s) missing:</span><br>" +
           missing.map((field) => "- " + escapeHtml(field.section) + ": " + escapeHtml(field.label)).join("<br>");
@@ -952,24 +900,22 @@
 
     function buildTxt() {
       let out = "";
-      out += "THE_REACH_N8N_AUTOPUBLISH_HANDOFF.txt\n";
+      out += "THE_REACH_SOCIAL_ACCESS_HANDOFF.txt\n";
       out += "Generated: " + new Date().toISOString() + "\n";
       out += "Client: The Reach\n";
-      out += "Purpose: social account values for auto-publishing.\n\n";
+      out += "Purpose: Facebook, Instagram, and LinkedIn access details.\n\n";
 
       out += "DO NOT INCLUDE\n";
-      out += "- Supabase keys\n";
-      out += "- SMTP keys\n";
-      out += "- Telegram keys\n";
-      out += "- n8n keys or workflow settings\n";
+      out += "- Passwords\n";
+      out += "- Secret keys\n";
+      out += "- Technical settings\n";
       out += "- Google Drive credentials\n\n";
 
       out += "ASK STEFANI\n";
-      out += "1. Ask Stefani to add your email to The Reach Meta Business Portfolio with access to the Facebook Page and linked Instagram account.\n";
+      out += "1. Ask Stefani to add your email to The Reach Meta business account with access to the Facebook Page and linked Instagram account.\n";
       out += "2. Ask Stefani for the official Facebook Page URL, Facebook Page ID, Instagram handle, and Instagram Business Account ID.\n";
       out += "3. Ask Stefani to add your email as admin on The Reach LinkedIn Company Page.\n";
-      out += "4. Ask Stefani for the LinkedIn Company Page URL and Organization ID.\n";
-      out += "5. Ask for one public test image link that opens without login.\n\n";
+      out += "4. Ask Stefani for the LinkedIn Company Page URL and Organization ID.\n\n";
 
       out += "CHECKLIST\n";
       checklistItems.forEach((item, index) => {
@@ -989,7 +935,7 @@
       });
 
       out += "\n\nNEXT STEP\n";
-      out += "Send this TXT file back to the implementation team. They will plug the values into the existing auto-publisher and run the first controlled test.\n";
+      out += "Send this TXT file back to our team. We will finish the technical setup and run the first test.\n";
 
       return out;
     }
