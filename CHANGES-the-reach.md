@@ -2,6 +2,10 @@
 
 ## Edited
 
+- Request-access persistence hardening: `/api/team/request-access` now treats the Supabase insert as authoritative, returns a real error when saving fails, stores the baseline workspace UUID, and no longer shows a fake success when no request row exists.
+- Request-access notification hardening: admin email is sent only after a saved row; SMTP failure reports `emailSent: false` without losing the request.
+- Team request visibility: Settings now refreshes pending access requests on focus, visibility, and a 60-second visible-tab interval, and explicitly refreshes team/request rows after invite, approve/reject, and resend actions.
+- Request-access regression tests: added focused coverage for successful saves, insert failures, existing team conflicts, duplicate pending requests, and SMTP failure after persistence.
 - Brand Playbook copy-card elevation: lightened the shared copy-block surface, strengthened Stone borders/shadows, and made the copy icon chip readable so the cards pop from the Sand page background.
 - Settings status cleanup: removed the Notion integration card, marked real wired systems as Active/Monitored, and kept Analytics tracking as Coming Soon because no real analytics feature was verified behind that row.
 - Brand Playbook card elevation: added a central `reach-copy-card` surface so copy blocks render lighter with stronger Reach Stone borders and more visible elevation in light mode.
@@ -69,6 +73,8 @@
 
 ## Verification
 
+- Request-access root fix passed focused team/auth tests, `npm run typecheck`, `npm run lint` with only existing warnings, full `npm test` with 27 files / 237 tests, and `npm run build`; commit `f79b594` was pushed, GitHub CI passed, and Vercel production is ready.
+- Production request-access proof passed on `https://thereach.ten80ten.com`: a controlled QA request returned HTTP 200, created one pending `signup_requests` row with the baseline workspace UUID, sent one admin notification, and was then deleted; production pending request count is back to 0 after cleanup.
 - Support Inbox production smoke passed on `https://thereach.ten80ten.com`: admin list HTTP 200, thread detail HTTP 200, own support list HTTP 200, own live-chat empty state HTTP 200, self-chat guard HTTP 400, and inactive-recipient guard HTTP 400. Positive admin-to-teammate chat is intentionally blocked until a second user is reinvited and active.
 - Brand Playbook copy-card elevation passed `git diff --check`, `npm run typecheck`, `npm run lint` with only existing warnings, and `npm run build`; functional commit `1b57a08` and tracking commit `67cb69d` were pushed to `origin/main`, GitHub CI passed for the latest tree, and production CSS on `https://thereach.ten80ten.com` contains the new raised-card selectors.
 - Settings/Brand Playbook UI cleanup passed `git diff --check`, `npm run typecheck`, `npm run lint` with only existing warnings, and `npm run build`; Settings hashtag/caption Manage buttons were verified to already route to the Brand Kit Copy Hub focus targets.

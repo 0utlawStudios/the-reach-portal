@@ -1,9 +1,23 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: 67cb69d docs: record brand playbook card polish
+Last pushed SHA: f79b594 fix: make access requests authoritative
 Next: Continue production QA backlog: Settings/Profile polish, pipeline realtime QA, Support Inbox/chat regression checks, and full production QA.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
+
+Request-access / team refresh root-fix notes:
+
+- Investigated the reported 6 AM request-access submission that showed `Request Submitted` but did not appear in email or Settings.
+- Verified production `signup_requests` had 0 rows, so the submitted request did not persist.
+- Root cause: `/api/team/request-access` inherited the Ten80Ten anti-enumeration pattern that logged insert failures but still returned HTTP 200. That can show the success screen while creating no Supabase row and sending no admin notification.
+- Patched `/api/team/request-access` so DB persistence is authoritative: insert errors now return HTTP 500, existing team emails return HTTP 409 with a clear message, duplicate pending requests return `already_pending`, and successful requests include the baseline workspace UUID.
+- Request-access admin notification is now awaited after a successful insert. SMTP failure no longer loses the saved request; the response reports `emailSent: false` while the request remains visible in Settings.
+- Added audit logging for `access_request_submitted`.
+- Added Settings/Team refresh hardening: pending requests refresh on focus, visibility, and every 60 seconds while open; invite, approve/reject, and resend success paths explicitly refresh Supabase-backed team/pending state.
+- Added focused request-access regression coverage: successful insert includes workspace id, insert failure is not a fake success, existing team email is a real conflict, duplicate pending requests do not insert twice, and SMTP failure keeps the saved request.
+- Verification passed: focused team/auth tests, `npm run typecheck`, `npm run lint` with only existing warnings, full `npm test` with 27 files / 237 tests, and `npm run build`.
+- Pushed commit `f79b594` to `origin/main`; GitHub CI passed lint, typecheck, tests, and build. Vercel production deployment is ready.
+- Production proof on `https://thereach.ten80ten.com`: controlled request-access probe returned HTTP 200 with `status: pending`, created exactly 1 `signup_requests` row with workspace `00000000-0000-0000-0000-000000000001`, reported `emailSent: true` to 1 admin recipient, then the QA row was deleted. Production pending request count is back to 0 after cleanup.
 
 Support Inbox production smoke notes:
 
