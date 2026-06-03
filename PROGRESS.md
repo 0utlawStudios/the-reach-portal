@@ -1,10 +1,20 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed functional SHA: c45846b fix: canonicalize cleanup audit system actors
-Last verified tracking SHA: 898bcd9 docs: record deep health audit fix
-Next: Wait for CI/Vercel on c45846b, then continue the production QA backlog.
+Last pushed functional SHA: 2190414 docs: fix manual mobile overflow
+Last verified tracking SHA: c745ec1 docs: record cleanup audit system actor fix
+Next: Wait for CI/Vercel on 2190414, then continue the production QA backlog.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
+
+Client manual responsive QA slice notes:
+
+- Fixed the client manual mobile overflow without changing copy, pricing claims, or portal app code.
+- Root cause: grid children were allowed to keep automatic min-content width, so hero/meta content could widen the page on strict mobile viewports. Tables also needed contained horizontal scrolling inside their cards.
+- Updated manual CSS so grid children, cards, callouts, and table cards have bounded min/max widths; long pill/table text can wrap; wide tables scroll inside their panels; and the hero signature strip labels fit without clipping.
+- Render QA used headless Chrome DevTools against the local HTML file at strict `390x1200` and desktop `1440x1200`: both returned `documentElement.scrollWidth === innerWidth` and no page-level overflow offenders.
+- Visual QA screenshots were generated at `/tmp/reach-manual-mobile-strict.png` and `/tmp/reach-manual-desktop-strict.png`; the mobile hero, luxury rail, cards, and desktop signature strip render cleanly.
+- Manual content scan still passes: `Content Engine` count is 0; the only `ten80ten` hit is the production domain; the manual includes Later, Hootsuite, savings, support, mentions, 60 TB Drive, platform logic, and Create Post guidance.
+- Pushed manual commit `2190414` to `origin/main`.
 
 Cleanup audit system actor canonicalization slice notes:
 
