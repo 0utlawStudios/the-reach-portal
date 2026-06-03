@@ -304,6 +304,13 @@
       font-size: 14px;
     }
 
+    .section-note {
+      margin: 6px 0 0;
+      color: var(--stone);
+      font-size: 14px;
+      font-weight: 750;
+    }
+
     .pill {
       display: inline-flex;
       margin: 5px 7px 10px 0;
@@ -813,9 +820,9 @@
       {
         title: "Test Media",
         pills: ["Public link"],
+        note: "Paste one image link only. Before sending, open the link in a private/incognito window. If it asks for login or permission, it is not usable.",
         fields: [
-          ["test_image_url", "Public test image URL", "url", true, ""],
-          ["media_access_confirmed", "Confirm the image opens without login", "textarea", true, "Paste yes + any note. The link must open or download without a password."]
+          ["test_image_url", "Public image URL that opens without login", "url", true, ""]
         ]
       }
     ];
@@ -868,6 +875,13 @@
             pill.textContent = pillText;
             sectionEl.appendChild(pill);
           });
+        }
+
+        if (section.note) {
+          const note = document.createElement("p");
+          note.className = "section-note";
+          note.textContent = section.note;
+          sectionEl.appendChild(note);
         }
 
         const grid = document.createElement("div");
