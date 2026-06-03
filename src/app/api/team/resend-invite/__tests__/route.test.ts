@@ -34,7 +34,7 @@ function makeQuery(table: string) {
 }
 
 vi.mock("@/lib/auth/require", () => ({
-  requireBearerTeamRole: vi.fn(() => Promise.resolve({ user: { id: "admin-1" }, email: "admin@example.com", role: "admin" })),
+  requireBearerTeamRole: vi.fn(() => Promise.resolve({ user: { id: "admin-1" }, email: "admin@example.com", role: "admin", workspaceId: "workspace-1" })),
 }));
 
 vi.mock("@supabase/supabase-js", () => ({

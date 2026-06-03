@@ -66,6 +66,25 @@ function cleanUpdates(input: unknown): ProfileUpdates {
   return updates;
 }
 
+function cleanProfileAvatarUrl(value: string): string | null {
+  const url = value.trim();
+  if (!url) return null;
+  if (url.length > 2048) return null;
+  try {
+    const parsed = new URL(url);
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    if (!supabaseUrl || parsed.protocol !== "https:") return null;
+    if (parsed.host !== new URL(supabaseUrl).host) return null;
+    const prefix = "/storage/v1/object/public/avatars/";
+    if (!parsed.pathname.startsWith(prefix)) return null;
+    const objectPath = decodeURIComponent(parsed.pathname.slice(prefix.length));
+    if (objectPath.includes("..") || !objectPath.startsWith("profiles/")) return null;
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
 function toDbUpdates(updates: ProfileUpdates) {
   const dbUpdates: Record<string, unknown> = {};
   if (updates.name !== undefined) dbUpdates.name = updates.name;
@@ -75,12 +94,13 @@ function toDbUpdates(updates: ProfileUpdates) {
   return dbUpdates;
 }
 
-async function auditUpdate(admin: AdminClient, actorEmail: string, target: TeamMemberRow, updates: ProfileUpdates, roleChanged: boolean) {
+async function auditUpdate(admin: AdminClient, workspaceId: string, actorEmail: string, target: TeamMemberRow, updates: ProfileUpdates, roleChanged: boolean) {
   try {
     await admin.rpc("record_audit_event", {
       p_entity_type: "team",
       p_action: roleChanged ? "role_changed" : "member_profile_updated",
       p_entity_id: null,
+      p_workspace_id: workspaceId,
       p_metadata: {
         user_name: actorEmail,
         details: roleChanged
@@ -114,6 +134,13 @@ export async function POST(request: NextRequest) {
     }
     if (updates.role === "superadmin" && ctx.role !== "superadmin") {
       return NextResponse.json({ error: "Only a superadmin can assign superadmin" }, { status: 403 });
+    }
+    if (typeof updates.avatar === "string") {
+      const avatar = cleanProfileAvatarUrl(updates.avatar);
+      if (!avatar) {
+        return NextResponse.json({ error: "Avatar must be uploaded through The Reach profile photo uploader" }, { status: 400 });
+      }
+      updates.avatar = avatar;
     }
 
     const dbUpdates = toDbUpdates(updates);
@@ -188,7 +215,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    await auditUpdate(admin, ctx.email, target, updates, roleChanged);
+    await auditUpdate(admin, ctx.workspaceId, ctx.email, target, updates, roleChanged);
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";

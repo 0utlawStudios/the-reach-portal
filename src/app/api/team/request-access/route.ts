@@ -100,6 +100,9 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (insertErr || !inserted?.id) {
+      if ((insertErr as { code?: string } | null)?.code === "23505") {
+        return NextResponse.json(GENERIC_RECEIVED_RESPONSE);
+      }
       console.error("[request-access] Insert failed:", insertErr?.message || "missing inserted id");
       return NextResponse.json(
         { error: "Your request could not be saved. Please try again or ask the admin to invite you directly." },
@@ -112,7 +115,6 @@ export async function POST(request: NextRequest) {
     const smtpPass = process.env.SMTP_PASS;
     let emailSent = false;
     let emailError = "";
-    let adminRecipientCount = 0;
     if (smtpUser && smtpPass) {
       try {
         const transporter = getTransporter();
@@ -125,7 +127,6 @@ export async function POST(request: NextRequest) {
         if (adminsErr) throw new Error(`Admin lookup failed: ${adminsErr.message}`);
 
         const adminEmails = admins?.map((a) => a.email).filter(Boolean) || [];
-        adminRecipientCount = adminEmails.length;
 
         if (adminEmails.length > 0) {
           await transporter.sendMail({
@@ -153,6 +154,7 @@ export async function POST(request: NextRequest) {
         p_entity_type: "team",
         p_action: "access_request_submitted",
         p_entity_id: inserted.id,
+        p_workspace_id: BASELINE_WORKSPACE_ID,
         p_metadata: {
           user_name: email,
           details: emailSent
@@ -162,14 +164,7 @@ export async function POST(request: NextRequest) {
       });
     } catch { /* best-effort */ }
 
-    return NextResponse.json({
-      success: true,
-      requestId: inserted.id,
-      status: "pending",
-      smtpConfigured: !!(smtpUser && smtpPass),
-      emailSent,
-      adminRecipientCount,
-    });
+    return NextResponse.json(GENERIC_RECEIVED_RESPONSE);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[request-access]", message);

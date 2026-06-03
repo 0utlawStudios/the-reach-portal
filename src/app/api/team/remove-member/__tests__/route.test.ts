@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 type MockResult = { data?: unknown; error?: { message: string } | null };
 
-let actor = { user: { id: "admin-1" }, email: "admin@example.com", role: "admin" };
+let actor = { user: { id: "admin-1" }, email: "admin@example.com", role: "admin", workspaceId: "workspace-1" };
 let listUsersPages: Array<{ users: Array<{ id: string; email?: string }>; error?: { message: string } | null }>;
 let deleteUserResult: MockResult;
 let tableResults: Record<string, { maybeSingle?: MockResult | MockResult[]; delete?: MockResult | MockResult[]; list?: MockResult | MockResult[] }>;
@@ -71,7 +71,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
   process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-key";
-  actor = { user: { id: "admin-1" }, email: "admin@example.com", role: "admin" };
+  actor = { user: { id: "admin-1" }, email: "admin@example.com", role: "admin", workspaceId: "workspace-1" };
   listUsersPages = [{ users: [{ id: "user-1", email: "member@example.com" }] }];
   deleteUserResult = { data: null, error: null };
   tableResults = {
@@ -117,7 +117,7 @@ describe("POST /api/team/remove-member", () => {
   });
 
   it("blocks removing the last active superadmin", async () => {
-    actor = { user: { id: "superadmin-1" }, email: "root@example.com", role: "superadmin" };
+    actor = { user: { id: "superadmin-1" }, email: "root@example.com", role: "superadmin", workspaceId: "workspace-1" };
     tableResults.team_members.maybeSingle = { data: { id: "other-root", email: "other-root@example.com", role: "superadmin", status: "active" }, error: null };
     tableResults.team_members.list = { data: [{ id: "other-root" }], error: null };
 

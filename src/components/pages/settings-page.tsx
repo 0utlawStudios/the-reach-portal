@@ -14,7 +14,7 @@ import { PresenceDot } from "@/components/presence-dot";
 import { PresenceLabel } from "@/components/presence-label";
 import { usePipeline } from "@/lib/pipeline-context";
 import { ThemeSelector } from "@/components/theme-selector";
-import { logAudit, fetchAllAuditLogs, AuditEntry } from "@/lib/audit";
+import { fetchAllAuditLogs, AuditEntry } from "@/lib/audit";
 import { History, ArrowUpRight, Search, FileText as FileTextIcon, Shield as ShieldIcon, AtSign, ArrowUpDown, Filter, ChevronRight, CheckCircle, Activity, Clock as ClockIcon } from "lucide-react";
 import { formatDateTime, formatDateShort, formatDateTimeCompact } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
@@ -93,7 +93,13 @@ function EditProfileModal({
     const useDb = !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
     if (useDb) {
-      const path = `${member.id}-${Date.now()}.jpg`;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) {
+        addToast("Upload failed. Please sign in again.", "error");
+        setUploading(false);
+        return;
+      }
+      const path = `profiles/${user.id}/${member.id}-${Date.now()}.jpg`;
       const { error } = await supabase.storage.from("avatars").upload(path, croppedBlob, { upsert: true, contentType: "image/jpeg", cacheControl: "31536000" });
       if (!error) {
         const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
@@ -435,7 +441,6 @@ export function SettingsPage() {
       } else {
         addToast(`Invited ${inviteName.trim()}, but email delivery uncertain`, "info");
       }
-      logAudit("system", currentUser.name, "invite_sent", `Invited ${inviteName.trim()} (${inviteEmail.trim()}) as ${inviteRole}`);
       void refreshMembers();
       refreshPendingRequests();
       setInviteEmail(""); setInviteName(""); setShowInvite(false);

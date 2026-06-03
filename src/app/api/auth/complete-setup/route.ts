@@ -29,7 +29,7 @@ function cleanPhone(value: unknown): string | null {
   return phone || null;
 }
 
-function cleanAvatarUrl(value: unknown): string | undefined {
+function cleanSupabaseAvatarUrl(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
   const url = value.trim();
   if (!url) return undefined;
@@ -37,10 +37,26 @@ function cleanAvatarUrl(value: unknown): string | undefined {
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== "https:") return undefined;
-    return url;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    if (!supabaseUrl) return undefined;
+    const expectedHost = new URL(supabaseUrl).host;
+    if (parsed.host !== expectedHost) return undefined;
+    const prefix = "/storage/v1/object/public/avatars/";
+    if (!parsed.pathname.startsWith(prefix)) return undefined;
+    return parsed.toString();
   } catch {
     return undefined;
   }
+}
+
+function cleanOwnedProfileAvatarUrl(value: unknown, userId: string): string | undefined {
+  const url = cleanSupabaseAvatarUrl(value);
+  if (!url) return undefined;
+  const parsed = new URL(url);
+  const objectPath = decodeURIComponent(parsed.pathname.replace("/storage/v1/object/public/avatars/", ""));
+  if (objectPath.includes("..")) return undefined;
+  if (!objectPath.startsWith(`profiles/${userId}/`)) return undefined;
+  return url;
 }
 
 function cleanName(value: unknown): string | null {
@@ -58,7 +74,6 @@ export async function POST(request: NextRequest) {
     const name = cleanName(body.name);
     if (!name) return NextResponse.json({ error: "Full name is required" }, { status: 400 });
     const phone = cleanPhone(body.phone);
-    const avatarUrl = cleanAvatarUrl(body.avatarUrl);
 
     const admin = getAdminClient();
     const { data: authData, error: authErr } = await admin.auth.getUser(token);
@@ -83,7 +98,17 @@ export async function POST(request: NextRequest) {
     if (!["pending", "active"].includes(String(member.status))) {
       return NextResponse.json({ error: "Invitation is not active" }, { status: 403 });
     }
-    if (!avatarUrl && !member.avatar_url) {
+    const avatarUrl = cleanOwnedProfileAvatarUrl(body.avatarUrl, user.id);
+    const submittedAvatar = typeof body.avatarUrl === "string" && body.avatarUrl.trim().length > 0;
+    const existingAvatarUrl = String(member.avatar_url || "").trim();
+    const safeExistingAvatarUrl = member.status === "active"
+      ? cleanSupabaseAvatarUrl(existingAvatarUrl)
+      : cleanOwnedProfileAvatarUrl(existingAvatarUrl, user.id);
+
+    if (submittedAvatar && !avatarUrl) {
+      return NextResponse.json({ error: "Profile photo is required" }, { status: 400 });
+    }
+    if (!avatarUrl && !safeExistingAvatarUrl) {
       return NextResponse.json({ error: "Profile photo is required" }, { status: 400 });
     }
 
@@ -136,6 +161,7 @@ export async function POST(request: NextRequest) {
         p_entity_type: "team",
         p_action: "member_activated",
         p_entity_id: null,
+        p_workspace_id: BASELINE_WORKSPACE_ID,
         p_metadata: {
           user_name: email,
           details: `${name} completed invite setup`,
@@ -154,7 +180,7 @@ export async function POST(request: NextRequest) {
         email,
         role: member.role,
         status: "active",
-        avatarUrl: avatarUrl || member.avatar_url || null,
+        avatarUrl: avatarUrl || safeExistingAvatarUrl || null,
       },
     });
   } catch (err: unknown) {

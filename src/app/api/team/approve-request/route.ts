@@ -206,6 +206,7 @@ export async function POST(request: NextRequest) {
         p_entity_type: "team",
         p_action: "request_approved",
         p_entity_id: null,
+        p_workspace_id: ctx.workspaceId,
         p_metadata: {
           user_name: reviewerEmail,
           details: emailSent

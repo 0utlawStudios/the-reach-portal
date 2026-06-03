@@ -110,7 +110,7 @@ describe("POST /api/auth/complete-setup", () => {
     const res = await POST(makeRequest({
       name: "Ace Creatives",
       phone: "+63 915 495 4549",
-      avatarUrl: "https://test.supabase.co/storage/v1/object/public/avatars/ace.png",
+      avatarUrl: "https://test.supabase.co/storage/v1/object/public/avatars/profiles/user-1/ace.png",
     }));
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -125,7 +125,7 @@ describe("POST /api/auth/complete-setup", () => {
           status: "active",
           name: "Ace Creatives",
           phone: "+639154954549",
-          avatar_url: "https://test.supabase.co/storage/v1/object/public/avatars/ace.png",
+          avatar_url: "https://test.supabase.co/storage/v1/object/public/avatars/profiles/user-1/ace.png",
         }),
       }),
       expect.objectContaining({
@@ -156,12 +156,23 @@ describe("POST /api/auth/complete-setup", () => {
     expect(operations.some((op) => op.table === "workspace_members" && op.method === "upsert")).toBe(false);
   });
 
+  it("requires the setup photo to be uploaded under the authenticated user's profile path", async () => {
+    const res = await POST(makeRequest({
+      name: "Ace Creatives",
+      avatarUrl: "https://test.supabase.co/storage/v1/object/public/avatars/profiles/other-user/ace.png",
+    }));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("Profile photo is required");
+    expect(operations.some((op) => op.table === "workspace_members" && op.method === "upsert")).toBe(false);
+  });
+
   it("allows setup without a new avatar when the member already has a profile photo", async () => {
     tableResults.team_members.maybeSingle = {
       data: {
         id: "member-1",
         role: "social_media_specialist",
-        status: "pending",
+        status: "active",
         avatar_url: "https://test.supabase.co/storage/v1/object/public/avatars/existing.png",
       },
       error: null,

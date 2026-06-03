@@ -84,12 +84,13 @@ async function sendInviteEmail(email: string, member: TeamMemberRow, confirmUrl:
   }
 }
 
-async function auditEmailChange(admin: AdminClient, actorEmail: string, member: TeamMemberRow, oldEmail: string, newEmail: string) {
+async function auditEmailChange(admin: AdminClient, workspaceId: string, actorEmail: string, member: TeamMemberRow, oldEmail: string, newEmail: string) {
   try {
     await admin.rpc("record_audit_event", {
       p_entity_type: "team",
       p_action: "member_email_changed",
       p_entity_id: null,
+      p_workspace_id: workspaceId,
       p_metadata: {
         user_name: actorEmail,
         details: `${member.name}'s email changed from ${oldEmail} to ${newEmail}`,
@@ -100,7 +101,7 @@ async function auditEmailChange(admin: AdminClient, actorEmail: string, member: 
   }
 }
 
-async function updateActiveMemberEmail(admin: AdminClient, authUser: User, member: TeamMemberRow, newEmail: string, actorEmail: string) {
+async function updateActiveMemberEmail(admin: AdminClient, workspaceId: string, authUser: User, member: TeamMemberRow, newEmail: string, actorEmail: string) {
   const oldEmail = member.email.toLowerCase();
   const previousMetadata = authUser.user_metadata || {};
 
@@ -147,7 +148,7 @@ async function updateActiveMemberEmail(admin: AdminClient, authUser: User, membe
     return NextResponse.json({ error: "App identity reconciliation failed; Auth email was rolled back." }, { status: 500 });
   }
 
-  await auditEmailChange(admin, actorEmail, member, oldEmail, newEmail);
+  await auditEmailChange(admin, workspaceId, actorEmail, member, oldEmail, newEmail);
   return NextResponse.json({
     success: true,
     email: newEmail,
@@ -156,7 +157,7 @@ async function updateActiveMemberEmail(admin: AdminClient, authUser: User, membe
   });
 }
 
-async function updatePendingInviteEmail(admin: AdminClient, member: TeamMemberRow, oldAuthUser: User | null, newEmail: string, actorEmail: string) {
+async function updatePendingInviteEmail(admin: AdminClient, workspaceId: string, member: TeamMemberRow, oldAuthUser: User | null, newEmail: string, actorEmail: string) {
   const oldEmail = member.email.toLowerCase();
   const tempPassword = crypto.randomUUID() + "!Aa1";
   const { data: authData, error: createErr } = await admin.auth.admin.createUser({
@@ -195,7 +196,7 @@ async function updatePendingInviteEmail(admin: AdminClient, member: TeamMemberRo
 
   const confirmUrl = `${getSiteUrl()}/auth/confirm?token_hash=${encodeURIComponent(linkData.properties.hashed_token)}&type=invite`;
   const emailResult = await sendInviteEmail(newEmail, member, confirmUrl);
-  await auditEmailChange(admin, actorEmail, member, oldEmail, newEmail);
+  await auditEmailChange(admin, workspaceId, actorEmail, member, oldEmail, newEmail);
 
   return NextResponse.json({
     success: true,
@@ -273,7 +274,7 @@ export async function POST(request: NextRequest) {
       if (!isSelf) {
         return NextResponse.json({ error: "Active members must change their own email while signed in." }, { status: 409 });
       }
-      return updateActiveMemberEmail(admin, oldAuthUser, target, newEmail, ctx.email);
+      return updateActiveMemberEmail(admin, ctx.workspaceId, oldAuthUser, target, newEmail, ctx.email);
     }
 
     if (!isAdminActor) {
@@ -292,7 +293,7 @@ export async function POST(request: NextRequest) {
       pendingTarget.role = requestedRole;
     }
 
-    return updatePendingInviteEmail(admin, pendingTarget, oldAuthUser, newEmail, ctx.email);
+    return updatePendingInviteEmail(admin, ctx.workspaceId, pendingTarget, oldAuthUser, newEmail, ctx.email);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[team/change-email]", message);

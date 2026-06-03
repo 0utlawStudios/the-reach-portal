@@ -184,10 +184,10 @@ export default function SetupPasswordPage() {
     // session, so upload failure no longer strands the user; they can retry
     // setup with the same consumed invite session.
     let avatarUrl: string | null = null;
-    if (avatarFile && user?.email) {
+    if (avatarFile && user?.id) {
       const ext = avatarFile.name.split(".").pop() || "jpg";
-      const path = `${user.email.replace(/[^a-z0-9]/gi, "_")}-${Date.now()}.${ext}`;
-      const { error: uploadErr } = await supabase.storage.from("avatars").upload(path, avatarFile, { upsert: true, cacheControl: "31536000" });
+      const path = `profiles/${user.id}/${Date.now()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage.from("avatars").upload(path, avatarFile, { upsert: true, cacheControl: "31536000", contentType: avatarFile.type || "image/jpeg" });
       if (uploadErr) {
         setError("Failed to upload photo. Please try again.");
         setLoading(false);

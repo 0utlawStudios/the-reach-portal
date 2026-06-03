@@ -6,8 +6,12 @@ const SIGNUP_REQUESTS_WORKSPACE_MIGRATION_SRC = readFileSync(
   join(process.cwd(), "supabase/migrations/0040_signup_requests_workspace_hardening.sql"),
   "utf8",
 );
+const AUTH_AUDIT_AVATAR_MIGRATION_SRC = readFileSync(
+  join(process.cwd(), "supabase/migrations/0041_auth_audit_avatar_hardening.sql"),
+  "utf8",
+);
 
-type MockResult = { data?: unknown; error?: { message: string } | null };
+type MockResult = { data?: unknown; error?: { message: string; code?: string } | null };
 
 let tableResults: Record<string, {
   maybeSingle?: MockResult | MockResult[];
@@ -119,6 +123,12 @@ describe("POST /api/team/request-access", () => {
     expect(SIGNUP_REQUESTS_WORKSPACE_MIGRATION_SRC).not.toContain("workspace_id is null");
   });
 
+  it("enforces one pending request per lowercased email and workspace in migration history", () => {
+    expect(AUTH_AUDIT_AVATAR_MIGRATION_SRC).toContain("signup_requests_pending_lower_email_workspace_uidx");
+    expect(AUTH_AUDIT_AVATAR_MIGRATION_SRC).toContain("ON public.signup_requests (workspace_id, lower(email))");
+    expect(AUTH_AUDIT_AVATAR_MIGRATION_SRC).toContain("WHERE status = 'pending'");
+  });
+
   it("saves a new request with the baseline workspace before notifying admins", async () => {
     const res = await POST(makeRequest({
       name: "Hanes Abasola",
@@ -130,7 +140,9 @@ describe("POST /api/team/request-access", () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toMatchObject({ success: true, requestId: "request-1", status: "pending", emailSent: true });
+    expect(body).toMatchObject({ success: true, status: "received" });
+    expect(JSON.stringify(body)).not.toContain("request-1");
+    expect(JSON.stringify(body)).not.toContain("emailSent");
     expect(operations).toEqual(expect.arrayContaining([
       {
         table: "signup_requests",
@@ -187,6 +199,17 @@ describe("POST /api/team/request-access", () => {
     expect(sendMail).not.toHaveBeenCalled();
   });
 
+  it("returns the generic response for a duplicate pending insert race", async () => {
+    tableResults.signup_requests.insert = { data: null, error: { message: "duplicate key value violates unique constraint", code: "23505" } };
+
+    const res = await POST(makeRequest({ name: "Race User", email: "race@example.com" }));
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({ success: true, status: "received" });
+    expect(sendMail).not.toHaveBeenCalled();
+  });
+
   it("keeps the saved request when admin email delivery fails", async () => {
     sendMail.mockRejectedValueOnce(new Error("smtp down"));
 
@@ -194,7 +217,8 @@ describe("POST /api/team/request-access", () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toMatchObject({ success: true, requestId: "request-1", emailSent: false });
+    expect(body).toMatchObject({ success: true, status: "received" });
+    expect(JSON.stringify(body)).not.toContain("emailSent");
     expect(operations).toEqual(expect.arrayContaining([
       { table: "signup_requests", method: "insert", payload: expect.objectContaining({ email: "saved@example.com" }) },
     ]));

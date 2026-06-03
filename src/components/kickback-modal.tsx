@@ -58,8 +58,14 @@ export function KickbackModal() {
     let attachmentUrl: string | undefined;
 
     if (file && useSupabase) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) {
+        addToast("Please sign in again before attaching a revision file.", "error");
+        setUploading(false);
+        return;
+      }
       const ext = file.name.split(".").pop();
-      const path = `kickback/${pendingKickback.cardId}-${Date.now()}.${ext}`;
+      const path = `kickback/${user.id}/${pendingKickback.cardId}-${Date.now()}.${ext}`;
       const { error } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
       if (!error) {
         const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);

@@ -19,6 +19,7 @@ const SUPPORT_ALERT_MIGRATION_SRC = readFileSync(join(process.cwd(), "supabase/m
 const TEAM_ACCESS_REALTIME_MIGRATION_SRC = readFileSync(join(process.cwd(), "supabase/migrations/0037_reach_team_access_realtime.sql"), "utf8");
 const AUDIT_ACTOR_CLEANUP_MIGRATION_SRC = readFileSync(join(process.cwd(), "supabase/migrations/0038_reach_launch_audit_actor_cleanup.sql"), "utf8");
 const AUDIT_ACTOR_NORMALIZATION_MIGRATION_SRC = readFileSync(join(process.cwd(), "supabase/migrations/0039_reach_cleanup_audit_actor_normalization.sql"), "utf8");
+const AUTH_AUDIT_AVATAR_MIGRATION_SRC = readFileSync(join(process.cwd(), "supabase/migrations/0041_auth_audit_avatar_hardening.sql"), "utf8");
 
 describe("invite setup flow hardening", () => {
   it("activates invitations through the server route, not a client-side team_members update", () => {
@@ -41,9 +42,17 @@ describe("invite setup flow hardening", () => {
   it("requires a profile photo while still allowing setup retry from the existing session", () => {
     expect(SETUP_SRC).toContain("Please add a profile photo.");
     expect(SETUP_SRC).toContain("Failed to upload photo. Please try again.");
+    expect(SETUP_SRC).toContain("profiles/${user.id}/");
     expect(SETUP_SRC).toContain("The page can resume from an existing");
     expect(SETUP_SRC).toContain("const canSubmit = ready && !loading");
     expect(SETUP_SRC).not.toContain("Photo upload failed, but your workspace access will still be activated.");
+  });
+
+  it("locks avatar writes to authenticated user-owned storage prefixes", () => {
+    expect(AUTH_AUDIT_AVATAR_MIGRATION_SRC).toContain("DROP POLICY IF EXISTS \"Allow uploads avatars\"");
+    expect(AUTH_AUDIT_AVATAR_MIGRATION_SRC).toContain("FOR INSERT TO authenticated");
+    expect(AUTH_AUDIT_AVATAR_MIGRATION_SRC).toContain("(storage.foldername(name))[2] = auth.uid()::text");
+    expect(AUTH_AUDIT_AVATAR_MIGRATION_SRC).toContain("IN ('profiles', 'kickback')");
   });
 });
 

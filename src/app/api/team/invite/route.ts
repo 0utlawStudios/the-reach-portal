@@ -175,6 +175,7 @@ export async function POST(request: NextRequest) {
         p_entity_type: "team",
         p_action: "invite_sent",
         p_entity_id: null,
+        p_workspace_id: ctx.workspaceId,
         p_metadata: {
           user_name: actorEmail,
           details: emailSent
