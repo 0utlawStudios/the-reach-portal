@@ -327,7 +327,7 @@ function ComingSoonBadge() {
 // ─── Main Settings Page ───
 export function SettingsPage() {
   const { theme, toggleTheme } = useTheme();
-  const { members, removeMember, pendingRequests, refreshPendingRequests } = useTeam();
+  const { members, removeMember, pendingRequests, refreshMembers, refreshPendingRequests } = useTeam();
   const { currentUser } = useAuth();
   const { navigate } = useNavigation();
   const { addToast } = useToast();
@@ -388,6 +388,7 @@ export function SettingsPage() {
       const data = await res.json();
       if (res.ok) {
         refreshPendingRequests();
+        void refreshMembers();
         if (action === "approve" && data.emailSent === false && data.inviteUrl) {
           await navigator.clipboard.writeText(data.inviteUrl);
           addToast("Approved. Email failed, invite link copied to clipboard.", "info");
@@ -435,6 +436,8 @@ export function SettingsPage() {
         addToast(`Invited ${inviteName.trim()}, but email delivery uncertain`, "info");
       }
       logAudit("system", currentUser.name, "invite_sent", `Invited ${inviteName.trim()} (${inviteEmail.trim()}) as ${inviteRole}`);
+      void refreshMembers();
+      refreshPendingRequests();
       setInviteEmail(""); setInviteName(""); setShowInvite(false);
     } catch {
       addToast("Network error. Invite not sent.", "error");
@@ -468,6 +471,7 @@ export function SettingsPage() {
       }
     } catch { addToast("Network error", "error"); }
     setResendingInvite(null);
+    void refreshMembers();
   };
 
   return (

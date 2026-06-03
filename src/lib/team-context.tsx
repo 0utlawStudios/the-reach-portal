@@ -84,6 +84,7 @@ const DEFAULT_MEMBERS: TeamMember[] = [];
 const TEAM_MEMBER_SELECT =
   "id, name, email, phone, role, secondary_role, status, joined_at, created_at, updated_at, avatar_url";
 const TEAM_REFRESH_MS = 5 * 60 * 1000;
+const PENDING_REQUEST_REFRESH_MS = 60 * 1000;
 
 export function TeamProvider({ children }: { children: ReactNode }) {
   const { addToast } = useToast();
@@ -137,14 +138,37 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       .select("*")
       .eq("status", "pending")
       .order("created_at", { ascending: false })
-      .then(({ data }) => {
-        if (data) setPendingRequests(data);
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("[team] pending request load failed:", error.message);
+          return;
+        }
+        setPendingRequests(data || []);
       });
   }, [useDb]);
 
   useEffect(() => {
     refreshPendingRequests();
   }, [refreshPendingRequests]);
+
+  useEffect(() => {
+    if (!useDb) return;
+    const refreshIfVisible = () => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      refreshPendingRequests();
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refreshPendingRequests();
+    };
+    window.addEventListener("focus", refreshIfVisible);
+    document.addEventListener("visibilitychange", onVisible);
+    const interval = window.setInterval(refreshIfVisible, PENDING_REQUEST_REFRESH_MS);
+    return () => {
+      window.removeEventListener("focus", refreshIfVisible);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.clearInterval(interval);
+    };
+  }, [useDb, refreshPendingRequests]);
 
   // ─── Low-cost freshness for team changes ───
   // Team membership changes are rare and every local mutation already calls

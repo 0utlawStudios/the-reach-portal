@@ -5,6 +5,8 @@ import { consume, getClientIp } from "@/lib/rate-limit";
 
 export const maxDuration = 10;
 
+const BASELINE_WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
+
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -45,93 +47,133 @@ export async function POST(request: NextRequest) {
 
     const admin = getAdminClient();
 
-    // Anti-enumeration: always respond with success. Internally we still skip
-    // the insert (and the admin notification) if the email already maps to a
-    // team member or a pending request, so we don't spam admins or pile up
-    // duplicates — but the response shape is identical for unknown emails.
-    const { data: existingMember } = await admin
+    const { data: existingMember, error: existingErr } = await admin
       .from("team_members")
-      .select("id")
+      .select("id, status")
       .eq("email", email)
       .maybeSingle();
+    if (existingErr) {
+      console.error("[request-access] Team lookup failed:", existingErr.message);
+      return NextResponse.json({ error: "Could not check access status. Please try again." }, { status: 500 });
+    }
 
-    const { data: pendingReq } = await admin
+    if (existingMember) {
+      return NextResponse.json(
+        {
+          error: "This email is already in the team list. Ask an admin to resend the invite or update the account.",
+          status: existingMember.status || "team_member",
+        },
+        { status: 409 },
+      );
+    }
+
+    const { data: pendingReq, error: pendingErr } = await admin
       .from("signup_requests")
       .select("id")
       .eq("email", email)
       .eq("status", "pending")
       .maybeSingle();
+    if (pendingErr) {
+      console.error("[request-access] Pending lookup failed:", pendingErr.message);
+      return NextResponse.json({ error: "Could not check existing requests. Please try again." }, { status: 500 });
+    }
 
-    const alreadyKnown = !!existingMember || !!pendingReq;
+    if (pendingReq) {
+      return NextResponse.json({
+        success: true,
+        status: "already_pending",
+        message: "Your request is already pending review.",
+      });
+    }
 
-    let insertErr: { message: string } | null = null;
-    if (!alreadyKnown) {
-      // Insert the request
-      const res = await admin
-        .from("signup_requests")
-        .insert({
-          name: body.name.trim(),
-          email,
-          phone: body.phone || null,
-          company: body.company || null,
-          reason: body.reason || null,
-          status: "pending",
-        });
-      insertErr = res.error;
+    const requestRow = {
+      workspace_id: BASELINE_WORKSPACE_ID,
+      name: body.name.trim(),
+      email,
+      phone: body.phone || null,
+      company: body.company || null,
+      reason: body.reason || null,
+      status: "pending",
+      requested_by: email,
+    };
 
-      if (insertErr) {
-        console.error("[request-access] Insert failed:", insertErr.message);
-        // Still respond 200 to preserve anti-enumeration. Caller can retry; we
-        // surface the failure only in server logs.
-      }
-    } else {
-      console.log(`[request-access] Skipped duplicate request for ${email}`);
+    const { data: inserted, error: insertErr } = await admin
+      .from("signup_requests")
+      .insert(requestRow)
+      .select("id")
+      .single();
+
+    if (insertErr || !inserted?.id) {
+      console.error("[request-access] Insert failed:", insertErr?.message || "missing inserted id");
+      return NextResponse.json(
+        { error: "Your request could not be saved. Please try again or ask the admin to invite you directly." },
+        { status: 500 },
+      );
     }
 
     // ─── Email admins about the new request (only for genuinely new emails) ───
-    // SEC-008: Fire-and-forget. Awaiting the SMTP round-trip before responding
-    // turned response latency into an account-enumeration oracle — a "new"
-    // email took noticeably longer than a known one. We dispatch the admin
-    // notification without blocking and return immediately, so the response
-    // timing is identical for known and unknown emails.
     const smtpUser = process.env.SMTP_USER;
     const smtpPass = process.env.SMTP_PASS;
-    if (smtpUser && smtpPass && !alreadyKnown && !insertErr) {
-      const notifyName = body.name.trim();
-      const notifyPhone = body.phone;
-      const notifyCompany = body.company;
-      const notifyReason = body.reason;
-      void (async () => {
+    let emailSent = false;
+    let emailError = "";
+    let adminRecipientCount = 0;
+    if (smtpUser && smtpPass) {
+      try {
         const transporter = getTransporter();
 
         // Find superadmins and admins to notify
-        const { data: admins } = await admin
+        const { data: admins, error: adminsErr } = await admin
           .from("team_members")
           .select("email")
           .in("role", ["superadmin", "admin"]);
+        if (adminsErr) throw new Error(`Admin lookup failed: ${adminsErr.message}`);
 
         const adminEmails = admins?.map((a) => a.email).filter(Boolean) || [];
+        adminRecipientCount = adminEmails.length;
 
         if (adminEmails.length > 0) {
           await transporter.sendMail({
             from: getFromAddress(),
             to: adminEmails.join(", "),
-            subject: `New Access Request: ${notifyName}`,
+            subject: `New Access Request: ${body.name.trim()}`,
             html: buildAdminNotificationHtml({
-              name: notifyName,
+              name: body.name.trim(),
               email,
-              phone: notifyPhone,
-              company: notifyCompany,
-              reason: notifyReason,
+              phone: body.phone,
+              company: body.company,
+              reason: body.reason,
             }),
           });
+          emailSent = true;
         }
-      })().catch((emailErr: unknown) => {
-        console.error("[request-access] Email FAILED:", emailErr instanceof Error ? emailErr.message : emailErr);
-      });
+      } catch (emailErr: unknown) {
+        emailError = emailErr instanceof Error ? emailErr.message : "Unknown SMTP error";
+        console.error("[request-access] Email FAILED:", emailError);
+      }
     }
 
-    return NextResponse.json({ success: true, smtpConfigured: !!(smtpUser && smtpPass) });
+    try {
+      await admin.rpc("record_audit_event", {
+        p_entity_type: "team",
+        p_action: "access_request_submitted",
+        p_entity_id: inserted.id,
+        p_metadata: {
+          user_name: email,
+          details: emailSent
+            ? `Access request from ${body.name.trim()} (${email}) — admin email sent`
+            : `Access request from ${body.name.trim()} (${email}) — saved, admin email not sent${emailError ? `: ${emailError}` : ""}`,
+        },
+      });
+    } catch { /* best-effort */ }
+
+    return NextResponse.json({
+      success: true,
+      requestId: inserted.id,
+      status: "pending",
+      smtpConfigured: !!(smtpUser && smtpPass),
+      emailSent,
+      adminRecipientCount,
+    });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[request-access]", message);
