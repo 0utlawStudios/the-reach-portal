@@ -1,8 +1,8 @@
 # The Reach Clone Progress
 
 Phase: IN PROGRESS - production-readiness QA and Reach polish
-Last pushed SHA: 0424dec fix: harden pipeline realtime and notifications
-Next: Fix Drive/security hardening findings from QA swarm, then continue UI/accessibility and full production QA.
+Last pushed SHA: 897571c fix: harden drive media access
+Next: Fix team removal hierarchy, request-access enumeration/null-workspace gaps, then continue UI/accessibility and full production QA.
 Blockers: None. `supabase status`/local DB diff still require Docker if needed.
 
 QA swarm / audit normalization slice notes:
@@ -28,6 +28,17 @@ Pipeline realtime / notification hardening slice notes:
 - Added static regression coverage for workspace-state Realtime subscription, canonical Realtime updates, kickback temp-ID guards, and authenticated notification routes.
 - Verification passed: focused iron-law tests (16), `npm run typecheck`, `git diff --check`, `npm run lint` with one existing AI worker warning, full `npm test` with 28 files / 247 tests, and `npm run build`.
 - Pushed commit `0424dec` to `origin/main`; GitHub CI is running.
+
+Drive media access hardening slice notes:
+
+- Treated the Drive findings from the ops/security QA agent as root security issues, not UI polish.
+- Hardened `/api/drive/stream`: bearer-authenticated requests still pass directly; same-origin media-tag fallback is now bounded to Drive file IDs already referenced by app data or physically inside app-managed Drive folders. A forged Referer can no longer stream arbitrary service-account-visible Drive files.
+- Hardened `/api/drive/finalize`: the route now reads Drive metadata and verifies the file parent belongs to one of the app-managed folders before calling `setPublicPermission(fileId)`.
+- Hardened `/api/drive/proxy-upload`: files above 4 MB are rejected before `file.arrayBuffer()`, forcing the existing resumable upload path instead of buffering large media through the app server.
+- Updated Google Drive metadata reads to include parent folders and added a central `MAX_DRIVE_PROXY_FILE_SIZE`.
+- Added static Drive security tests for stream fallback, finalize permission order, and proxy upload threshold.
+- Verification passed: focused Drive route tests (10), `npm run typecheck`, `git diff --check`, `npm run lint` with one existing AI worker warning, full `npm test` with 29 files / 250 tests, and `npm run build`.
+- Pushed commit `897571c` to `origin/main`; GitHub CI is running.
 
 Auth / team access hardening slice notes:
 

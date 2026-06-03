@@ -1,5 +1,7 @@
 # The Reach Clone Changes
 
+Latest slice: Drive media access is hardened. Stream fallback is limited to app-known/app-managed Drive files, finalize verifies Drive parent folders before public permissions, and proxy upload rejects files above 4 MB before buffering. Verification passed focused Drive tests, `npm run typecheck`, `git diff --check`, `npm run lint`, full `npm test`, and `npm run build`.
+
 Latest slice: pipeline realtime and notification hardening now drives posts Realtime from resolved workspace state, applies Supabase UPDATE payloads as canonical, rejects revision kickbacks for temporary post IDs, and sends protected notification routes with bearer auth plus response checks. Verification passed focused iron-law tests, `npm run typecheck`, `git diff --check`, `npm run lint`, full `npm test`, and `npm run build`.
 
 Latest slice: audit cleanup actor normalization now resolves known cloned/test launch cleanup removals to `SYSTEM` in both historical detail formats. Verification passed focused setup/static tests, `npm run typecheck`, `git diff --check`, `npm run lint` with only existing warnings, `npm run build`, `supabase db push`, remote migration list `0039`, and production `v_audit_log_with_actor` checks.
