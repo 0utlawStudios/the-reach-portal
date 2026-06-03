@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const sendMail = vi.fn((_: Record<string, unknown>) => Promise.resolve());
+const sendMail = vi.fn<(mail: Record<string, unknown>) => Promise<void>>(() => Promise.resolve());
 const rpc = vi.fn(() => Promise.resolve({ data: null, error: null }));
 
 let postRow: Record<string, unknown> | null;
