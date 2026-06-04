@@ -1,69 +1,57 @@
 # The Reach Clone Progress
 
-updated-at: 2026-06-04T19:08:23Z
+updated-at: 2026-06-04T19:40:20Z
 
-phase: PHASE 2 - EXECUTE / PROD AUTH-RLS VERIFICATION PASSED
+phase: PHASE 1 - HEADLESS BROWSER INFRA GREEN
 
-item: Verified the `moveCard` returned-row persistence proof against Reach production Supabase using temporary authenticated QA data, then cleaned up all temporary rows/users.
+item: Added pinned Playwright production E2E infrastructure so live DOM drag evidence can be captured in the Reach Portal repo.
 
-last SHA: 682c9a9
+last SHA: 715cc15
 
 next:
 
-- Commit and push this production verification tracking update.
-- Begin Phase 3 final QA swarm with explicit missing-browser-trace flags.
-- Continue only on verified remaining defects: handle-vs-card target, `over.id` no-op visibility, drawer role fallback if approval buttons are in scope, or any RLS/error-honesty miss.
+- Commit and push the Phase 1 Playwright infrastructure slice.
+- Begin Phase 2 named-user mapping using real Reach production users only: one author-class persona and one approver-class persona.
+- Do not attempt to use Muaaz or Carlo for Reach verification; user clarified they belong to the separate Ten80Ten SMM Portal, not The Reach Portal.
 
 blockers:
 
-- Live authenticated browser DOM event, console, and network traces are still unavailable because the required in-app browser execution surface was not exposed after tool discovery.
-- The requested named-role production matrix cannot currently use Muaaz or Carlo as Reach users: read-only Reach team data returned five team rows and did not include Muaaz or Carlo.
+- None for Phase 1.
 
 files:
 
-- `PLAN-drag.md`
-- `AUDIT-drag.md`
+- `.gitignore`
+- `package.json`
+- `package-lock.json`
+- `playwright.config.ts`
+- `e2e/.gitkeep`
 - `PROGRESS.md`
-- `src/lib/pipeline-context.tsx`
-- `src/lib/__tests__/iron-law-static.test.ts`
 
 invariants:
 
 - Correct repo only: `/Users/ace/Documents/CURSOR MAIN/THE REACH SMM PORTAL`.
 - Do not touch `/Users/ace/Documents/CURSOR MAIN/ten80ten-smm-portal`.
-- `load()` provision-before-posts-select path left unchanged.
-- Empty DB arrays remain authoritative, not localStorage fallback.
-- Existing `isValidUuid(cardId)` guard before id-keyed Supabase stage writes remains in place.
-- `workspace_id` insert fallback left unchanged.
-- Human `posted` lockdown left unchanged.
-- No production writes in this slice.
+- No pipeline/runtime source changed in this slice.
+- No DB schema, RLS, triggers, migrations, or production data changed in this slice.
 - No design, brand, or copy changes.
 - Posts must never disappear.
 
 current evidence:
 
-- Reach Supabase project host observed from `.env.local`: `gxmpmdhmxyfqusdzcemt.supabase.co`.
-- Read-only `posts` count is 24 with stage counts `ideas=1`, `awaiting_approval=7`, `revision_needed=2`, `approved_scheduled=6`, `posted=8`.
-- Sample rows by stage: `ab3fbde3-d358-4013-8272-9abda6f21db9` ideas, `1a40fd5b-0e11-4f77-a06d-890f4f487460` awaiting approval, `9221b39f-13bf-4b5d-b2a9-da54a375c72d` revision needed, `f0f6cd20-1fff-4945-8115-624a596a0905` approved/scheduled, `72c4343f-83a9-41ba-950e-d9dd5106a530` posted.
-- Source evidence shows DnD provider/sensors/droppable/sortable wiring is present; drag listeners are handle-only on `aria-label="Drag card"`.
-- Fixed implementation gap: `moveCard` now chains `.select("id, stage").maybeSingle()` after the stage update and calls `assertStageMoveCommitted()` before audit/notification/publish-job side effects.
-- Production temp auth/RLS proof used Reach project `gxmpmdhmxyfqusdzcemt.supabase.co` and temporary post `51700423-1482-444e-943f-0cd1215b4b21`.
-- Authenticated `creative_director` temp user update returned `{ id: "51700423-1482-444e-943f-0cd1215b4b21", stage: "awaiting_approval" }` for `ideas -> awaiting_approval`.
-- Authenticated `creative_director` temp user update returned `{ id: "51700423-1482-444e-943f-0cd1215b4b21", stage: "approved_scheduled" }` for `awaiting_approval -> approved_scheduled`.
-- Cross-workspace hostile update against temp post `6045130d-e2ce-4af3-bf4e-fbb312f16601` returned `null` with HTTP 200 and the hostile post remained `ideas`.
-- Manual authenticated `approved_scheduled -> posted` attempt returned `POSTED_LOCKDOWN` and the temp post remained `approved_scheduled`.
-- Cleanup completed: temp main post deleted, hostile post deleted, hostile workspace deleted, temp workspace member deleted, temp team member deleted, temp auth user deleted.
-- Focused static/unit verification passed: `npm test -- src/lib/__tests__/iron-law-static.test.ts` passed 21 tests.
+- Installed `@playwright/test` pinned exactly at `1.60.0` with `--save-exact`.
+- `npx playwright --version` returned `Version 1.60.0`.
+- `npx playwright install chromium` completed successfully.
+- `playwright.config.ts` sets `testDir: ./e2e`, Chromium-only project, headless mode, `baseURL` default `https://thereach.ten80ten.com`, `trace: "on"`, `screenshot: "only-on-failure"`, and `video: "retain-on-failure"`.
+- `.gitignore` now excludes `e2e/.auth/`, `test-results/`, and `playwright-report/`.
 - `npm run typecheck` passed.
 - `npm run lint` passed with the existing `src/lib/ai/worker.ts` unused `generateImagesForCaption` warning only.
-- Full `npm test` passed: 30 files, 266 tests.
-- `npm run build` passed with Next.js 16.2.0.
+- `git diff --check` passed.
 
 changes report:
 
-- EDITED: `PROGRESS.md`
-- PREVIOUS PHASE 2 CODE SLICE: `src/lib/pipeline-context.tsx`, `src/lib/__tests__/iron-law-static.test.ts`
-- MODIFIED: no migrations, production rows, design, brand, or copy
+- EDITED: `.gitignore`, `package.json`, `package-lock.json`, `PROGRESS.md`
+- ADDED: `playwright.config.ts`, `e2e/.gitkeep`
+- MODIFIED: no app runtime source, migrations, production rows, design, brand, or copy
 - LEFT UNTOUCHED: `/Users/ace/Documents/CURSOR MAIN/ten80ten-smm-portal`
 
 ---
