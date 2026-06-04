@@ -68,6 +68,7 @@ function EditProfileModal({
   const [avatarUrl, setAvatarUrl] = useState(member.avatar || "");
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [sendingRecovery, setSendingRecovery] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Avatar crop flow
   const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
@@ -77,6 +78,28 @@ function EditProfileModal({
   const canChangeEmail = isSelf || (canManageTeam && member.status === "pending" && member.role !== "superadmin");
   const canEditRole = canManageTeam && member.role !== "superadmin";
   const canSave = (canEditProfile || canManageTeam || (emailChanged && canChangeEmail)) && !saving;
+  const canSendRecovery = isSelf || canManageTeam;
+
+  const sendPasswordRecovery = async () => {
+    if (!canSendRecovery || sendingRecovery) return;
+    setSendingRecovery(true);
+    try {
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: normalizedEmail }),
+      });
+      if (!res.ok) {
+        addToast("Recovery email could not be requested.", "error");
+        return;
+      }
+      addToast(`Recovery link sent to ${normalizedEmail}`, "success");
+    } catch {
+      addToast("Network error. Recovery link not sent.", "error");
+    } finally {
+      setSendingRecovery(false);
+    }
+  };
 
   const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!canEditProfile && !canManageTeam) return;
@@ -262,6 +285,32 @@ function EditProfileModal({
               )}
             </div>
 
+            {/* Password recovery */}
+            {canSendRecovery && (
+              <div className="rounded-xl border border-gray-100 dark:border-white/[0.06] bg-gray-50/70 dark:bg-white/[0.02] px-3 py-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-white dark:bg-white/[0.04] border border-gray-100 dark:border-white/[0.06] flex items-center justify-center shrink-0">
+                    <Key className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[12px] font-medium text-gray-700 dark:text-gray-300">Password recovery</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">Email a secure reset link to this sign-in address.</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={sendingRecovery || !normalizedEmail}
+                    onClick={sendPasswordRecovery}
+                    className="h-8 rounded-lg text-[10px] px-3 cursor-pointer disabled:opacity-60"
+                  >
+                    {sendingRecovery ? <Loader2 className="w-3 h-3 mr-1.5 animate-spin" /> : <Mail className="w-3 h-3 mr-1.5" />}
+                    Send Link
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* Actions */}
             <div className="flex gap-2 pt-2">
               <Button variant="outline" onClick={onClose} className="flex-1 h-9 rounded-lg text-[12px]">Cancel</Button>
@@ -358,6 +407,7 @@ export function SettingsPage() {
   const [activeIntegration, setActiveIntegration] = useState<string | null>(null);
   const [approving, setApproving] = useState<string | null>(null);
   const [resendingInvite, setResendingInvite] = useState<string | null>(null);
+  const [sendingOwnRecovery, setSendingOwnRecovery] = useState(false);
 
   // Load workspace timezone on mount
   useEffect(() => {
@@ -381,6 +431,40 @@ export function SettingsPage() {
     }
     navigate("brandkit");
   }, [navigate]);
+
+  const sendPasswordRecovery = useCallback(async (email: string) => {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) {
+      addToast("No email address found for this account.", "error");
+      return false;
+    }
+    try {
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: cleanEmail }),
+      });
+      if (!res.ok) {
+        addToast("Recovery email could not be requested.", "error");
+        return false;
+      }
+      addToast(`Recovery link sent to ${cleanEmail}`, "success");
+      return true;
+    } catch {
+      addToast("Network error. Recovery link not sent.", "error");
+      return false;
+    }
+  }, [addToast]);
+
+  const handleOwnPasswordRecovery = useCallback(async () => {
+    if (sendingOwnRecovery) return;
+    setSendingOwnRecovery(true);
+    try {
+      await sendPasswordRecovery(currentUser.email);
+    } finally {
+      setSendingOwnRecovery(false);
+    }
+  }, [currentUser.email, sendPasswordRecovery, sendingOwnRecovery]);
 
   const handleApprove = async (reqId: string, action: "approve" | "reject", role = "social_media_specialist") => {
     setApproving(reqId);
@@ -547,6 +631,18 @@ export function SettingsPage() {
                 <option value="America/New_York">Eastern Time (ET)</option>
                 <option value="UTC">UTC</option>
               </select>
+            </SettingRow>
+            <SettingRow icon={Key} label="Password" desc={`Send a secure reset link to ${currentUser.email}`}>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={sendingOwnRecovery}
+                onClick={handleOwnPasswordRecovery}
+                className="h-7 text-[10px] rounded-lg px-3 cursor-pointer disabled:opacity-60"
+              >
+                {sendingOwnRecovery ? <Loader2 className="w-3 h-3 mr-1.5 animate-spin" /> : <Mail className="w-3 h-3 mr-1.5" />}
+                Send Reset Link
+              </Button>
             </SettingRow>
           </Section>
 
