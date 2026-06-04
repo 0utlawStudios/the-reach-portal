@@ -1,18 +1,18 @@
 # The Reach Clone Progress
 
-updated-at: 2026-06-04T19:40:20Z
+updated-at: 2026-06-04T19:43:11Z
 
-phase: PHASE 1 - HEADLESS BROWSER INFRA GREEN
+phase: PHASE 2 - NAMED USER MATRIX GREEN
 
-item: Added pinned Playwright production E2E infrastructure so live DOM drag evidence can be captured in the Reach Portal repo.
+item: Mapped real Reach production users to `auth.users` rows for E2E personas, excluding Muaaz and Carlo because the user clarified they are not Reach Portal users.
 
-last SHA: 715cc15
+last SHA: 2fce299
 
 next:
 
-- Commit and push the Phase 1 Playwright infrastructure slice.
-- Begin Phase 2 named-user mapping using real Reach production users only: one author-class persona and one approver-class persona.
-- Do not attempt to use Muaaz or Carlo for Reach verification; user clarified they belong to the separate Ten80Ten SMM Portal, not The Reach Portal.
+- Commit and push the Phase 2 named-user evidence slice.
+- Begin Phase 3 Playwright drag matrix against production with temporary QA users/posts/workspace and persistent evidence output under `perf/drag-evidence/`.
+- Use the real Reach named-user personas as documented references, not Muaaz/Carlo.
 
 blockers:
 
@@ -20,11 +20,7 @@ blockers:
 
 files:
 
-- `.gitignore`
-- `package.json`
-- `package-lock.json`
-- `playwright.config.ts`
-- `e2e/.gitkeep`
+- `NAMED-USERS.md`
 - `PROGRESS.md`
 
 invariants:
@@ -33,24 +29,22 @@ invariants:
 - Do not touch `/Users/ace/Documents/CURSOR MAIN/ten80ten-smm-portal`.
 - No pipeline/runtime source changed in this slice.
 - No DB schema, RLS, triggers, migrations, or production data changed in this slice.
+- Service-role/admin access was used only for read-only linked SQL and auth-user mapping.
 - No design, brand, or copy changes.
 - Posts must never disappear.
 
 current evidence:
 
-- Installed `@playwright/test` pinned exactly at `1.60.0` with `--save-exact`.
-- `npx playwright --version` returned `Version 1.60.0`.
-- `npx playwright install chromium` completed successfully.
-- `playwright.config.ts` sets `testDir: ./e2e`, Chromium-only project, headless mode, `baseURL` default `https://thereach.ten80ten.com`, `trace: "on"`, `screenshot: "only-on-failure"`, and `video: "retain-on-failure"`.
-- `.gitignore` now excludes `e2e/.auth/`, `test-results/`, and `playwright-report/`.
-- `npm run typecheck` passed.
-- `npm run lint` passed with the existing `src/lib/ai/worker.ts` unused `generateImagesForCaption` warning only.
+- Linked Supabase SQL joined `public.workspace_members` to `auth.users` and `public.team_members`; all selected personas trace to real `auth.users.id` values.
+- Active Reach workspace members: Aldridge Dagos `f4d6c15a-7b94-4e58-ac8b-4de98aa0d644` (`superadmin`), Hanes Lawrence Abasola `952b51be-9037-4da3-8364-5b52bf894347` (`admin`), Shahannie Manuel `a7f2165d-d667-4bf8-ab37-383ffc485323` (`creative_director`).
+- Active Reach role counts are `admin=1`, `creative_director=1`, and `superadmin=1`; no active lower-role author-only user exists in Reach production `workspace_members`.
+- `NAMED-USERS.md` records the exact SQL and mapping.
 - `git diff --check` passed.
 
 changes report:
 
-- EDITED: `.gitignore`, `package.json`, `package-lock.json`, `PROGRESS.md`
-- ADDED: `playwright.config.ts`, `e2e/.gitkeep`
+- EDITED: `PROGRESS.md`
+- ADDED: `NAMED-USERS.md`
 - MODIFIED: no app runtime source, migrations, production rows, design, brand, or copy
 - LEFT UNTOUCHED: `/Users/ace/Documents/CURSOR MAIN/ten80ten-smm-portal`
 
