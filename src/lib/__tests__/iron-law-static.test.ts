@@ -13,7 +13,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync, statSync } from "fs";
 import { join } from "path";
-import { resolveLoadedCards, type PostRow } from "../pipeline-context";
+import { assertStageMoveCommitted, resolveLoadedCards, type PostRow } from "../pipeline-context";
 
 const PIPELINE_PATH = join(process.cwd(), "src/lib/pipeline-context.tsx");
 const PIPELINE_SRC = readFileSync(PIPELINE_PATH, "utf8");
@@ -110,6 +110,35 @@ describe("iron-law guards in pipeline-context.tsx", () => {
     expect(cards[0].id).toBe(row.id);
     expect(cards[0].title).toBe("Real post");
     expect(cards[0].platforms).toEqual(["instagram"]);
+  });
+
+  it("stage moves require proof that exactly the target post reached the target stage", () => {
+    const id = "33333333-3333-4333-8333-333333333333";
+    expect(() => assertStageMoveCommitted(null, id, "awaiting_approval")).toThrow(
+      /No post row was updated/,
+    );
+    expect(() => assertStageMoveCommitted(
+      { id: "44444444-4444-4444-8444-444444444444", stage: "awaiting_approval" },
+      id,
+      "awaiting_approval",
+    )).toThrow(/different post/);
+    expect(() => assertStageMoveCommitted(
+      { id, stage: "ideas" },
+      id,
+      "awaiting_approval",
+    )).toThrow(/expected "awaiting_approval"/);
+    expect(() => assertStageMoveCommitted(
+      { id, stage: "awaiting_approval" },
+      id,
+      "awaiting_approval",
+    )).not.toThrow();
+  });
+
+  it("moveCard requests the updated post row before treating a stage move as committed", () => {
+    expect(PIPELINE_SRC).toMatch(
+      /\.update\(\s*\{\s*stage:\s*newStage\s*\}\s*\)[\s\S]{0,200}\.eq\(\s*["']id["']\s*,\s*cardId\s*\)[\s\S]{0,120}\.select\(\s*["']id,\s*stage["']\s*\)[\s\S]{0,80}\.maybeSingle\(\s*\)/,
+    );
+    expect(PIPELINE_SRC).toMatch(/assertStageMoveCommitted\s*\(\s*data\s+as\s+StageMoveCommitRow\s*,\s*cardId\s*,\s*newStage\s*\)/);
   });
 
   it("createCard always sets workspace_id via fallback, not conditional-only (AGENTS.md §1c)", () => {

@@ -246,6 +246,24 @@ export function resolveLoadedCards(
   return fallback();
 }
 
+type StageMoveCommitRow = Pick<PostRow, "id" | "stage"> | null | undefined;
+
+export function assertStageMoveCommitted(
+  row: StageMoveCommitRow,
+  cardId: string,
+  newStage: PipelineStage,
+): void {
+  if (!row) {
+    throw new Error("No post row was updated. Check workspace access and reload.");
+  }
+  if (row.id !== cardId) {
+    throw new Error("Stage update returned a different post. Card restored.");
+  }
+  if (row.stage !== newStage) {
+    throw new Error(`Stage update returned "${row.stage}", expected "${newStage}". Card restored.`);
+  }
+}
+
 function isSupabaseConfigured(): boolean {
   return !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 }
@@ -560,8 +578,14 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
       markMutation(cardId);
       (async () => {
         try {
-          const { error } = await supabase.from("posts").update({ stage: newStage }).eq("id", cardId);
+          const { data, error } = await supabase
+            .from("posts")
+            .update({ stage: newStage })
+            .eq("id", cardId)
+            .select("id, stage")
+            .maybeSingle();
           if (error) throw error;
+          assertStageMoveCommitted(data as StageMoveCommitRow, cardId, newStage);
           // Stage move committed — record the audit entry NOW, not before the
           // write. Logging before confirmation produced phantom audit rows on
           // failed moves and an extra RPC on every drag (PERF-001 / DATA-004).
