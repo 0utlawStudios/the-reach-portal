@@ -21,6 +21,7 @@ import { Archive, RotateCcw, Calendar } from "lucide-react";
 import { RepurposeModal } from "./repurpose-modal";
 import { ValidationErrorModal } from "./validation-error-modal";
 import { useNavigation } from "@/lib/navigation-context";
+import { useManualPostedMovesEnabled } from "@/lib/manual-posted-settings";
 
 // ─── Context-aware comparators per column ───
 // PERF-012: comparators only — no array clone here. The single-pass useMemo
@@ -58,6 +59,7 @@ function compareForStage(stage: PipelineStage) {
 
 // ─── RBAC: columns that require Approver ───
 const APPROVER_COLUMNS: PipelineStage[] = ["approved_scheduled", "posted"];
+const MANUAL_POSTED_ROLES = new Set(["superadmin", "admin", "owner"]);
 
 type DragTelemetryDetail = {
   activeId: string;
@@ -132,6 +134,11 @@ export function KanbanBoard() {
     () => isPipelineApproverRole(currentMember?.role || currentUser.role),
     [currentMember, currentUser.role]
   );
+  const userIsManualPostedOperator = useMemo(
+    () => MANUAL_POSTED_ROLES.has((currentMember?.role || currentUser.role || "").trim().toLowerCase()),
+    [currentMember, currentUser.role],
+  );
+  const manualPostedMovesEnabled = useManualPostedMovesEnabled();
 
   // CST week window (Sun-Sat)
   const thisWeekStart = useMemo(() => {
@@ -251,8 +258,8 @@ export function KanbanBoard() {
       return;
     }
 
-    // ── Posted lockdown: humans never drag here. n8n owns this transition. ──
-    if (targetStage === "posted") {
+    // ── Posted lockdown: only admin-class users can use the Settings override. ──
+    if (targetStage === "posted" && (!manualPostedMovesEnabled || !userIsManualPostedOperator)) {
       emitDragTelemetry("end", {
         activeId: cardId,
         overId,
@@ -261,7 +268,9 @@ export function KanbanBoard() {
         outcome: "blocked_posted_target",
       });
       addToast(
-        "Only the auto-publisher moves cards to Posted. The card will move automatically once n8n confirms the post is live.",
+        manualPostedMovesEnabled
+          ? "Only workspace admins can manually move cards to Posted."
+          : "Manual Posted moves are disabled in Settings. Turn them on before moving cards to Posted.",
         "warning",
       );
       return;
@@ -330,7 +339,7 @@ export function KanbanBoard() {
       outcome: "move_requested",
     });
     moveCard(cardId, targetStage);
-  }, [cards, moveCard, requestKickback, userIsApprover, addToast]);
+  }, [cards, moveCard, requestKickback, userIsApprover, userIsManualPostedOperator, manualPostedMovesEnabled, addToast]);
 
   const handleDragOver = useCallback(() => {
     // Empty: all moves on drop. DragOverlay provides visual feedback.

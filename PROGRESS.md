@@ -1,59 +1,52 @@
 # The Reach Clone Progress
 
-updated-at: 2026-06-04T20:06:24Z
+updated-at: 2026-06-04T21:31:00Z
 
-phase: DONE
+phase: HARDENING
 
-item: Reach Portal drag audit closed GREEN with live authenticated Playwright DOM, network, DB, UI, hostile-server, trace, screenshot, named-user, and cleanup evidence.
+item: Reach Portal drag surface changed from handle-only to whole-card drag. Manual Posted moves are now controlled by an admin-only Settings toggle and persisted through a service-role API route that writes `posted_at`.
 
-last SHA: 970f962
+last SHA: pending
 
 next:
 
-- None.
+- User should test locally at `http://localhost:3001` with Settings > Publishing > Manual Posted moves enabled.
 
 blockers:
 
-- None.
+- Local Playwright drag matrix could not reach `kanban-board` from its injected Supabase storage state; seeded rows/users/workspaces cleaned up successfully.
 
 files:
 
-- `.gitignore`
-- `package.json`
-- `package-lock.json`
-- `playwright.config.ts`
-- `e2e/.gitkeep`
-- `e2e/drag.spec.ts`
-- `src/components/kanban-board.tsx`
-- `src/components/pipeline-column.tsx`
 - `src/components/content-card.tsx`
-- `NAMED-USERS.md`
-- `AUDIT-FINAL-drag.md`
+- `src/components/kanban-board.tsx`
+- `src/components/pages/settings-page.tsx`
+- `src/lib/pipeline-context.tsx`
+- `src/lib/manual-posted-settings.ts`
+- `src/app/api/admin/posts/[id]/manual-posted/route.ts`
+- `src/lib/__tests__/iron-law-static.test.ts`
 - `PROGRESS.md`
-- `perf/drag-evidence/drag-4748171-r4/seed.json`
-- `perf/drag-evidence/drag-4748171-r4/matrix.json`
-- `perf/drag-evidence/drag-4748171-r4/*.png`
-- `perf/drag-evidence/playwright-results/.last-run.json`
-- `perf/drag-evidence/playwright-results/drag-production-drag-matri-ce3d1-network-DB-and-UI-agreement-chromium/trace.zip`
+- `The Reach/FULL_TECHNICAL_FEATURE_AUDIT.md`
 
 invariants:
 
 - Correct repo only: `/Users/ace/Documents/CURSOR MAIN/THE REACH SMM PORTAL`.
 - Left untouched: `/Users/ace/Documents/CURSOR MAIN/ten80ten-smm-portal`.
-- No design, brand, copy, DB schema, RLS, trigger, or migration changes in the final closeout slice.
-- Runtime app changes are limited to non-visual `data-testid` attributes and `CustomEvent` drag telemetry for E2E evidence.
+- No DB schema, RLS, trigger, or migration changes.
+- Direct browser-authenticated Supabase writes to `stage='posted'` remain blocked by migration `0046_post_stage_transition_guard.sql`.
+- Manual Posted moves use an admin-only Next route with `requireBearerTeamRole(request, ["superadmin", "admin", "owner"])`.
 - Posts must never disappear.
 
 evidence:
 
-- Final run id: `drag-4748171-r4`.
-- Prod command: `PLAYWRIGHT_RUN_ID=drag-4748171-r4 npm run e2e:prod`.
-- Result: 1 Chromium test passed.
-- Matrix file: `perf/drag-evidence/drag-4748171-r4/matrix.json`.
-- Seed file: `perf/drag-evidence/drag-4748171-r4/seed.json`.
-- Trace: `perf/drag-evidence/playwright-results/drag-production-drag-matri-ce3d1-network-DB-and-UI-agreement-chromium/trace.zip`.
-- Screenshots: `perf/drag-evidence/drag-4748171-r4/*.png`.
-- Cleanup: `postsRemaining=0`, `auditRowsRemaining=0`, `workspaceMembersRemaining=0`, `teamMembersRemaining=0`, `workspacesRemaining=0`, `authUsersRemaining=0`, `cleanupErrors=[]`.
+- `npm run typecheck`: passed.
+- `npm test -- --run src/lib/__tests__/iron-law-static.test.ts`: passed, 26 tests.
+- `npm run lint`: passed with existing `src/lib/ai/worker.ts` warning.
+- `npm test`: passed, 30 files / 271 tests.
+- `npm run build`: passed; route table includes `/api/admin/posts/[id]/manual-posted`.
+- `git diff --check`: passed.
+- `curl -X POST /api/admin/posts/.../manual-posted` without bearer token: `401 Unauthorized`.
+- Local Playwright run id `drag-reach-manual-posted`: failed before board render; cleanup counts all zero.
 
 named users:
 
@@ -64,16 +57,15 @@ named users:
 
 verification:
 
-- `PLAYWRIGHT_RUN_ID=drag-4748171-r4 npm run e2e:prod`: passed.
-- `npx playwright test --list`: passed, 1 Chromium production drag matrix spec detected.
 - `npm run typecheck`: passed.
 - `npm run lint`: passed with the existing `src/lib/ai/worker.ts` warning.
 - `git diff --check`: passed.
-- `npm test`: passed, 30 files / 270 tests.
+- `npm test`: passed, 30 files / 271 tests.
 - `npm run build`: passed.
+- `PLAYWRIGHT_BASE_URL=http://127.0.0.1:3001 PLAYWRIGHT_RUN_ID=drag-reach-manual-posted npx playwright test e2e/drag.spec.ts --project=chromium`: failed before drag because `kanban-board` never rendered from the harness auth state; cleanup succeeded.
 
 changes report:
 
-- EDITED: `.gitignore`, `package.json`, `package-lock.json`, `playwright.config.ts`, `e2e/drag.spec.ts`, `src/components/kanban-board.tsx`, `src/components/pipeline-column.tsx`, `src/components/content-card.tsx`, `NAMED-USERS.md`, `AUDIT-FINAL-drag.md`, `PROGRESS.md`
-- ADDED: `e2e/.gitkeep`, `perf/drag-evidence/drag-4748171-r4/*`, `perf/drag-evidence/playwright-results/*`
+- EDITED: `src/components/content-card.tsx`, `src/components/kanban-board.tsx`, `src/components/pages/settings-page.tsx`, `src/lib/pipeline-context.tsx`, `src/lib/__tests__/iron-law-static.test.ts`, `PROGRESS.md`, `The Reach/FULL_TECHNICAL_FEATURE_AUDIT.md`
+- ADDED: `src/lib/manual-posted-settings.ts`, `src/app/api/admin/posts/[id]/manual-posted/route.ts`
 - LEFT UNTOUCHED: `/Users/ace/Documents/CURSOR MAIN/ten80ten-smm-portal`, DB migrations, RLS, triggers, design, brand, copy

@@ -163,16 +163,16 @@ function ContentCardInner({ card, isDragOverlay, stageColor }: Props) {
     <div
       ref={setNodeRef}
       style={style}
+      {...attributes}
+      {...listeners}
       data-testid={`content-card-${card.id}`}
       data-stage={card.stage}
       onClick={() => !isDragging && selectCard(card)}
-      className={`group relative rounded-xl overflow-hidden cursor-pointer bg-white dark:bg-[#151518] border hover:shadow-md transition-all duration-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${isDragging ? "opacity-20 scale-[0.97]" : "hover:-translate-y-0.5"} ${overdue ? "border-red-300 dark:border-red-500/30 shadow-red-100 dark:shadow-red-500/5" : "border-gray-200/80 dark:border-white/[0.06] hover:border-gray-300 dark:hover:border-white/[0.12]"}`}
+      className={`group relative rounded-xl overflow-hidden cursor-grab active:cursor-grabbing touch-none bg-white dark:bg-[#151518] border hover:shadow-md transition-all duration-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${isDragging ? "opacity-20 scale-[0.97]" : "hover:-translate-y-0.5"} ${overdue ? "border-red-300 dark:border-red-500/30 shadow-red-100 dark:shadow-red-500/5" : "border-gray-200/80 dark:border-white/[0.06] hover:border-gray-300 dark:hover:border-white/[0.12]"}`}
     >
-      {/* UX-012: Ten80Ten drag contract — drag starts from a real handle. */}
+      {/* Visible drag affordance; the whole card surface is draggable. */}
       <button
         type="button"
-        {...attributes}
-        {...listeners}
         onClick={(e) => e.stopPropagation()}
         aria-label="Drag card"
         data-testid={`content-card-drag-handle-${card.id}`}

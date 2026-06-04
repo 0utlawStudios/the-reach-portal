@@ -13,6 +13,7 @@ import { usePresence } from "@/lib/use-presence";
 import { PresenceDot } from "@/components/presence-dot";
 import { PresenceLabel } from "@/components/presence-label";
 import { usePipeline } from "@/lib/pipeline-context";
+import { setManualPostedMovesEnabled, useManualPostedMovesEnabled } from "@/lib/manual-posted-settings";
 import { ThemeSelector } from "@/components/theme-selector";
 import { fetchAllAuditLogs, AuditEntry } from "@/lib/audit";
 import { History, ArrowUpRight, Search, FileText as FileTextIcon, Shield as ShieldIcon, AtSign, ArrowUpDown, Filter, ChevronRight, CheckCircle, Activity, Clock as ClockIcon } from "lucide-react";
@@ -338,6 +339,7 @@ export function SettingsPage() {
   const { navigate } = useNavigation();
   const { addToast } = useToast();
   const { workspaceId } = usePipeline();
+  const manualPostedMovesEnabled = useManualPostedMovesEnabled();
   const [workspaceTz, setWorkspaceTz] = useState("America/Chicago");
   const currentMember = members.find((m) => m.email === currentUser.email);
   const isAdmin = currentMember?.role === "superadmin" || currentMember?.role === "admin";
@@ -563,6 +565,18 @@ export function SettingsPage() {
               Coming Soon so the UI does not imply a saved per-user setting. */}
           <Section title="Publishing" icon={<Zap className="w-3.5 h-3.5 text-amber-500" />}>
             <SettingRow icon={Clock} label="Auto-publish" desc="n8n claims approved posts at scheduled time"><div className="flex items-center gap-2"><ActiveBadge /><Toggle defaultOn disabled /></div></SettingRow>
+            {isAdmin && (
+              <SettingRow icon={Send} label="Manual Posted moves" desc="Allow admins to drag verified live posts into Posted">
+                <Toggle
+                  checked={manualPostedMovesEnabled}
+                  ariaLabel="Manual Posted moves"
+                  onChange={(enabled) => {
+                    setManualPostedMovesEnabled(enabled);
+                    addToast(enabled ? "Manual Posted moves enabled" : "Manual Posted moves disabled", "success");
+                  }}
+                />
+              </SettingRow>
+            )}
             <SettingRow icon={BarChart3} label="Analytics tracking" desc="Track engagement after publishing"><div className="flex items-center gap-2"><ComingSoonBadge /><Toggle defaultOn disabled /></div></SettingRow>
             <SettingRow icon={FileText} label="Hashtag sets" desc="Reusable hashtag groups"><Button size="sm" variant="outline" onClick={() => openBrandKitCopy("hashtags")} className="h-7 text-[10px] rounded-lg px-3 cursor-pointer">Manage</Button></SettingRow>
             <SettingRow icon={Smartphone} label="Caption templates" desc="Saved caption formats"><Button size="sm" variant="outline" onClick={() => openBrandKitCopy("captions")} className="h-7 text-[10px] rounded-lg px-3 cursor-pointer">Manage</Button></SettingRow>
@@ -1413,15 +1427,36 @@ function SettingRow({ icon: Icon, label, desc, children }: { icon: LucideIcon; l
   );
 }
 
-function Toggle({ defaultOn = false, disabled = false }: { defaultOn?: boolean; disabled?: boolean }) {
-  const [on, setOn] = useState(defaultOn);
+function Toggle({
+  defaultOn = false,
+  disabled = false,
+  checked,
+  onChange,
+  ariaLabel,
+}: {
+  defaultOn?: boolean;
+  disabled?: boolean;
+  checked?: boolean;
+  onChange?: (enabled: boolean) => void;
+  ariaLabel?: string;
+}) {
+  const [internalOn, setInternalOn] = useState(defaultOn);
+  const on = checked ?? internalOn;
   // UX-013: when disabled the toggle is inert — flipping it would not persist
   // anything, so it must not appear interactive.
+  const toggle = () => {
+    const next = !on;
+    if (checked === undefined) setInternalOn(next);
+    onChange?.(next);
+  };
   return (
     <button
-      onClick={disabled ? undefined : () => setOn(!on)}
+      type="button"
+      onClick={disabled ? undefined : toggle}
       disabled={disabled}
       aria-disabled={disabled}
+      aria-pressed={on}
+      aria-label={ariaLabel}
       className={`w-9 h-5 rounded-full transition-colors shrink-0 ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"} ${on ? "bg-blue-500" : "bg-gray-200 dark:bg-white/[0.1]"}`}
     >
       <div className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${on ? "translate-x-[18px]" : "translate-x-[2px]"}`} />

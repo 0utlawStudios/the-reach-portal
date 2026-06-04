@@ -9,6 +9,7 @@ import { logAudit } from "./audit";
 import { useAuth } from "./auth-context";
 import { useToast } from "./toast-context";
 import { APP_TIMEZONE, formatDateTimeCompact, isValidUuid } from "./utils";
+import { useManualPostedMovesEnabled } from "./manual-posted-settings";
 
 // Real @mention pattern — @username form, not any "@" character. Avoids
 // false-positive mention notifications on pasted emails or URLs containing "@".
@@ -349,6 +350,7 @@ const PipelineContext = createContext<PipelineContextType | null>(null);
 export function PipelineProvider({ children }: { children: ReactNode }) {
   const { currentUser, accessToken, provisionResult } = useAuth();
   const { addToast } = useToast();
+  const manualPostedMovesEnabled = useManualPostedMovesEnabled();
   const [cards, setCards] = useState<ContentCard[]>(PLACEHOLDER_CARDS);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCard, setSelectedCard] = useState<ContentCard | null>(null);
@@ -552,19 +554,19 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const moveCard = useCallback((cardId: string, newStage: PipelineStage) => {
-    // POSTED LOCKDOWN: only the n8n auto-publisher (service-role) writes
-    // stage='posted'. The DB has a BEFORE UPDATE trigger that rejects this
-    // path; we short-circuit here so the user sees a useful toast instead
-    // of a confusing 400 error.
-    if (newStage === "posted") {
+    const card = cardsRef.current.find((c) => c.id === cardId);
+
+    // POSTED LOCKDOWN: browser Supabase sessions cannot write stage='posted'
+    // directly. When the Settings override is enabled, we use the admin API
+    // route below so posted_at is written through the service-role path.
+    if (newStage === "posted" && !manualPostedMovesEnabled) {
       addToast(
-        "Only the auto-publisher moves cards to Posted. The card will move automatically once n8n confirms the post is live.",
+        "Manual Posted moves are disabled in Settings. Turn them on before moving cards to Posted.",
         "warning",
       );
       return;
     }
 
-    const card = cardsRef.current.find((c) => c.id === cardId);
     if (card?.stage === "posted") {
       addToast("Posted cards are locked. Create a new post or use the publisher recovery path.", "warning");
       return;
@@ -583,6 +585,61 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     if (card?.stage === "revision_needed" && newStage === "awaiting_approval") {
       setPendingReapproval({ cardId, cardTitle: card.title });
       return; // Don't move yet — modal will handle it
+    }
+
+    if (newStage === "posted") {
+      if (!card) return;
+      const previousCard = card;
+      const fromStage = card.stage;
+      const postedAt = new Date().toISOString();
+      const today = postedAt.split("T")[0];
+      const rollback = () => {
+        setCards((prev) => prev.map((c) => c.id === cardId ? previousCard : c));
+        setSelectedCard((prev) => prev?.id === cardId ? previousCard : prev);
+      };
+
+      setCards((prev) => prev.map((c) => {
+        if (c.id !== cardId) return c;
+        return { ...c, stage: "posted", postedAt, updatedAt: today };
+      }));
+      setSelectedCard((prev) => prev?.id === cardId ? { ...prev, stage: "posted", postedAt, updatedAt: today } : prev);
+
+      if (useSupabase && isValidUuid(cardId)) {
+        markMutation(cardId);
+        (async () => {
+          try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const token = session?.access_token;
+            if (!token) throw new Error("Missing session token");
+            const res = await fetch(`/api/admin/posts/${cardId}/manual-posted`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({ postedAt }),
+            });
+            const payload = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(payload?.error || "Manual Posted move failed");
+            if (payload?.data?.stage !== "posted") throw new Error("Manual Posted move did not commit");
+            const committedPostedAt = payload.data.posted_at || postedAt;
+            setCards((prev) => prev.map((c) => c.id === cardId ? { ...c, postedAt: committedPostedAt } : c));
+            setSelectedCard((prev) => prev?.id === cardId ? { ...prev, postedAt: committedPostedAt } : prev);
+            addToast("Moved to Posted manually.", "success");
+          } catch (error) {
+            const message = formatPipelineError(error);
+            console.error("[pipeline] manual posted move failed:", message);
+            rollback();
+            recentMutations.current.delete(cardId);
+            const fromLabel = PIPELINE_COLUMNS.find((c) => c.id === fromStage)?.title || fromStage;
+            addToast(`Move failed: ${message}. Card restored to "${fromLabel}".`, "error");
+          }
+        })();
+      } else {
+        logAudit(cardId, currentUser.name, "manual_posted", "Manually moved to Posted");
+        addToast("Moved to Posted manually.", "success");
+      }
+      return;
     }
 
     // Normal move
@@ -665,7 +722,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
       // Local-only mode (no Supabase configured): record the audit locally.
       logAudit(cardId, currentUser.name, "stage_change", `Moved from ${fromLabel} to ${toLabel}`);
     }
-  }, [useSupabase, currentUser.name, addToast, postNotification]);
+  }, [useSupabase, currentUser.name, addToast, postNotification, manualPostedMovesEnabled]);
 
   const requestReapproval = useCallback((cardId: string) => {
     const card = cardsRef.current.find((c) => c.id === cardId);

@@ -21,6 +21,11 @@ const PIPELINE_SRC = readFileSync(PIPELINE_PATH, "utf8");
 const KANBAN_BOARD_SRC = readFileSync(join(process.cwd(), "src/components/kanban-board.tsx"), "utf8");
 const ASSET_DRAWER_SRC = readFileSync(join(process.cwd(), "src/components/asset-review-drawer.tsx"), "utf8");
 const CONTENT_CARD_SRC = readFileSync(join(process.cwd(), "src/components/content-card.tsx"), "utf8");
+const MANUAL_POSTED_ROUTE_SRC = readFileSync(
+  join(process.cwd(), "src/app/api/admin/posts/[id]/manual-posted/route.ts"),
+  "utf8",
+);
+const MANUAL_POSTED_SETTINGS_SRC = readFileSync(join(process.cwd(), "src/lib/manual-posted-settings.ts"), "utf8");
 const REVISION_MODAL_SRC = readFileSync(join(process.cwd(), "src/components/revision-modal.tsx"), "utf8");
 const KICKBACK_MODAL_SRC = readFileSync(join(process.cwd(), "src/components/kickback-modal.tsx"), "utf8");
 const AUDIT_SRC = readFileSync(join(process.cwd(), "src/lib/audit.ts"), "utf8");
@@ -207,6 +212,17 @@ describe("iron-law guards in pipeline-context.tsx", () => {
     expect(POST_STAGE_GUARD_MIGRATION_SRC).toMatch(/CREATE TRIGGER posts_block_manual_posted/);
   });
 
+  it("manual Posted override stays admin-only and uses the service-role API path", () => {
+    expect(MANUAL_POSTED_SETTINGS_SRC).toContain("manual_posted_moves_enabled");
+    expect(KANBAN_BOARD_SRC).toContain("useManualPostedMovesEnabled");
+    expect(PIPELINE_SRC).toContain("useManualPostedMovesEnabled");
+    expect(PIPELINE_SRC).toContain("/api/admin/posts/${cardId}/manual-posted");
+    expect(MANUAL_POSTED_ROUTE_SRC).toContain('requireBearerTeamRole(request, ["superadmin", "admin", "owner"])');
+    expect(MANUAL_POSTED_ROUTE_SRC).toContain("createServiceRoleClient");
+    expect(MANUAL_POSTED_ROUTE_SRC).toMatch(/\.update\(\{\s*stage:\s*"posted",\s*posted_at:\s*postedAt\s*\}\)/);
+    expect(MANUAL_POSTED_ROUTE_SRC).toContain('p_action: "manual_posted"');
+  });
+
   it("createCard always sets workspace_id via fallback, not conditional-only (AGENTS.md §1c)", () => {
     // FORBIDDEN: `if (workspaceIdRef.current) insertRow.workspace_id = ...`
     //   — silently omits workspace_id when the ref is null and the INSERT fails RLS.
@@ -358,17 +374,26 @@ describe("iron-law guards in audit.ts", () => {
   });
 });
 
-describe("pipeline drag handle contract", () => {
-  it("keeps the Ten80Ten drag handle as a real listener button", () => {
-    const handleMatch = CONTENT_CARD_SRC.match(
-      /<button[\s\S]{0,500}aria-label="Drag card"[\s\S]{0,500}>\s*<span/,
-    );
-    expect(handleMatch).not.toBeNull();
-    const handle = handleMatch![0];
-    expect(handle).toMatch(/\{\.\.\.attributes\}/);
-    expect(handle).toMatch(/\{\.\.\.listeners\}/);
-    expect(handle).not.toMatch(/pointer-events-none/);
-    expect(CONTENT_CARD_SRC).not.toMatch(/visible drag affordance; the whole card is draggable/i);
+describe("pipeline drag surface contract", () => {
+  it("keeps the whole Reach content card draggable while preserving a visible handle", () => {
+    const rootStart = CONTENT_CARD_SRC.indexOf("ref={setNodeRef}");
+    const handleLabel = CONTENT_CARD_SRC.indexOf('aria-label="Drag card"');
+    const handleStart = CONTENT_CARD_SRC.lastIndexOf("<button", handleLabel);
+    expect(rootStart).toBeGreaterThan(-1);
+    expect(handleStart).toBeGreaterThan(rootStart);
+
+    const rootSegment = CONTENT_CARD_SRC.slice(rootStart, handleStart);
+    expect(rootSegment).toContain("{...attributes}");
+    expect(rootSegment).toContain("{...listeners}");
+    expect(rootSegment).toContain("cursor-grab");
+    expect(rootSegment).toContain("touch-none");
+
+    const handleSegment = CONTENT_CARD_SRC.slice(handleStart, CONTENT_CARD_SRC.indexOf("{cardContent}", handleStart));
+    expect(handleSegment).toContain('aria-label="Drag card"');
+    expect(handleSegment).not.toContain("{...listeners}");
+    expect(handleSegment).not.toContain("{...attributes}");
+    expect(handleSegment).not.toMatch(/pointer-events-none/);
+    expect(CONTENT_CARD_SRC).toMatch(/visible drag affordance; the whole card surface is draggable/i);
     expect(CONTENT_CARD_SRC).toMatch(/draggable=\{false\}/);
   });
 });

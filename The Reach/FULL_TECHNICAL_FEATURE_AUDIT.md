@@ -2,6 +2,17 @@
 
 Generated from repo audit of `src`, `supabase/migrations`, `n8n`, config files, and API routes.
 
+## 0. 2026-06-05 Reach Drag And Manual Posted Delta
+
+| Area | Current behavior |
+| --- | --- |
+| Card drag surface | Reach content cards are draggable from the whole card surface. The visible grip remains as an affordance, but the dnd-kit `attributes`/`listeners` live on the card root. |
+| Manual Posted setting | Settings > Publishing exposes an admin-only `Manual Posted moves` toggle. It persists locally under `manual_posted_moves_enabled` and broadcasts same-tab changes with `reach:manual-posted-moves-changed`. |
+| Drag to Posted | Dropping into `Posted` is blocked unless the Settings toggle is enabled and the user is admin-class (`superadmin`, `admin`, `owner`). |
+| Posted persistence | Browser Supabase writes to `stage='posted'` remain blocked by migration `0046_post_stage_transition_guard.sql`. Approved manual moves call `POST /api/admin/posts/[id]/manual-posted`, which verifies `requireBearerTeamRole(request, ["superadmin", "admin", "owner"])`, uses the service-role client, writes `stage='posted'` and `posted_at`, and records `manual_posted` audit metadata. |
+| Failure behavior | Manual Posted moves are optimistic in the board, then roll back to the previous card object if the service route fails. |
+| Verification | `npm run typecheck`, focused iron-law test, full `npm test`, `npm run lint`, `npm run build`, `git diff --check`, and unauthenticated route check passed. Local Playwright drag matrix failed before board render due harness auth/bootstrap, not during drag; cleanup counts were all zero. |
+
 ## 1. Product Scope
 
 This app is a private social media content operations portal with:
@@ -453,4 +464,3 @@ These are mandatory or posts/support/AI state will break.
 | `npm run db:diff` | Supabase schema diff. |
 | `npm run db:types` | Generate Supabase TypeScript types. |
 | `npm run db:types:check` | Verify generated DB types. |
-
