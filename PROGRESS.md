@@ -1,5 +1,58 @@
 # The Reach Clone Progress
 
+updated-at: 2026-06-04T18:59:45Z
+
+phase: PHASE 1 - DRAG QA SWARM 1 COMPLETE / NO CODE
+
+item: Completed Reach-only read-only drag audit and wrote `PLAN-drag.md` plus `AUDIT-drag.md`; no source code or production rows changed.
+
+last SHA: 760e6fd
+
+next:
+
+- Commit and push Phase 1 drag audit docs.
+- Begin Phase 2 with the highest-confidence root-cause direction: make `moveCard` prove exactly one `posts` row changed before treating a stage move as committed.
+- Preserve Iron Law invariants before touching any pipeline code: provision before posts SELECT, empty DB arrays remain authoritative, every post-id Supabase write keeps `isValidUuid()`, and no localStorage fallback on empty DB result.
+
+blockers:
+
+- Live authenticated browser DOM event, console, and network traces were not captured in Phase 1 because the required in-app browser execution surface was unavailable after tool discovery and Phase 1 forbids completed production drops that mutate `posts.stage`.
+- The requested named-role production matrix cannot currently use Muaaz or Carlo as Reach users: read-only Reach team data returned five team rows and did not include Muaaz or Carlo.
+
+files:
+
+- `PLAN-drag.md`
+- `AUDIT-drag.md`
+- `PROGRESS.md`
+
+invariants:
+
+- Correct repo only: `/Users/ace/Documents/CURSOR MAIN/THE REACH SMM PORTAL`.
+- Do not touch `/Users/ace/Documents/CURSOR MAIN/ten80ten-smm-portal`.
+- No code edits in Phase 1.
+- No production writes in Phase 1.
+- No design, brand, or copy changes.
+- Posts must never disappear.
+
+current evidence:
+
+- Reach Supabase project host observed from `.env.local`: `gxmpmdhmxyfqusdzcemt.supabase.co`.
+- Read-only `posts` count is 24 with stage counts `ideas=1`, `awaiting_approval=7`, `revision_needed=2`, `approved_scheduled=6`, `posted=8`.
+- Sample rows by stage: `ab3fbde3-d358-4013-8272-9abda6f21db9` ideas, `1a40fd5b-0e11-4f77-a06d-890f4f487460` awaiting approval, `9221b39f-13bf-4b5d-b2a9-da54a375c72d` revision needed, `f0f6cd20-1fff-4945-8115-624a596a0905` approved/scheduled, `72c4343f-83a9-41ba-950e-d9dd5106a530` posted.
+- Source evidence shows DnD provider/sensors/droppable/sortable wiring is present; drag listeners are handle-only on `aria-label="Drag card"`.
+- Highest-confidence implementation gap: `moveCard` updates optimistically and checks only Supabase `error`; it does not prove a row was returned or affected.
+- Focused static verification passed: `npm test -- src/lib/__tests__/iron-law-static.test.ts -t "pipeline drag handle contract"` passed 1 test with 18 skipped.
+
+changes report:
+
+- EDITED: `PLAN-drag.md`, `AUDIT-drag.md`, `PROGRESS.md`
+- MODIFIED: no source code, migrations, production rows, design, brand, or copy
+- LEFT UNTOUCHED: `/Users/ace/Documents/CURSOR MAIN/ten80ten-smm-portal`
+
+---
+
+Historical progress:
+
 Phase: FINAL PRODUCTION QA PASSED - tracking docs being closed out
 Last pushed functional SHA: baa59c1 fix: format settings queue errors
 Last verified tracking SHA: b62b9bc docs: record manual responsive qa
