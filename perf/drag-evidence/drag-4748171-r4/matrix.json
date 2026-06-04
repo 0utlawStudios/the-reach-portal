@@ -1,0 +1,138 @@
+{
+  "runId": "drag-4748171-r4",
+  "rows": [
+    {
+      "id": "editor-ideas-awaiting",
+      "role": "editor",
+      "transition": "ideas->awaiting_approval",
+      "domStartFired": true,
+      "domEndFired": true,
+      "dragEndOutcome": "move_requested",
+      "dbStage": "awaiting_approval",
+      "uiStage": "awaiting_approval",
+      "network": [
+        {
+          "status": 200,
+          "url": "https://gxmpmdhmxyfqusdzcemt.supabase.co/rest/v1/posts?id=eq.2e358ad3-4d3a-47f5-9a5e-6c2bec14d327&select=id%2Cstage",
+          "body": "{\"id\":\"2e358ad3-4d3a-47f5-9a5e-6c2bec14d327\",\"stage\":\"awaiting_approval\"}"
+        }
+      ],
+      "screenshot": "perf/drag-evidence/drag-4748171-r4/editor-ideas-awaiting.png"
+    },
+    {
+      "id": "editor-awaiting-approved-blocked",
+      "role": "editor",
+      "transition": "awaiting_approval->approved_scheduled",
+      "domStartFired": true,
+      "domEndFired": true,
+      "dragEndOutcome": "blocked_approver_required",
+      "dbStage": "awaiting_approval",
+      "uiStage": "awaiting_approval",
+      "network": [],
+      "screenshot": "perf/drag-evidence/drag-4748171-r4/editor-awaiting-approved-blocked.png"
+    },
+    {
+      "id": "editor-posted-ideas-blocked",
+      "role": "editor",
+      "transition": "posted->ideas",
+      "domStartFired": true,
+      "domEndFired": true,
+      "dragEndOutcome": "blocked_posted_source",
+      "dbStage": "posted",
+      "uiStage": "posted",
+      "network": [],
+      "screenshot": "perf/drag-evidence/drag-4748171-r4/editor-posted-ideas-blocked.png"
+    },
+    {
+      "id": "approver-awaiting-approved",
+      "role": "creative_director",
+      "transition": "awaiting_approval->approved_scheduled",
+      "domStartFired": true,
+      "domEndFired": true,
+      "dragEndOutcome": "move_requested",
+      "dbStage": "approved_scheduled",
+      "uiStage": "approved_scheduled",
+      "network": [
+        {
+          "status": 200,
+          "url": "https://gxmpmdhmxyfqusdzcemt.supabase.co/rest/v1/posts?id=eq.1d050466-f828-4949-ad44-759c4ca0f1f2&select=id%2Cstage",
+          "body": "{\"id\":\"1d050466-f828-4949-ad44-759c4ca0f1f2\",\"stage\":\"approved_scheduled\"}"
+        }
+      ],
+      "screenshot": "perf/drag-evidence/drag-4748171-r4/approver-awaiting-approved.png"
+    },
+    {
+      "id": "approver-revision-awaiting",
+      "role": "creative_director",
+      "transition": "revision_needed->awaiting_approval",
+      "domStartFired": true,
+      "domEndFired": true,
+      "dragEndOutcome": "move_requested",
+      "dbStage": "awaiting_approval",
+      "uiStage": "awaiting_approval",
+      "network": [
+        {
+          "status": 204,
+          "url": "https://gxmpmdhmxyfqusdzcemt.supabase.co/rest/v1/posts?id=eq.08e23d07-fe1d-475b-8746-511cfebfc5a6",
+          "body": ""
+        }
+      ],
+      "screenshot": "perf/drag-evidence/drag-4748171-r4/approver-revision-awaiting.png"
+    },
+    {
+      "id": "approver-approved-ideas",
+      "role": "creative_director",
+      "transition": "approved_scheduled->ideas",
+      "domStartFired": true,
+      "domEndFired": true,
+      "dragEndOutcome": "move_requested",
+      "dbStage": "ideas",
+      "uiStage": "ideas",
+      "network": [
+        {
+          "status": 200,
+          "url": "https://gxmpmdhmxyfqusdzcemt.supabase.co/rest/v1/posts?id=eq.b71f5f26-bb6a-4093-8ed4-b2718dd20580&select=id%2Cstage",
+          "body": "{\"id\":\"b71f5f26-bb6a-4093-8ed4-b2718dd20580\",\"stage\":\"ideas\"}"
+        }
+      ],
+      "screenshot": "perf/drag-evidence/drag-4748171-r4/approver-approved-ideas.png"
+    }
+  ],
+  "directChecks": [
+    {
+      "id": "server-editor-approval-bypass",
+      "postId": "2e358ad3-4d3a-47f5-9a5e-6c2bec14d327",
+      "expected": "APPROVAL_LOCKDOWN",
+      "error": "APPROVAL_LOCKDOWN: Only approver-class users can move posts to \"approved_scheduled\". | Allowed roles are superadmin, admin, owner, approver, and creative_director. | P0001",
+      "dbStage": "awaiting_approval"
+    },
+    {
+      "id": "server-cross-workspace-update",
+      "postId": "fbba5349-3067-4155-9804-b1a36bacd28e",
+      "expected": "zero-row RLS denial",
+      "status": 200,
+      "data": null,
+      "dbStage": "ideas"
+    },
+    {
+      "id": "server-service-role-posted-recovery",
+      "postId": "330a22f1-434d-47b4-8cd8-782cbcb617ab",
+      "expected": "service role can recover posted",
+      "status": 200,
+      "data": {
+        "id": "330a22f1-434d-47b4-8cd8-782cbcb617ab",
+        "stage": "ideas"
+      },
+      "dbStage": "ideas"
+    }
+  ],
+  "cleanup": {
+    "postsRemaining": 0,
+    "auditRowsRemaining": 0,
+    "workspaceMembersRemaining": 0,
+    "teamMembersRemaining": 0,
+    "workspacesRemaining": 0,
+    "authUsersRemaining": 0,
+    "cleanupErrors": []
+  }
+}

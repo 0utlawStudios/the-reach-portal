@@ -265,12 +265,14 @@ async function cleanupFixture(fixture: FixtureState) {
     countRows(admin.from("team_members").select("id", { count: "exact", head: true }).in("email", fixture.createdEmails)),
     countRows(admin.from("workspaces").select("id", { count: "exact", head: true }).in("id", fixture.createdWorkspaceIds)),
   ]);
+  const authUsersRemaining = await countAuthUsers(fixture.createdEmails);
   Object.assign(cleanupEvidence, {
     postsRemaining,
     auditRowsRemaining,
     workspaceMembersRemaining,
     teamMembersRemaining,
     workspacesRemaining,
+    authUsersRemaining,
     cleanupErrors,
   });
   expect(cleanupEvidence).toMatchObject({
@@ -279,6 +281,7 @@ async function cleanupFixture(fixture: FixtureState) {
     workspaceMembersRemaining: 0,
     teamMembersRemaining: 0,
     workspacesRemaining: 0,
+    authUsersRemaining: 0,
   });
   expect(cleanupErrors).toEqual([]);
 }
@@ -335,8 +338,12 @@ async function runRevisionReapprovalDrag(page: Page) {
   await resetDragEvents(page);
   await dragCardToStage(page, postId, "awaiting_approval");
   await expect(page.getByRole("dialog", { name: "Submit for Re-Approval" })).toBeVisible();
-  await page.getByPlaceholder(/Detail what was fixed/i).fill("QA fixed revision and is resubmitting.");
-  await page.getByRole("button", { name: "Submit Revision" }).click();
+  const revisionNote = page.getByPlaceholder(/Detail what was fixed/i);
+  await revisionNote.click();
+  await revisionNote.pressSequentially("QA fixed revision and is resubmitting.", { delay: 5 });
+  const submitRevision = page.getByRole("button", { name: "Submit Revision" });
+  await expect(submitRevision).toBeEnabled();
+  await submitRevision.click();
   await expect.poll(() => readStage(postId), { timeout: 15_000 }).toBe("awaiting_approval");
   await page.waitForTimeout(300);
   const uiStage = await expectUiStage(page, postId, "awaiting_approval");
@@ -620,6 +627,21 @@ async function countRows(query: PromiseLike<{ count: number | null; error: unkno
   const { count, error } = await query;
   if (error) throw new Error(`count rows: ${formatError(error)}`);
   return count;
+}
+
+async function countAuthUsers(emails: string[]): Promise<number> {
+  if (emails.length === 0) return 0;
+  const wanted = new Set(emails.map((email) => email.toLowerCase()));
+  let remaining = 0;
+  for (let page = 1; page < 20; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) throw new Error(`list auth users: ${formatError(error)}`);
+    for (const user of data.users) {
+      if (user.email && wanted.has(user.email.toLowerCase())) remaining++;
+    }
+    if (data.users.length < 1000) break;
+  }
+  return remaining;
 }
 
 function loadEnv(): Record<string, string> {

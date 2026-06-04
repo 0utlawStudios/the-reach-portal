@@ -1,104 +1,139 @@
 # Drag Final Audit - Reach Portal
 
-updated-at: 2026-06-04T19:24:04Z
+updated-at: 2026-06-04T20:05:26Z
 repo: `/Users/ace/Documents/CURSOR MAIN/THE REACH SMM PORTAL`
-scope: drag/stage persistence, role enforcement, production DB proof
+production target: `https://thereach.ten80ten.com`
+status: GREEN
 
-## Status
+## Result
 
-The source and production database enforcement defects found after Phase 1 are fixed and verified.
+The Reach Portal drag audit is GREEN. The prior BLOCKED items are closed with a live authenticated Chromium Playwright run, real DOM drag events, Supabase network capture, service-role DB re-query, UI stage readback, hostile server checks, screenshots, and a trace zip.
 
-Live authenticated browser DOM/event evidence is still missing. No screenshot, console trace, network trace, or pointer-event trace was captured, so this audit does not claim visual/browser proof.
+- Playwright run id: `drag-4748171-r4`
+- Matrix evidence: `perf/drag-evidence/drag-4748171-r4/matrix.json`
+- Seed/auth evidence: `perf/drag-evidence/drag-4748171-r4/seed.json`
+- Trace: `perf/drag-evidence/playwright-results/drag-production-drag-matri-ce3d1-network-DB-and-UI-agreement-chromium/trace.zip`
+- Screenshots: `perf/drag-evidence/drag-4748171-r4/*.png`
+- Command: `PLAYWRIGHT_RUN_ID=drag-4748171-r4 npm run e2e:prod`
+- Result: 1 Chromium test passed.
 
-## Fixed Findings
+## Scope Guard
 
-### P0 - Posted posts could move out of Posted
+- Correct repo only: `/Users/ace/Documents/CURSOR MAIN/THE REACH SMM PORTAL`.
+- Untouched repo: `/Users/ace/Documents/CURSOR MAIN/ten80ten-smm-portal`.
+- Muaaz and Carlo are not mapped here because the user clarified they are Ten80Ten SMM Portal users, not Reach Portal users.
+- Actual active Reach users are mapped from `auth.users.id = workspace_members.user_id` in `NAMED-USERS.md:43-56`.
+- No design, brand, copy, migrations, RLS, or DB guard changes were made in this closeout slice.
 
-Fixed at the database and UI/provider layers.
+## Harness
 
-- DB: `supabase/migrations/0046_post_stage_transition_guard.sql:21` rejects browser-authenticated stage changes where `OLD.stage = 'posted'`.
-- DB: service-role recovery remains allowed by the same guard in `supabase/migrations/0046_post_stage_transition_guard.sql:22`.
-- Board: `src/components/kanban-board.tsx:184` blocks dragging a `posted` source card.
-- Provider: `src/lib/pipeline-context.tsx:567` blocks direct `moveCard()` attempts from a `posted` source card.
+- Playwright is pinned as `@playwright/test@1.60.0` in `package.json:42-44`.
+- Scripts are present in `package.json:15-16`: `e2e` and `e2e:prod`.
+- Chromium headless, prod baseURL, traces, failure screenshots, and failure video are configured in `playwright.config.ts:17-29`.
+- Playwright output is written under `perf/drag-evidence/playwright-results` in `playwright.config.ts:5` so the final trace is commit-visible while root `test-results/` remains ignored.
+- Ignore rules for transient auth and default reports are in `.gitignore:13-17`.
 
-Production proof with temporary rows only:
+## Browser Instrumentation
 
-- Stamp `qa-0046-1780601151490-2d4054`.
-- Editor `posted -> ideas` rejected with `POSTED_LOCKDOWN` on post `ec1a772e-f3a2-448e-8f47-0d6a1985f5c0`.
-- Service-role `posted -> ideas` recovery succeeded on post `a2ddbf99-7daa-4a81-8127-10878002a5e1`.
+- Board telemetry emits `reach:drag-start` and `reach:drag-end` from `src/components/kanban-board.tsx:62-74`.
+- Drag start emits active card/source stage evidence at `src/components/kanban-board.tsx:175-183`.
+- Drag end emits gate outcomes for posted lock, approver lock, missing fields, kickback, and allowed moves at `src/components/kanban-board.tsx:241-333`.
+- The board root exposes `data-testid="kanban-board"` at `src/components/kanban-board.tsx:339-340`.
+- Columns and drop zones expose stable test ids and stage attributes at `src/components/pipeline-column.tsx:24-35`.
+- Cards and drag handles expose stable test ids and stage attributes at `src/components/content-card.tsx:162-179`.
+- The E2E uses real mouse pointer events from handle to drop zone at `e2e/drag.spec.ts:470-487`.
+- The E2E records DOM drag events at `e2e/drag.spec.ts:496-519` and Supabase PATCH responses at `e2e/drag.spec.ts:521-535`.
+- The E2E asserts DB stage and UI stage agreement at `e2e/drag.spec.ts:489-552`.
 
-### P1 - DB did not enforce approver-only approval
+## Named Users
 
-Fixed at the database layer and aligned with the client role helper.
+The active Reach production users are:
 
-- DB: `supabase/migrations/0046_post_stage_transition_guard.sql:48` checks every transition into `approved_scheduled`.
-- DB: `supabase/migrations/0046_post_stage_transition_guard.sql:52` reads `public.workspace_members` for the active user/workspace.
-- DB: `supabase/migrations/0046_post_stage_transition_guard.sql:56` limits approval to `superadmin`, `admin`, `owner`, `approver`, and `creative_director`.
-- Helper: `src/lib/roles.ts:1` centralizes the approver role set.
-- Board: `src/components/kanban-board.tsx:117` uses the shared helper with `team_members` role and auth-role fallback.
-- Drawer: `src/components/asset-review-drawer.tsx:48` uses the same helper and fallback.
+| Persona | Name | Email | auth.users id | Role | Evidence |
+| --- | --- | --- | --- | --- | --- |
+| Superadmin fallback | Aldridge Dagos | `aldridge@ten80ten.com` | `f4d6c15a-7b94-4e58-ac8b-4de98aa0d644` | `superadmin` | `NAMED-USERS.md:47` |
+| Approver persona | Hanes Lawrence Abasola | `hanes@ten80ten.com` | `952b51be-9037-4da3-8364-5b52bf894347` | `admin` | `NAMED-USERS.md:48` |
+| Author-capable persona | Shahannie Manuel | `shang.ten80ten@gmail.com` | `a7f2165d-d667-4bf8-ab37-383ffc485323` | `creative_director` | `NAMED-USERS.md:49` |
 
-Production proof with temporary rows only:
+Reach currently has active role counts `admin=1`, `creative_director=1`, and `superadmin=1`; no active lower-role author-only Reach user exists (`NAMED-USERS.md:51-56`). To verify lower-role behavior without mutating named production users, the Playwright run seeded temporary auth-backed personas:
 
-- Editor `awaiting_approval -> approved_scheduled` rejected with `APPROVAL_LOCKDOWN` on post `e3e339fc-990a-40cf-a4f4-bb0444d761e3`.
-- Creative director `awaiting_approval -> approved_scheduled` succeeded on post `70269cb3-d802-4820-8f19-831af9c5f6bc`.
+- Editor: `qa-drag-4748171-r4-editor@example.com`, auth user `3a91e34d-1e4c-4f5a-8f30-3bd2bacc6295`, role `editor`.
+- Approver-class: `qa-drag-4748171-r4-creative_director@example.com`, auth user `a796c7a5-f1f1-49e0-b2b3-d36caf5edb53`, role `creative_director`.
+- Auth method: Supabase password sign-in, then JWT/session injection into Playwright storageState via `sb-<project-ref>-auth-token` localStorage, implemented at `e2e/drag.spec.ts:596-617` and recorded in `perf/drag-evidence/drag-4748171-r4/seed.json`.
 
-### P1 - Board and drawer role logic disagreed
+## E2E Drag Matrix
 
-Fixed by replacing component-local role checks with `isPipelineApproverRole()`.
+All rows share trace `perf/drag-evidence/playwright-results/drag-production-drag-matri-ce3d1-network-DB-and-UI-agreement-chromium/trace.zip`.
 
-- Shared helper: `src/lib/roles.ts:9`.
-- Board lookup/fallback: `src/components/kanban-board.tsx:112`.
-- Drawer lookup/fallback: `src/components/asset-review-drawer.tsx:44`.
+| Case | Role | DB row id | Transition | DOM start/end | Outcome | Network | DB stage | UI stage | Screenshot |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `editor-ideas-awaiting` | `editor` | `2e358ad3-4d3a-47f5-9a5e-6c2bec14d327` | `ideas->awaiting_approval` | true/true | `move_requested` | PATCH 200 body `stage=awaiting_approval` | `awaiting_approval` | `awaiting_approval` | `perf/drag-evidence/drag-4748171-r4/editor-ideas-awaiting.png` |
+| `editor-awaiting-approved-blocked` | `editor` | `2e358ad3-4d3a-47f5-9a5e-6c2bec14d327` | `awaiting_approval->approved_scheduled` | true/true | `blocked_approver_required` | none | `awaiting_approval` | `awaiting_approval` | `perf/drag-evidence/drag-4748171-r4/editor-awaiting-approved-blocked.png` |
+| `editor-posted-ideas-blocked` | `editor` | `330a22f1-434d-47b4-8cd8-782cbcb617ab` | `posted->ideas` | true/true | `blocked_posted_source` | none | `posted` | `posted` | `perf/drag-evidence/drag-4748171-r4/editor-posted-ideas-blocked.png` |
+| `approver-awaiting-approved` | `creative_director` | `1d050466-f828-4949-ad44-759c4ca0f1f2` | `awaiting_approval->approved_scheduled` | true/true | `move_requested` | PATCH 200 body `stage=approved_scheduled` | `approved_scheduled` | `approved_scheduled` | `perf/drag-evidence/drag-4748171-r4/approver-awaiting-approved.png` |
+| `approver-revision-awaiting` | `creative_director` | `08e23d07-fe1d-475b-8746-511cfebfc5a6` | `revision_needed->awaiting_approval` | true/true | `move_requested` | PATCH 204 | `awaiting_approval` | `awaiting_approval` | `perf/drag-evidence/drag-4748171-r4/approver-revision-awaiting.png` |
+| `approver-approved-ideas` | `creative_director` | `b71f5f26-bb6a-4093-8ed4-b2718dd20580` | `approved_scheduled->ideas` | true/true | `move_requested` | PATCH 200 body `stage=ideas` | `ideas` | `ideas` | `perf/drag-evidence/drag-4748171-r4/approver-approved-ideas.png` |
 
-### P2 - Drawer/modal success before persistence proof
+## Hostile Server Matrix
 
-Fixed by moving success toasts into confirmed provider commit paths and using neutral "saving" copy from callers.
+The hostile checks are implemented at `e2e/drag.spec.ts:407-468`.
 
-- Stage moves request the updated row via `.select("id, stage").maybeSingle()` in `src/lib/pipeline-context.tsx:605`.
-- `assertStageMoveCommitted()` rejects missing/wrong returned rows in `src/lib/pipeline-context.tsx:251`.
-- Supabase/PostgREST plain-object errors are formatted by `formatPipelineError()` in `src/lib/pipeline-context.tsx:267`.
-- Reapproval success toast fires after the Supabase write succeeds in `src/lib/pipeline-context.tsx:717`.
-- Kickback success toast fires after the Supabase write succeeds in `src/lib/pipeline-context.tsx:821`.
-- Drawer revision request now shows neutral saving copy at `src/components/asset-review-drawer.tsx:1030`.
-- Drawer next-stage move now shows neutral saving copy at `src/components/asset-review-drawer.tsx:1122`.
-- Modal caller success toasts were removed from `src/components/revision-modal.tsx` and `src/components/kickback-modal.tsx`.
+| Case | DB row id | Expected | Observed | DB stage after |
+| --- | --- | --- | --- | --- |
+| `server-editor-approval-bypass` | `2e358ad3-4d3a-47f5-9a5e-6c2bec14d327` | editor cannot force `approved_scheduled` | `APPROVAL_LOCKDOWN` / `P0001` | `awaiting_approval` |
+| `server-cross-workspace-update` | `fbba5349-3067-4155-9804-b1a36bacd28e` | cross-workspace update fails closed | HTTP 200 with `data=null` due RLS zero-row denial | `ideas` |
+| `server-service-role-posted-recovery` | `330a22f1-434d-47b4-8cd8-782cbcb617ab` | service role can recover a posted row | HTTP 200 body `stage=ideas` | `ideas` |
 
-## Production DB Verification
+## Cleanup
 
-Remote migration state:
+The fixture seeds temporary workspaces, auth users, workspace members, team members, and posts at `e2e/drag.spec.ts:152-234`. Cleanup deletes and asserts zero remainders at `e2e/drag.spec.ts:236-286`, including auth-user enumeration at `e2e/drag.spec.ts:632-645`.
 
-- `supabase migration list` shows local `0046` and remote `0046`.
-
-Temporary QA data cleanup:
+Final cleanup evidence from `perf/drag-evidence/drag-4748171-r4/matrix.json`:
 
 - `postsRemaining=0`
 - `auditRowsRemaining=0`
 - `workspaceMembersRemaining=0`
 - `teamMembersRemaining=0`
-- Auth admin delete calls completed for temporary users.
+- `workspacesRemaining=0`
+- `authUsersRemaining=0`
+- `cleanupErrors=[]`
 
-Post-cleanup live board counts:
+## Verification
 
-- Total posts: `24`
-- `ideas=1`
-- `awaiting_approval=7`
-- `revision_needed=2`
-- `approved_scheduled=6`
-- `posted=8`
-
-## Local Verification
-
-- `npm test -- src/lib/__tests__/iron-law-static.test.ts`: 25/25 passed.
+- `PLAYWRIGHT_RUN_ID=drag-4748171-r4 npm run e2e:prod`: passed, 1 Chromium test.
+- `npx playwright test --list`: detects the production drag matrix spec.
 - `npm run typecheck`: passed.
-- `npm run lint`: passed with existing warning in `src/lib/ai/worker.ts`.
+- `npm run lint`: passed with the existing `src/lib/ai/worker.ts` warning.
 - `git diff --check`: passed.
-- `npm test`: 30 files / 270 tests passed.
+- `npm test`: passed, 30 files / 270 tests.
 - `npm run build`: passed.
 
-## Missing Evidence
+## Changes
 
-- No live authenticated browser DOM drag trace.
-- No browser screenshot or visual alignment proof.
-- No browser console/network capture for a real drag/drop.
-- Current Reach production data still does not contain Muaaz or Carlo team rows, so a named-user matrix for those users cannot be truthfully completed from current DB state.
+EDITED:
+
+- `playwright.config.ts`
+- `package.json`
+- `package-lock.json`
+- `.gitignore`
+- `e2e/drag.spec.ts`
+- `src/components/kanban-board.tsx`
+- `src/components/pipeline-column.tsx`
+- `src/components/content-card.tsx`
+- `NAMED-USERS.md`
+- `AUDIT-FINAL-drag.md`
+- `PROGRESS.md`
+
+ADDED:
+
+- `e2e/.gitkeep`
+- `perf/drag-evidence/drag-4748171-r4/seed.json`
+- `perf/drag-evidence/drag-4748171-r4/matrix.json`
+- `perf/drag-evidence/drag-4748171-r4/*.png`
+- `perf/drag-evidence/playwright-results/.last-run.json`
+- `perf/drag-evidence/playwright-results/drag-production-drag-matri-ce3d1-network-DB-and-UI-agreement-chromium/trace.zip`
+
+LEFT UNTOUCHED:
+
+- `/Users/ace/Documents/CURSOR MAIN/ten80ten-smm-portal`
+- DB migrations, RLS policies, production schema, design, brand, and copy
