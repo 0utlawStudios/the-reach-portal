@@ -59,6 +59,20 @@ function compareForStage(stage: PipelineStage) {
 // ─── RBAC: columns that require Approver ───
 const APPROVER_COLUMNS: PipelineStage[] = ["approved_scheduled", "posted"];
 
+type DragTelemetryDetail = {
+  activeId: string;
+  overId?: string | null;
+  fromStage?: PipelineStage | "unknown" | null;
+  targetStage?: PipelineStage | null;
+  outcome: string;
+  missing?: string[];
+};
+
+function emitDragTelemetry(eventName: "start" | "end", detail: DragTelemetryDetail) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(`reach:drag-${eventName}`, { detail }));
+}
+
 export function KanbanBoard() {
   const { cards, moveCard, requestKickback, selectCard, isLoading } = usePipeline();
   const { currentUser } = useAuth();
@@ -160,18 +174,41 @@ export function KanbanBoard() {
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const card = cards.find((c) => c.id === event.active.id);
+    emitDragTelemetry("start", {
+      activeId: String(event.active.id),
+      fromStage: card?.stage || null,
+      outcome: card ? "active_card_found" : "active_card_missing",
+    });
     if (card) setActiveCard(card);
   }, [cards]);
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     setActiveCard(null);
     const { active, over } = event;
-    if (!over) return;
+    const cardId = String(active.id);
+    if (!over) {
+      emitDragTelemetry("end", {
+        activeId: cardId,
+        overId: null,
+        fromStage: null,
+        targetStage: null,
+        outcome: "no_drop_target",
+      });
+      return;
+    }
 
-    const cardId = active.id as string;
-    const overId = over.id as string;
+    const overId = String(over.id);
     const sourceCard = cards.find((c) => c.id === cardId);
-    if (!sourceCard) return;
+    if (!sourceCard) {
+      emitDragTelemetry("end", {
+        activeId: cardId,
+        overId,
+        fromStage: null,
+        targetStage: null,
+        outcome: "source_card_missing",
+      });
+      return;
+    }
 
     // Determine target stage
     const isColumn = PIPELINE_COLUMNS.some((col) => col.id === overId);
@@ -179,16 +216,50 @@ export function KanbanBoard() {
       ? (overId as PipelineStage)
       : cards.find((c) => c.id === overId)?.stage;
 
-    if (!targetStage || sourceCard.stage === targetStage) return;
+    if (!targetStage) {
+      emitDragTelemetry("end", {
+        activeId: cardId,
+        overId,
+        fromStage: sourceCard.stage,
+        targetStage: null,
+        outcome: "target_stage_missing",
+      });
+      return;
+    }
+
+    if (sourceCard.stage === targetStage) {
+      emitDragTelemetry("end", {
+        activeId: cardId,
+        overId,
+        fromStage: sourceCard.stage,
+        targetStage,
+        outcome: "same_stage_noop",
+      });
+      return;
+    }
 
     // ── Posted archive lock: humans do not move published cards back into active workflow. ──
     if (sourceCard.stage === "posted") {
+      emitDragTelemetry("end", {
+        activeId: cardId,
+        overId,
+        fromStage: sourceCard.stage,
+        targetStage,
+        outcome: "blocked_posted_source",
+      });
       addToast("Posted cards are locked. Create a new post or use the publisher recovery path.", "warning");
       return;
     }
 
     // ── Posted lockdown: humans never drag here. n8n owns this transition. ──
     if (targetStage === "posted") {
+      emitDragTelemetry("end", {
+        activeId: cardId,
+        overId,
+        fromStage: sourceCard.stage,
+        targetStage,
+        outcome: "blocked_posted_target",
+      });
       addToast(
         "Only the auto-publisher moves cards to Posted. The card will move automatically once n8n confirms the post is live.",
         "warning",
@@ -209,6 +280,14 @@ export function KanbanBoard() {
       const unchecked = (sourceCard.checklist || []).filter((c) => !c.checked).length;
       if (unchecked > 0) missing.push(`${unchecked} checklist item${unchecked > 1 ? "s" : ""}`);
       if (missing.length > 0) {
+        emitDragTelemetry("end", {
+          activeId: cardId,
+          overId,
+          fromStage: sourceCard.stage,
+          targetStage,
+          outcome: "blocked_missing_required_fields",
+          missing,
+        });
         setValidationErrors(missing);
         return;
       }
@@ -216,12 +295,26 @@ export function KanbanBoard() {
 
     // ── RBAC gate: Approver-only columns ──
     if (APPROVER_COLUMNS.includes(targetStage) && !userIsApprover) {
+      emitDragTelemetry("end", {
+        activeId: cardId,
+        overId,
+        fromStage: sourceCard.stage,
+        targetStage,
+        outcome: "blocked_approver_required",
+      });
       addToast("Error: Approver permissions required to move cards here.", "error");
       return; // snap back
     }
 
     // ── Universal gate: ANY card → revision_needed requires feedback ──
     if (targetStage === "revision_needed") {
+      emitDragTelemetry("end", {
+        activeId: cardId,
+        overId,
+        fromStage: sourceCard.stage,
+        targetStage,
+        outcome: "kickback_required",
+      });
       requestKickback(cardId);
       return; // modal handles the move after user provides reason
     }
@@ -229,6 +322,13 @@ export function KanbanBoard() {
     // ── Fix Submitted: revision_needed → awaiting_approval (modal intercept) ──
     // moveCard() already intercepts this and opens the RevisionModal
     // All other moves go through moveCard() normally
+    emitDragTelemetry("end", {
+      activeId: cardId,
+      overId,
+      fromStage: sourceCard.stage,
+      targetStage,
+      outcome: "move_requested",
+    });
     moveCard(cardId, targetStage);
   }, [cards, moveCard, requestKickback, userIsApprover, addToast]);
 
@@ -237,7 +337,7 @@ export function KanbanBoard() {
   }, []);
 
   return (
-    <div className="flex flex-col flex-1 min-h-0">
+    <div data-testid="kanban-board" className="flex flex-col flex-1 min-h-0">
       {/* Tab bar */}
       <div className="flex items-center gap-1 px-4 pt-3 pb-1 shrink-0">
         <button onClick={() => setView("pipeline")}

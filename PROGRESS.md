@@ -1,51 +1,57 @@
 # The Reach Clone Progress
 
-updated-at: 2026-06-04T19:43:11Z
+updated-at: 2026-06-04T19:52:33Z
 
-phase: PHASE 2 - NAMED USER MATRIX GREEN
+phase: PHASE 3 - E2E DRAG MATRIX CODE READY
 
-item: Mapped real Reach production users to `auth.users` rows for E2E personas, excluding Muaaz and Carlo because the user clarified they are not Reach Portal users.
+item: Added production Playwright drag matrix spec plus non-visual DnD test IDs and drag telemetry events.
 
-last SHA: 2fce299
+last SHA: c078023
 
 next:
 
-- Commit and push the Phase 2 named-user evidence slice.
-- Begin Phase 3 Playwright drag matrix against production with temporary QA users/posts/workspace and persistent evidence output under `perf/drag-evidence/`.
-- Use the real Reach named-user personas as documented references, not Muaaz/Carlo.
+- Commit and push this E2E code slice so Vercel production receives the test IDs and telemetry.
+- Wait for the new production deployment to become Ready.
+- Run `npm run e2e:prod` against `https://thereach.ten80ten.com` and commit generated evidence under `perf/drag-evidence/`.
 
 blockers:
 
-- None for Phase 1.
+- None for this code slice.
 
 files:
 
-- `NAMED-USERS.md`
+- `playwright.config.ts`
+- `e2e/drag.spec.ts`
+- `src/components/kanban-board.tsx`
+- `src/components/pipeline-column.tsx`
+- `src/components/content-card.tsx`
 - `PROGRESS.md`
 
 invariants:
 
 - Correct repo only: `/Users/ace/Documents/CURSOR MAIN/THE REACH SMM PORTAL`.
 - Do not touch `/Users/ace/Documents/CURSOR MAIN/ten80ten-smm-portal`.
-- No pipeline/runtime source changed in this slice.
 - No DB schema, RLS, triggers, migrations, or production data changed in this slice.
-- Service-role/admin access was used only for read-only linked SQL and auth-user mapping.
+- Runtime changes are limited to non-visual `data-testid` attributes and `CustomEvent` drag telemetry for E2E evidence.
 - No design, brand, or copy changes.
 - Posts must never disappear.
 
 current evidence:
 
-- Linked Supabase SQL joined `public.workspace_members` to `auth.users` and `public.team_members`; all selected personas trace to real `auth.users.id` values.
-- Active Reach workspace members: Aldridge Dagos `f4d6c15a-7b94-4e58-ac8b-4de98aa0d644` (`superadmin`), Hanes Lawrence Abasola `952b51be-9037-4da3-8364-5b52bf894347` (`admin`), Shahannie Manuel `a7f2165d-d667-4bf8-ab37-383ffc485323` (`creative_director`).
-- Active Reach role counts are `admin=1`, `creative_director=1`, and `superadmin=1`; no active lower-role author-only user exists in Reach production `workspace_members`.
-- `NAMED-USERS.md` records the exact SQL and mapping.
+- `e2e/drag.spec.ts` seeds a temporary workspace, two temporary auth users (`editor`, `creative_director`), one post per starting stage, and a hostile workspace/post, then cleans them up.
+- Auth method in the spec is Supabase password sign-in followed by JWT/session injection into Playwright `storageState` via `sb-<project-ref>-auth-token` localStorage and `pt_v2_nav_page="pipeline"`.
+- `src/components/kanban-board.tsx` now emits `reach:drag-start` and `reach:drag-end` custom events with active id, source stage, target stage, drop target id, and gate outcome.
+- `src/components/pipeline-column.tsx` exposes `pipeline-column-<stage>` and `pipeline-dropzone-<stage>` test IDs.
+- `src/components/content-card.tsx` exposes `content-card-<post_id>` and `content-card-drag-handle-<post_id>` test IDs plus `data-stage`.
+- `npx playwright test --list` finds one Chromium production drag matrix test.
+- Full local verification passed: `npm run typecheck`, `npm run lint` with the existing AI worker warning, `git diff --check`, full `npm test` with 30 files / 270 tests, and `npm run build`.
 - `git diff --check` passed.
 
 changes report:
 
-- EDITED: `PROGRESS.md`
-- ADDED: `NAMED-USERS.md`
-- MODIFIED: no app runtime source, migrations, production rows, design, brand, or copy
+- EDITED: `playwright.config.ts`, `src/components/kanban-board.tsx`, `src/components/pipeline-column.tsx`, `src/components/content-card.tsx`, `PROGRESS.md`
+- ADDED: `e2e/drag.spec.ts`
+- MODIFIED: no migrations, production rows, design, brand, or copy
 - LEFT UNTOUCHED: `/Users/ace/Documents/CURSOR MAIN/ten80ten-smm-portal`
 
 ---

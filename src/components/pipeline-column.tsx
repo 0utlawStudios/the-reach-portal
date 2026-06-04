@@ -21,7 +21,7 @@ export function PipelineColumn({ column, cards, isLoading, columnRef }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
 
   return (
-    <div ref={columnRef} className="flex flex-col flex-1 min-w-[240px] sm:min-w-[190px] snap-start">
+    <div ref={columnRef} data-testid={`pipeline-column-${column.id}`} className="flex flex-col flex-1 min-w-[240px] sm:min-w-[190px] snap-start">
       {/* Column header */}
       <div className="flex items-center gap-2.5 px-3 py-2.5 mb-2">
         <div className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: column.color, boxShadow: `0 0 6px ${column.color}40` }} />
@@ -31,6 +31,8 @@ export function PipelineColumn({ column, cards, isLoading, columnRef }: Props) {
       {/* Drop zone lane */}
       <div
         ref={setNodeRef}
+        data-testid={`pipeline-dropzone-${column.id}`}
+        data-stage={column.id}
         style={!isOver ? { borderColor: `${column.color}18` } : undefined}
         className={`flex-1 rounded-xl p-2 transition-all duration-150 overflow-y-auto border ${
           isOver

@@ -163,6 +163,8 @@ function ContentCardInner({ card, isDragOverlay, stageColor }: Props) {
     <div
       ref={setNodeRef}
       style={style}
+      data-testid={`content-card-${card.id}`}
+      data-stage={card.stage}
       onClick={() => !isDragging && selectCard(card)}
       className={`group relative rounded-xl overflow-hidden cursor-pointer bg-white dark:bg-[#151518] border hover:shadow-md transition-all duration-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${isDragging ? "opacity-20 scale-[0.97]" : "hover:-translate-y-0.5"} ${overdue ? "border-red-300 dark:border-red-500/30 shadow-red-100 dark:shadow-red-500/5" : "border-gray-200/80 dark:border-white/[0.06] hover:border-gray-300 dark:hover:border-white/[0.12]"}`}
     >
@@ -173,6 +175,7 @@ function ContentCardInner({ card, isDragOverlay, stageColor }: Props) {
         {...listeners}
         onClick={(e) => e.stopPropagation()}
         aria-label="Drag card"
+        data-testid={`content-card-drag-handle-${card.id}`}
         className="absolute top-1 left-1 z-10 flex h-11 w-11 items-center justify-center rounded-md text-[#E1DFD5] opacity-100 cursor-grab active:cursor-grabbing transition-opacity duration-200 touch-none"
       >
         <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[#6C655A]/80 backdrop-blur-sm ring-1 ring-[#E1DFD5]/35 hover:bg-[#6C655A] transition-colors duration-200">
