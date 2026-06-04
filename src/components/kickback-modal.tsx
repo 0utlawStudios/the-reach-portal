@@ -76,7 +76,6 @@ export function KickbackModal() {
     }
 
     submitKickback(pendingKickback.cardId, note.trim(), attachmentUrl);
-    addToast("Revision requested. Creator and approvers notified.", "warning");
     setNote("");
     removeFile();
     setUploading(false);

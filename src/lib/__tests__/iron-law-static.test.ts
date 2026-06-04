@@ -13,15 +13,23 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync, statSync } from "fs";
 import { join } from "path";
-import { assertStageMoveCommitted, resolveLoadedCards, type PostRow } from "../pipeline-context";
+import { assertStageMoveCommitted, formatPipelineError, resolveLoadedCards, type PostRow } from "../pipeline-context";
+import { isPipelineApproverRole } from "../roles";
 
 const PIPELINE_PATH = join(process.cwd(), "src/lib/pipeline-context.tsx");
 const PIPELINE_SRC = readFileSync(PIPELINE_PATH, "utf8");
+const KANBAN_BOARD_SRC = readFileSync(join(process.cwd(), "src/components/kanban-board.tsx"), "utf8");
 const ASSET_DRAWER_SRC = readFileSync(join(process.cwd(), "src/components/asset-review-drawer.tsx"), "utf8");
 const CONTENT_CARD_SRC = readFileSync(join(process.cwd(), "src/components/content-card.tsx"), "utf8");
+const REVISION_MODAL_SRC = readFileSync(join(process.cwd(), "src/components/revision-modal.tsx"), "utf8");
+const KICKBACK_MODAL_SRC = readFileSync(join(process.cwd(), "src/components/kickback-modal.tsx"), "utf8");
 const AUDIT_SRC = readFileSync(join(process.cwd(), "src/lib/audit.ts"), "utf8");
 const DEEP_CHECK_SRC = readFileSync(join(process.cwd(), "src/app/api/health/deep-check/route.ts"), "utf8");
 const POST_SAFETY_MIGRATION_SRC = readFileSync(join(process.cwd(), "supabase/migrations/0015_post_safety.sql"), "utf8");
+const POST_STAGE_GUARD_MIGRATION_SRC = readFileSync(
+  join(process.cwd(), "supabase/migrations/0046_post_stage_transition_guard.sql"),
+  "utf8",
+);
 const NOTIFICATIONS_SHARED_SRC = readFileSync(join(process.cwd(), "src/app/api/notifications/_shared.ts"), "utf8");
 const NOTIFICATION_ROUTE_SRCS = [
   "approved",
@@ -134,11 +142,69 @@ describe("iron-law guards in pipeline-context.tsx", () => {
     )).not.toThrow();
   });
 
+  it("stage move errors preserve PostgREST object details instead of rendering [object Object]", () => {
+    expect(formatPipelineError({
+      message: "new row violates row-level security policy",
+      details: "No active workspace membership",
+      hint: "Provision workspace access",
+      code: "42501",
+    })).toBe(
+      "new row violates row-level security policy — No active workspace membership — Provision workspace access — code 42501",
+    );
+    expect(formatPipelineError({ message: "invalid input value for enum pipeline_stage" })).toBe(
+      "invalid input value for enum pipeline_stage",
+    );
+    expect(formatPipelineError({ status: 0, error: "fetch failed" })).toBe(
+      '{"status":0,"error":"fetch failed"}',
+    );
+  });
+
   it("moveCard requests the updated post row before treating a stage move as committed", () => {
     expect(PIPELINE_SRC).toMatch(
       /\.update\(\s*\{\s*stage:\s*newStage\s*\}\s*\)[\s\S]{0,200}\.eq\(\s*["']id["']\s*,\s*cardId\s*\)[\s\S]{0,120}\.select\(\s*["']id,\s*stage["']\s*\)[\s\S]{0,80}\.maybeSingle\(\s*\)/,
     );
     expect(PIPELINE_SRC).toMatch(/assertStageMoveCommitted\s*\(\s*data\s+as\s+StageMoveCommitRow\s*,\s*cardId\s*,\s*newStage\s*\)/);
+    expect(PIPELINE_SRC).toMatch(/const message = formatPipelineError\s*\(\s*error\s*\)/);
+    expect(PIPELINE_SRC).not.toMatch(/stage_change failed[\s\S]{0,240}String\s*\(\s*error\s*\)/);
+  });
+
+  it("stage-move callers do not show success toasts before provider persistence is proven", () => {
+    expect(ASSET_DRAWER_SRC).not.toMatch(
+      /moveCard\s*\(\s*selectedCard\.id\s*,\s*["']approved_scheduled["']\s*\)\s*;\s*addToast\s*\(\s*["']Post approved and scheduled/,
+    );
+    expect(ASSET_DRAWER_SRC).not.toMatch(
+      /moveCard\s*\(\s*selectedCard\.id\s*,\s*nextStage\s*\)\s*;\s*addToast\s*\([^)]*Post moved/,
+    );
+    expect(REVISION_MODAL_SRC).not.toContain("Revision submitted. Sent for re-approval.");
+    expect(KICKBACK_MODAL_SRC).not.toContain("Revision requested. Creator and approvers notified.");
+  });
+
+  it("board and drawer share the same approver-role helper", () => {
+    for (const role of ["superadmin", "admin", "owner", "approver", "creative_director"]) {
+      expect(isPipelineApproverRole(role), role).toBe(true);
+    }
+    for (const role of ["editor", "social_media_specialist", "video_editor", "graphic_designer", "specialist", "viewer"]) {
+      expect(isPipelineApproverRole(role), role).toBe(false);
+    }
+    expect(KANBAN_BOARD_SRC).toMatch(/isPipelineApproverRole\s*\(\s*currentMember\?\.role\s*\|\|\s*currentUser\.role\s*\)/);
+    expect(ASSET_DRAWER_SRC).toMatch(/isPipelineApproverRole\s*\(\s*currentMember\?\.role\s*\|\|\s*currentUser\.role\s*\)/);
+    expect(ASSET_DRAWER_SRC).not.toMatch(/if\s*\(\s*!me\s*\)\s*return\s+false/);
+  });
+
+  it("database stage-transition guard locks posted source and approver-only approval", () => {
+    expect(KANBAN_BOARD_SRC).toMatch(/sourceCard\.stage\s*===\s*["']posted["']/);
+    expect(PIPELINE_SRC).toMatch(/card\?\.stage\s*===\s*["']posted["']/);
+    expect(POST_STAGE_GUARD_MIGRATION_SRC).toMatch(/CREATE OR REPLACE FUNCTION public\.block_manual_posted_transition\(\)/);
+    expect(POST_STAGE_GUARD_MIGRATION_SRC).toMatch(/OLD\.stage\s*=\s*'posted'/);
+    expect(POST_STAGE_GUARD_MIGRATION_SRC).toMatch(/Published posts cannot be moved out of "posted"/);
+    expect(POST_STAGE_GUARD_MIGRATION_SRC).toMatch(/NEW\.stage\s*=\s*'approved_scheduled'/);
+    expect(POST_STAGE_GUARD_MIGRATION_SRC).toMatch(/public\.workspace_members/);
+    expect(POST_STAGE_GUARD_MIGRATION_SRC).toMatch(/wm\.user_id\s*=\s*auth\.uid\(\)/);
+    expect(POST_STAGE_GUARD_MIGRATION_SRC).toMatch(
+      /'superadmin', 'admin', 'owner', 'approver', 'creative_director'/,
+    );
+    expect(POST_STAGE_GUARD_MIGRATION_SRC).toMatch(/DROP TRIGGER IF EXISTS posts_block_manual_posted/);
+    expect(POST_STAGE_GUARD_MIGRATION_SRC).toMatch(/CREATE TRIGGER posts_block_manual_posted/);
   });
 
   it("createCard always sets workspace_id via fallback, not conditional-only (AGENTS.md §1c)", () => {

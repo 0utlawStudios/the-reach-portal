@@ -12,6 +12,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useTeam } from "@/lib/team-context";
 import { useToast } from "@/lib/toast-context";
 import { PIPELINE_COLUMNS, PipelineStage, ContentCard as ContentCardType } from "@/lib/types";
+import { isPipelineApproverRole } from "@/lib/roles";
 import { PipelineColumn } from "./pipeline-column";
 import { ContentCard } from "./content-card";
 import { PlatformIcon } from "./platform-icons";
@@ -57,10 +58,6 @@ function compareForStage(stage: PipelineStage) {
 
 // ─── RBAC: columns that require Approver ───
 const APPROVER_COLUMNS: PipelineStage[] = ["approved_scheduled", "posted"];
-
-function isApprover(role: string): boolean {
-  return ["superadmin", "admin", "owner", "approver", "creative_director"].includes(role);
-}
 
 export function KanbanBoard() {
   const { cards, moveCard, requestKickback, selectCard, isLoading } = usePipeline();
@@ -118,7 +115,7 @@ export function KanbanBoard() {
     [members, currentUser.email]
   );
   const userIsApprover = useMemo(
-    () => isApprover(currentMember?.role || currentUser.role || ""),
+    () => isPipelineApproverRole(currentMember?.role || currentUser.role),
     [currentMember, currentUser.role]
   );
 
@@ -183,6 +180,12 @@ export function KanbanBoard() {
       : cards.find((c) => c.id === overId)?.stage;
 
     if (!targetStage || sourceCard.stage === targetStage) return;
+
+    // ── Posted archive lock: humans do not move published cards back into active workflow. ──
+    if (sourceCard.stage === "posted") {
+      addToast("Posted cards are locked. Create a new post or use the publisher recovery path.", "warning");
+      return;
+    }
 
     // ── Posted lockdown: humans never drag here. n8n owns this transition. ──
     if (targetStage === "posted") {

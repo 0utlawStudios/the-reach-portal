@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import { usePipeline } from "@/lib/pipeline-context";
-import { useToast } from "@/lib/toast-context";
 import { Button } from "@/components/ui/button";
 import { X, Send, FileCheck, AlertCircle } from "lucide-react";
 import { MentionTextarea } from "./mention-textarea";
@@ -10,7 +9,6 @@ import { useFocusTrap } from "./use-focus-trap";
 
 export function RevisionModal() {
   const { pendingReapproval, submitReapproval, cancelReapproval } = usePipeline();
-  const { addToast } = useToast();
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -34,7 +32,6 @@ export function RevisionModal() {
     if (!isValid || submitting) return;
     setSubmitting(true);
     submitReapproval(pendingReapproval.cardId, note.trim());
-    addToast("Revision submitted. Sent for re-approval.", "success");
     setNote("");
     setSubmitting(false);
   };

@@ -28,6 +28,7 @@ import { useToast } from "@/lib/toast-context";
 import { ensureMediaAsset } from "@/lib/media-assets";
 import { formatDate, formatDateTime, formatDateShort, formatDateTimeCompact } from "@/lib/utils";
 import { useFocusTrap } from "./use-focus-trap";
+import { isPipelineApproverRole } from "@/lib/roles";
 
 // Strict @mention pattern — an @ followed by a name-like token. Used so a
 // pasted email or URL containing "@" does not trigger a phantom mention.
@@ -40,11 +41,13 @@ export function AssetReviewDrawer() {
   const { addToast } = useToast();
   const { currentUser, accessToken } = useAuth();
   const { members } = useTeam();
+  const currentMember = useMemo(
+    () => members.find((m) => m.email === currentUser.email),
+    [members, currentUser.email],
+  );
   const userIsApprover = useMemo(() => {
-    const me = members.find((m) => m.email === currentUser.email);
-    if (!me) return false;
-    return ["superadmin", "admin", "approver", "creative_director"].includes(me.role);
-  }, [members, currentUser.email]);
+    return isPipelineApproverRole(currentMember?.role || currentUser.role);
+  }, [currentMember?.role, currentUser.role]);
   const [revisionMode, setRevisionMode] = useState(false);
   const [revisionFeedback, setRevisionFeedback] = useState("");
   const [editDate, setEditDate] = useState("");
@@ -1024,7 +1027,7 @@ export function AssetReviewDrawer() {
                 <Button size="sm" disabled={!revisionFeedback.trim()} onClick={() => {
                   const feedback = revisionFeedback.trim();
                   submitKickback(selectedCard.id, feedback);
-                  addToast("Revision request submitted. Saving and notifying the team.", "warning");
+                  addToast("Saving revision request...", "info");
                   setRevisionMode(false); setRevisionFeedback("");
                 }} className="flex-1 h-9 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[12px] shadow-sm disabled:opacity-40 transition-all duration-150">
                   Submit Revision Request
@@ -1051,9 +1054,9 @@ export function AssetReviewDrawer() {
                   const unchk = checklist.filter((c) => !c.checked).length;
                   if (unchk > 0) missing.push(`${unchk} checklist item${unchk > 1 ? "s" : ""}`);
                   if (missing.length > 0) { setValidationErrors(missing); return; }
-                  moveCard(selectedCard.id, "approved_scheduled"); addToast("Post approved and scheduled.", "success");
+                  moveCard(selectedCard.id, "approved_scheduled");
                 }}
-                  className="flex-1 h-9 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[12px] shadow-sm shadow-emerald-500/20 transition-all duration-150">
+                className="flex-1 h-9 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[12px] shadow-sm shadow-emerald-500/20 transition-all duration-150">
                   <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />Approve Post
                 </Button>
               </div>
@@ -1116,7 +1119,7 @@ export function AssetReviewDrawer() {
                       }
                     }
                     moveCard(selectedCard.id, nextStage);
-                    addToast(nextStage === "awaiting_approval" ? `Notification & Email dispatched to ${currentUser.name} — Post sent for approval` : `Post moved to ${nextColumn.title}`, nextStage === "awaiting_approval" ? "success" : "info");
+                    addToast("Saving stage move...", "info");
                   }} className="flex-1 h-9 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-[12px] shadow-sm transition-all duration-150">
                     Move to {nextColumn.title}<ChevronRight className="w-3.5 h-3.5 ml-1" />
                   </Button>

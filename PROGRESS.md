@@ -652,3 +652,25 @@ Safety notes:
 - Baseline workspace UUID remains `00000000-0000-0000-0000-000000000001`.
 - Do not commit secrets.
 - Do not fabricate Supabase refs, Drive IDs, social handles, OpenAI keys, or brand hex values.
+
+Drag persistence/error-honesty slice notes (2026-06-04 19:18:53 UTC):
+
+- Continued work only in `/Users/ace/Documents/CURSOR MAIN/THE REACH SMM PORTAL`; no files in `/Users/ace/Documents/CURSOR MAIN/ten80ten-smm-portal` were read or edited in this slice.
+- Fixed the Phase 3 error-honesty finding where PostgREST/Supabase plain-object errors could become `[object Object]` in rollback toasts and logs.
+- Added `formatPipelineError()` in `src/lib/pipeline-context.tsx` and routed stage-change, reapproval, and kickback failure messaging through it.
+- Kept stage-change persistence proof intact: `moveCard()` still updates `posts.stage`, selects `id, stage`, calls `.maybeSingle()`, and passes the returned row through `assertStageMoveCommitted()` before treating the move as committed.
+- Removed premature success toasts from drawer/modal callers that invoke persistence-backed stage changes. Success notifications for revision submit and kickback now fire only in the provider after the Supabase write succeeds, or in the local-only path when no DB commit is available to prove.
+- Added static/unit coverage in `src/lib/__tests__/iron-law-static.test.ts` for object-aware error formatting and for avoiding pre-commit success toasts in stage-move callers.
+- Verification before this note: focused iron-law static tests passed, `npm run typecheck` passed, `npm run lint` passed with the existing `src/lib/ai/worker.ts` unused-function warning, full `npm test` passed, and `npm run build` passed.
+
+Drag stage-transition enforcement slice notes (2026-06-04 19:24:04 UTC):
+
+- Continued work only in `/Users/ace/Documents/CURSOR MAIN/THE REACH SMM PORTAL`; no files in `/Users/ace/Documents/CURSOR MAIN/ten80ten-smm-portal` were read or edited in this slice.
+- Intentionally touched `src/lib/pipeline-context.tsx` for the drag/stage fix after applying the AGENTS.md pipeline checklist: UUID guard remains, workspace provisioning/load invariants remain, and empty DB arrays still do not fall back to localStorage.
+- Added `supabase/migrations/0046_post_stage_transition_guard.sql` and applied it to the linked Reach Supabase project. `supabase migration list` now shows local `0046` and remote `0046`.
+- The `posts_block_manual_posted` trigger now rejects browser-authenticated moves out of `posted`, preserves the service-role publisher/recovery path, preserves the existing browser-authenticated move-into-`posted` block, and rejects browser-authenticated moves into `approved_scheduled` unless the active workspace role is `superadmin`, `admin`, `owner`, `approver`, or `creative_director`.
+- Added shared UI helper `isPipelineApproverRole()` in `src/lib/roles.ts`, wired both board and drawer to it, and added a board/provider source-stage lock for `posted` cards.
+- Live production QA used temporary users/posts only. Proof stamp `qa-0046-1780601151490-2d4054`: editor `awaiting_approval -> approved_scheduled` rejected with `APPROVAL_LOCKDOWN` on post `e3e339fc-990a-40cf-a4f4-bb0444d761e3`; creative_director approval succeeded on post `70269cb3-d802-4820-8f19-831af9c5f6bc`; editor `posted -> ideas` rejected with `POSTED_LOCKDOWN` on post `ec1a772e-f3a2-448e-8f47-0d6a1985f5c0`; service-role `posted -> ideas` recovery succeeded on post `a2ddbf99-7daa-4a81-8127-10878002a5e1`; browser-authenticated `approved_scheduled -> posted` rejected with `POSTED_LOCKDOWN` on post `464ddff4-821c-453d-8551-dad9ccffed96`.
+- QA cleanup verified `postsRemaining=0`, `auditRowsRemaining=0`, `workspaceMembersRemaining=0`, and `teamMembersRemaining=0` for the temporary data. Auth admin delete calls completed for temporary users.
+- Production posts returned to baseline after cleanup: 24 total, with `ideas=1`, `awaiting_approval=7`, `revision_needed=2`, `approved_scheduled=6`, and `posted=8`.
+- Verification passed on the current tree: focused iron-law static tests `25/25`, `npm run typecheck`, `npm run lint` with the existing `src/lib/ai/worker.ts` unused-function warning, `git diff --check`, full `npm test` with 30 files / 270 tests, and `npm run build`.

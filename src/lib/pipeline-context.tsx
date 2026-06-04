@@ -264,6 +264,25 @@ export function assertStageMoveCommitted(
   }
 }
 
+export function formatPipelineError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === "object") {
+    const record = error as Record<string, unknown>;
+    const message = typeof record.message === "string" ? record.message : null;
+    const details = typeof record.details === "string" ? record.details : null;
+    const hint = typeof record.hint === "string" ? record.hint : null;
+    const code = typeof record.code === "string" ? `code ${record.code}` : null;
+    const parts = [message, details, hint, code].filter(Boolean);
+    if (parts.length > 0) return parts.join(" — ");
+    try {
+      return JSON.stringify(record);
+    } catch {
+      return Object.prototype.toString.call(error);
+    }
+  }
+  return String(error);
+}
+
 function isSupabaseConfigured(): boolean {
   return !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 }
@@ -545,6 +564,12 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    const card = cardsRef.current.find((c) => c.id === cardId);
+    if (card?.stage === "posted") {
+      addToast("Posted cards are locked. Create a new post or use the publisher recovery path.", "warning");
+      return;
+    }
+
     // TEMP-ID GUARD: the card's createCard INSERT is still in flight (its id
     // is a timestamp, not a UUID). Applying a stage move now would be lost —
     // the in-flight INSERT carries the card's original stage. Reject so the
@@ -555,7 +580,6 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     }
 
     // INTERCEPT: revision_needed → awaiting_approval requires a note
-    const card = cardsRef.current.find((c) => c.id === cardId);
     if (card?.stage === "revision_needed" && newStage === "awaiting_approval") {
       setPendingReapproval({ cardId, cardTitle: card.title });
       return; // Don't move yet — modal will handle it
@@ -594,7 +618,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
           // The stage UPDATE itself failed — nothing committed. Roll local
           // state back and clear the dedup mark so a realtime echo can
           // re-sync the card.
-          const message = error instanceof Error ? error.message : String(error);
+          const message = formatPipelineError(error);
           console.error("[pipeline] stage_change failed:", message);
           rollback();
           recentMutations.current.delete(cardId);
@@ -678,7 +702,8 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
       const notes = card?.notes ? card.notes + "\n\n" + noteLine : noteLine;
       supabase.from("posts").update({ stage: "awaiting_approval", notes }).eq("id", cardId).then(({ error }) => {
         if (error) {
-          console.error("[pipeline] reapproval sync failed:", error.message);
+          const message = formatPipelineError(error);
+          console.error("[pipeline] reapproval sync failed:", message);
           // Rollback local state — DB write failed, so the prior version is canonical.
           if (previousCard) {
             setCards((prev) => prev.map((c) => c.id === cardId ? previousCard : c));
@@ -686,12 +711,13 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
           }
           // Clear the dedup mark so a realtime echo can re-sync the card (DATA-003).
           recentMutations.current.delete(cardId);
-          addToast(`Save failed: ${error.message}. Changes reverted.`, "error");
+          addToast(`Save failed: ${message}. Changes reverted.`, "error");
           return;
         }
         // Only fire the audit + notification once the DB write actually committed.
         // Previously these ran unconditionally, which produced phantom emails (DATA-002).
         logAudit(cardId, author, "revision_submitted", `Fix submitted: ${note}`);
+        addToast("Revision submitted. Sent for re-approval.", "success");
         postNotification("/api/notifications/awaiting-approval", {
           postId: cardId,
           postTitle: card?.title || "",
@@ -702,6 +728,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     } else {
       // Local-only path (no Supabase configured or temp id): still record audit locally.
       logAudit(cardId, author, "revision_submitted", `Fix submitted: ${note}`);
+      addToast("Revision submitted. Sent for re-approval.", "success");
     }
 
     setPendingReapproval(null);
@@ -779,7 +806,8 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
       const notes = card?.notes ? card.notes + "\n\n" + noteLine : noteLine;
       supabase.from("posts").update({ stage: "revision_needed", notes }).eq("id", cardId).then(({ error }) => {
         if (error) {
-          console.error("[pipeline] kickback sync failed:", error.message);
+          const message = formatPipelineError(error);
+          console.error("[pipeline] kickback sync failed:", message);
           // Rollback local state — DB write failed, so prior version is canonical.
           if (previousCard) {
             setCards((prev) => prev.map((c) => c.id === cardId ? previousCard : c));
@@ -787,16 +815,18 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
           }
           // Clear the dedup mark so a realtime echo can re-sync the card (DATA-003).
           recentMutations.current.delete(cardId);
-          addToast(`Kickback failed: ${error.message}. Changes reverted.`, "error");
+          addToast(`Kickback failed: ${message}. Changes reverted.`, "error");
           return;
         }
         // Only fire audit + notifications + @mention emails on confirmed DB commit.
         // This closes the DATA-002 phantom-email path.
         fireNotifications();
+        addToast("Revision requested. Notifications are being sent.", "warning");
       });
     } else {
       // Local-only path: no DB to confirm, so fire audit + notifications now.
       fireNotifications();
+      addToast("Revision requested. Notifications are being sent.", "warning");
     }
 
     setPendingKickback(null);
