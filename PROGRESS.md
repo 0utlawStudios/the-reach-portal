@@ -1,18 +1,18 @@
 # The Reach Clone Progress
 
-updated-at: 2026-06-04T19:05:03Z
+updated-at: 2026-06-04T19:08:23Z
 
-phase: PHASE 2 - EXECUTE / STAGE MOVE PERSISTENCE PROOF
+phase: PHASE 2 - EXECUTE / PROD AUTH-RLS VERIFICATION PASSED
 
-item: Fixed the highest-confidence drag root-cause candidate by making `moveCard` prove Supabase returned the updated `posts.id` and target `stage` before treating a drop as committed.
+item: Verified the `moveCard` returned-row persistence proof against Reach production Supabase using temporary authenticated QA data, then cleaned up all temporary rows/users.
 
-last SHA: b85c6c3
+last SHA: 682c9a9
 
 next:
 
-- Commit and push this Phase 2 persistence-proof slice.
-- Perform live Phase 2 QA with temporary rows and cleanup if authenticated browser/session tooling becomes available.
-- Continue Phase 2 with the next ranked issues only if QA still shows drag failure: handle-vs-card target, `over.id` no-op visibility, and drawer role fallback if approval buttons are in scope.
+- Commit and push this production verification tracking update.
+- Begin Phase 3 final QA swarm with explicit missing-browser-trace flags.
+- Continue only on verified remaining defects: handle-vs-card target, `over.id` no-op visibility, drawer role fallback if approval buttons are in scope, or any RLS/error-honesty miss.
 
 blockers:
 
@@ -47,6 +47,12 @@ current evidence:
 - Sample rows by stage: `ab3fbde3-d358-4013-8272-9abda6f21db9` ideas, `1a40fd5b-0e11-4f77-a06d-890f4f487460` awaiting approval, `9221b39f-13bf-4b5d-b2a9-da54a375c72d` revision needed, `f0f6cd20-1fff-4945-8115-624a596a0905` approved/scheduled, `72c4343f-83a9-41ba-950e-d9dd5106a530` posted.
 - Source evidence shows DnD provider/sensors/droppable/sortable wiring is present; drag listeners are handle-only on `aria-label="Drag card"`.
 - Fixed implementation gap: `moveCard` now chains `.select("id, stage").maybeSingle()` after the stage update and calls `assertStageMoveCommitted()` before audit/notification/publish-job side effects.
+- Production temp auth/RLS proof used Reach project `gxmpmdhmxyfqusdzcemt.supabase.co` and temporary post `51700423-1482-444e-943f-0cd1215b4b21`.
+- Authenticated `creative_director` temp user update returned `{ id: "51700423-1482-444e-943f-0cd1215b4b21", stage: "awaiting_approval" }` for `ideas -> awaiting_approval`.
+- Authenticated `creative_director` temp user update returned `{ id: "51700423-1482-444e-943f-0cd1215b4b21", stage: "approved_scheduled" }` for `awaiting_approval -> approved_scheduled`.
+- Cross-workspace hostile update against temp post `6045130d-e2ce-4af3-bf4e-fbb312f16601` returned `null` with HTTP 200 and the hostile post remained `ideas`.
+- Manual authenticated `approved_scheduled -> posted` attempt returned `POSTED_LOCKDOWN` and the temp post remained `approved_scheduled`.
+- Cleanup completed: temp main post deleted, hostile post deleted, hostile workspace deleted, temp workspace member deleted, temp team member deleted, temp auth user deleted.
 - Focused static/unit verification passed: `npm test -- src/lib/__tests__/iron-law-static.test.ts` passed 21 tests.
 - `npm run typecheck` passed.
 - `npm run lint` passed with the existing `src/lib/ai/worker.ts` unused `generateImagesForCaption` warning only.
@@ -55,7 +61,8 @@ current evidence:
 
 changes report:
 
-- EDITED: `src/lib/pipeline-context.tsx`, `src/lib/__tests__/iron-law-static.test.ts`, `PROGRESS.md`
+- EDITED: `PROGRESS.md`
+- PREVIOUS PHASE 2 CODE SLICE: `src/lib/pipeline-context.tsx`, `src/lib/__tests__/iron-law-static.test.ts`
 - MODIFIED: no migrations, production rows, design, brand, or copy
 - LEFT UNTOUCHED: `/Users/ace/Documents/CURSOR MAIN/ten80ten-smm-portal`
 
