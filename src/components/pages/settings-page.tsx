@@ -474,7 +474,7 @@ export function SettingsPage() {
     }
   }, [currentUser.email, sendPasswordRecovery, sendingOwnRecovery]);
 
-  const handleApprove = async (reqId: string, action: "approve" | "reject", role = "social_media_specialist") => {
+  const handleApprove = async (reqId: string, action: "approve" | "reject", role = "social_media_specialist", hasExistingInvite = false) => {
     setApproving(reqId);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -494,6 +494,8 @@ export function SettingsPage() {
           addToast(data.reusedPendingInvite ? "Invite refreshed. Email failed, link copied to clipboard." : "Approved. Email failed, invite link copied to clipboard.", "info");
         } else if (action === "approve" && data.reusedPendingInvite) {
           addToast("Invite refreshed and request marked approved.", "success");
+        } else if (action === "reject" && hasExistingInvite) {
+          addToast("Request dismissed. Pending invite remains available.", "info");
         } else {
           addToast(action === "approve" ? `Approved. Branded invite sent.` : "Request rejected", action === "approve" ? "success" : "info");
         }
@@ -789,13 +791,13 @@ export function SettingsPage() {
                         {/* Only superadmin sees approve/reject buttons */}
                         {isSuperadmin && (
                           <div className="flex gap-1.5 shrink-0">
-                            <button disabled={approving === req.id} onClick={() => handleApprove(req.id, "reject")}
+                            <button disabled={approving === req.id} onClick={() => handleApprove(req.id, "reject", "social_media_specialist", Boolean(matchingInvite))}
                               className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-white/[0.08] text-[10px] font-medium text-gray-500 hover:text-red-500 hover:border-red-200 dark:hover:border-red-500/20 transition-colors cursor-pointer disabled:opacity-40">
-                              Reject
+                              {matchingInvite ? "Dismiss" : "Reject"}
                             </button>
-                            <button disabled={approving === req.id} onClick={() => handleApprove(req.id, "approve", "social_media_specialist")}
+                            <button disabled={approving === req.id} onClick={() => handleApprove(req.id, "approve", "social_media_specialist", Boolean(matchingInvite))}
                             className="reach-secondary-action px-3 py-1.5 rounded-lg text-[10px] font-medium cursor-pointer transition-colors disabled:opacity-40">
-                              {approving === req.id ? "..." : matchingInvite ? "Resend Invite" : "Approve"}
+                              {approving === req.id ? "..." : matchingInvite ? "Approve & Resend" : "Approve"}
                             </button>
                           </div>
                         )}
