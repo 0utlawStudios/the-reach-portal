@@ -424,6 +424,14 @@ export function SettingsPage() {
 
   const activeMembers = useMemo(() => members.filter((m) => m.status === "active"), [members]);
   const pendingMembers = useMemo(() => members.filter((m) => m.status === "pending"), [members]);
+  const pendingInviteByEmail = useMemo(
+    () => new Map(pendingMembers.map((m) => [m.email.toLowerCase(), m])),
+    [pendingMembers],
+  );
+  const pendingRequestByEmail = useMemo(
+    () => new Map(pendingRequests.map((req) => [req.email.toLowerCase(), req])),
+    [pendingRequests],
+  );
   const openBrandKitCopy = useCallback((focus: "hashtags" | "captions") => {
     if (typeof window !== "undefined") {
       window.sessionStorage.setItem("reach_brandkit_tab", "copy");
@@ -483,7 +491,9 @@ export function SettingsPage() {
         void refreshMembers();
         if (action === "approve" && data.emailSent === false && data.inviteUrl) {
           await navigator.clipboard.writeText(data.inviteUrl);
-          addToast("Approved. Email failed, invite link copied to clipboard.", "info");
+          addToast(data.reusedPendingInvite ? "Invite refreshed. Email failed, link copied to clipboard." : "Approved. Email failed, invite link copied to clipboard.", "info");
+        } else if (action === "approve" && data.reusedPendingInvite) {
+          addToast("Invite refreshed and request marked approved.", "success");
         } else {
           addToast(action === "approve" ? `Approved. Branded invite sent.` : "Request rejected", action === "approve" ? "success" : "info");
         }
@@ -757,32 +767,42 @@ export function SettingsPage() {
                 Pending Access Requests ({pendingRequests.length})
               </h3>
               <div className="bg-white dark:bg-[#151518] rounded-2xl border border-amber-200/60 dark:border-amber-500/20 overflow-hidden shadow-sm">
-                {pendingRequests.map((req, i) => (
-                  <div key={req.id} className={`px-4 py-3 ${i > 0 ? "border-t border-amber-100 dark:border-amber-500/10" : ""}`}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-medium text-gray-800 dark:text-gray-200">{req.name}</p>
-                        <p className="text-[11px] text-gray-400 mt-0.5">{req.email}{req.phone ? ` · ${req.phone}` : ""}</p>
-                        {req.company && <p className="text-[10px] text-gray-400 mt-0.5">{req.company}</p>}
-                        {req.reason && <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1 italic">&ldquo;{req.reason}&rdquo;</p>}
-                        <p className="text-[9px] text-gray-300 dark:text-gray-600 mt-1">{formatDateTimeCompact(req.created_at)}</p>
-                      </div>
-                      {/* Only superadmin sees approve/reject buttons */}
-                      {isSuperadmin && (
-                        <div className="flex gap-1.5 shrink-0">
-                          <button disabled={approving === req.id} onClick={() => handleApprove(req.id, "reject")}
-                            className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-white/[0.08] text-[10px] font-medium text-gray-500 hover:text-red-500 hover:border-red-200 dark:hover:border-red-500/20 transition-colors cursor-pointer disabled:opacity-40">
-                            Reject
-                          </button>
-                          <button disabled={approving === req.id} onClick={() => handleApprove(req.id, "approve", "social_media_specialist")}
-                          className="reach-secondary-action px-3 py-1.5 rounded-lg text-[10px] font-medium cursor-pointer transition-colors disabled:opacity-40">
-                            {approving === req.id ? "..." : "Approve"}
-                          </button>
+                {pendingRequests.map((req, i) => {
+                  const matchingInvite = pendingInviteByEmail.get(req.email.toLowerCase());
+                  return (
+                    <div key={req.id} className={`px-4 py-3 ${i > 0 ? "border-t border-amber-100 dark:border-amber-500/10" : ""}`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <p className="text-[13px] font-medium text-gray-800 dark:text-gray-200">{req.name}</p>
+                            {matchingInvite && (
+                              <Badge variant="outline" className="text-[10px] h-5 px-2 border text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20">
+                                <Mail className="w-2.5 h-2.5 mr-1" />Pending Invite
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-gray-400 mt-0.5">{req.email}{req.phone ? ` · ${req.phone}` : ""}</p>
+                          {req.company && <p className="text-[10px] text-gray-400 mt-0.5">{req.company}</p>}
+                          {req.reason && <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1 italic">&ldquo;{req.reason}&rdquo;</p>}
+                          <p className="text-[9px] text-gray-300 dark:text-gray-600 mt-1">{formatDateTimeCompact(req.created_at)}</p>
                         </div>
-                      )}
+                        {/* Only superadmin sees approve/reject buttons */}
+                        {isSuperadmin && (
+                          <div className="flex gap-1.5 shrink-0">
+                            <button disabled={approving === req.id} onClick={() => handleApprove(req.id, "reject")}
+                              className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-white/[0.08] text-[10px] font-medium text-gray-500 hover:text-red-500 hover:border-red-200 dark:hover:border-red-500/20 transition-colors cursor-pointer disabled:opacity-40">
+                              Reject
+                            </button>
+                            <button disabled={approving === req.id} onClick={() => handleApprove(req.id, "approve", "social_media_specialist")}
+                            className="reach-secondary-action px-3 py-1.5 rounded-lg text-[10px] font-medium cursor-pointer transition-colors disabled:opacity-40">
+                              {approving === req.id ? "..." : matchingInvite ? "Resend Invite" : "Approve"}
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -847,6 +867,7 @@ export function SettingsPage() {
               <div className="bg-white dark:bg-[#151518] rounded-2xl border border-amber-200/60 dark:border-amber-500/20 overflow-hidden shadow-sm">
                 {pendingMembers.map((member, i) => {
                   const role = roleConfig[member.role];
+                  const matchingRequest = pendingRequestByEmail.get(member.email.toLowerCase());
                   return (
                     <div key={member.id} className={`flex items-center gap-3 px-4 py-3.5 ${i > 0 ? "border-t border-amber-100 dark:border-amber-500/10" : ""}`}>
                       <div className="w-9 h-9 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-[11px] font-bold text-white shrink-0">
@@ -860,6 +881,11 @@ export function SettingsPage() {
                           <Badge variant="outline" className="text-[10px] h-5 px-2 border text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20">
                             <Mail className="w-2.5 h-2.5 mr-1" />Invite Sent
                           </Badge>
+                          {matchingRequest && (
+                            <Badge variant="outline" className="text-[10px] h-5 px-2 border text-blue-600 bg-blue-50 border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20">
+                              <Activity className="w-2.5 h-2.5 mr-1" />Access Requested
+                            </Badge>
+                          )}
                         </div>
                       </div>
                       <div className="flex gap-1.5 shrink-0">

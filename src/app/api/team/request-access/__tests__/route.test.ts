@@ -172,7 +172,7 @@ describe("POST /api/team/request-access", () => {
     expect(sendMail).not.toHaveBeenCalled();
   });
 
-  it("returns a generic received response when the email already belongs to the team", async () => {
+  it("returns a generic received response when the email already belongs to an active team member", async () => {
     tableResults.team_members.maybeSingle = { data: { id: "member-1", status: "active" }, error: null };
 
     const res = await POST(makeRequest({ name: "Aldridge", email: "aldridge@ten80ten.com" }));
@@ -184,6 +184,33 @@ describe("POST /api/team/request-access", () => {
     expect(JSON.stringify(body)).not.toContain("team_member");
     expect(operations.some((op) => op.table === "signup_requests" && op.method === "insert")).toBe(false);
     expect(sendMail).not.toHaveBeenCalled();
+  });
+
+  it("saves a visible request when the email already has a pending invite", async () => {
+    tableResults.team_members.maybeSingle = { data: { id: "member-1", status: "pending" }, error: null };
+
+    const res = await POST(makeRequest({ name: "Stefani Sorenson", email: "stefani@thereach.travel" }));
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({ success: true, status: "received" });
+    expect(operations).toEqual(expect.arrayContaining([
+      {
+        table: "signup_requests",
+        method: "insert",
+        payload: expect.objectContaining({
+          workspace_id: "00000000-0000-0000-0000-000000000001",
+          email: "stefani@thereach.travel",
+          status: "pending",
+          requested_by: "stefani@thereach.travel",
+          reason: "Already has a pending invite and requested access again.",
+        }),
+      },
+    ]));
+    expect(sendMail).toHaveBeenCalledWith(expect.objectContaining({
+      to: "admin@example.com",
+      subject: "New Access Request: Stefani Sorenson",
+    }));
   });
 
   it("does not create duplicate pending requests", async () => {

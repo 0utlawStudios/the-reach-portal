@@ -62,7 +62,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Could not check access status. Please try again." }, { status: 500 });
     }
 
-    if (existingMember) {
+    const isPendingInviteRequest = existingMember?.status === "pending";
+    if (existingMember && !isPendingInviteRequest) {
       return NextResponse.json(GENERIC_RECEIVED_RESPONSE);
     }
 
@@ -88,7 +89,7 @@ export async function POST(request: NextRequest) {
       email,
       phone: body.phone || null,
       company: body.company || null,
-      reason: body.reason || null,
+      reason: body.reason || (isPendingInviteRequest ? "Already has a pending invite and requested access again." : null),
       status: "pending",
       requested_by: email,
     };

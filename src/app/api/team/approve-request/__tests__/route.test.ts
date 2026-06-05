@@ -174,6 +174,69 @@ describe("POST /api/team/approve-request", () => {
     ]));
   });
 
+  it("reuses an existing pending invite when approving a matching access request", async () => {
+    signupRequestResult = {
+      data: {
+        id: "request-1",
+        name: "Request Name",
+        email: " Stefani@TheReach.Travel ",
+        phone: "+17738959399",
+        status: "pending",
+      },
+      error: null,
+    };
+    existingMemberResult = {
+      data: {
+        id: "pending-member-1",
+        name: "Stefani Sorenson",
+        role: "admin",
+        status: "pending",
+      },
+      error: null,
+    };
+    listUsersPages = [{ users: [{ id: "old-auth-user", email: "stefani@thereach.travel" }] }];
+
+    const res = await POST(makeRequest({ requestId: "request-1", action: "approve", role: "social_media_specialist" }));
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({
+      success: true,
+      action: "approved",
+      email: "stefani@thereach.travel",
+      emailSent: false,
+      reusedPendingInvite: true,
+      inviteUrl: "https://thereach.ten80ten.com/auth/confirm?token_hash=hashed-token&type=invite",
+    });
+    expect(operations.some((op) => op.table === "team_members" && op.method === "insert")).toBe(false);
+    expect(operations).toEqual(expect.arrayContaining([
+      { table: "workspace_members", method: "delete", filters: [["user_id", "old-auth-user"]] },
+      { table: "auth.users", method: "deleteUser", id: "old-auth-user" },
+      {
+        table: "auth.users",
+        method: "createUser",
+        payload: expect.objectContaining({
+          email: "stefani@thereach.travel",
+          user_metadata: { name: "Stefani Sorenson", role: "admin", phone: "+17738959399" },
+        }),
+      },
+      {
+        table: "auth.users",
+        method: "generateLink",
+        payload: expect.objectContaining({
+          email: "stefani@thereach.travel",
+          options: { data: { name: "Stefani Sorenson", role: "admin" } },
+        }),
+      },
+      {
+        table: "signup_requests",
+        method: "update",
+        payload: expect.objectContaining({ status: "approved", reviewed_by: "admin@example.com" }),
+        filters: [["id", "request-1"]],
+      },
+    ]));
+  });
+
   it("rolls back newly-created invite state when request finalization fails", async () => {
     requestUpdateResult = { data: null, error: { message: "status write failed" } };
 
