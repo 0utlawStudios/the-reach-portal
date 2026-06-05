@@ -185,3 +185,31 @@ Run this mental checklist:
 5. Does the provision endpoint still get called before the posts SELECT?
 
 If any answer is "no" or "I'm not sure" — stop and re-read this file.
+
+---
+
+## 9. LOCAL PRODUCT MEMORY
+
+### 9a. Editable Design Link is optional
+The `sourceVault.designLink` / Editable Design Link field is OPTIONAL.
+
+Do NOT add it to:
+- Create Post required validation
+- Kanban completeness gates
+- Drawer approval or re-approval gates
+- Validation error guidance for missing required fields
+- Submit disabled checks
+
+The field may still be saved and displayed when provided. Do NOT show a red
+required asterisk on its label. Use optional helper copy.
+
+### 9b. Desktop sidebar auto-hides when unpinned
+An unpinned desktop sidebar must be collapsed at rest and expand only on hover.
+`nav_sidebar_pinned = false` means auto-hide mode.
+
+Required behavior:
+- Default unpinned state is collapsed
+- Hover expansion is transient and must NOT be persisted to localStorage
+- Pinning expands and persists the sidebar
+- Unpinning collapses immediately
+- Mouse leave collapses any unpinned expanded state

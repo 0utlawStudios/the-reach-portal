@@ -46,7 +46,7 @@ The pipeline has a completeness check (scheduled date, time, thumbnail, caption,
 - Drawer "Move to [next stage]" button
 - Drawer "Ready for Re-Approval" button (add full validation before opening the reapproval modal)
 
-Also add designLink (editable design file link) to the required fields in all completeness gates. Check sourceVault.designLink is not empty.
+Editable design links are optional and must not be included in completeness gates.
 
 ---
 
@@ -79,7 +79,6 @@ Guidance text per field (define as a lookup map):
 - asset source: "Select where the media came from (Canva Pro, Envato, Pexels, etc.)."
 - thumbnail: "Upload or select a cover image for the post card."
 - content for publishing: "Upload at least one file that will be posted to social platforms."
-- design file link: "Go to the Details tab and paste the editable Canva/Figma link. Sharing must be set to 'Anyone with the link can edit'."
 - Any field containing "checklist item": "Complete all items in the Pre-Submit Checklist before moving forward."
 - Fallback: "This field is required before the post can move forward."
 
@@ -98,15 +97,13 @@ The create post modal only has a file upload button for content. Add a "Browse L
 
 ---
 
-## 7. Design File Link Required
+## 7. Editable Design Link Optional
 
 In the create post modal (Details tab) and the asset review drawer (Source Vault tab):
-- Rename label to "Editable Design Link" with red asterisk (required)
-- Add helper text below the label: "Paste the editable Canva, Figma, or Adobe link. Make sure sharing is set to 'Anyone with the link can edit' so the team can make revisions."
+- Rename label to "Editable Design Link" without a red asterisk.
+- Add helper text below the label: "Optional Canva, Figma, or Adobe link for team revisions."
 - Placeholder: "https://www.canva.com/design/..."
-- Add to form validation in create post (missing.push("design file link") if empty)
-- Add to the submit button disabled check
-- Add to all completeness gates in kanban board and drawer (check sourceVault.designLink)
+- Do not add it to form validation, submit disabled checks, or completeness gates.
 
 ---
 

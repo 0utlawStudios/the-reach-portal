@@ -15,7 +15,6 @@ const FIELD_GUIDANCE: Record<string, string> = {
   "asset source": "Select where the media came from (Envato, Pexels, Shot by Team, etc.).",
   "thumbnail": "Upload or select a cover image for the post card.",
   "content for publishing": "Upload at least one file that n8n will post to social platforms.",
-  "design file link": "Go to the Details tab and paste the editable Canva/Figma link. Make sure sharing is set to 'Anyone with the link can edit'.",
 };
 
 function getGuidance(field: string): string {

@@ -203,7 +203,7 @@ All domain rows require `workspace_id uuid not null`. The app must provision wor
 | Realtime | Handles INSERT/UPDATE/DELETE, scoped by workspace where possible, with mutation dedup. |
 | Create post | Optimistic temp card, Google Drive upload first, `posts.insert` always includes `workspace_id`, temp id remaps to UUID. |
 | Move post | UUID guard prevents Supabase calls on temp IDs. Rollback on DB error. |
-| Approval gate | Moving to `approved_scheduled` requires thumbnail, publish content, caption, design link, all checklist items. |
+| Approval gate | Moving to `approved_scheduled` requires thumbnail, publish content, caption, asset source, schedule, and all checklist items. Editable design links are optional. |
 | Revision gate | Moving to `revision_needed` requires feedback/kickback modal. |
 | Fix submitted | `revision_needed` to `awaiting_approval` requires note. |
 | Posted stage | UI blocks manual move. DB trigger also blocks clients. Only n8n/service-role publisher may mark posted with `posted_at`. |

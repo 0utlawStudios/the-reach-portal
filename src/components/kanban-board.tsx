@@ -285,7 +285,6 @@ export function KanbanBoard() {
       if (!sourceCard.sourceVault?.rawFiles?.length) missing.push("content for publishing");
       if (!sourceCard.caption?.trim()) missing.push("caption");
       if (!sourceCard.assetSource?.trim()) missing.push("asset source");
-      if (!sourceCard.sourceVault?.designLink?.trim()) missing.push("design file link");
       const unchecked = (sourceCard.checklist || []).filter((c) => !c.checked).length;
       if (unchecked > 0) missing.push(`${unchecked} checklist item${unchecked > 1 ? "s" : ""}`);
       if (missing.length > 0) {

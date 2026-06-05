@@ -32,7 +32,7 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
     const saved = loadState<string>(PAGE_KEY, "dashboard");
     return isPage(saved) ? saved : "dashboard";
   });
-  const [sidebarCollapsed, setSidebarCollapsedState] = useState(() => loadState<boolean>(PIN_KEY, false) ? false : loadState<boolean>(SIDEBAR_KEY, false));
+  const [sidebarCollapsed, setSidebarCollapsedState] = useState(() => loadState<boolean>(PIN_KEY, false) ? false : true);
   const [sidebarPinned, setSidebarPinned] = useState(() => loadState<boolean>(PIN_KEY, false));
   const [pendingOpenPostId, setPendingOpenPostId] = useState<string | null>(null);
   const [pendingSupportThreadId, setPendingSupportThreadId] = useState<string | null>(null);
@@ -74,7 +74,6 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
 
   const setSidebarCollapsed = useCallback((v: boolean) => {
     setSidebarCollapsedState(v);
-    saveState(SIDEBAR_KEY, v);
   }, []);
 
   const togglePin = useCallback(() => {
@@ -84,6 +83,9 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
       if (next) {
         setSidebarCollapsedState(false);
         saveState(SIDEBAR_KEY, false);
+      } else {
+        setSidebarCollapsedState(true);
+        saveState(SIDEBAR_KEY, true);
       }
       return next;
     });

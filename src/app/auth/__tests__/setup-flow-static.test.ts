@@ -136,6 +136,14 @@ describe("Support Inbox navigation", () => {
     expect(SETTINGS_SRC).not.toContain("SupportInbox");
     expect(SETTINGS_SRC).not.toContain("Support Inbox");
   });
+
+  it("keeps the desktop sidebar auto-hidden whenever it is unpinned", () => {
+    expect(NAVIGATION_SRC).toContain("loadState<boolean>(PIN_KEY, false) ? false : true");
+    expect(NAVIGATION_SRC).toContain("setSidebarCollapsedState(true);");
+    expect(NAVIGATION_SRC).toContain("saveState(SIDEBAR_KEY, true);");
+    expect(NAVIGATION_SRC).not.toContain("setSidebarCollapsedState(v);\n    saveState(SIDEBAR_KEY, v);");
+    expect(APP_SHELL_SRC).toContain("hoverExpandRef.current || !sidebarCollapsed");
+  });
 });
 
 const removedGenerationLabel = ["Creator", "Studio"].join(" ");

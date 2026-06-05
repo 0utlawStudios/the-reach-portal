@@ -131,7 +131,7 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
   };
   const handleMouseLeave = () => {
     if (sidebarPinned) return;
-    if (hoverExpandRef.current) { hoverExpandRef.current = false; setSidebarCollapsed(true); }
+    if (hoverExpandRef.current || !sidebarCollapsed) { hoverExpandRef.current = false; setSidebarCollapsed(true); }
   };
 
   const closeMobile = () => setMobileOpen(false);

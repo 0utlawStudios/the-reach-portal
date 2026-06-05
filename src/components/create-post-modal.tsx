@@ -161,7 +161,6 @@ export function CreatePostModal({ open, onClose }: Props) {
     if (!scheduledTime) missing.push("time");
     if (!caption.trim()) missing.push("caption");
     if (!assetSource.trim()) missing.push("asset source");
-    if (!designLink.trim()) missing.push("design file link");
     if (missing.length > 0) { setValidationErrors(missing); return; }
 
     setSubmitting(true);
@@ -528,9 +527,9 @@ export function CreatePostModal({ open, onClose }: Props) {
             {activeTab === "details" && (
               <div className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Editable Design Link <span className="text-red-400">*</span></label>
+                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Editable Design Link</label>
                   <input value={designLink} onChange={(e) => setDesignLink(e.target.value)} placeholder="https://www.canva.com/design/..." className={`${inputClass} font-mono text-[11px]`} />
-                  <p className="text-[9px] text-gray-400 dark:text-gray-500 leading-relaxed">Paste the editable Canva, Figma, or Adobe link. Make sure sharing is set to &quot;Anyone with the link can edit&quot; so the team can make revisions.</p>
+                  <p className="text-[9px] text-gray-400 dark:text-gray-500 leading-relaxed">Optional Canva, Figma, or Adobe link for team revisions.</p>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Google Drive Folder</label>
