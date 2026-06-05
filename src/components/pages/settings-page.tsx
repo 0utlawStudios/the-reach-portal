@@ -28,7 +28,8 @@ import {
   Shield, Download, Sun, Moon, Mail,
   Smartphone, BarChart3, Zap, Link2, Webhook, FileText,
   UserPlus, ShieldCheck, Pencil, Eye, Crown, X, Send, Megaphone, Users, Settings as SettingsIcon,
-  Camera, Save, Upload, Trash2, RefreshCw, Loader2,
+  Save, Upload, Trash2, RefreshCw, Loader2,
+  Maximize2,
 } from "lucide-react";
 
 const roleConfig: Record<UserRole, { label: string; icon: React.ReactNode; color: string }> = {
@@ -40,6 +41,70 @@ const roleConfig: Record<UserRole, { label: string; icon: React.ReactNode; color
   video_editor: { label: "Video Editor", icon: <Pencil className="w-3 h-3" />, color: "text-orange-600 bg-orange-50 border-orange-200 dark:bg-orange-500/10 dark:text-orange-400 dark:border-orange-500/20" },
   graphic_designer: { label: "Graphic Designer", icon: <Palette className="w-3 h-3" />, color: "text-pink-600 bg-pink-50 border-pink-200 dark:bg-pink-500/10 dark:text-pink-400 dark:border-pink-500/20" },
 };
+
+function AvatarLightbox({
+  member,
+  onClose,
+  canChange,
+  onChange,
+}: {
+  member: TeamMember;
+  onClose: () => void;
+  canChange?: boolean;
+  onChange?: () => void;
+}) {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-[70] bg-black/80 dark:bg-black/85 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-[520px] rounded-2xl border border-white/[0.10] bg-[#151518] shadow-2xl overflow-hidden"
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${member.name} profile photo`}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.08]">
+          <div className="min-w-0">
+            <p className="text-[15px] font-semibold text-white truncate">{member.name}</p>
+            <p className="text-[11px] text-gray-500 truncate">{member.email}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-white/[0.06] cursor-pointer" aria-label="Close photo">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="px-6 py-8 flex flex-col items-center gap-5">
+          <div
+            className="relative rounded-full overflow-hidden border border-white/[0.12] bg-white/[0.04] shadow-[0_18px_60px_rgba(0,0,0,0.35)]"
+            style={{ width: "min(78vw, 78vh, 640px)", height: "min(78vw, 78vh, 640px)" }}
+          >
+            <OptimizedAvatar
+              src={member.avatar}
+              name={member.name}
+              width={640}
+              height={640}
+              eager
+              className="w-full h-full object-cover"
+              fallbackClassName="w-full h-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-6xl sm:text-8xl font-bold text-white"
+            />
+          </div>
+          {canChange && onChange && (
+            <Button type="button" onClick={onChange} className="reach-secondary-action h-9 rounded-lg text-[12px] px-4 cursor-pointer">
+              <Upload className="w-3.5 h-3.5 mr-1.5" />Change Photo
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ─── Edit Profile Modal ───
 function EditProfileModal({
@@ -69,6 +134,7 @@ function EditProfileModal({
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [sendingRecovery, setSendingRecovery] = useState(false);
+  const [photoOpen, setPhotoOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Avatar crop flow
   const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
@@ -79,6 +145,7 @@ function EditProfileModal({
   const canEditRole = canManageTeam && member.role !== "superadmin";
   const canSave = (canEditProfile || canManageTeam || (emailChanged && canChangeEmail)) && !saving;
   const canSendRecovery = isSelf || canManageTeam;
+  const canChangeAvatar = canEditProfile || canManageTeam;
 
   const sendPasswordRecovery = async () => {
     if (!canSendRecovery || sendingRecovery) return;
@@ -102,7 +169,7 @@ function EditProfileModal({
   };
 
   const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!canEditProfile && !canManageTeam) return;
+    if (!canChangeAvatar) return;
     const file = e.target.files?.[0];
     if (!file) return;
     const src = URL.createObjectURL(file);
@@ -222,24 +289,26 @@ function EditProfileModal({
             <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarSelect} className="hidden" />
             <div className="flex justify-center">
               <div className="relative group">
-                <OptimizedAvatar
-                  src={avatarUrl}
-                  name={name}
-                  width={80}
-                  height={80}
-                  eager
-                  className="w-20 h-20 rounded-full object-cover"
-                  fallbackClassName="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-[22px] font-bold text-white"
-                />
-                <button disabled={!canManageTeam} onClick={() => fileInputRef.current?.click()} className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer disabled:cursor-not-allowed">
-                  {uploading ? (
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <Camera className="w-5 h-5 text-white" />
-                  )}
+                <button type="button" onClick={() => setPhotoOpen(true)} className="relative rounded-full cursor-zoom-in block" aria-label={`Open ${name}'s profile photo`}>
+                  <OptimizedAvatar
+                    src={avatarUrl}
+                    name={name}
+                    width={80}
+                    height={80}
+                    eager
+                    className="w-20 h-20 rounded-full object-cover"
+                    fallbackClassName="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-[22px] font-bold text-white"
+                  />
+                  <span className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <Maximize2 className="w-5 h-5 text-white" />
+                  </span>
                 </button>
-                <button disabled={!canManageTeam} onClick={() => fileInputRef.current?.click()} className="reach-secondary-action absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-2 border-white dark:border-[#151518] flex items-center justify-center cursor-pointer transition-colors disabled:cursor-not-allowed disabled:opacity-50">
-                  <Upload className="w-3 h-3 text-white" />
+                <button disabled={!canChangeAvatar} onClick={() => fileInputRef.current?.click()} className="reach-secondary-action absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-2 border-white dark:border-[#151518] flex items-center justify-center cursor-pointer transition-colors disabled:cursor-not-allowed disabled:opacity-50" aria-label="Change profile photo">
+                  {uploading ? (
+                    <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <Upload className="w-3 h-3 text-white" />
+                  )}
                 </button>
               </div>
             </div>
@@ -352,6 +421,17 @@ function EditProfileModal({
           onClose={() => { setCropImageSrc(null); }}
         />
       )}
+      {photoOpen && (
+        <AvatarLightbox
+          member={{ ...member, name, email: normalizedEmail, phone: phone || undefined, role, avatar: avatarUrl || undefined }}
+          onClose={() => setPhotoOpen(false)}
+          canChange={canChangeAvatar}
+          onChange={() => {
+            setPhotoOpen(false);
+            fileInputRef.current?.click();
+          }}
+        />
+      )}
     </>
   );
 }
@@ -408,6 +488,7 @@ export function SettingsPage() {
   const [approving, setApproving] = useState<string | null>(null);
   const [resendingInvite, setResendingInvite] = useState<string | null>(null);
   const [sendingOwnRecovery, setSendingOwnRecovery] = useState(false);
+  const [photoViewer, setPhotoViewer] = useState<{ member: TeamMember; canChange: boolean } | null>(null);
 
   // Load workspace timezone on mount
   useEffect(() => {
@@ -817,10 +898,20 @@ export function SettingsPage() {
                 {activeMembers.map((member, i) => {
                   const role = roleConfig[member.role];
                   const canEditMember = member.email === currentUser.email || (isAdmin && (member.role !== "superadmin" || isSuperadmin));
+                  const canChangePhoto = isAdmin && canEditMember;
                   return (
-                    <button key={member.id} onClick={canEditMember ? () => setEditingMember(member) : undefined}
+                    <div
+                      key={member.id}
                       className={`w-full flex items-start gap-3 px-4 py-3.5 transition-colors text-left ${canEditMember ? "hover:bg-slate-50 dark:hover:bg-white/[0.02] cursor-pointer" : "cursor-default"} ${i > 0 ? "border-t border-gray-50 dark:border-white/[0.03]" : ""}`}>
-                      <div className="relative shrink-0 mt-0.5">
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setPhotoViewer({ member, canChange: canChangePhoto });
+                        }}
+                        className="relative shrink-0 mt-0.5 rounded-full cursor-zoom-in group/avatar"
+                        aria-label={`Open ${member.name}'s profile photo`}
+                      >
                         <OptimizedAvatar
                           src={member.avatar}
                           name={member.name}
@@ -830,9 +921,23 @@ export function SettingsPage() {
                           className="w-9 h-9 rounded-full object-cover"
                           fallbackClassName="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-[11px] font-bold text-white"
                         />
+                        <span className="absolute inset-0 rounded-full bg-black/35 opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center">
+                          <Maximize2 className="w-3.5 h-3.5 text-white" />
+                        </span>
                         <PresenceDot status={getStatus(member.email)} />
-                      </div>
-                      <div className="flex-1 min-w-0">
+                      </button>
+                      <div
+                        role={canEditMember ? "button" : undefined}
+                        tabIndex={canEditMember ? 0 : undefined}
+                        onClick={canEditMember ? () => setEditingMember(member) : undefined}
+                        onKeyDown={canEditMember ? (event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            setEditingMember(member);
+                          }
+                        } : undefined}
+                        className="flex-1 min-w-0"
+                      >
                         <div className="flex items-center justify-between">
                           <p className="text-[13px] font-medium text-gray-800 dark:text-gray-200">{member.name}</p>
                           {canEditMember && <Pencil className="w-3.5 h-3.5 text-gray-300 shrink-0 ml-2" />}
@@ -852,7 +957,7 @@ export function SettingsPage() {
                           className="block mt-1 text-[10px] leading-tight"
                         />
                       </div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -872,9 +977,25 @@ export function SettingsPage() {
                   const matchingRequest = pendingRequestByEmail.get(member.email.toLowerCase());
                   return (
                     <div key={member.id} className={`flex items-center gap-3 px-4 py-3.5 ${i > 0 ? "border-t border-amber-100 dark:border-amber-500/10" : ""}`}>
-                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-[11px] font-bold text-white shrink-0">
-                        {member.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setPhotoViewer({ member, canChange: isAdmin })}
+                        className="relative shrink-0 rounded-full cursor-zoom-in group/avatar"
+                        aria-label={`Open ${member.name}'s profile photo`}
+                      >
+                        <OptimizedAvatar
+                          src={member.avatar}
+                          name={member.name}
+                          width={36}
+                          height={36}
+                          eager={i < 6}
+                          className="w-9 h-9 rounded-full object-cover"
+                          fallbackClassName="w-9 h-9 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-[11px] font-bold text-white"
+                        />
+                        <span className="absolute inset-0 rounded-full bg-black/35 opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center">
+                          <Maximize2 className="w-3.5 h-3.5 text-white" />
+                        </span>
+                      </button>
                       <div className="flex-1 min-w-0">
                         <p className="text-[13px] font-medium text-gray-800 dark:text-gray-200">{member.name}</p>
                         <p className="text-[11px] text-gray-400 mt-0.5">{member.email}</p>
@@ -927,6 +1048,18 @@ export function SettingsPage() {
             members.some((m) => m.email === currentUser.email && (m.role === "superadmin" || m.role === "admin"))
           }
           onDelete={() => { removeMember(editingMember.id, editingMember.email, currentUser.email); }}
+        />
+      )}
+      {photoViewer && (
+        <AvatarLightbox
+          member={photoViewer.member}
+          onClose={() => setPhotoViewer(null)}
+          canChange={photoViewer.canChange}
+          onChange={() => {
+            const member = photoViewer.member;
+            setPhotoViewer(null);
+            setEditingMember(member);
+          }}
         />
       )}
 
