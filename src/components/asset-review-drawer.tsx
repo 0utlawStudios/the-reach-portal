@@ -304,7 +304,7 @@ export function AssetReviewDrawer() {
         workspaceId,
         usedIn: selectedCard.id,
       }).catch((err) => console.error("[drawer] media_assets sync failed:", err));
-      addToast("Cover image uploaded to Drive", "success");
+      addToast("Cover image uploaded", "success");
     } catch (err) {
       // REVERT — never persist blob URL
       URL.revokeObjectURL(blobUrl);
@@ -363,7 +363,7 @@ export function AssetReviewDrawer() {
         usedIn: selectedCard.id,
       }).catch((err) => console.error("[drawer] media_assets sync failed:", err));
       logAudit(selectedCard.id, currentUser.name, "raw_file_uploaded", `Uploaded ${file.name} (${newFile.usageType})`);
-      addToast(`${file.name} uploaded to Drive`, "success");
+      addToast(`${file.name} uploaded`, "success");
     } catch (err) {
       // NO BLOB FALLBACK — show error, let user retry
       addToast(`Upload failed: ${err instanceof Error ? err.message : "unknown error"}. Try again.`, "error");
@@ -639,7 +639,7 @@ export function AssetReviewDrawer() {
               <div className="bg-white dark:bg-white/[0.03] rounded-xl border border-gray-200/60 dark:border-white/[0.06] p-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-medium text-gray-600 dark:text-gray-300 truncate flex-1">{uploadingFileName}</span>
-                  <span className="text-[10px] font-bold text-orange-500 tabular-nums ml-2">{uploadProgress}%</span>
+                  <span className="text-[10px] font-bold text-orange-500 tabular-nums ml-2">{uploadProgress >= 90 && uploadProgress < 100 ? "Finishing up..." : uploadProgress <= 0 ? "Preparing..." : uploadProgress + "%"}</span>
                 </div>
                 <div className="w-full h-1.5 rounded-full bg-gray-100 dark:bg-white/[0.06] overflow-hidden">
                   <div className="h-full rounded-full bg-gradient-to-r from-orange-500 to-amber-500 transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
@@ -763,7 +763,7 @@ export function AssetReviewDrawer() {
                       <Paperclip className="w-3 h-3 text-orange-400" />License / Release
                       <span className="text-gray-300 dark:text-gray-600 text-[8px] normal-case ml-auto">Optional</span>
                     </label>
-                    <p className="text-[9px] text-gray-400 dark:text-gray-500 leading-relaxed mb-2">Attach the license, model release, or proof of rights. Stored in Google Drive for copyright protection and compliance.</p>
+                    <p className="text-[9px] text-gray-400 dark:text-gray-500 leading-relaxed mb-2">Attach the license, model release, or proof of rights. Stored securely for copyright protection and compliance.</p>
                     {selectedCard.licenseFileId ? (
                       <div className="flex items-center gap-2.5 bg-emerald-50 dark:bg-emerald-500/5 border border-emerald-200/60 dark:border-emerald-500/20 rounded-lg px-3.5 py-2.5">
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />

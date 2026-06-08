@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
       // Log the full error server-side, return clean message to client
       const rawErr = await uploadRes.text();
       console.error("[proxy-upload] Google Drive error:", uploadRes.status, rawErr);
-      return jsonResponse({ error: `Google Drive rejected the upload (HTTP ${uploadRes.status}). Check that the service account has Content Manager access to the Shared Drive.` }, 500);
+      return jsonResponse({ error: `The upload was rejected by storage (HTTP ${uploadRes.status}). Please try again, or contact an admin if this keeps happening.` }, 500);
     }
 
     const driveFile = await uploadRes.json();

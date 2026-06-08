@@ -167,50 +167,63 @@ export function MediaPage() {
     const files = e.target.files;
     if (!files || uploading) return;
     setUploading(true);
-    const { uploadToDrive } = await import("@/lib/drive-upload");
-    for (const file of Array.from(files)) {
-      setUploadingFileName(file.name);
-      setUploadProgress(0);
-      try {
-        const result = await uploadToDrive(file, "media-library", undefined, setUploadProgress);
-        const asset: MediaAsset = {
-          id: `m-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-          name: file.name,
-          url: result.url,
-          type: file.type.startsWith("video") ? "video" : "image",
-          folder: "Media Library",
-          uploadedAt: new Date().toISOString(),
-          addedBy: currentUser.name,
-        };
+    const fileList = Array.from(files);
+    const { uploadManyToDrive } = await import("@/lib/drive-upload");
 
-        // Persist to Supabase
-        if (useDb) {
-          const { data: inserted, error } = await supabase
-            .from("media_assets")
-            .insert({
-              name: asset.name,
-              url: asset.url,
-              file_type: asset.type,
-              folder: asset.folder,
-              added_by: asset.addedBy,
-              workspace_id: workspaceId || BASELINE_WORKSPACE_ID,
-            })
-            .select("id")
-            .single();
-          if (error) {
-            console.error("[media] upload library insert failed:", error.message);
-            addToast(`Uploaded ${file.name} to Drive, but library save failed. Try again.`, "error");
-            continue;
-          }
-          if (inserted) asset.id = inserted.id;
-        }
+    setUploadingFileName(fileList.length === 1 ? fileList[0].name : `Uploading ${fileList.length} files`);
+    setUploadProgress(0);
 
-        setMedia((prev) => [asset, ...prev]);
-        addToast(`${file.name} uploaded`, "success");
-      } catch (err) {
-        addToast(`Failed to upload ${file.name}: ${err instanceof Error ? err.message : "error"}`, "error");
+    // Upload all files concurrently (3-wide pool) instead of one-at-a-time.
+    const items = await uploadManyToDrive(fileList, "media-library", {
+      concurrency: 3,
+      onProgress: setUploadProgress,
+    });
+
+    // Persist results. Uploads already ran in parallel; the saves below are
+    // quick and run after, preserving the original per-file save + toast.
+    for (const it of items) {
+      const file = it.file;
+      if (it.error || !it.result) {
+        addToast(`Couldn't upload ${file.name}: ${it.error?.message || "upload failed"}`, "error");
+        continue;
       }
+      const result = it.result;
+      const asset: MediaAsset = {
+        id: `m-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        name: file.name,
+        url: result.url,
+        type: file.type.startsWith("video") ? "video" : "image",
+        folder: "Media Library",
+        uploadedAt: new Date().toISOString(),
+        addedBy: currentUser.name,
+      };
+
+      // Persist to Supabase
+      if (useDb) {
+        const { data: inserted, error } = await supabase
+          .from("media_assets")
+          .insert({
+            name: asset.name,
+            url: asset.url,
+            file_type: asset.type,
+            folder: asset.folder,
+            added_by: asset.addedBy,
+            workspace_id: workspaceId || BASELINE_WORKSPACE_ID,
+          })
+          .select("id")
+          .single();
+        if (error) {
+          console.error("[media] upload library insert failed:", error.message);
+          addToast(`Uploaded ${file.name}, but saving to the library failed. Try again.`, "error");
+          continue;
+        }
+        if (inserted) asset.id = inserted.id;
+      }
+
+      setMedia((prev) => [asset, ...prev]);
+      addToast(`${file.name} uploaded`, "success");
     }
+
     if (fileInputRef.current) fileInputRef.current.value = "";
     setUploading(false);
     setUploadProgress(0);
@@ -376,7 +389,7 @@ export function MediaPage() {
           <div className="px-4 py-3 border-b border-gray-100 dark:border-white/[0.06] bg-white dark:bg-[#111] shrink-0">
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-[11px] font-medium text-gray-600 dark:text-gray-300 truncate">{uploadingFileName}</span>
-              <span className="text-[11px] font-bold text-orange-500 tabular-nums ml-2">{uploadProgress}%</span>
+              <span className="text-[11px] font-bold text-orange-500 tabular-nums ml-2">{uploadProgress >= 90 && uploadProgress < 100 ? "Finishing up..." : uploadProgress <= 0 ? "Preparing..." : uploadProgress + "%"}</span>
             </div>
             <div className="w-full h-1.5 rounded-full bg-gray-100 dark:bg-white/[0.06] overflow-hidden">
               <div className="h-full rounded-full bg-gradient-to-r from-orange-500 to-amber-500 transition-all duration-300" style={{ width: `${uploadProgress}%` }} />

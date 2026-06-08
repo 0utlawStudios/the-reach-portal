@@ -169,33 +169,64 @@ export function CreatePostModal({ open, onClose }: Props) {
     const rawFiles: import("@/lib/types").RawFile[] = [];
     let uploadFailed = false;
 
-    // Upload all files to Drive — NO BLOB FALLBACK
+    // Upload all files to Drive — NO BLOB FALLBACK.
+    // Files upload concurrently (3-wide pool) instead of one-at-a-time, while
+    // preserving order: rawFiles[0] stays the master/thumbnail. Any failure is
+    // fail-closed, so the card is not created with missing files.
     if (files.length > 0) {
-      const { uploadToDrive } = await import("@/lib/drive-upload");
+      const { uploadManyToDrive } = await import("@/lib/drive-upload");
+
+      // New files that actually need uploading, tagged with their original index.
+      const pending: { index: number; file: File }[] = [];
       for (let i = 0; i < files.length; i++) {
         const f = files[i];
-
-        // Library file: already on Drive, skip upload
-        if (f.driveUrl) {
-          rawFiles.push({
-            name: f.name,
-            url: f.driveUrl,
-            fileId: f.driveFileId,
-            usageType: i === 0 ? "master" : "supplementary",
-            mimeType: f.mimeType || (f.type === "video" ? "video/mp4" : "image/jpeg"),
-            size: 0,
-            uploadedAt: new Date().toISOString(),
-          });
-          if (i === 0) thumbnailUrl = f.driveUrl;
-          continue;
-        }
-
+        if (f.driveUrl) continue; // library file: already uploaded
         const rawFile = rawFilesRef.current.get(f.id);
         if (!rawFile) continue;
-        setUploadingFileName(rawFile.name);
+        pending.push({ index: i, file: rawFile });
+      }
+
+      const uploaded = new Map<number, { url: string; fileId: string; mimeType?: string; size?: number }>();
+      if (pending.length > 0) {
+        setUploadingFileName(pending.length === 1 ? pending[0].file.name : `Uploading ${pending.length} files`);
         setUploadProgress(0);
-        try {
-          const result = await uploadToDrive(rawFile, "raw-files", undefined, setUploadProgress);
+        const items = await uploadManyToDrive(pending.map((p) => p.file), "raw-files", {
+          concurrency: 3,
+          stopOnError: true,
+          onProgress: setUploadProgress,
+        });
+        const failure = items.find((it) => it.error);
+        if (failure) {
+          addToast(`Couldn't upload ${failure.file.name}: ${failure.error?.message || "upload failed"}`, "error");
+          uploadFailed = true;
+        } else {
+          for (const it of items) {
+            if (it.result) uploaded.set(pending[it.index].index, it.result);
+          }
+        }
+      }
+
+      // Rebuild rawFiles in the original file order (master = index 0).
+      if (!uploadFailed) {
+        for (let i = 0; i < files.length; i++) {
+          const f = files[i];
+          if (f.driveUrl) {
+            rawFiles.push({
+              name: f.name,
+              url: f.driveUrl,
+              fileId: f.driveFileId,
+              usageType: i === 0 ? "master" : "supplementary",
+              mimeType: f.mimeType || (f.type === "video" ? "video/mp4" : "image/jpeg"),
+              size: 0,
+              uploadedAt: new Date().toISOString(),
+            });
+            if (i === 0) thumbnailUrl = f.driveUrl;
+            continue;
+          }
+          const rawFile = rawFilesRef.current.get(f.id);
+          if (!rawFile) continue;
+          const result = uploaded.get(i);
+          if (!result) continue;
           rawFiles.push({
             name: rawFile.name,
             url: result.url,
@@ -206,10 +237,6 @@ export function CreatePostModal({ open, onClose }: Props) {
             uploadedAt: new Date().toISOString(),
           });
           if (i === 0) thumbnailUrl = result.url;
-        } catch (err) {
-          addToast(`Failed to upload ${rawFile.name}: ${err instanceof Error ? err.message : "error"}`, "error");
-          uploadFailed = true;
-          break;
         }
       }
     }
@@ -464,7 +491,7 @@ export function CreatePostModal({ open, onClose }: Props) {
                 {/* License upload */}
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">License / Release <span className="text-gray-300 dark:text-gray-600 text-[8px] normal-case">Optional</span></label>
-                  <p className="text-[9px] text-gray-400 dark:text-gray-500 leading-relaxed -mt-0.5 mb-1">Attach the license, model release, or proof of rights. Stored in Google Drive for copyright protection and compliance.</p>
+                  <p className="text-[9px] text-gray-400 dark:text-gray-500 leading-relaxed -mt-0.5 mb-1">Attach the license, model release, or proof of rights. Stored securely for copyright protection and compliance.</p>
                   {licenseFileId ? (
                     <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-500/5 border border-emerald-200 dark:border-emerald-500/20 rounded-lg px-3 py-2">
                       <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium flex-1">License uploaded</span>
@@ -532,8 +559,8 @@ export function CreatePostModal({ open, onClose }: Props) {
                   <p className="text-[9px] text-gray-400 dark:text-gray-500 leading-relaxed">Optional Canva, Figma, or Adobe link for team revisions.</p>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Google Drive Folder</label>
-                  <input value={driveFolder} onChange={(e) => setDriveFolder(e.target.value)} placeholder="e.g. drive.google.com/drive/folders/..." className={`${inputClass} font-mono text-[11px]`} />
+                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Asset Folder</label>
+                  <input value={driveFolder} onChange={(e) => setDriveFolder(e.target.value)} placeholder="Paste a shared folder link" className={`${inputClass} font-mono text-[11px]`} />
                 </div>
               </div>
             )}
@@ -543,7 +570,7 @@ export function CreatePostModal({ open, onClose }: Props) {
               <div className="bg-white dark:bg-white/[0.03] rounded-xl border border-gray-200/60 dark:border-white/[0.06] p-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-medium text-gray-600 dark:text-gray-300 truncate flex-1">{uploadingFileName}</span>
-                  <span className="text-[10px] font-bold text-orange-500 tabular-nums ml-2">{uploadProgress}%</span>
+                  <span className="text-[10px] font-bold text-orange-500 tabular-nums ml-2">{uploadProgress >= 90 && uploadProgress < 100 ? "Finishing up..." : uploadProgress <= 0 ? "Preparing..." : uploadProgress + "%"}</span>
                 </div>
                 <div className="w-full h-1.5 rounded-full bg-gray-100 dark:bg-white/[0.06] overflow-hidden">
                   <div className="h-full rounded-full bg-gradient-to-r from-orange-500 to-amber-500 transition-all duration-300" style={{ width: `${uploadProgress}%` }} />

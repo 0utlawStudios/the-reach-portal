@@ -268,7 +268,7 @@ export function MediaPicker({ open, onClose, onSelect, folder = "raw-files", car
               {uploading && (
                 <div className="rounded-xl border border-gray-200/60 dark:border-white/[0.06] p-4 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-medium text-gray-600 dark:text-gray-300">Uploading...</span>
+                    <span className="text-[11px] font-medium text-gray-600 dark:text-gray-300">{uploadProgress >= 90 && uploadProgress < 100 ? "Finishing up..." : uploadProgress <= 0 ? "Preparing..." : "Uploading..."}</span>
                     <span className="text-[11px] font-bold text-orange-500 tabular-nums">{uploadProgress}%</span>
                   </div>
                   <div className="w-full h-2 rounded-full bg-gray-100 dark:bg-white/[0.06] overflow-hidden">
@@ -281,7 +281,7 @@ export function MediaPicker({ open, onClose, onSelect, folder = "raw-files", car
                   className="w-full py-12 rounded-2xl border-2 border-dashed border-gray-200 dark:border-white/[0.08] flex flex-col items-center justify-center gap-3 text-gray-400 hover:text-orange-500 hover:border-orange-300 hover:bg-orange-50/20 dark:hover:bg-orange-500/[0.02] transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-gray-400 disabled:hover:border-gray-200">
                   <div className="w-14 h-14 rounded-2xl bg-gray-50 dark:bg-white/[0.04] flex items-center justify-center"><Upload className="w-6 h-6" /></div>
                   <p className="text-[13px] font-medium">{assetSource.trim() ? "Click to select file" : "Select asset source first"}</p>
-                  <p className="text-[11px] text-gray-300 dark:text-gray-600">Images & videos — uploaded to Google Drive</p>
+                  <p className="text-[11px] text-gray-300 dark:text-gray-600">Images and videos, saved to your library</p>
                 </button>
               )}
             </div>

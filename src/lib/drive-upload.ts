@@ -37,14 +37,35 @@ export interface DriveUploadResult {
 
 export type ProgressCallback = (percent: number) => void;
 
-const RETRY_DELAYS = [2000, 8000, 32000];
+// Interactive-friendly backoff. The old [2000, 8000, 32000] meant a single
+// transient hiccup cost up to 42s of dead waiting (and the proxy path re-sent
+// the whole file each time). Worst case is now ~11s.
+const RETRY_DELAYS = [1000, 3000, 7000];
 
-// Files at or above this threshold use the resumable path to avoid Vercel's 4.5 MB body limit.
-const RESUMABLE_THRESHOLD = 4 * 1024 * 1024; // 4 MB
+// A large direct-to-Google upload is expensive to repeat, so it gets a single
+// gentle retry rather than the full ladder.
+const PUT_RETRY_DELAYS = [3000];
 
-async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
+// Abort an upload that makes no progress for this long. XMLHttpRequest has no
+// default timeout, so without this a stalled connection hangs with no end —
+// the literal "upload took forever" symptom. The watchdog resets on every
+// progress event, so a slow-but-moving upload is never killed.
+const STALL_TIMEOUT_MS = 30000;
+
+// Files at or above this threshold upload directly to storage: the client sends
+// bytes straight to the destination, and the server only mints the session and
+// finalizes. Below it, the small-file proxy path is used.
+//
+// Lowered from 4 MB to 1 MB on real-user evidence (~2 MB photos took minutes and
+// often failed). The proxy path holds a serverless function for the ENTIRE
+// client upload, so a slow connection can blow past the function time limit and
+// 500, which then retries. The direct path never holds a function during the
+// byte transfer, so it stays reliable on slow connections.
+const RESUMABLE_THRESHOLD = 1 * 1024 * 1024; // 1 MB
+
+async function withRetry<T>(fn: () => Promise<T>, label: string, delays: number[] = RETRY_DELAYS): Promise<T> {
   let lastError: Error | null = null;
-  for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
+  for (let attempt = 0; attempt <= delays.length; attempt++) {
     try {
       return await fn();
     } catch (err) {
@@ -59,13 +80,49 @@ async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
       ) {
         throw lastError;
       }
-      if (attempt < RETRY_DELAYS.length) {
-        console.warn(`[drive-upload] ${label} attempt ${attempt + 1} failed, retrying in ${RETRY_DELAYS[attempt]}ms...`);
-        await new Promise((r) => setTimeout(r, RETRY_DELAYS[attempt]));
+      if (attempt < delays.length) {
+        console.warn(`[drive-upload] ${label} attempt ${attempt + 1} failed, retrying in ${delays[attempt]}ms...`);
+        await new Promise((r) => setTimeout(r, delays[attempt]));
       }
     }
   }
-  throw lastError || new Error(`${label} failed after ${RETRY_DELAYS.length + 1} attempts`);
+  throw lastError || new Error(`${label} failed after ${delays.length + 1} attempts`);
+}
+
+// Aborts an in-flight upload when no progress arrives for STALL_TIMEOUT_MS.
+// kick() re-arms the timer on each progress event; clear() disarms it once the
+// request settles. The caller wires these to the xhr events.
+function makeStallWatchdog(xhr: XMLHttpRequest, onStall: () => void) {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const clear = () => {
+    if (timer) { clearTimeout(timer); timer = null; }
+  };
+  const kick = () => {
+    clear();
+    timer = setTimeout(() => {
+      try { xhr.abort(); } catch { /* already settled */ }
+      onStall();
+    }, STALL_TIMEOUT_MS);
+  };
+  return { kick, clear };
+}
+
+// fetch() has no default timeout, so a slow or dead endpoint can leave the
+// "finishing up" step hanging with no end — a card stuck below 100% forever.
+// The AbortController bounds it; withRetry treats the resulting error as
+// retryable, and the message stays honest for the user.
+const FETCH_TIMEOUT_MS = 20000;
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (err) {
+    if (controller.signal.aborted) throw new Error("Upload timed out");
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // ─── Proxy path (< 4 MB) ───────────────────────────────────────────────────
@@ -92,25 +149,32 @@ async function uploadViaProxy(
 
     return new Promise<DriveUploadResult>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
+      let settled = false;
+      const fail = (err: Error) => { if (settled) return; settled = true; watchdog.clear(); reject(err); };
+      const done = (value: DriveUploadResult) => { if (settled) return; settled = true; watchdog.clear(); resolve(value); };
+      const watchdog = makeStallWatchdog(xhr, () => fail(new Error("Upload stalled (no progress for 30s)")));
+
       xhr.open("POST", "/api/drive/proxy-upload", true);
       if (accessToken) xhr.setRequestHeader("Authorization", `Bearer ${accessToken}`);
 
       xhr.upload.onprogress = (e) => {
+        watchdog.kick();
         if (e.lengthComputable) {
           onProgress?.(Math.round((e.loaded / e.total) * 90));
         }
       };
 
       xhr.onload = () => {
+        watchdog.clear();
         onProgress?.(95);
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
             const data = JSON.parse(xhr.responseText);
             if (data.error) {
-              reject(new Error(data.error));
+              fail(new Error(data.error));
             } else {
               onProgress?.(100);
-              resolve({
+              done({
                 fileId: data.fileId,
                 url: data.url,
                 mimeType: data.mimeType,
@@ -118,20 +182,22 @@ async function uploadViaProxy(
               });
             }
           } catch {
-            reject(new Error("Invalid response from upload server"));
+            fail(new Error("Invalid response from upload server"));
           }
         } else {
           try {
             const data = JSON.parse(xhr.responseText);
-            reject(new Error(data.error || `Upload failed: ${xhr.status}`));
+            fail(new Error(data.error || `Upload failed: ${xhr.status}`));
           } catch {
-            reject(new Error(`Upload failed: ${xhr.status}`));
+            fail(new Error(`Upload failed: ${xhr.status}`));
           }
         }
       };
 
-      xhr.onerror = () => reject(new Error("Network error during upload"));
-      xhr.ontimeout = () => reject(new Error("Upload timed out"));
+      xhr.onerror = () => fail(new Error("Network error during upload"));
+      xhr.ontimeout = () => fail(new Error("Upload timed out"));
+      xhr.onabort = () => fail(new Error("Upload aborted"));
+      watchdog.kick();
       xhr.send(formData);
     });
   }, "Proxy upload");
@@ -155,7 +221,7 @@ async function getUploadSession(
   cardId: string | undefined
 ): Promise<string> {
   const headers = await getAuthHeaders();
-  const res = await fetch("/api/drive/upload", {
+  const res = await fetchWithTimeout("/api/drive/upload", {
     method: "POST",
     headers,
     body: JSON.stringify({
@@ -188,10 +254,16 @@ async function putToGoogle(
 ): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
+    let settled = false;
+    const fail = (err: Error) => { if (settled) return; settled = true; watchdog.clear(); reject(err); };
+    const done = (id: string) => { if (settled) return; settled = true; watchdog.clear(); resolve(id); };
+    const watchdog = makeStallWatchdog(xhr, () => fail(new Error("Upload stalled (no progress for 30s)")));
+
     xhr.open("PUT", uploadUri, true);
     xhr.setRequestHeader("Content-Type", normalizeDriveMimeType(file.type));
 
     xhr.upload.onprogress = (e) => {
+      watchdog.kick();
       if (e.lengthComputable) {
         // Map to 5–90% of overall progress
         onProgress?.(5 + Math.round((e.loaded / e.total) * 85));
@@ -199,31 +271,34 @@ async function putToGoogle(
     };
 
     xhr.onload = () => {
+      watchdog.clear();
       if (xhr.status === 200 || xhr.status === 201) {
         try {
           const data = JSON.parse(xhr.responseText);
           if (!data.id) {
-            reject(new Error("Google did not return a file ID after upload"));
+            fail(new Error("Storage did not return a file ID after upload"));
           } else {
-            resolve(data.id as string);
+            done(data.id as string);
           }
         } catch {
-          reject(new Error("Invalid response from Google after upload"));
+          fail(new Error("Invalid response from storage after upload"));
         }
       } else {
-        reject(new Error(`Upload to Google failed: ${xhr.status}`));
+        fail(new Error(`Upload to storage failed: ${xhr.status}`));
       }
     };
 
-    xhr.onerror = () => reject(new Error("Network error during upload to Google"));
-    xhr.ontimeout = () => reject(new Error("Upload to Google timed out"));
+    xhr.onerror = () => fail(new Error("Network error during upload"));
+    xhr.ontimeout = () => fail(new Error("Upload timed out"));
+    xhr.onabort = () => fail(new Error("Upload aborted"));
+    watchdog.kick();
     xhr.send(file);
   });
 }
 
 async function finalizeUpload(fileId: string): Promise<DriveUploadResult> {
   const headers = await getAuthHeaders();
-  const res = await fetch("/api/drive/finalize", {
+  const res = await fetchWithTimeout("/api/drive/finalize", {
     method: "POST",
     headers,
     body: JSON.stringify({ fileId }),
@@ -255,17 +330,21 @@ async function uploadViaResumable(
 ): Promise<DriveUploadResult> {
   onProgress?.(0);
 
-  // Step 1: create resumable session (returns uploadUri)
-  const uploadUri = await withRetry(
-    () => getUploadSession(file, folder, cardId),
-    "Session creation"
+  // Steps 1+2 together, under one retry. Each attempt mints a FRESH session and
+  // then PUTs the bytes: re-PUTting a partially-consumed session URI is not
+  // safe, so a retry must start a new session. Previously the PUT had no retry
+  // at all, so any dropped connection failed the whole upload outright.
+  const fileId = await withRetry(
+    async () => {
+      const uploadUri = await getUploadSession(file, folder, cardId);
+      onProgress?.(5);
+      // The uploadUri is pre-authenticated, so the browser PUTs straight to
+      // storage with no auth header and no server hop for the bytes.
+      return putToGoogle(file, uploadUri, onProgress);
+    },
+    "Direct upload",
+    PUT_RETRY_DELAYS,
   );
-  onProgress?.(5);
-
-  // Step 2: PUT file directly to Google (bypasses Vercel)
-  // The uploadUri is pre-authenticated — no auth headers needed.
-  // Google resumable upload endpoints are CORS-safe (Access-Control-Allow-Origin: *).
-  const fileId = await putToGoogle(file, uploadUri, onProgress);
   onProgress?.(90);
 
   // Step 3: set permissions and get serving URL
@@ -296,4 +375,81 @@ export async function uploadToDrive(
     return uploadViaResumable(file, folder, cardId, onProgress);
   }
   return uploadViaProxy(file, folder, cardId, onProgress);
+}
+
+// ─── Batch upload (bounded concurrency) ──────────────────────────────────────
+
+export interface BatchItemResult {
+  /** Index within the input array, preserved regardless of completion order. */
+  index: number;
+  file: File;
+  result?: DriveUploadResult;
+  error?: Error;
+}
+
+/**
+ * Upload many files with bounded concurrency instead of one-at-a-time.
+ *
+ * - At most `concurrency` uploads run at once (default 3).
+ * - `onProgress` reports a size-weighted aggregate percent across the batch.
+ * - `stopOnError` stops launching NEW uploads after the first failure
+ *   (in-flight uploads still finish), matching a fail-closed caller.
+ * - Returns one BatchItemResult per started file, each tagged with its original
+ *   `index`, so callers can map results back to input order.
+ */
+export async function uploadManyToDrive(
+  files: File[],
+  folder: "thumbnails" | "raw-files" | "media-library",
+  opts: {
+    cardId?: string;
+    concurrency?: number;
+    stopOnError?: boolean;
+    onProgress?: ProgressCallback;
+    onSettled?: (item: BatchItemResult) => void;
+  } = {},
+): Promise<BatchItemResult[]> {
+  const { cardId, concurrency = 3, stopOnError = false, onProgress, onSettled } = opts;
+  const total = files.length;
+  if (total === 0) return [];
+
+  const totalBytes = files.reduce((sum, f) => sum + (f.size || 1), 0);
+  const filePercent = new Array<number>(total).fill(0);
+  const emitProgress = () => {
+    if (!onProgress) return;
+    let weighted = 0;
+    for (let i = 0; i < total; i++) weighted += (files[i].size || 1) * filePercent[i];
+    onProgress(Math.round(weighted / totalBytes));
+  };
+
+  const settled = new Array<BatchItemResult | undefined>(total);
+  let next = 0;
+  let aborted = false;
+
+  const worker = async () => {
+    while (!aborted) {
+      const i = next++;
+      if (i >= total) return;
+      const file = files[i];
+      try {
+        const result = await uploadToDrive(file, folder, cardId, (p) => {
+          filePercent[i] = p;
+          emitProgress();
+        });
+        filePercent[i] = 100;
+        emitProgress();
+        const item: BatchItemResult = { index: i, file, result };
+        settled[i] = item;
+        try { onSettled?.(item); } catch { /* caller side effect, ignore */ }
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        const item: BatchItemResult = { index: i, file, error };
+        settled[i] = item;
+        try { onSettled?.(item); } catch { /* ignore */ }
+        if (stopOnError) { aborted = true; return; }
+      }
+    }
+  };
+
+  await Promise.all(Array.from({ length: Math.min(concurrency, total) }, worker));
+  return settled.filter((x): x is BatchItemResult => x !== undefined);
 }
