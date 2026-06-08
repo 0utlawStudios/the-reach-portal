@@ -13,6 +13,8 @@ import { X, RotateCcw, Sparkles, Copy, Calendar, ArrowRight, CheckCircle } from 
 import { ensureMediaAsset } from "@/lib/media-assets";
 import { useAuth } from "@/lib/auth-context";
 import { useFocusTrap } from "./use-focus-trap";
+import { isDrivePublishableMediaMime } from "@/lib/drive-policy";
+import { resolvePostedArchiveDate } from "@/lib/post-archive";
 
 type RepurposeMode = "select" | "repost" | "rewrite" | "seasonal";
 
@@ -64,6 +66,15 @@ export function RepurposeModal({ card, onClose }: Props) {
       hook: hook.trim() || undefined,
       scheduledDate,
       scheduledTime,
+      sourceVault: card.sourceVault
+        ? {
+            designLink: card.sourceVault.designLink,
+            driveFolder: card.sourceVault.driveFolder,
+            rawFiles: card.sourceVault.rawFiles?.map((file) => ({ ...file })),
+          }
+        : undefined,
+      assetSource: card.assetSource,
+      licenseFileId: card.licenseFileId,
     });
     // Sync thumbnail and rawFiles to Media Library (dedup-safe)
     if (card.thumbnailUrl) {
@@ -78,6 +89,7 @@ export function RepurposeModal({ card, onClose }: Props) {
     }
     if (card.sourceVault?.rawFiles) {
       for (const rf of card.sourceVault.rawFiles) {
+        if (!isDrivePublishableMediaMime(rf.mimeType, rf.name)) continue;
         ensureMediaAsset({
           name: rf.name,
           url: rf.url,
@@ -119,7 +131,7 @@ export function RepurposeModal({ card, onClose }: Props) {
                   <p className="text-[13px] font-medium text-gray-800 dark:text-gray-200 line-clamp-1">{card.title}</p>
                   <div className="flex items-center gap-1.5 mt-1">
                     {card.platforms.map((p) => <span key={p} className="text-gray-400"><PlatformIcon platform={p} className="w-3 h-3" /></span>)}
-                    <span className="text-[10px] text-gray-400 ml-1">Posted {card.scheduledDate}</span>
+                    <span className="text-[10px] text-gray-400 ml-1">Posted {resolvePostedArchiveDate(card) || "unknown"}</span>
                   </div>
                   <p className="text-[11px] text-gray-500 mt-1 line-clamp-2">{card.caption}</p>
                 </div>

@@ -25,7 +25,12 @@ const MANUAL_POSTED_ROUTE_SRC = readFileSync(
   join(process.cwd(), "src/app/api/admin/posts/[id]/manual-posted/route.ts"),
   "utf8",
 );
+const MANUAL_POSTED_SETTINGS_ROUTE_SRC = readFileSync(
+  join(process.cwd(), "src/app/api/admin/manual-posted-settings/route.ts"),
+  "utf8",
+);
 const MANUAL_POSTED_SETTINGS_SRC = readFileSync(join(process.cwd(), "src/lib/manual-posted-settings.ts"), "utf8");
+const SETTINGS_PAGE_SRC = readFileSync(join(process.cwd(), "src/components/pages/settings-page.tsx"), "utf8");
 const REVISION_MODAL_SRC = readFileSync(join(process.cwd(), "src/components/revision-modal.tsx"), "utf8");
 const KICKBACK_MODAL_SRC = readFileSync(join(process.cwd(), "src/components/kickback-modal.tsx"), "utf8");
 const AUDIT_SRC = readFileSync(join(process.cwd(), "src/lib/audit.ts"), "utf8");
@@ -212,12 +217,21 @@ describe("iron-law guards in pipeline-context.tsx", () => {
     expect(POST_STAGE_GUARD_MIGRATION_SRC).toMatch(/CREATE TRIGGER posts_block_manual_posted/);
   });
 
-  it("manual Posted override stays admin-only and uses the service-role API path", () => {
-    expect(MANUAL_POSTED_SETTINGS_SRC).toContain("manual_posted_moves_enabled");
+  it("manual Posted override is globally toggled by superadmin and usable by approvers only for approved cards", () => {
+    expect(MANUAL_POSTED_SETTINGS_SRC).toContain("/api/admin/manual-posted-settings");
+    expect(MANUAL_POSTED_SETTINGS_SRC).not.toContain("loadState");
+    expect(MANUAL_POSTED_SETTINGS_SRC).not.toContain("saveState");
+    expect(SETTINGS_PAGE_SRC).toContain("{isSuperadmin && (");
+    expect(MANUAL_POSTED_SETTINGS_ROUTE_SRC).toContain("MANUAL_POSTED_TOGGLE_ROLES");
     expect(KANBAN_BOARD_SRC).toContain("useManualPostedMovesEnabled");
+    expect(KANBAN_BOARD_SRC).toContain('sourceCard.stage !== "approved_scheduled"');
+    expect(KANBAN_BOARD_SRC).toContain("blocked_posted_approver_required");
     expect(PIPELINE_SRC).toContain("useManualPostedMovesEnabled");
     expect(PIPELINE_SRC).toContain("/api/admin/posts/${cardId}/manual-posted");
-    expect(MANUAL_POSTED_ROUTE_SRC).toContain('requireBearerTeamRole(request, ["superadmin", "admin", "owner"])');
+    expect(PIPELINE_SRC).toContain('card?.stage !== "approved_scheduled"');
+    expect(MANUAL_POSTED_ROUTE_SRC).toContain("requireBearerTeamRole(request, MANUAL_POSTED_MOVE_ROLES)");
+    expect(MANUAL_POSTED_ROUTE_SRC).toContain("MANUAL_POSTED_FLAG_NAME");
+    expect(MANUAL_POSTED_ROUTE_SRC).toContain('existing.stage !== "approved_scheduled"');
     expect(MANUAL_POSTED_ROUTE_SRC).toContain("createServiceRoleClient");
     expect(MANUAL_POSTED_ROUTE_SRC).toMatch(/\.update\(\{\s*stage:\s*"posted",\s*posted_at:\s*postedAt\s*\}\)/);
     expect(MANUAL_POSTED_ROUTE_SRC).toContain('p_action: "manual_posted"');

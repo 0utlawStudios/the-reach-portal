@@ -1,7 +1,7 @@
 // POST /api/admin/posts/[id]/manual-posted
 //
-// Admin-only emergency/manual confirmation path for cases where Meta or the
-// auto-publisher is blocked but the operator has verified the content is live.
+// Emergency/manual confirmation path for cases where Meta or the auto-publisher
+// is blocked but an approver-class operator has verified the content is live.
 // Browser clients cannot update stage='posted' directly; migration 0046 blocks
 // that. This route verifies the admin-class actor, then uses the service-role
 // client and records posted_at in the same write.
@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireBearerTeamRole } from "@/lib/auth/require";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { isValidUuid } from "@/lib/utils";
+import { MANUAL_POSTED_FLAG_NAME, MANUAL_POSTED_MOVE_ROLES } from "@/lib/manual-posted-constants";
 
 export const runtime = "nodejs";
 export const maxDuration = 10;
@@ -27,7 +28,7 @@ function parsePostedAt(value: unknown): string {
 
 export async function POST(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   try {
-    const auth = await requireBearerTeamRole(request, ["superadmin", "admin", "owner"]);
+    const auth = await requireBearerTeamRole(request, MANUAL_POSTED_MOVE_ROLES);
     if (auth instanceof NextResponse) return auth;
 
     const { id } = await ctx.params;
@@ -44,6 +45,18 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 
     const postedAt = parsePostedAt(body.postedAt);
     const admin = createServiceRoleClient();
+    const { data: flag, error: flagError } = await admin
+      .from("feature_flags")
+      .select("enabled")
+      .eq("name", MANUAL_POSTED_FLAG_NAME)
+      .maybeSingle<{ enabled: boolean | null }>();
+    if (flagError) {
+      console.error("[admin/posts/manual-posted] flag read failed:", flagError.message);
+      return NextResponse.json({ error: "Could not verify Manual Posted setting" }, { status: 500 });
+    }
+    if (flag?.enabled !== true) {
+      return NextResponse.json({ error: "Manual Posted moves are disabled in Settings." }, { status: 403 });
+    }
 
     const { data: existing, error: existingError } = await admin
       .from("posts")
@@ -62,6 +75,9 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 
     if (existing.stage === "posted") {
       return NextResponse.json({ success: true, data: { id, stage: "posted", posted_at: existing.posted_at || postedAt } });
+    }
+    if (existing.stage !== "approved_scheduled") {
+      return NextResponse.json({ error: "Only Approved / Scheduled posts can be manually moved to Posted." }, { status: 409 });
     }
 
     const { data, error } = await admin

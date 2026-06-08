@@ -22,6 +22,7 @@ import { RepurposeModal } from "./repurpose-modal";
 import { ValidationErrorModal } from "./validation-error-modal";
 import { useNavigation } from "@/lib/navigation-context";
 import { useManualPostedMovesEnabled } from "@/lib/manual-posted-settings";
+import { isArchivedPostedCard, isCurrentPostedCard, resolvePostedArchiveDate } from "@/lib/post-archive";
 
 // ─── Context-aware comparators per column ───
 // PERF-012: comparators only — no array clone here. The single-pass useMemo
@@ -45,11 +46,14 @@ function compareForStage(stage: PipelineStage) {
       }
 
       // Posted: most recently published at top (reverse chronological)
-      case "posted":
-        if (a.scheduledDate && b.scheduledDate) return b.scheduledDate.localeCompare(a.scheduledDate);
-        if (a.scheduledDate && !b.scheduledDate) return -1;
-        if (!a.scheduledDate && b.scheduledDate) return 1;
+      case "posted": {
+        const aDate = resolvePostedArchiveDate(a);
+        const bDate = resolvePostedArchiveDate(b);
+        if (aDate && bDate) return bDate.localeCompare(aDate);
+        if (aDate && !bDate) return -1;
+        if (!aDate && bDate) return 1;
         return b.updatedAt.localeCompare(a.updatedAt);
+      }
 
       default:
         return 0;
@@ -59,7 +63,6 @@ function compareForStage(stage: PipelineStage) {
 
 // ─── RBAC: columns that require Approver ───
 const APPROVER_COLUMNS: PipelineStage[] = ["approved_scheduled", "posted"];
-const MANUAL_POSTED_ROLES = new Set(["superadmin", "admin", "owner"]);
 
 type DragTelemetryDetail = {
   activeId: string;
@@ -134,10 +137,6 @@ export function KanbanBoard() {
     () => isPipelineApproverRole(currentMember?.role || currentUser.role),
     [currentMember, currentUser.role]
   );
-  const userIsManualPostedOperator = useMemo(
-    () => MANUAL_POSTED_ROLES.has((currentMember?.role || currentUser.role || "").trim().toLowerCase()),
-    [currentMember, currentUser.role],
-  );
   const manualPostedMovesEnabled = useManualPostedMovesEnabled();
 
   // CST week window (Sun-Sat)
@@ -164,7 +163,7 @@ export function KanbanBoard() {
     // Posted column only shows this week's posts — older ones auto-archive.
     // Filter mutates the bucket reference; the prior arrays were never observed.
     if (groups.posted) {
-      groups.posted = groups.posted.filter((c) => !c.scheduledDate || new Date(c.scheduledDate) >= thisWeekStart);
+      groups.posted = groups.posted.filter((c) => isCurrentPostedCard(c, thisWeekStart));
     }
     for (const col of PIPELINE_COLUMNS) {
       groups[col.id].sort(compareForStage(col.id));
@@ -175,8 +174,8 @@ export function KanbanBoard() {
   // Archive = posted cards before this week
   const archivedCards = useMemo(() => {
     return cards
-      .filter((c) => c.stage === "posted" && c.scheduledDate && new Date(c.scheduledDate) < thisWeekStart)
-      .sort((a, b) => (b.scheduledDate || "").localeCompare(a.scheduledDate || ""));
+      .filter((c) => isArchivedPostedCard(c, thisWeekStart))
+      .sort((a, b) => (resolvePostedArchiveDate(b) || "").localeCompare(resolvePostedArchiveDate(a) || ""));
   }, [cards, thisWeekStart]);
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
@@ -258,22 +257,41 @@ export function KanbanBoard() {
       return;
     }
 
-    // ── Posted lockdown: only admin-class users can use the Settings override. ──
-    if (targetStage === "posted" && (!manualPostedMovesEnabled || !userIsManualPostedOperator)) {
-      emitDragTelemetry("end", {
-        activeId: cardId,
-        overId,
-        fromStage: sourceCard.stage,
-        targetStage,
-        outcome: "blocked_posted_target",
-      });
-      addToast(
-        manualPostedMovesEnabled
-          ? "Only workspace admins can manually move cards to Posted."
-          : "Manual Posted moves are disabled in Settings. Turn them on before moving cards to Posted.",
-        "warning",
-      );
-      return;
+    // ── Posted lockdown: temporary Settings override for verified live posts. ──
+    if (targetStage === "posted") {
+      if (!manualPostedMovesEnabled) {
+        emitDragTelemetry("end", {
+          activeId: cardId,
+          overId,
+          fromStage: sourceCard.stage,
+          targetStage,
+          outcome: "blocked_posted_target",
+        });
+        addToast("Manual Posted moves are disabled in Settings. Turn them on before moving cards to Posted.", "warning");
+        return;
+      }
+      if (sourceCard.stage !== "approved_scheduled") {
+        emitDragTelemetry("end", {
+          activeId: cardId,
+          overId,
+          fromStage: sourceCard.stage,
+          targetStage,
+          outcome: "blocked_posted_source_not_approved",
+        });
+        addToast("Only Approved / Scheduled cards can be manually moved to Posted.", "warning");
+        return;
+      }
+      if (!userIsApprover) {
+        emitDragTelemetry("end", {
+          activeId: cardId,
+          overId,
+          fromStage: sourceCard.stage,
+          targetStage,
+          outcome: "blocked_posted_approver_required",
+        });
+        addToast("Approver permissions are required to manually move cards to Posted.", "error");
+        return;
+      }
     }
 
     // ── Completeness gate: required fields must be filled before entering Awaiting Approval or Approved ──
@@ -338,7 +356,7 @@ export function KanbanBoard() {
       outcome: "move_requested",
     });
     moveCard(cardId, targetStage);
-  }, [cards, moveCard, requestKickback, userIsApprover, userIsManualPostedOperator, manualPostedMovesEnabled, addToast]);
+  }, [cards, moveCard, requestKickback, userIsApprover, manualPostedMovesEnabled, addToast]);
 
   const handleDragOver = useCallback(() => {
     // Empty: all moves on drop. DragOverlay provides visual feedback.
@@ -418,7 +436,7 @@ export function KanbanBoard() {
                         <div className="flex items-center gap-1">
                           {card.platforms.map((p) => <span key={p} className="text-gray-400"><PlatformIcon platform={p} className="w-3 h-3" /></span>)}
                         </div>
-                        <span className="text-[10px] text-gray-400 flex items-center gap-1"><Calendar className="w-2.5 h-2.5" />Posted {card.scheduledDate}</span>
+                        <span className="text-[10px] text-gray-400 flex items-center gap-1"><Calendar className="w-2.5 h-2.5" />Posted {resolvePostedArchiveDate(card) || "unknown"}</span>
                       </div>
                     </div>
                     <button

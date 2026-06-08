@@ -8,7 +8,8 @@ export type FlagName =
   | "publish_v2"
   | "media_v2"
   | "audit_v2"
-  | "content_validation_v2";
+  | "content_validation_v2"
+  | "manual_posted_moves";
 
 type CacheEntry = { value: boolean; at: number };
 

@@ -571,6 +571,10 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
       addToast("Posted cards are locked. Create a new post or use the publisher recovery path.", "warning");
       return;
     }
+    if (newStage === "posted" && card?.stage !== "approved_scheduled") {
+      addToast("Only Approved / Scheduled cards can be manually moved to Posted.", "warning");
+      return;
+    }
 
     // TEMP-ID GUARD: the card's createCard INSERT is still in flight (its id
     // is a timestamp, not a UUID). Applying a stage move now would be lost —

@@ -13,7 +13,7 @@ import { usePresence } from "@/lib/use-presence";
 import { PresenceDot } from "@/components/presence-dot";
 import { PresenceLabel } from "@/components/presence-label";
 import { usePipeline } from "@/lib/pipeline-context";
-import { setManualPostedMovesEnabled, useManualPostedMovesEnabled } from "@/lib/manual-posted-settings";
+import { setManualPostedMovesEnabled, useManualPostedMovesSetting } from "@/lib/manual-posted-settings";
 import { ThemeSelector } from "@/components/theme-selector";
 import { fetchAllAuditLogs, AuditEntry } from "@/lib/audit";
 import { History, ArrowUpRight, Search, FileText as FileTextIcon, Shield as ShieldIcon, AtSign, ArrowUpDown, Filter, ChevronRight, CheckCircle, Activity, Clock as ClockIcon } from "lucide-react";
@@ -468,7 +468,8 @@ export function SettingsPage() {
   const { navigate } = useNavigation();
   const { addToast } = useToast();
   const { workspaceId } = usePipeline();
-  const manualPostedMovesEnabled = useManualPostedMovesEnabled();
+  const manualPostedMovesSetting = useManualPostedMovesSetting();
+  const [manualPostedSaving, setManualPostedSaving] = useState(false);
   const [workspaceTz, setWorkspaceTz] = useState("America/Chicago");
   const currentMember = members.find((m) => m.email === currentUser.email);
   const isAdmin = currentMember?.role === "superadmin" || currentMember?.role === "admin";
@@ -754,14 +755,24 @@ export function SettingsPage() {
               Coming Soon so the UI does not imply a saved per-user setting. */}
           <Section title="Publishing" icon={<Zap className="w-3.5 h-3.5 text-amber-500" />}>
             <SettingRow icon={Clock} label="Auto-publish" desc="n8n claims approved posts at scheduled time"><div className="flex items-center gap-2"><ActiveBadge /><Toggle defaultOn disabled /></div></SettingRow>
-            {isAdmin && (
-              <SettingRow icon={Send} label="Manual Posted moves" desc="Allow admins to drag verified live posts into Posted">
+            {isSuperadmin && (
+              <SettingRow icon={Send} label="Manual Posted moves" desc="Temporarily let approvers move approved cards to Posted">
                 <Toggle
-                  checked={manualPostedMovesEnabled}
+                  checked={manualPostedMovesSetting.enabled}
+                  disabled={manualPostedMovesSetting.loading || manualPostedSaving}
                   ariaLabel="Manual Posted moves"
-                  onChange={(enabled) => {
-                    setManualPostedMovesEnabled(enabled);
-                    addToast(enabled ? "Manual Posted moves enabled" : "Manual Posted moves disabled", "success");
+                  onChange={async (enabled) => {
+                    setManualPostedSaving(true);
+                    try {
+                      await setManualPostedMovesEnabled(enabled);
+                      addToast(enabled ? "Manual Posted moves enabled" : "Manual Posted moves disabled", "success");
+                    } catch (err) {
+                      const message = err instanceof Error ? err.message : "Could not update Manual Posted moves";
+                      addToast(message, "error");
+                      await manualPostedMovesSetting.refresh();
+                    } finally {
+                      setManualPostedSaving(false);
+                    }
                   }}
                 />
               </SettingRow>
