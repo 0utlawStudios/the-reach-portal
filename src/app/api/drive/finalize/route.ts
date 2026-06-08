@@ -4,7 +4,7 @@ import { requireBearerTeamRole } from "@/lib/auth/require";
 import { consume, getClientIp } from "@/lib/rate-limit";
 import { VALID_DRIVE_FOLDERS } from "@/lib/drive-policy";
 
-export const maxDuration = 10;
+export const maxDuration = 60;
 
 // SEC-002: Drive file IDs are base64-url-ish strings, generally 20-80 chars.
 // We don't want to forward arbitrary client input into Drive API calls or

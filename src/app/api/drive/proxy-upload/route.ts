@@ -32,11 +32,11 @@ export async function POST(request: NextRequest) {
     if (auth instanceof Response) return auth;
     const { user } = auth;
 
-    // SEC-001: 30/min/user. Tighter than drive/upload (which only mints a
-    // resumable URL) because each call here actually streams bytes through
-    // our serverless host.
+    // 60/min/user. The proxy path is the primary route for every file under 4 MB
+    // (one round-trip per file), so a multi-file batch — e.g. a 26-photo upload —
+    // must not trip the limit. Matches drive/upload's 60/min envelope.
     const rlKey = `user:${user.id}|ip:${getClientIp(request)}`;
-    const rl = await consume("drive-proxy-upload:user", rlKey, 30, 60);
+    const rl = await consume("drive-proxy-upload:user", rlKey, 60, 60);
     if (!rl.allowed) {
       return jsonResponse({ error: "Too many uploads. Please slow down." }, 429);
     }

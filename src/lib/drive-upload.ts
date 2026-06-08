@@ -52,16 +52,18 @@ const PUT_RETRY_DELAYS = [3000];
 // progress event, so a slow-but-moving upload is never killed.
 const STALL_TIMEOUT_MS = 30000;
 
-// Files at or above this threshold upload directly to storage: the client sends
-// bytes straight to the destination, and the server only mints the session and
-// finalizes. Below it, the small-file proxy path is used.
+// Files at or above this threshold upload directly to storage (client PUTs bytes
+// straight to Google; the server only mints the session + finalizes). Below it,
+// the small-file proxy path is used — a SINGLE round-trip per file with a 60s
+// server budget and a stall watchdog.
 //
-// Lowered from 4 MB to 1 MB on real-user evidence (~2 MB photos took minutes and
-// often failed). The proxy path holds a serverless function for the ENTIRE
-// client upload, so a slow connection can blow past the function time limit and
-// 500, which then retries. The direct path never holds a function during the
-// byte transfer, so it stays reliable on slow connections.
-const RESUMABLE_THRESHOLD = 1 * 1024 * 1024; // 1 MB
+// Kept at 4 MB (just under Vercel's 4.5 MB request-body limit). An earlier change
+// lowered this to 1 MB to "help slow connections", but that pushed ordinary
+// photos onto the direct path, whose per-file session+finalize fetches timed out
+// under a large batch — a real 26-file upload failed with "Upload timed out".
+// The slow-connection case is already handled by the stall watchdog + gentle
+// retries on the proxy path, so the proxy is the right home for anything < 4 MB.
+const RESUMABLE_THRESHOLD = 4 * 1024 * 1024; // 4 MB
 
 async function withRetry<T>(fn: () => Promise<T>, label: string, delays: number[] = RETRY_DELAYS): Promise<T> {
   let lastError: Error | null = null;
@@ -111,7 +113,7 @@ function makeStallWatchdog(xhr: XMLHttpRequest, onStall: () => void) {
 // "finishing up" step hanging with no end — a card stuck below 100% forever.
 // The AbortController bounds it; withRetry treats the resulting error as
 // retryable, and the message stays honest for the user.
-const FETCH_TIMEOUT_MS = 20000;
+const FETCH_TIMEOUT_MS = 45000;
 async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);

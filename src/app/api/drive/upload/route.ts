@@ -15,7 +15,7 @@ import {
   VALID_DRIVE_FOLDERS,
 } from "@/lib/drive-policy";
 
-export const maxDuration = 10;
+export const maxDuration = 60;
 
 interface UploadRequest {
   fileName: string;
