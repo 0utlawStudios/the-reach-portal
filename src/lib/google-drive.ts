@@ -1,4 +1,5 @@
 import { GoogleAuth } from "google-auth-library";
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 // ─── Drive API base URLs ───
 const DRIVE_API = "https://www.googleapis.com/drive/v3";
@@ -45,7 +46,13 @@ async function driveFetch(url: string, init?: RequestInit): Promise<Response> {
   const token = await getAccessToken();
   const headers = new Headers(init?.headers);
   headers.set("Authorization", `Bearer ${token}`);
-  return fetch(url, { ...init, headers });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 45000);
+  try {
+    return await fetch(url, { ...init, headers, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // ─── Subfolder cache ───
@@ -171,8 +178,35 @@ export function getImageUrl(fileId: string): string {
   return `https://lh3.googleusercontent.com/d/${fileId}=s0`;
 }
 
+function streamSigningSecret(): string {
+  const secret = process.env.DRIVE_STREAM_SIGNING_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  if (!secret) throw new Error("Drive stream signing secret is not configured");
+  return secret;
+}
+
+export function signDriveStreamToken(fileId: string): string {
+  return createHmac("sha256", streamSigningSecret())
+    .update(fileId)
+    .digest("base64url");
+}
+
+export function verifyDriveStreamToken(fileId: string, token: string | null | undefined): boolean {
+  if (!token) return false;
+  try {
+    const expected = signDriveStreamToken(fileId);
+    const a = Buffer.from(expected);
+    const b = Buffer.from(token);
+    return a.length === b.length && timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
+}
+
 export function getStreamUrl(fileId: string): string {
-  return `/api/drive/stream?id=${fileId}`;
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
+  const base = siteUrl ? siteUrl.replace(/\/+$/, "") : "";
+  const params = new URLSearchParams({ id: fileId, token: signDriveStreamToken(fileId) });
+  return `${base}/api/drive/stream?${params.toString()}`;
 }
 
 // ─── File metadata ───

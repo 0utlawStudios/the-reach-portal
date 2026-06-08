@@ -23,7 +23,7 @@
  */
 
 import {
-  isAllowedDriveMediaMime,
+  isAllowedDriveUploadForFolder,
   MAX_DRIVE_MEDIA_FILE_SIZE,
   normalizeDriveMimeType,
 } from "@/lib/drive-policy";
@@ -36,6 +36,23 @@ export interface DriveUploadResult {
 }
 
 export type ProgressCallback = (percent: number) => void;
+
+export interface UploadFailureReport {
+  phase?: string;
+  route?: string;
+  uploadPath?: "proxy" | "resumable" | "unknown";
+  cardId?: string;
+  postTitle?: string;
+  folder?: string;
+  fileName?: string;
+  mimeType?: string;
+  fileSize?: number;
+  batchTotal?: number;
+  batchFailed?: number;
+  errorMessage: string;
+  errorStatus?: number;
+  errorDetail?: string;
+}
 
 // Interactive-friendly backoff. The old [2000, 8000, 32000] meant a single
 // transient hiccup cost up to 42s of dead waiting (and the proxy path re-sent
@@ -51,6 +68,8 @@ const PUT_RETRY_DELAYS = [3000];
 // the literal "upload took forever" symptom. The watchdog resets on every
 // progress event, so a slow-but-moving upload is never killed.
 const STALL_TIMEOUT_MS = 30000;
+const PROXY_TOTAL_TIMEOUT_MS = 120000;
+const DIRECT_RESPONSE_TIMEOUT_MS = 120000;
 
 // Files at or above this threshold upload directly to storage (client PUTs bytes
 // straight to Google; the server only mints the session + finalizes). Below it,
@@ -78,6 +97,7 @@ async function withRetry<T>(fn: () => Promise<T>, label: string, delays: number[
         lastError.message.includes("401") ||
         lastError.message.includes("403") ||
         lastError.message.includes("404") ||
+        lastError.message.includes("429") ||
         lastError.message.includes("413")
       ) {
         throw lastError;
@@ -142,11 +162,12 @@ async function uploadViaProxy(
     const { data: sessionData } = await supabase.auth.getSession();
     const accessToken = sessionData.session?.access_token;
 
+    const mimeType = normalizeDriveMimeType(file.type, file.name);
     const formData = new FormData();
     formData.append("file", file);
     formData.append("folder", folder);
     formData.append("fileName", file.name);
-    formData.append("mimeType", normalizeDriveMimeType(file.type));
+    formData.append("mimeType", mimeType);
     if (cardId) formData.append("cardId", cardId);
 
     return new Promise<DriveUploadResult>((resolve, reject) => {
@@ -157,12 +178,17 @@ async function uploadViaProxy(
       const watchdog = makeStallWatchdog(xhr, () => fail(new Error("Upload stalled (no progress for 30s)")));
 
       xhr.open("POST", "/api/drive/proxy-upload", true);
+      xhr.timeout = PROXY_TOTAL_TIMEOUT_MS;
       if (accessToken) xhr.setRequestHeader("Authorization", `Bearer ${accessToken}`);
 
       xhr.upload.onprogress = (e) => {
         watchdog.kick();
         if (e.lengthComputable) {
           onProgress?.(Math.round((e.loaded / e.total) * 90));
+          if (e.loaded >= e.total) {
+            watchdog.clear();
+            onProgress?.(92);
+          }
         }
       };
 
@@ -228,7 +254,7 @@ async function getUploadSession(
     headers,
     body: JSON.stringify({
       fileName: file.name,
-      mimeType: normalizeDriveMimeType(file.type),
+      mimeType: normalizeDriveMimeType(file.type, file.name),
       folder,
       cardId,
       fileSize: file.size,
@@ -257,18 +283,32 @@ async function putToGoogle(
   return new Promise<string>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     let settled = false;
-    const fail = (err: Error) => { if (settled) return; settled = true; watchdog.clear(); reject(err); };
-    const done = (id: string) => { if (settled) return; settled = true; watchdog.clear(); resolve(id); };
+    let responseTimer: ReturnType<typeof setTimeout> | null = null;
+    const clearResponseTimer = () => {
+      if (responseTimer) { clearTimeout(responseTimer); responseTimer = null; }
+    };
+    const armResponseTimer = () => {
+      clearResponseTimer();
+      responseTimer = setTimeout(() => {
+        fail(new Error("Upload finished sending but storage did not respond"));
+      }, DIRECT_RESPONSE_TIMEOUT_MS);
+    };
+    const fail = (err: Error) => { if (settled) return; settled = true; watchdog.clear(); clearResponseTimer(); reject(err); };
+    const done = (id: string) => { if (settled) return; settled = true; watchdog.clear(); clearResponseTimer(); resolve(id); };
     const watchdog = makeStallWatchdog(xhr, () => fail(new Error("Upload stalled (no progress for 30s)")));
 
     xhr.open("PUT", uploadUri, true);
-    xhr.setRequestHeader("Content-Type", normalizeDriveMimeType(file.type));
+    xhr.setRequestHeader("Content-Type", normalizeDriveMimeType(file.type, file.name));
 
     xhr.upload.onprogress = (e) => {
       watchdog.kick();
       if (e.lengthComputable) {
         // Map to 5–90% of overall progress
         onProgress?.(5 + Math.round((e.loaded / e.total) * 85));
+        if (e.loaded >= e.total) {
+          watchdog.clear();
+          armResponseTimer();
+        }
       }
     };
 
@@ -369,7 +409,7 @@ export async function uploadToDrive(
 ): Promise<DriveUploadResult> {
   if (file.size === 0) throw new Error("Cannot upload empty file");
   if (file.size > MAX_DRIVE_MEDIA_FILE_SIZE) throw new Error(`File exceeds ${MAX_DRIVE_MEDIA_FILE_SIZE / (1024 * 1024)}MB limit.`);
-  if (!isAllowedDriveMediaMime(file.type)) throw new Error("Unsupported media type. Upload an image or video file.");
+  if (!isAllowedDriveUploadForFolder(folder, file.type, file.name)) throw new Error("Unsupported file type for this upload location.");
 
   onProgress?.(0);
 
@@ -377,6 +417,25 @@ export async function uploadToDrive(
     return uploadViaResumable(file, folder, cardId, onProgress);
   }
   return uploadViaProxy(file, folder, cardId, onProgress);
+}
+
+export async function reportUploadFailure(report: UploadFailureReport): Promise<void> {
+  try {
+    const { supabase } = await import("@/lib/supabaseClient");
+    const { data } = await supabase.auth.getSession();
+    const accessToken = data.session?.access_token;
+    if (!accessToken) return;
+    await fetch("/api/drive/upload-failure", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(report),
+    });
+  } catch (err) {
+    console.error("[drive-upload] failure report failed:", err instanceof Error ? err.message : err);
+  }
 }
 
 // ─── Batch upload (bounded concurrency) ──────────────────────────────────────

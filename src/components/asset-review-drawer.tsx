@@ -26,6 +26,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useTeam } from "@/lib/team-context";
 import { useToast } from "@/lib/toast-context";
 import { ensureMediaAsset } from "@/lib/media-assets";
+import { isDrivePublishableMediaMime, normalizeDriveMimeType } from "@/lib/drive-policy";
 import { formatDate, formatDateTime, formatDateShort, formatDateTimeCompact } from "@/lib/utils";
 import { useFocusTrap } from "./use-focus-trap";
 import { isPipelineApproverRole } from "@/lib/roles";
@@ -35,6 +36,14 @@ import { isPipelineApproverRole } from "@/lib/roles";
 const MENTION_RE = /@[a-zA-Z][\w.-]*/;
 
 type DrawerTab = "content" | "vault" | "audit";
+
+function uploadErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "unknown error";
+}
+
+function uploadPathForSize(file: File): "proxy" | "resumable" {
+  return file.size >= 4 * 1024 * 1024 ? "resumable" : "proxy";
+}
 
 export function AssetReviewDrawer() {
   const { selectedCard, isDrawerOpen, isEditingOnOpen, closeDrawer, moveCard, requestReapproval, submitKickback, updateCard, deleteCard, workspaceId } = usePipeline();
@@ -283,6 +292,11 @@ export function AssetReviewDrawer() {
   const handleAssetReplace = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || uploading) return;
+    if (!isDrivePublishableMediaMime(file.type, file.name)) {
+      addToast("Cover uploads must be images or videos.", "error");
+      if (assetInputRef.current) assetInputRef.current.value = "";
+      return;
+    }
     setUploading(true);
     setUploadingFileName(file.name);
     setUploadProgress(0);
@@ -309,7 +323,22 @@ export function AssetReviewDrawer() {
       // REVERT — never persist blob URL
       URL.revokeObjectURL(blobUrl);
       updateCard(selectedCard.id, { thumbnailUrl: prevUrl });
-      addToast(`Cover upload failed: ${err instanceof Error ? err.message : "unknown error"}. Try again.`, "error");
+      const errorMessage = uploadErrorMessage(err);
+      const { reportUploadFailure } = await import("@/lib/drive-upload");
+      await reportUploadFailure({
+        phase: "drawer_cover_upload",
+        route: "/api/drive/upload-failure",
+        uploadPath: uploadPathForSize(file),
+        cardId: selectedCard.id,
+        postTitle: selectedCard.title,
+        folder: "thumbnails",
+        fileName: file.name,
+        mimeType: normalizeDriveMimeType(file.type, file.name),
+        fileSize: file.size,
+        errorMessage,
+        errorDetail: err instanceof Error ? err.stack : undefined,
+      });
+      addToast(`Cover upload failed: ${errorMessage}. Try again.`, "error");
     }
     if (prevUrl?.startsWith("blob:")) URL.revokeObjectURL(prevUrl);
     logAudit(selectedCard.id, currentUser.name, "asset_replaced", `Replaced cover with ${file.name}`);
@@ -339,6 +368,7 @@ export function AssetReviewDrawer() {
     try {
       const { uploadToDrive } = await import("@/lib/drive-upload");
       const result = await uploadToDrive(file, "raw-files", selectedCard.id, setUploadProgress);
+      const resultMimeType = result.mimeType || normalizeDriveMimeType(file.type, file.name);
       const existingFiles = selectedCard.sourceVault?.rawFiles || [];
       const isFirstFile = existingFiles.length === 0;
       const newFile = {
@@ -346,27 +376,44 @@ export function AssetReviewDrawer() {
         url: result.url,
         fileId: result.fileId,
         usageType: (isFirstFile ? "master" : "supplementary") as "master" | "supplementary",
-        mimeType: result.mimeType || file.type,
+        mimeType: resultMimeType,
         size: result.size || file.size,
         uploadedAt: new Date().toISOString(),
       };
       const rawFiles = [...existingFiles, newFile];
       updateCard(selectedCard.id, { sourceVault: { ...(selectedCard.sourceVault || {}), rawFiles } });
       // Sync to Media Library
-      ensureMediaAsset({
-        name: file.name,
-        url: result.url,
-        fileType: (result.mimeType || file.type).startsWith("video") ? "video" : "image",
-        folder: "Pipeline Uploads",
-        addedBy: currentUser.name,
-        workspaceId,
-        usedIn: selectedCard.id,
-      }).catch((err) => console.error("[drawer] media_assets sync failed:", err));
+      if (isDrivePublishableMediaMime(resultMimeType, file.name)) {
+        ensureMediaAsset({
+          name: file.name,
+          url: result.url,
+          fileType: resultMimeType.startsWith("video") ? "video" : "image",
+          folder: "Pipeline Uploads",
+          addedBy: currentUser.name,
+          workspaceId,
+          usedIn: selectedCard.id,
+        }).catch((err) => console.error("[drawer] media_assets sync failed:", err));
+      }
       logAudit(selectedCard.id, currentUser.name, "raw_file_uploaded", `Uploaded ${file.name} (${newFile.usageType})`);
       addToast(`${file.name} uploaded`, "success");
     } catch (err) {
       // NO BLOB FALLBACK — show error, let user retry
-      addToast(`Upload failed: ${err instanceof Error ? err.message : "unknown error"}. Try again.`, "error");
+      const errorMessage = uploadErrorMessage(err);
+      const { reportUploadFailure } = await import("@/lib/drive-upload");
+      await reportUploadFailure({
+        phase: "drawer_raw_file_upload",
+        route: "/api/drive/upload-failure",
+        uploadPath: uploadPathForSize(file),
+        cardId: selectedCard.id,
+        postTitle: selectedCard.title,
+        folder: "raw-files",
+        fileName: file.name,
+        mimeType: normalizeDriveMimeType(file.type, file.name),
+        fileSize: file.size,
+        errorMessage,
+        errorDetail: err instanceof Error ? err.stack : undefined,
+      });
+      addToast(`Upload failed: ${errorMessage}. Try again.`, "error");
     }
     if (rawFileInputRef.current) rawFileInputRef.current.value = "";
     setUploading(false);
@@ -692,7 +739,7 @@ export function AssetReviewDrawer() {
             )}
 
             {/* Dropzone */}
-            <input ref={rawFileInputRef} type="file" accept="image/*,video/*,.pdf,.psd,.ai,.prproj,.aep,.sketch,.fig" onChange={handleRawFileUpload} className="hidden" />
+            <input ref={rawFileInputRef} type="file" accept="image/*,video/*,.pdf,.txt,.doc,.docx,.csv,.xls,.xlsx,.ppt,.pptx,.zip,.psd,.ai,.prproj,.aep,.sketch,.fig" onChange={handleRawFileUpload} className="hidden" />
             <div className="flex gap-2">
               <button disabled={uploading} onClick={() => rawFileInputRef.current?.click()} className={`flex-1 border border-dashed rounded-xl py-3 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
                 !(selectedCard.sourceVault?.rawFiles?.length)
@@ -775,7 +822,7 @@ export function AssetReviewDrawer() {
                         onClick={async () => {
                           const input = document.createElement("input");
                           input.type = "file";
-                          input.accept = "image/*,.pdf,.txt";
+                          input.accept = "image/*,.pdf,.txt,.doc,.docx";
                           input.onchange = async (ev) => {
                             const file = (ev.target as HTMLInputElement).files?.[0];
                             if (!file) return;
@@ -786,7 +833,22 @@ export function AssetReviewDrawer() {
                               updateCard(selectedCard.id, { licenseFileId: result.fileId });
                               logAudit(selectedCard.id, currentUser.name, "license_uploaded", `Uploaded license: ${file.name}`);
                               addToast("License uploaded", "success");
-                            } catch {
+                            } catch (err) {
+                              const { reportUploadFailure } = await import("@/lib/drive-upload");
+                              const errorMessage = uploadErrorMessage(err);
+                              await reportUploadFailure({
+                                phase: "drawer_license_upload",
+                                route: "/api/drive/upload-failure",
+                                uploadPath: uploadPathForSize(file),
+                                cardId: selectedCard.id,
+                                postTitle: selectedCard.title,
+                                folder: "raw-files",
+                                fileName: file.name,
+                                mimeType: normalizeDriveMimeType(file.type, file.name),
+                                fileSize: file.size,
+                                errorMessage,
+                                errorDetail: err instanceof Error ? err.stack : undefined,
+                              });
                               addToast("License upload failed", "error");
                             }
                           };
@@ -921,7 +983,7 @@ export function AssetReviewDrawer() {
                 <div className="space-y-3">
                   <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em] flex items-center gap-1.5"><Paperclip className="w-3 h-3 text-violet-500" />Raw Project Files</label>
 
-                  <input ref={rawFileInputRef} type="file" onChange={handleRawFileUpload} className="hidden" />
+                  <input ref={rawFileInputRef} type="file" accept="image/*,video/*,.pdf,.txt,.doc,.docx,.csv,.xls,.xlsx,.ppt,.pptx,.zip,.psd,.ai,.prproj,.aep,.sketch,.fig" onChange={handleRawFileUpload} className="hidden" />
                   <button onClick={() => rawFileInputRef.current?.click()} className="w-full border-2 border-dashed border-gray-200 dark:border-white/[0.08] rounded-xl py-5 flex flex-col items-center gap-1.5 text-gray-400 hover:text-gray-500 hover:border-gray-300 dark:hover:border-white/[0.15] transition-colors cursor-pointer">
                     <Upload className="w-5 h-5" />
                     <span className="text-[11px]">Upload .prproj, .zip, .psd, or any project file</span>

@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { ensureSubfolder, getAccessToken, getFileMetadata, getRootFolderId } from "@/lib/google-drive";
+import { ensureSubfolder, getAccessToken, getFileMetadata, getRootFolderId, verifyDriveStreamToken } from "@/lib/google-drive";
 import { VALID_DRIVE_FOLDERS } from "@/lib/drive-policy";
 
 export const maxDuration = 60; // Fluid Compute — stays alive while streaming
@@ -100,7 +100,12 @@ async function isInAppManagedDriveFolder(fileId: string): Promise<boolean> {
 // is not enough because it can be forged; the referer fallback is constrained
 // to file IDs already referenced by app rows or physically inside app-managed
 // Drive folders.
-async function checkAuth(req: NextRequest, fileId: string): Promise<{ ok: boolean; authed: boolean }> {
+async function checkAuth(req: NextRequest, fileId: string): Promise<{ ok: boolean; authed: boolean; signed: boolean }> {
+  const signedToken = req.nextUrl.searchParams.get("token");
+  if (verifyDriveStreamToken(fileId, signedToken)) {
+    return { ok: true, authed: true, signed: true };
+  }
+
   // Media tag fallback: allowed only for file IDs already present in app data
   // or physically inside one of the app-managed Drive folders.
   const referer = req.headers.get("referer") || "";
@@ -128,10 +133,11 @@ async function checkAuth(req: NextRequest, fileId: string): Promise<{ ok: boolea
     }
   }
 
-  if (tokenOk) return { ok: true, authed: true };
+  if (tokenOk) return { ok: true, authed: true, signed: false };
   return {
     ok: refOk && (await isKnownAppDriveFile(fileId) || await isInAppManagedDriveFolder(fileId)),
     authed: false,
+    signed: false,
   };
 }
 
@@ -190,7 +196,9 @@ export async function GET(request: NextRequest) {
     // standard 1-day immutable window. When they only proved same-origin via
     // Referer we keep the byte cache out of intermediaries — the Referer
     // header doesn't ride along on subsequent retrievals.
-    const cacheControl = auth.authed
+    const cacheControl = auth.signed
+      ? "public, max-age=86400, immutable"
+      : auth.authed
       ? "private, max-age=86400, immutable"
       : "private, no-store";
 

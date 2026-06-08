@@ -21,22 +21,105 @@ export const ALLOWED_MEDIA_MIME_TYPES = new Set<string>([
   "image/png",
   "image/webp",
   "image/gif",
+  "image/avif",
   "image/heic",
   "image/heif",
   "video/mp4",
+  "video/x-m4v",
   "video/quicktime",
   "video/webm",
+  "application/pdf",
+  "text/plain",
+  "text/csv",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/zip",
+  "application/x-7z-compressed",
+  "application/vnd.rar",
+  "image/vnd.adobe.photoshop",
+  "application/postscript",
+  "application/vnd.adobe.aftereffects",
+  "application/vnd.adobe.premiere",
+  "application/x-sketch",
+  "application/x-figma",
 ]);
 
 export const MAX_DRIVE_MEDIA_FILE_SIZE = 250 * 1024 * 1024;
 export const MAX_DRIVE_PROXY_FILE_SIZE = 4 * 1024 * 1024;
 
-export function normalizeDriveMimeType(value: unknown): string {
-  return typeof value === "string" && value.trim()
+const MIME_BY_EXTENSION: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  gif: "image/gif",
+  avif: "image/avif",
+  heic: "image/heic",
+  heif: "image/heif",
+  mp4: "video/mp4",
+  m4v: "video/x-m4v",
+  mov: "video/quicktime",
+  qt: "video/quicktime",
+  webm: "video/webm",
+  pdf: "application/pdf",
+  txt: "text/plain",
+  text: "text/plain",
+  csv: "text/csv",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ppt: "application/vnd.ms-powerpoint",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  zip: "application/zip",
+  "7z": "application/x-7z-compressed",
+  rar: "application/vnd.rar",
+  psd: "image/vnd.adobe.photoshop",
+  ai: "application/postscript",
+  aep: "application/vnd.adobe.aftereffects",
+  prproj: "application/vnd.adobe.premiere",
+  sketch: "application/x-sketch",
+  fig: "application/x-figma",
+};
+
+export function inferDriveMimeTypeFromName(fileName: unknown): string | null {
+  if (typeof fileName !== "string") return null;
+  const clean = fileName.split("?")[0]?.split("#")[0] || "";
+  const ext = clean.includes(".") ? clean.split(".").pop()?.toLowerCase() : "";
+  return ext ? MIME_BY_EXTENSION[ext] || null : null;
+}
+
+export function normalizeDriveMimeType(value: unknown, fileName?: unknown): string {
+  const direct = typeof value === "string" && value.trim()
     ? value.split(";")[0].trim().toLowerCase()
-    : "application/octet-stream";
+    : "";
+  if (direct && direct !== "application/octet-stream") return direct;
+  return inferDriveMimeTypeFromName(fileName) || direct || "application/octet-stream";
 }
 
 export function isAllowedDriveMediaMime(mimeType: string): boolean {
   return ALLOWED_MEDIA_MIME_TYPES.has(normalizeDriveMimeType(mimeType));
+}
+
+export function isAllowedDriveUploadForFolder(folder: unknown, mimeType: unknown, fileName?: unknown): boolean {
+  const normalized = normalizeDriveMimeType(mimeType, fileName);
+  if (!ALLOWED_MEDIA_MIME_TYPES.has(normalized)) return false;
+  return folder === "raw-files" || isDrivePublishableMediaMime(normalized);
+}
+
+export function isDriveVideoMime(mimeType: unknown, fileName?: unknown): boolean {
+  return normalizeDriveMimeType(mimeType, fileName).startsWith("video/");
+}
+
+export function isDriveImageMime(mimeType: unknown, fileName?: unknown): boolean {
+  return normalizeDriveMimeType(mimeType, fileName).startsWith("image/");
+}
+
+export function isDrivePublishableMediaMime(mimeType: unknown, fileName?: unknown): boolean {
+  const normalized = normalizeDriveMimeType(mimeType, fileName);
+  return normalized.startsWith("image/") || normalized.startsWith("video/");
 }

@@ -5,12 +5,21 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { usePipeline } from "@/lib/pipeline-context";
 import { useToast } from "@/lib/toast-context";
 import { supabase } from "@/lib/supabaseClient";
+import { isDrivePublishableMediaMime, normalizeDriveMimeType } from "@/lib/drive-policy";
 import { X, Upload, FolderOpen, Image as ImageIcon, Film, Search, CheckCircle, Clock, Link2, ExternalLink } from "lucide-react";
 import { PLACEHOLDER_MEDIA } from "@/lib/placeholder-data";
 import { useFocusTrap } from "./use-focus-trap";
 
 const ASSET_SOURCES = ["Canva Pro", "Envato Elements", "Pexels", "Shot by Team", "Client Provided", "Google Images", "AI Generated"];
 const BASELINE_WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
+
+function uploadErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "error";
+}
+
+function uploadPathForSize(file: File): "proxy" | "resumable" {
+  return file.size >= 4 * 1024 * 1024 ? "resumable" : "proxy";
+}
 
 type PickerTab = "upload" | "library";
 
@@ -198,6 +207,10 @@ export function MediaPicker({ open, onClose, onSelect, folder = "raw-files", car
       const file = (ev.target as HTMLInputElement).files?.[0];
       if (!file) return;
       if (!assetSource.trim()) { addToast("Asset source is required before uploading", "error"); return; }
+      if (!isDrivePublishableMediaMime(file.type, file.name)) {
+        addToast("This picker only accepts image or video files.", "error");
+        return;
+      }
       setUploading(true);
       setUploadProgress(0);
       try {
@@ -207,7 +220,21 @@ export function MediaPicker({ open, onClose, onSelect, folder = "raw-files", car
         addToast(`${file.name} uploaded`, "success");
         onClose();
       } catch (err) {
-        addToast(`Upload failed: ${err instanceof Error ? err.message : "error"}`, "error");
+        const { reportUploadFailure } = await import("@/lib/drive-upload");
+        const errorMessage = uploadErrorMessage(err);
+        await reportUploadFailure({
+          phase: "media_picker_upload",
+          route: "/api/drive/upload-failure",
+          uploadPath: uploadPathForSize(file),
+          cardId,
+          folder,
+          fileName: file.name,
+          mimeType: normalizeDriveMimeType(file.type, file.name),
+          fileSize: file.size,
+          errorMessage,
+          errorDetail: err instanceof Error ? err.stack : undefined,
+        });
+        addToast(`Upload failed: ${errorMessage}`, "error");
       } finally { setUploading(false); setUploadProgress(0); }
     };
     input.click();

@@ -30,6 +30,7 @@ interface TelegramPingArgs {
   /** Absolute https URL the "Open in portal" button points to. */
   threadUrl: string;
   buttonLabel?: string;
+  chatId?: string;
 }
 
 /**
@@ -38,7 +39,7 @@ interface TelegramPingArgs {
  */
 export async function pingTelegram(args: TelegramPingArgs): Promise<boolean> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_ADMIN_CHAT_ID;
+  const chatId = args.chatId || process.env.TELEGRAM_ADMIN_CHAT_ID;
   if (!token || !chatId) {
     // Not configured. Email remains the backstop notification for tickets.
     return false;

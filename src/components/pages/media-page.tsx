@@ -7,6 +7,7 @@ import { usePipeline } from "@/lib/pipeline-context";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
 import { supabase } from "@/lib/supabaseClient";
+import { isDrivePublishableMediaMime, normalizeDriveMimeType } from "@/lib/drive-policy";
 import { formatDateShort, formatDateTimeCompact } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -51,6 +52,14 @@ function addUsage(map: Map<string, ContentCard[]>, url: string | undefined, card
   const existing = map.get(url) || [];
   if (!existing.some((c) => c.id === card.id)) existing.push(card);
   map.set(url, existing);
+}
+
+function uploadErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "upload failed";
+}
+
+function uploadPathForSize(file: File): "proxy" | "resumable" {
+  return file.size >= 4 * 1024 * 1024 ? "resumable" : "proxy";
 }
 
 export function MediaPage() {
@@ -166,62 +175,106 @@ export function MediaPage() {
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || uploading) return;
+    const selectedFiles = Array.from(files);
+    const fileList = selectedFiles.filter((file) => isDrivePublishableMediaMime(file.type, file.name));
+    if (fileList.length !== selectedFiles.length) {
+      addToast("Media Library uploads must be images or videos. Add documents in Source Vault.", "error");
+    }
+    if (fileList.length === 0) {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
     setUploading(true);
-    const fileList = Array.from(files);
-    const { uploadManyToDrive } = await import("@/lib/drive-upload");
+    const { reportUploadFailure, uploadManyToDrive } = await import("@/lib/drive-upload");
 
     setUploadingFileName(fileList.length === 1 ? fileList[0].name : `Uploading ${fileList.length} files`);
     setUploadProgress(0);
 
-    // Upload all files concurrently (3-wide pool) instead of one-at-a-time.
-    const items = await uploadManyToDrive(fileList, "media-library", {
-      concurrency: 3,
-      onProgress: setUploadProgress,
-    });
+    try {
+      // Upload all files concurrently (3-wide pool) instead of one-at-a-time.
+      const items = await uploadManyToDrive(fileList, "media-library", {
+        concurrency: 3,
+        onProgress: setUploadProgress,
+      });
 
-    // Persist results. Uploads already ran in parallel; the saves below are
-    // quick and run after, preserving the original per-file save + toast.
-    for (const it of items) {
-      const file = it.file;
-      if (it.error || !it.result) {
-        addToast(`Couldn't upload ${file.name}: ${it.error?.message || "upload failed"}`, "error");
-        continue;
+      const failures = items.filter((it) => it.error || !it.result);
+      if (failures.length > 0) {
+        const first = failures[0];
+        await reportUploadFailure({
+          phase: "media_library_batch_upload",
+          route: "/api/drive/upload-failure",
+          uploadPath: uploadPathForSize(first.file),
+          folder: "media-library",
+          fileName: first.file.name,
+          mimeType: normalizeDriveMimeType(first.file.type, first.file.name),
+          fileSize: first.file.size,
+          batchTotal: fileList.length,
+          batchFailed: failures.length,
+          errorMessage: uploadErrorMessage(first.error),
+          errorDetail: first.error?.stack,
+        });
       }
-      const result = it.result;
-      const asset: MediaAsset = {
-        id: `m-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        name: file.name,
-        url: result.url,
-        type: file.type.startsWith("video") ? "video" : "image",
-        folder: "Media Library",
-        uploadedAt: new Date().toISOString(),
-        addedBy: currentUser.name,
-      };
 
-      // Persist to Supabase
-      if (useDb) {
-        const { data: inserted, error } = await supabase
-          .from("media_assets")
-          .insert({
-            name: asset.name,
-            url: asset.url,
-            file_type: asset.type,
-            folder: asset.folder,
-            added_by: asset.addedBy,
-            workspace_id: workspaceId || BASELINE_WORKSPACE_ID,
-          })
-          .select("id")
-          .single();
-        if (error) {
-          console.error("[media] upload library insert failed:", error.message);
-          addToast(`Uploaded ${file.name}, but saving to the library failed. Try again.`, "error");
+      // Persist results. Uploads already ran in parallel; the saves below are
+      // quick and run after, preserving the original per-file save + toast.
+      for (const it of items) {
+        const file = it.file;
+        if (it.error || !it.result) {
+          addToast(`Couldn't upload ${file.name}: ${uploadErrorMessage(it.error)}`, "error");
           continue;
         }
-        if (inserted) asset.id = inserted.id;
-      }
+        const result = it.result;
+        const asset: MediaAsset = {
+          id: `m-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          name: file.name,
+          url: result.url,
+          type: file.type.startsWith("video") ? "video" : "image",
+          folder: "Media Library",
+          uploadedAt: new Date().toISOString(),
+          addedBy: currentUser.name,
+        };
 
-      setMedia((prev) => [asset, ...prev]);
-      addToast(`${file.name} uploaded`, "success");
+        // Persist to Supabase
+        if (useDb) {
+          const { data: inserted, error } = await supabase
+            .from("media_assets")
+            .insert({
+              name: asset.name,
+              url: asset.url,
+              file_type: asset.type,
+              folder: asset.folder,
+              added_by: asset.addedBy,
+              workspace_id: workspaceId || BASELINE_WORKSPACE_ID,
+            })
+            .select("id")
+            .single();
+          if (error) {
+            console.error("[media] upload library insert failed:", error.message);
+            addToast(`Uploaded ${file.name}, but saving to the library failed. Try again.`, "error");
+            continue;
+          }
+          if (inserted) asset.id = inserted.id;
+        }
+
+        setMedia((prev) => [asset, ...prev]);
+        addToast(`${file.name} uploaded`, "success");
+      }
+    } catch (err) {
+      const first = fileList[0];
+      await reportUploadFailure({
+        phase: "media_library_upload_exception",
+        route: "/api/drive/upload-failure",
+        uploadPath: first ? uploadPathForSize(first) : "unknown",
+        folder: "media-library",
+        fileName: first?.name,
+        mimeType: first ? normalizeDriveMimeType(first.type, first.name) : undefined,
+        fileSize: first?.size,
+        batchTotal: fileList.length,
+        batchFailed: fileList.length,
+        errorMessage: uploadErrorMessage(err),
+        errorDetail: err instanceof Error ? err.stack : undefined,
+      });
+      addToast(`Upload failed: ${uploadErrorMessage(err)}`, "error");
     }
 
     if (fileInputRef.current) fileInputRef.current.value = "";

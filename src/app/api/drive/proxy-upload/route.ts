@@ -4,17 +4,19 @@ import {
   ensureSubfolder,
   setPublicPermission,
   getAccessToken,
+  getStreamUrl,
 } from "@/lib/google-drive";
 import { consume, getClientIp } from "@/lib/rate-limit";
 import { requireBearerTeamRole } from "@/lib/auth/require";
 import {
   ALLOWED_DRIVE_ROLES,
-  isAllowedDriveMediaMime,
+  isAllowedDriveUploadForFolder,
   MAX_DRIVE_MEDIA_FILE_SIZE,
   MAX_DRIVE_PROXY_FILE_SIZE,
   normalizeDriveMimeType,
   VALID_DRIVE_FOLDERS,
 } from "@/lib/drive-policy";
+import { notifyUploadFailure } from "@/lib/upload-alerts";
 
 export const maxDuration = 60;
 
@@ -27,9 +29,15 @@ function jsonResponse(data: Record<string, unknown>, status = 200) {
 }
 
 export async function POST(request: NextRequest) {
+  let authContext: { user: { id: string }; email: string; role: string; workspaceId: string } | null = null;
+  let fileName = "";
+  let mimeType = "";
+  let folder = "";
+  let fileSize = 0;
   try {
     const auth = await requireBearerTeamRole(request, ALLOWED_DRIVE_ROLES);
     if (auth instanceof Response) return auth;
+    authContext = auth;
     const { user } = auth;
 
     // 60/min/user. The proxy path is the primary route for every file under 4 MB
@@ -43,9 +51,10 @@ export async function POST(request: NextRequest) {
 
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
-    const folder = formData.get("folder") as string;
-    const fileName = formData.get("fileName") as string || file?.name || "upload";
-    const mimeType = normalizeDriveMimeType(formData.get("mimeType") || file?.type);
+    folder = formData.get("folder") as string;
+    fileName = formData.get("fileName") as string || file?.name || "upload";
+    fileSize = Number(file?.size || 0);
+    mimeType = normalizeDriveMimeType(formData.get("mimeType") || file?.type, fileName);
 
     if (!file || !(file instanceof File)) {
       return jsonResponse({ error: "No file provided" }, 400);
@@ -53,8 +62,8 @@ export async function POST(request: NextRequest) {
     if (!VALID_DRIVE_FOLDERS.includes(folder as typeof VALID_DRIVE_FOLDERS[number])) {
       return jsonResponse({ error: "Invalid folder" }, 400);
     }
-    if (!isAllowedDriveMediaMime(mimeType)) {
-      return jsonResponse({ error: "Unsupported media type" }, 415);
+    if (!isAllowedDriveUploadForFolder(folder, mimeType, fileName)) {
+      return jsonResponse({ error: "Unsupported file type for this upload folder" }, 415);
     }
     if (file.size > MAX_DRIVE_MEDIA_FILE_SIZE) {
       return jsonResponse({ error: `File exceeds ${MAX_DRIVE_MEDIA_FILE_SIZE / (1024 * 1024)}MB limit.` }, 413);
@@ -99,22 +108,50 @@ export async function POST(request: NextRequest) {
       Buffer.from(`\r\n--${boundary}--`),
     ]);
 
-    const uploadRes = await fetch(
-      "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType,size&supportsAllDrives=true",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": `multipart/related; boundary=${boundary}`,
-        },
-        body: multipartBody,
-      }
-    );
+    const uploadController = new AbortController();
+    const uploadTimer = setTimeout(() => uploadController.abort(), 45000);
+    let uploadRes: Response;
+    try {
+      uploadRes = await fetch(
+        "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType,size&supportsAllDrives=true",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": `multipart/related; boundary=${boundary}`,
+          },
+          body: multipartBody,
+          signal: uploadController.signal,
+        }
+      );
+    } finally {
+      clearTimeout(uploadTimer);
+    }
 
     if (!uploadRes.ok) {
       // Log the full error server-side, return clean message to client
       const rawErr = await uploadRes.text();
       console.error("[proxy-upload] Google Drive error:", uploadRes.status, rawErr);
+      await notifyUploadFailure({
+        source: "server",
+        phase: "proxy_drive_upload",
+        route: "/api/drive/proxy-upload",
+        uploadPath: "proxy",
+        workspaceId: authContext.workspaceId,
+        userId: authContext.user.id,
+        userEmail: authContext.email,
+        userRole: authContext.role,
+        folder,
+        fileName,
+        mimeType,
+        fileSize,
+        errorStatus: uploadRes.status,
+        errorMessage: "Storage rejected the proxied upload",
+        errorDetail: rawErr,
+        userAgent: request.headers.get("user-agent"),
+        ip: getClientIp(request),
+        requestUrl: request.url,
+      });
       return jsonResponse({ error: `The upload was rejected by storage (HTTP ${uploadRes.status}). Please try again, or contact an admin if this keeps happening.` }, 500);
     }
 
@@ -136,7 +173,7 @@ export async function POST(request: NextRequest) {
 
     return jsonResponse({
       fileId,
-      url: `/api/drive/stream?id=${fileId}`,
+      url: getStreamUrl(fileId),
       mimeType: driveFile.mimeType || mimeType,
       size: Number(driveFile.size || file.size),
       driveFileName,
@@ -144,6 +181,26 @@ export async function POST(request: NextRequest) {
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown server error";
     console.error("[proxy-upload] Error:", message);
+    if (authContext) {
+      await notifyUploadFailure({
+        source: "server",
+        phase: "proxy_upload_route",
+        route: "/api/drive/proxy-upload",
+        uploadPath: "proxy",
+        workspaceId: authContext.workspaceId,
+        userId: authContext.user.id,
+        userEmail: authContext.email,
+        userRole: authContext.role,
+        folder,
+        fileName,
+        mimeType,
+        fileSize,
+        errorMessage: message,
+        userAgent: request.headers.get("user-agent"),
+        ip: getClientIp(request),
+        requestUrl: request.url,
+      });
+    }
     // Return clean error — never include raw stack traces or Google API responses
     return jsonResponse({ error: message.slice(0, 200) }, 500);
   }

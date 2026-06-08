@@ -52,7 +52,7 @@ beforeEach(() => {
   process.env.SMTP_PASS = "smtp-pass";
   process.env.TELEGRAM_BOT_TOKEN = "telegram-token";
   process.env.TELEGRAM_ADMIN_CHAT_ID = "12345";
-  process.env.NEXT_PUBLIC_SITE_URL = "https://reach.ten80ten.com";
+  process.env.NEXT_PUBLIC_SITE_URL = "https://thereach.ten80ten.com";
   postRow = {
     id: "11111111-1111-4111-8111-111111111111",
     workspace_id: "00000000-0000-0000-0000-000000000001",

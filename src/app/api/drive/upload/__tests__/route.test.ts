@@ -52,13 +52,55 @@ beforeEach(() => {
 describe("POST /api/drive/upload", () => {
   it("rejects unsupported MIME types before creating a Drive session", async () => {
     const res = await POST(makeRequest({
-      fileName: "brief.pdf",
-      mimeType: "application/pdf",
+      fileName: "malware.exe",
+      mimeType: "application/octet-stream",
       folder: "raw-files",
       fileSize: 1024,
     }));
 
     expect(res.status).toBe(415);
+    expect(driveMocks.ensureSubfolder).not.toHaveBeenCalled();
+    expect(driveMocks.createResumableUploadSession).not.toHaveBeenCalled();
+  });
+
+  it("rejects non-publishable source files outside raw-files", async () => {
+    const res = await POST(makeRequest({
+      fileName: "brief.pdf",
+      mimeType: "application/pdf",
+      folder: "media-library",
+      fileSize: 1024,
+    }));
+
+    expect(res.status).toBe(415);
+    expect(driveMocks.ensureSubfolder).not.toHaveBeenCalled();
+    expect(driveMocks.createResumableUploadSession).not.toHaveBeenCalled();
+  });
+
+  it("allows source files in raw-files", async () => {
+    const res = await POST(makeRequest({
+      fileName: "client-rights.pdf",
+      mimeType: "application/octet-stream",
+      folder: "raw-files",
+      fileSize: 4096,
+    }));
+
+    expect(res.status).toBe(200);
+    expect(driveMocks.createResumableUploadSession).toHaveBeenCalledWith(
+      expect.stringMatching(/client-rights\.pdf$/),
+      "application/pdf",
+      "sub-folder",
+      4096,
+    );
+  });
+
+  it("requires fileSize before creating a Drive session", async () => {
+    const res = await POST(makeRequest({
+      fileName: "hero.png",
+      mimeType: "image/png",
+      folder: "raw-files",
+    }));
+
+    expect(res.status).toBe(400);
     expect(driveMocks.ensureSubfolder).not.toHaveBeenCalled();
     expect(driveMocks.createResumableUploadSession).not.toHaveBeenCalled();
   });

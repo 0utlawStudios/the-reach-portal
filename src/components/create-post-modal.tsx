@@ -10,6 +10,7 @@ import { PlatformIcon } from "./platform-icons";
 import { useToast } from "@/lib/toast-context";
 import { useAuth } from "@/lib/auth-context";
 import { ensureMediaAsset } from "@/lib/media-assets";
+import { isDrivePublishableMediaMime, normalizeDriveMimeType } from "@/lib/drive-policy";
 import { MentionTextarea } from "./mention-textarea";
 import { formatDateTimeCompact } from "@/lib/utils";
 import { MediaPicker } from "./media-picker";
@@ -63,6 +64,14 @@ interface Props {
 }
 
 type ModalTab = "content" | "checklist" | "details";
+
+function uploadErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "upload failed";
+}
+
+function uploadPathForSize(file: File): "proxy" | "resumable" {
+  return file.size >= 4 * 1024 * 1024 ? "resumable" : "proxy";
+}
 
 export function CreatePostModal({ open, onClose }: Props) {
   const { createCard, workspaceId } = usePipeline();
@@ -127,7 +136,13 @@ export function CreatePostModal({ open, onClose }: Props) {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files;
     if (!selected) return;
-    const newFiles: UploadedFile[] = Array.from(selected).map((file) => {
+    const selectedFiles = Array.from(selected);
+    const acceptedFiles = selectedFiles.filter((file) => isDrivePublishableMediaMime(file.type, file.name));
+    const rejectedCount = selectedFiles.length - acceptedFiles.length;
+    if (rejectedCount > 0) {
+      addToast("Post content uploads must be images or videos. Add documents in Source Vault.", "error");
+    }
+    const newFiles: UploadedFile[] = acceptedFiles.map((file) => {
       const id = Date.now().toString() + Math.random().toString(36).slice(2);
       rawFilesRef.current.set(id, file);
       return {
@@ -174,7 +189,7 @@ export function CreatePostModal({ open, onClose }: Props) {
     // preserving order: rawFiles[0] stays the master/thumbnail. Any failure is
     // fail-closed, so the card is not created with missing files.
     if (files.length > 0) {
-      const { uploadManyToDrive } = await import("@/lib/drive-upload");
+      const { uploadManyToDrive, reportUploadFailure } = await import("@/lib/drive-upload");
 
       // New files that actually need uploading, tagged with their original index.
       const pending: { index: number; file: File }[] = [];
@@ -197,7 +212,22 @@ export function CreatePostModal({ open, onClose }: Props) {
         });
         const failure = items.find((it) => it.error);
         if (failure) {
-          addToast(`Couldn't upload ${failure.file.name}: ${failure.error?.message || "upload failed"}`, "error");
+          const errorMessage = uploadErrorMessage(failure.error);
+          addToast(`Couldn't upload ${failure.file.name}: ${errorMessage}`, "error");
+          await reportUploadFailure({
+            phase: "create_post_batch_upload",
+            route: "/api/drive/upload-failure",
+            uploadPath: uploadPathForSize(failure.file),
+            postTitle: title.trim(),
+            folder: "raw-files",
+            fileName: failure.file.name,
+            mimeType: normalizeDriveMimeType(failure.file.type, failure.file.name),
+            fileSize: failure.file.size,
+            batchTotal: pending.length,
+            batchFailed: items.filter((it) => it.error).length || 1,
+            errorMessage,
+            errorDetail: failure.error?.stack,
+          });
           uploadFailed = true;
         } else {
           for (const it of items) {
@@ -501,17 +531,32 @@ export function CreatePostModal({ open, onClose }: Props) {
                     <button type="button" onClick={async () => {
                       const input = document.createElement("input");
                       input.type = "file";
-                      input.accept = "image/*,.pdf,.txt";
+                      input.accept = "image/*,.pdf,.txt,.doc,.docx";
                       input.onchange = async (ev) => {
                         const file = (ev.target as HTMLInputElement).files?.[0];
                         if (!file) return;
                         addToast("Uploading license...", "info");
+                        const { reportUploadFailure, uploadToDrive } = await import("@/lib/drive-upload");
                         try {
-                          const { uploadToDrive } = await import("@/lib/drive-upload");
                           const result = await uploadToDrive(file, "raw-files");
                           setLicenseFileId(result.fileId);
                           addToast("License uploaded", "success");
-                        } catch { addToast("License upload failed", "error"); }
+                        } catch (err) {
+                          const errorMessage = uploadErrorMessage(err);
+                          await reportUploadFailure({
+                            phase: "create_post_license_upload",
+                            route: "/api/drive/upload-failure",
+                            uploadPath: uploadPathForSize(file),
+                            postTitle: title.trim(),
+                            folder: "raw-files",
+                            fileName: file.name,
+                            mimeType: normalizeDriveMimeType(file.type, file.name),
+                            fileSize: file.size,
+                            errorMessage,
+                            errorDetail: err instanceof Error ? err.stack : undefined,
+                          });
+                          addToast("License upload failed", "error");
+                        }
                       };
                       input.click();
                     }} className="w-full border border-dashed border-gray-200 dark:border-white/[0.08] rounded-lg py-2.5 flex items-center justify-center gap-2 text-gray-400 dark:text-gray-500 hover:text-orange-500 hover:border-orange-300 dark:hover:border-orange-500/30 transition-all cursor-pointer text-[11px]">

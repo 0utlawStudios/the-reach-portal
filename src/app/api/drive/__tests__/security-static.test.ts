@@ -17,6 +17,8 @@ describe("Drive route security contracts", () => {
     expect(DRIVE_STREAM_SRC).toContain('from("media_assets")');
     expect(DRIVE_STREAM_SRC).toContain('from("posts")');
     expect(DRIVE_STREAM_SRC).toContain("VALID_DRIVE_FOLDERS.map");
+    expect(DRIVE_STREAM_SRC).toContain("verifyDriveStreamToken(fileId, signedToken)");
+    expect(GOOGLE_DRIVE_SRC).toContain("signDriveStreamToken");
   });
 
   it("validates Drive parent folders before publicizing a finalized file", () => {
@@ -27,6 +29,8 @@ describe("Drive route security contracts", () => {
     expect(parentCheckIdx).toBeGreaterThan(metadataIdx);
     expect(permissionIdx).toBeGreaterThan(parentCheckIdx);
     expect(DRIVE_FINALIZE_SRC).toContain("VALID_DRIVE_FOLDERS.map");
+    expect(DRIVE_FINALIZE_SRC).toContain("isAllowedDriveMediaMime(mimeType)");
+    expect(DRIVE_FINALIZE_SRC).toContain("meta.size > MAX_DRIVE_MEDIA_FILE_SIZE");
     expect(GOOGLE_DRIVE_SRC).toContain("fields=id,name,mimeType,size,parents");
   });
 
@@ -37,5 +41,11 @@ describe("Drive route security contracts", () => {
     expect(proxyLimitIdx).toBeGreaterThan(-1);
     expect(bufferIdx).toBeGreaterThan(proxyLimitIdx);
     expect(DRIVE_PROXY_UPLOAD_SRC).toContain("Use resumable upload");
+  });
+
+  it("returns signed app stream URLs from both Drive upload paths", () => {
+    expect(DRIVE_PROXY_UPLOAD_SRC).toContain("getStreamUrl(fileId)");
+    expect(DRIVE_FINALIZE_SRC).toContain("getStreamUrl(fileId)");
+    expect(GOOGLE_DRIVE_SRC).toContain("token: signDriveStreamToken(fileId)");
   });
 });

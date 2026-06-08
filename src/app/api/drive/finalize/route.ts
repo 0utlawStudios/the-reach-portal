@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { ensureSubfolder, getRootFolderId, setPublicPermission, getStreamUrl, getFileMetadata } from "@/lib/google-drive";
 import { requireBearerTeamRole } from "@/lib/auth/require";
 import { consume, getClientIp } from "@/lib/rate-limit";
-import { VALID_DRIVE_FOLDERS } from "@/lib/drive-policy";
+import { isAllowedDriveMediaMime, MAX_DRIVE_MEDIA_FILE_SIZE, normalizeDriveMimeType, VALID_DRIVE_FOLDERS } from "@/lib/drive-policy";
+import { notifyUploadFailure } from "@/lib/upload-alerts";
 
 export const maxDuration = 60;
 
@@ -29,12 +30,15 @@ const ALLOWED_FINALIZE_ROLES: ReadonlyArray<string> = [
 ];
 
 export async function POST(request: NextRequest) {
+  let authContext: { user: { id: string }; email: string; role: string; workspaceId: string } | null = null;
+  let fileId: string | null = null;
   try {
     // SEC-002: Gate on bearer-team-role. Without this, an unauthenticated
     // caller could iterate fileIds and force-publicize unrelated workspace
     // assets.
     const auth = await requireBearerTeamRole(request, ALLOWED_FINALIZE_ROLES);
     if (auth instanceof NextResponse) return auth;
+    authContext = auth;
     const { user } = auth;
 
     // SEC-002: 60/min/user. Same envelope as publish-jobs — finalize is a
@@ -49,9 +53,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { fileId } = await request.json();
+    const body = await request.json();
+    fileId = typeof body?.fileId === "string" ? body.fileId : null;
 
-    if (!fileId || typeof fileId !== "string") {
+    if (!fileId) {
       return NextResponse.json({ error: "Missing fileId" }, { status: 400 });
     }
     // SEC-002: Reject malformed fileIds before we hand them to the Drive API.
@@ -69,12 +74,25 @@ export async function POST(request: NextRequest) {
     if (!belongsToAppFolder) {
       return NextResponse.json({ error: "File is not in an app-managed Drive folder" }, { status: 403 });
     }
+    const mimeType = normalizeDriveMimeType(meta.mimeType, meta.name);
+    if (!isAllowedDriveMediaMime(mimeType)) {
+      return NextResponse.json({ error: "Unsupported file type" }, { status: 415 });
+    }
+    if (!Number.isFinite(meta.size) || meta.size <= 0) {
+      return NextResponse.json({ error: "Missing or invalid file size" }, { status: 400 });
+    }
+    if (meta.size > MAX_DRIVE_MEDIA_FILE_SIZE) {
+      return NextResponse.json(
+        { error: `File exceeds ${MAX_DRIVE_MEDIA_FILE_SIZE / (1024 * 1024)}MB limit.` },
+        { status: 413 },
+      );
+    }
 
     // Set public permission so the file is servable
     await setPublicPermission(fileId);
 
-    const isImage = meta.mimeType.startsWith("image/");
-    const isVideo = meta.mimeType.startsWith("video/");
+    const isImage = mimeType.startsWith("image/");
+    const isVideo = mimeType.startsWith("video/");
 
     // Always use our stream proxy as primary URL — it's authenticated server-side
     // and works immediately (lh3 URLs break during Google permission propagation)
@@ -85,12 +103,29 @@ export async function POST(request: NextRequest) {
       imageUrl: isImage ? proxyUrl : null,
       streamUrl: isVideo ? proxyUrl : null,
       url: proxyUrl,
-      mimeType: meta.mimeType,
+      mimeType,
       size: meta.size,
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[drive/finalize]", message);
+    if (authContext) {
+      await notifyUploadFailure({
+        source: "server",
+        phase: "finalize_upload",
+        route: "/api/drive/finalize",
+        uploadPath: "resumable",
+        workspaceId: authContext.workspaceId,
+        userId: authContext.user.id,
+        userEmail: authContext.email,
+        userRole: authContext.role,
+        fileName: fileId,
+        errorMessage: message,
+        userAgent: request.headers.get("user-agent"),
+        ip: getClientIp(request),
+        requestUrl: request.url,
+      });
+    }
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
