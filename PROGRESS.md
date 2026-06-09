@@ -1,8 +1,8 @@
 # The Reach SMM Portal Progress
 
-updated-at: 2026-06-09T22:55:26+08:00
+updated-at: 2026-06-09T22:56:33+08:00
 
-phase: PHASE 2 - CHANGES doc verified, commit pending
+phase: PHASE 2 - complete; PHG audit pending
 
 current slice:
 
@@ -37,6 +37,7 @@ last commit SHA:
 - Slice 2 pushed commit: `fc8779d`
 - Slice 3 pushed commit: `2dcd51f`
 - Slice 4 pushed commit: `8e3645d`
+- CHANGES doc pushed commit: `10d2a18`
 
 investigation summary:
 
@@ -156,8 +157,8 @@ evidence captured:
 
 next step:
 
-- Commit and push the CHANGES doc slice.
-- After that, begin the read-only PHG audit and write `AUDIT-upload-hardening.md`.
+- Begin the read-only PHG audit and write `AUDIT-upload-hardening.md`.
+- Before committing the audit doc, confirm `git diff --stat` shows only `AUDIT-upload-hardening.md`.
 
 blockers:
 
