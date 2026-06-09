@@ -1,7 +1,7 @@
 # THE REACH Upload Hardening Audit
 
-updated-at: 2026-06-09T22:56:33+08:00
-phase: PHG audit swarm, pass 1
+updated-at: 2026-06-09T23:03:03+08:00
+phase: PHG audit swarm, pass 2
 scope:
 - `src/app/api/drive/**`
 - `src/lib/drive-*.ts`
@@ -13,39 +13,38 @@ scope:
 
 Phase 2 fixes the original production failure mode: batch uploads no longer abort after one file, Drive quota failures retry with jitter, app limiter 429s do not hammer, finalize resolves only the expected folder, and the named upload surfaces route through bounded-concurrency bulk upload.
 
-Audit result: no P0 findings. Two P1 items remain before DONE WHEN can be considered green:
-- `P1-001`: `/api/drive/stream` can return raw caught exception messages to the browser.
-- `P1-002`: the required hostile proof that 400 / 404 / 415 are not retried is incomplete.
+Audit result after pass 2: no unaddressed P0/P1 findings remain. Pass 1 found two P1 items; both were fixed in `8621467`.
 
 ## Findings
 
-### P1-001 - Stream route can leak raw Drive/server exception text to the browser
+### P1-001 - RESOLVED - Stream route can leak raw Drive/server exception text to the browser
 
 Evidence:
-- `src/app/api/drive/stream/route.ts:223-229` catches any thrown error and returns `{ error: message }` directly to the caller.
+- Pass 1: `src/app/api/drive/stream/route.ts:223-229` caught any thrown error and returned `{ error: message }` directly to the caller.
 - `src/lib/google-drive.ts:216-218` builds thrown metadata errors from raw Drive response text, so a stream metadata failure can include raw Google response bodies in that browser JSON.
+- Fixed: `src/app/api/drive/stream/route.ts:224-230` now returns `sanitizeUnknownUploadError(err)` with `statusForSanitizedDriveError(sanitized)`.
+- Guarded: `src/app/api/drive/__tests__/security-static.test.ts:57-60` asserts the stream catch path uses sanitized responses and does not return `JSON.stringify({ error: message })`.
 
 Impact:
 - This violates the upload-pipeline requirement that browser-facing Drive failures use sanitized allowlisted reasons.
 - It is outside the three upload submit routes, but it is still under `src/app/api/drive/**` and is part of the media/Drive pipeline users hit immediately after upload.
 
-Required fix:
-- Return a sanitized allowlisted error from the stream route catch path, while preserving raw detail in server logs only.
-- Add a route/static test proving raw Google text from a thrown metadata error is not returned.
+Status:
+- Resolved in `8621467`.
 
-### P1-002 - Hostile non-retry proof for real 400 / 404 / 415 is incomplete
+### P1-002 - RESOLVED - Hostile non-retry proof for real 400 / 404 / 415 is incomplete
 
 Evidence:
 - `src/lib/drive-errors.ts:101-111` classifies 400, 404, and 415 as non-retryable.
 - `src/lib/drive-upload.ts:156-160` honors structured retryability in `withRetry`.
-- Current upload helper tests cover Drive quota retry and app limiter no-hammer at `src/lib/__tests__/drive-upload.test.ts:213-273`, but there is no test that forces 400, 404, and 415 and asserts one send each.
+- Pass 1: upload helper tests covered Drive quota retry and app limiter no-hammer at `src/lib/__tests__/drive-upload.test.ts:213-273`, but did not force 400, 404, and 415 and assert one send each.
+- Fixed: `src/lib/__tests__/drive-upload.test.ts:275-303` now forces 400, 404, and 415 and asserts each file sends once with sanitized non-retryable messages.
 
 Impact:
 - The code path appears correct, but the explicit DONE WHEN condition is not fully proven.
 
-Required fix:
-- Add a hostile upload-helper test where 400, 404, and 415 fail once and are not retried.
-- Keep the existing 403/429 Drive quota retry tests green.
+Status:
+- Resolved in `8621467`.
 
 ### P2-001 - Service-account quota topology is still single-account
 
@@ -93,9 +92,11 @@ Recommendation:
 - Upload surface routing: `src/lib/__tests__/upload-surfaces-static.test.ts:18-45` guards Media Picker, Asset Review Drawer, Create Post, and Media Page against direct component-level `uploadToDrive` calls.
 - Create Post partial success retention: `src/components/create-post-modal.tsx:190-227` applies successful uploads before failing closed, with mapping logic in `src/lib/create-post-upload-state.ts:37-92`.
 
-## P0/P1 Fix Plan
+## Pass 2 Verdict
 
-1. Fix `P1-001` by sanitizing `/api/drive/stream` catch responses and adding a test.
-2. Fix `P1-002` by adding a hostile non-retry test for 400 / 404 / 415.
-3. Re-run the full verification suite and `npm run verify:target`.
-4. Re-audit once and update this document to pass 2.
+No unaddressed P0/P1 findings remain after re-audit.
+
+Remaining non-blocking items:
+- `P2-001`: service-account quota topology is still single-account.
+- `P2-002`: Media Library alerting reports only the first failed file.
+- `P3-001`: batch helper does not clamp invalid future concurrency options.

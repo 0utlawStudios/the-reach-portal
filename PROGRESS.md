@@ -1,8 +1,8 @@
 # The Reach SMM Portal Progress
 
-updated-at: 2026-06-09T23:01:57+08:00
+updated-at: 2026-06-09T23:04:51+08:00
 
-phase: PHASE 2 - post-audit P1 fix verified, commit pending
+phase: PHASE 3 - re-audit pass 2 verified, commit pending
 
 current slice:
 
@@ -40,7 +40,8 @@ last commit SHA:
 - CHANGES doc pushed commit: `10d2a18`
 - Progress ledger pushed commit: `3f2215b`
 - PHG audit pass 1 pushed commit: `1e789e4`
-- Post-audit P1 fix commit: pending
+- Post-audit P1 fix pushed commit: `8621467`
+- PHG audit pass 2 commit: pending
 
 investigation summary:
 
@@ -114,6 +115,11 @@ files touched in post-audit P1 fix:
 - `src/lib/__tests__/drive-upload.test.ts`
 - `PROGRESS.md`
 
+files touched in PHG audit pass 2:
+
+- `AUDIT-upload-hardening.md`
+- `PROGRESS.md`
+
 files audited:
 
 - `src/lib/drive-upload.ts`
@@ -177,11 +183,19 @@ evidence captured:
 - `npm test`: passed after post-audit P1 fix, 40 files / 310 tests.
 - `npm run build`: passed after post-audit P1 fix.
 - `git diff --check`: passed after post-audit P1 fix.
+- PHG audit pass 2: zero unaddressed P0/P1 findings; remaining items are P2/P3.
+- Final focused upload verification: `npm test -- --run src/lib/__tests__/drive-upload.test.ts src/lib/__tests__/upload-surfaces-static.test.ts src/app/api/drive/__tests__/security-static.test.ts src/app/api/drive/finalize/__tests__/route.test.ts src/app/api/drive/upload/__tests__/route.test.ts src/app/api/drive/proxy-upload/__tests__/route.test.ts` passed, 6 files / 31 tests.
+- Final `npm run typecheck`: passed.
+- Final `npm run lint`: passed with one pre-existing warning in `src/lib/ai/worker.ts`.
+- Final `npm test`: passed, 40 files / 310 tests.
+- Final `npm run build`: passed.
+- Final `git diff --check`: passed.
+- Final `npm run verify:target`: passed.
 
 next step:
 
-- Commit and push the post-audit P1 fix after `npm run verify:target`.
-- Re-audit once and update `AUDIT-upload-hardening.md` to pass 2.
+- Commit and push PHG audit pass 2 after another pre-push `npm run verify:target`.
+- Run production smoke on `https://thereach.ten80ten.com`, then stop with final report.
 
 blockers:
 
