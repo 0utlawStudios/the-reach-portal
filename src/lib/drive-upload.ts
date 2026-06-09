@@ -7,13 +7,13 @@
  *
  * Large files (≥ 4 MB): resumable path (bypasses Vercel's 4.5 MB body limit)
  *   1. Client → /api/drive/upload (JSON metadata) → returns uploadUri
- *   2. Client → uploadUri (PUT file bytes directly to Google, CORS-safe)
+ *   2. Client → /api/drive/upload-chunk (2 MB chunks) → Google resumable session
  *   3. Client → /api/drive/finalize (JSON fileId) → sets permissions, returns URL
  *
- * The uploadUri is a pre-authenticated Google URL — the service account token
- * is baked in server-side. The browser PUTs directly without any auth header.
- * Google's resumable upload endpoints return Access-Control-Allow-Origin: *
- * so CORS is not an issue.
+ * The uploadUri is a pre-authenticated Google URL minted server-side. Browsers
+ * cannot reliably PUT to that URL because Google does not return CORS headers
+ * for these service-account sessions, so bytes go through a same-origin chunk
+ * proxy. Each chunk is below Vercel's request body limit.
  *
  * Guarantees:
  * - Never returns a blob: URL
@@ -23,6 +23,7 @@
  */
 
 import {
+  DRIVE_RESUMABLE_CHUNK_SIZE,
   isAllowedDriveUploadForFolder,
   MAX_DRIVE_MEDIA_FILE_SIZE,
   normalizeDriveMimeType,
@@ -66,8 +67,8 @@ export interface UploadFailureReport {
 // the whole file each time). Worst case is now ~11s.
 const RETRY_DELAYS = process.env.NODE_ENV === "test" ? [1, 3, 7] : [1000, 3000, 7000];
 
-// A large direct-to-Google upload is expensive to repeat, so it gets a single
-// gentle retry rather than the full ladder.
+// A large resumable upload is expensive to repeat, so it gets a single gentle
+// retry rather than the full ladder. A retry starts a fresh Google session.
 const PUT_RETRY_DELAYS = process.env.NODE_ENV === "test" ? [1] : [3000];
 
 // Abort an upload that makes no progress for this long. XMLHttpRequest has no
@@ -367,12 +368,19 @@ async function getUploadSession(
   return data.uploadUri;
 }
 
-async function putToGoogle(
+async function uploadResumableChunk(
   file: File,
   uploadUri: string,
+  folder: string,
+  accessToken: string | undefined,
+  start: number,
+  end: number,
   onProgress: ProgressCallback | undefined
-): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
+): Promise<{ done: boolean; fileId?: string }> {
+  const mimeType = normalizeDriveMimeType(file.type, file.name);
+  const chunk = file.slice(start, end + 1, mimeType);
+  const total = file.size;
+  return new Promise<{ done: boolean; fileId?: string }>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     let settled = false;
     let responseTimer: ReturnType<typeof setTimeout> | null = null;
@@ -386,17 +394,23 @@ async function putToGoogle(
       }, DIRECT_RESPONSE_TIMEOUT_MS);
     };
     const fail = (err: Error) => { if (settled) return; settled = true; watchdog.clear(); clearResponseTimer(); reject(err); };
-    const done = (id: string) => { if (settled) return; settled = true; watchdog.clear(); clearResponseTimer(); resolve(id); };
+    const done = (value: { done: boolean; fileId?: string }) => { if (settled) return; settled = true; watchdog.clear(); clearResponseTimer(); resolve(value); };
     const watchdog = makeStallWatchdog(xhr, () => fail(new Error("Upload stalled (no progress for 30s)")));
 
-    xhr.open("PUT", uploadUri, true);
-    xhr.setRequestHeader("Content-Type", normalizeDriveMimeType(file.type, file.name));
+    xhr.open("POST", "/api/drive/upload-chunk", true);
+    xhr.timeout = DIRECT_RESPONSE_TIMEOUT_MS;
+    xhr.setRequestHeader("Content-Type", mimeType);
+    xhr.setRequestHeader("Content-Range", `bytes ${start}-${end}/${total}`);
+    xhr.setRequestHeader("X-Upload-Uri", uploadUri);
+    xhr.setRequestHeader("X-File-Name", file.name);
+    xhr.setRequestHeader("X-Drive-Folder", folder);
+    if (accessToken) xhr.setRequestHeader("Authorization", `Bearer ${accessToken}`);
 
     xhr.upload.onprogress = (e) => {
       watchdog.kick();
       if (e.lengthComputable) {
-        // Map to 5–90% of overall progress
-        onProgress?.(5 + Math.round((e.loaded / e.total) * 85));
+        const loaded = Math.min(e.loaded, end - start + 1);
+        onProgress?.(5 + Math.round(((start + loaded) / total) * 85));
         if (e.loaded >= e.total) {
           watchdog.clear();
           armResponseTimer();
@@ -409,13 +423,17 @@ async function putToGoogle(
       if (xhr.status === 200 || xhr.status === 201) {
         try {
           const data = JSON.parse(xhr.responseText);
-          if (!data.id) {
-            fail(new Error("Storage did not return a file ID after upload"));
+          if (data.error) {
+            fail(errorFromPayload(xhr.status || 500, data));
+          } else if (data.done === false) {
+            done({ done: false });
+          } else if (data.fileId) {
+            done({ done: true, fileId: data.fileId as string });
           } else {
-            done(data.id as string);
+            fail(new Error("Storage did not return a file ID after upload"));
           }
         } catch {
-          fail(new Error("Invalid response from storage after upload"));
+          fail(new Error("Invalid response from upload server"));
         }
       } else {
         fail(errorFromPayload(xhr.status, parseJson(xhr.responseText || "")));
@@ -426,8 +444,26 @@ async function putToGoogle(
     xhr.ontimeout = () => fail(new DriveUploadError("Upload timed out.", { reason: "timeout", retryable: true }));
     xhr.onabort = () => fail(new Error("Upload aborted"));
     watchdog.kick();
-    xhr.send(file);
+    xhr.send(chunk);
   });
+}
+
+async function putToGoogle(
+  file: File,
+  uploadUri: string,
+  folder: string,
+  onProgress: ProgressCallback | undefined
+): Promise<string> {
+  const accessToken = await getAccessTokenFromCurrentSession();
+  for (let start = 0; start < file.size; start += DRIVE_RESUMABLE_CHUNK_SIZE) {
+    const end = Math.min(start + DRIVE_RESUMABLE_CHUNK_SIZE, file.size) - 1;
+    const result = await uploadResumableChunk(file, uploadUri, folder, accessToken, start, end, onProgress);
+    if (result.done) {
+      if (!result.fileId) throw new Error("Storage did not return a file ID after upload");
+      return result.fileId;
+    }
+  }
+  throw new Error("Storage did not return a file ID after upload");
 }
 
 async function finalizeUpload(fileId: string, folder: string): Promise<DriveUploadResult> {
@@ -467,9 +503,10 @@ async function uploadViaResumable(
     async () => {
       const uploadUri = await getUploadSession(file, folder, cardId);
       onProgress?.(5);
-      // The uploadUri is pre-authenticated, so the browser PUTs straight to
-      // storage with no auth header and no server hop for the bytes.
-      return putToGoogle(file, uploadUri, onProgress);
+      // The uploadUri is pre-authenticated, but browsers cannot PUT to it
+      // directly because Google omits CORS headers. Send bounded same-origin
+      // chunks and let the server forward them to the session URL.
+      return putToGoogle(file, uploadUri, folder, onProgress);
     },
     "Direct upload",
     PUT_RETRY_DELAYS,

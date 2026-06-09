@@ -50,6 +50,7 @@ export const ALLOWED_MEDIA_MIME_TYPES = new Set<string>([
 
 export const MAX_DRIVE_MEDIA_FILE_SIZE = 250 * 1024 * 1024;
 export const MAX_DRIVE_PROXY_FILE_SIZE = 4 * 1024 * 1024;
+export const DRIVE_RESUMABLE_CHUNK_SIZE = 2 * 1024 * 1024;
 
 const MIME_BY_EXTENSION: Record<string, string> = {
   jpg: "image/jpeg",

@@ -96,26 +96,32 @@ function installMixedUploadMocks(run: MixedUploadRun) {
     timeout = 0;
     private method = "";
     private url = "";
+    private headers: Record<string, string> = {};
 
     open(method: string, url: string) {
       this.method = method;
       this.url = url;
     }
-    setRequestHeader() {}
+    setRequestHeader(name: string, value: string) {
+      this.headers[name.toLowerCase()] = value;
+    }
     abort() {
       this.onabort?.();
     }
-    send(body: FormData | File) {
+    send(body: FormData | File | Blob) {
       const isProxy = this.method === "POST" && this.url === "/api/drive/proxy-upload";
+      const isChunk = this.method === "POST" && this.url === "/api/drive/upload-chunk";
       const fileName = isProxy
         ? String((body as FormData).get("fileName") || "upload.jpg")
+        : isChunk ? this.headers["x-file-name"] || "upload.bin"
         : body instanceof File ? body.name : "upload.bin";
       if (isProxy) run.proxySends.push(fileName);
       else run.directSends.push(fileName);
       run.active++;
       run.maxActive = Math.max(run.maxActive, run.active);
       setTimeout(() => {
-        this.upload.onprogress?.({ lengthComputable: true, loaded: 10, total: 10 });
+        const uploadTotal = body instanceof Blob ? body.size || 10 : 10;
+        this.upload.onprogress?.({ lengthComputable: true, loaded: uploadTotal, total: uploadTotal });
         if (!isProxy && run.failDirectNames.has(fileName)) {
           this.status = 403;
           this.responseText = JSON.stringify({
@@ -126,14 +132,20 @@ function installMixedUploadMocks(run: MixedUploadRun) {
             },
           });
         } else {
-          this.status = isProxy ? 200 : 201;
+          this.status = 200;
+          const range = this.headers["content-range"]?.match(/^bytes \d+-(\d+)\/(\d+)$/);
+          const isFinalChunk = !range || Number(range[1]) + 1 >= Number(range[2]);
           this.responseText = JSON.stringify(isProxy ? {
             fileId: `drive-${fileName}`,
             url: `/api/drive/stream?id=drive-${fileName}`,
             mimeType: "image/jpeg",
             size: 10,
+          } : isFinalChunk ? {
+            done: true,
+            fileId: `drive-${fileName}`,
           } : {
-            id: `drive-${fileName}`,
+            done: false,
+            range: range ? `bytes=0-${range[1]}` : null,
           });
         }
         run.active--;
