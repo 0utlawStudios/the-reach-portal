@@ -272,6 +272,36 @@ describe("uploadManyToDrive", () => {
     expect(run.sends).toEqual(["limited.jpg"]);
   });
 
+  it("does not retry permanent Drive 400, 404, or 415 failures", async () => {
+    const run: MockUploadRun = {
+      sends: [],
+      active: 0,
+      maxActive: 0,
+      failNames: new Set(),
+      responsesByName: new Map([
+        ["bad-400.jpg", [{ status: 400, body: { error: { code: 400, message: "raw bad request" } } }]],
+        ["missing-404.jpg", [{ status: 404, body: { error: { code: 404, errors: [{ reason: "notFound" }] } } }]],
+        ["type-415.jpg", [{ status: 415, body: { error: { code: 415, message: "raw unsupported type" } } }]],
+      ]),
+    };
+    installProxyUploadXhrMock(run);
+
+    const results = await uploadManyToDrive([
+      makeImage("bad-400.jpg"),
+      makeImage("missing-404.jpg"),
+      makeImage("type-415.jpg"),
+    ], "raw-files", { concurrency: 3 });
+
+    expect(results).toHaveLength(3);
+    expect(results.every((item) => item.error && !item.result)).toBe(true);
+    expect(run.sends.sort()).toEqual(["bad-400.jpg", "missing-404.jpg", "type-415.jpg"]);
+    expect(results.map((item) => item.error?.message).sort()).toEqual([
+      "The upload request is invalid.",
+      "The uploaded file could not be found.",
+      "Unsupported file type for this upload location.",
+    ]);
+  });
+
   it("keeps a mixed image/video batch when one large video gets a Drive quota 403", async () => {
     vi.spyOn(Math, "random").mockReturnValue(0);
     const run: MixedUploadRun = {

@@ -53,4 +53,10 @@ describe("Drive route security contracts", () => {
     expect(DRIVE_FINALIZE_SRC).toContain("getStreamUrl(fileId)");
     expect(GOOGLE_DRIVE_SRC).toContain("token: signDriveStreamToken(fileId)");
   });
+
+  it("sanitizes stream route catch responses before returning them to the browser", () => {
+    expect(DRIVE_STREAM_SRC).toContain("sanitizeUnknownUploadError");
+    expect(DRIVE_STREAM_SRC).toContain("statusForSanitizedDriveError(sanitized)");
+    expect(DRIVE_STREAM_SRC).not.toContain("JSON.stringify({ error: message })");
+  });
 });

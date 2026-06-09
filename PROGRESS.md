@@ -1,8 +1,8 @@
 # The Reach SMM Portal Progress
 
-updated-at: 2026-06-09T22:56:33+08:00
+updated-at: 2026-06-09T23:01:57+08:00
 
-phase: PHASE 2 - complete; PHG audit pending
+phase: PHASE 2 - post-audit P1 fix verified, commit pending
 
 current slice:
 
@@ -38,6 +38,9 @@ last commit SHA:
 - Slice 3 pushed commit: `2dcd51f`
 - Slice 4 pushed commit: `8e3645d`
 - CHANGES doc pushed commit: `10d2a18`
+- Progress ledger pushed commit: `3f2215b`
+- PHG audit pass 1 pushed commit: `1e789e4`
+- Post-audit P1 fix commit: pending
 
 investigation summary:
 
@@ -100,6 +103,17 @@ files touched in CHANGES doc slice:
 - `CHANGES-upload-fix.md`
 - `PROGRESS.md`
 
+files touched in PHG audit pass 1:
+
+- `AUDIT-upload-hardening.md`
+
+files touched in post-audit P1 fix:
+
+- `src/app/api/drive/stream/route.ts`
+- `src/app/api/drive/__tests__/security-static.test.ts`
+- `src/lib/__tests__/drive-upload.test.ts`
+- `PROGRESS.md`
+
 files audited:
 
 - `src/lib/drive-upload.ts`
@@ -154,11 +168,20 @@ evidence captured:
   - `npm run build`: passed.
   - `git diff --check`: passed.
   - `npm run verify:target`: passed.
+- PHG audit pass 1 found no P0 and two P1 items:
+  - `P1-001`: `/api/drive/stream` returned raw caught exception messages.
+  - `P1-002`: hostile 400 / 404 / 415 non-retry proof was missing.
+- Focused post-audit P1 tests: `npm test -- --run src/lib/__tests__/drive-upload.test.ts src/app/api/drive/__tests__/security-static.test.ts` passed, 2 files / 13 tests.
+- `npm run typecheck`: passed after post-audit P1 fix.
+- `npm run lint`: passed after post-audit P1 fix with one pre-existing warning in `src/lib/ai/worker.ts`.
+- `npm test`: passed after post-audit P1 fix, 40 files / 310 tests.
+- `npm run build`: passed after post-audit P1 fix.
+- `git diff --check`: passed after post-audit P1 fix.
 
 next step:
 
-- Begin the read-only PHG audit and write `AUDIT-upload-hardening.md`.
-- Before committing the audit doc, confirm `git diff --stat` shows only `AUDIT-upload-hardening.md`.
+- Commit and push the post-audit P1 fix after `npm run verify:target`.
+- Re-audit once and update `AUDIT-upload-hardening.md` to pass 2.
 
 blockers:
 

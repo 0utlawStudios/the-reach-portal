@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { ensureSubfolder, getAccessToken, getFileMetadata, getRootFolderId, verifyDriveStreamToken } from "@/lib/google-drive";
 import { VALID_DRIVE_FOLDERS } from "@/lib/drive-policy";
+import { sanitizeUnknownUploadError, statusForSanitizedDriveError } from "@/lib/drive-errors";
 
 export const maxDuration = 60; // Fluid Compute — stays alive while streaming
 
@@ -222,9 +223,10 @@ export async function GET(request: NextRequest) {
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
+    const sanitized = sanitizeUnknownUploadError(err);
     console.error("[drive/stream]", message);
-    return new Response(JSON.stringify({ error: message }), {
-      status: 500,
+    return new Response(JSON.stringify(sanitized), {
+      status: statusForSanitizedDriveError(sanitized),
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
   }
