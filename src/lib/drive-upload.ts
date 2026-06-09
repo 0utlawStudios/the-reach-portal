@@ -453,9 +453,9 @@ export interface BatchItemResult {
  *
  * - At most `concurrency` uploads run at once (default 3).
  * - `onProgress` reports a size-weighted aggregate percent across the batch.
- * - `stopOnError` stops launching NEW uploads after the first failure
- *   (in-flight uploads still finish), matching a fail-closed caller.
- * - Returns one BatchItemResult per started file, each tagged with its original
+ * - Per-file failures are isolated: one failed file never prevents other files
+ *   from starting or settling.
+ * - Returns one BatchItemResult per input file, each tagged with its original
  *   `index`, so callers can map results back to input order.
  */
 export async function uploadManyToDrive(
@@ -464,12 +464,13 @@ export async function uploadManyToDrive(
   opts: {
     cardId?: string;
     concurrency?: number;
+    /** @deprecated Per-file failures never abort the rest of the batch. */
     stopOnError?: boolean;
     onProgress?: ProgressCallback;
     onSettled?: (item: BatchItemResult) => void;
   } = {},
 ): Promise<BatchItemResult[]> {
-  const { cardId, concurrency = 3, stopOnError = false, onProgress, onSettled } = opts;
+  const { cardId, concurrency = 3, onProgress, onSettled } = opts;
   const total = files.length;
   if (total === 0) return [];
 
@@ -484,10 +485,9 @@ export async function uploadManyToDrive(
 
   const settled = new Array<BatchItemResult | undefined>(total);
   let next = 0;
-  let aborted = false;
 
   const worker = async () => {
-    while (!aborted) {
+    while (true) {
       const i = next++;
       if (i >= total) return;
       const file = files[i];
@@ -506,7 +506,6 @@ export async function uploadManyToDrive(
         const item: BatchItemResult = { index: i, file, error };
         settled[i] = item;
         try { onSettled?.(item); } catch { /* ignore */ }
-        if (stopOnError) { aborted = true; return; }
       }
     }
   };

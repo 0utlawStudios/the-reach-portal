@@ -49,3 +49,6 @@ next-env.d.ts
 
 # oh-my-claudecode local state (never commit — memory lives in Obsidian)
 .omc/
+
+# local Claude settings
+.claude/settings.local.json

@@ -1,14 +1,15 @@
 # The Reach SMM Portal Progress
 
-updated-at: 2026-06-09T21:40:55+08:00
+updated-at: 2026-06-09T22:29:14+08:00
 
-phase: PHASE 1 COMPLETE - upload pipeline investigation and plan
+phase: PHASE 2 - Slice 1 committed, pending verify/push
 
 current slice:
 
-- Phase 1 only. No runtime application code changed.
-- Wrote `PLAN-upload-fix.md`.
-- STOP after push and wait for written user approval before Phase 2.
+- Slice 1: batch isolation contract and Create Post partial-success retention.
+- `uploadManyToDrive` now always settles every input file; `stopOnError` is retained only as deprecated compatibility and no longer aborts siblings.
+- Create Post stores successful Drive results on each selected file before returning on a partial failure, so a retry uploads only failed files while post creation remains fail-closed.
+- Added `.claude/settings.local.json` to `.gitignore`.
 
 current repo:
 
@@ -20,8 +21,8 @@ current repo:
 
 last commit SHA:
 
-- Before Phase 1 doc commit: `2f051b4`
-- Phase 1 doc commit: pending
+- Last pushed commit before Slice 1: `14ff28d`
+- Slice 1 commit: committed locally; exact pushed SHA is recorded by `git log -1` after push.
 
 investigation summary:
 
@@ -38,6 +39,16 @@ investigation summary:
 files touched in Phase 1:
 
 - `PLAN-upload-fix.md`
+- `PROGRESS.md`
+
+files touched in Slice 1:
+
+- `.gitignore`
+- `src/lib/drive-upload.ts`
+- `src/lib/create-post-upload-state.ts`
+- `src/lib/__tests__/drive-upload.test.ts`
+- `src/lib/__tests__/create-post-upload-state.test.ts`
+- `src/components/create-post-modal.tsx`
 - `PROGRESS.md`
 
 files audited:
@@ -66,13 +77,17 @@ evidence captured:
 - `tsx` retry reproduction with real `uploadToDrive`: generic 500 retried and succeeded after 2 sends; 429 and 403 rate-limit-shaped failures stopped after 1 send.
 - Official Google Drive docs checked for quota/error handling. Drive can return 403 user-rate-limit and 429 rate-limit responses and recommends jittered exponential backoff. Service-account API calls count as a single account.
 - Local Next 16 route handler docs read before planning API route changes: `node_modules/next/dist/docs/01-app/01-getting-started/15-route-handlers.md` and maxDuration config doc.
+- Focused Slice 1 tests: `npm test -- --run src/lib/__tests__/drive-upload.test.ts src/lib/__tests__/create-post-upload-state.test.ts` passed, 2 files / 4 tests.
+- `npm run typecheck`: passed.
+- `npm run lint`: passed with one pre-existing warning in `src/lib/ai/worker.ts`.
+- `npm test`: passed, 38 files / 296 tests.
+- `npm run build`: passed.
 
 next step:
 
-- Commit Phase 1 docs.
 - Run `npm run verify:target`.
 - Push to `origin/main` only if `verify:target` passes.
-- Stop and wait for written approval before Phase 2 code.
+- Continue to Slice 2 after push: structured retry classification, app-limiter backoff distinction, and sanitized server errors for both proxy and resumable routes.
 
 blockers:
 

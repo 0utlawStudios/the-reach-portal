@@ -16,6 +16,11 @@ import { formatDateTimeCompact } from "@/lib/utils";
 import { MediaPicker } from "./media-picker";
 import { ValidationErrorModal } from "./validation-error-modal";
 import { useFocusTrap } from "./use-focus-trap";
+import {
+  applyCreatePostUploadResults,
+  getPendingCreatePostUploads,
+  type CreatePostUploadFileState,
+} from "@/lib/create-post-upload-state";
 
 const contentTypes: { id: ContentType; label: string; icon: React.ReactNode }[] = [
   { id: "image", label: "Image", icon: <ImageIcon className="w-3.5 h-3.5" /> },
@@ -47,16 +52,7 @@ function getCompatibleContentTypes(selectedPlatforms: Platform[]): Set<string> {
 
 const ASSET_SOURCES = ["Canva Pro", "Envato Elements", "Pexels", "Shot by Team", "Client Provided", "Google Images", "AI Generated"];
 
-interface UploadedFile {
-  id: string;
-  name: string;
-  size: string;
-  type: "image" | "video";
-  preview: string;
-  driveUrl?: string;
-  driveFileId?: string;
-  mimeType?: string;
-}
+type UploadedFile = CreatePostUploadFileState;
 
 interface Props {
   open: boolean;
@@ -192,25 +188,24 @@ export function CreatePostModal({ open, onClose }: Props) {
       const { uploadManyToDrive, reportUploadFailure } = await import("@/lib/drive-upload");
 
       // New files that actually need uploading, tagged with their original index.
-      const pending: { index: number; file: File }[] = [];
-      for (let i = 0; i < files.length; i++) {
-        const f = files[i];
-        if (f.driveUrl) continue; // library file: already uploaded
-        const rawFile = rawFilesRef.current.get(f.id);
-        if (!rawFile) continue;
-        pending.push({ index: i, file: rawFile });
-      }
+      // Successfully uploaded files are stored on `files`, so a retry after a
+      // partial failure only sends the failed files.
+      const pending = getPendingCreatePostUploads(files, rawFilesRef.current);
 
-      const uploaded = new Map<number, { url: string; fileId: string; mimeType?: string; size?: number }>();
+      let filesForCard = files;
       if (pending.length > 0) {
         setUploadingFileName(pending.length === 1 ? pending[0].file.name : `Uploading ${pending.length} files`);
         setUploadProgress(0);
         const items = await uploadManyToDrive(pending.map((p) => p.file), "raw-files", {
           concurrency: 3,
-          stopOnError: true,
           onProgress: setUploadProgress,
         });
-        const failure = items.find((it) => it.error);
+        const applied = applyCreatePostUploadResults(files, pending, items);
+        filesForCard = applied.files;
+        if (applied.successes.length > 0) {
+          setFiles(applied.files);
+        }
+        const failure = applied.failures[0];
         if (failure) {
           const errorMessage = uploadErrorMessage(failure.error);
           addToast(`Couldn't upload ${failure.file.name}: ${errorMessage}`, "error");
@@ -224,22 +219,18 @@ export function CreatePostModal({ open, onClose }: Props) {
             mimeType: normalizeDriveMimeType(failure.file.type, failure.file.name),
             fileSize: failure.file.size,
             batchTotal: pending.length,
-            batchFailed: items.filter((it) => it.error).length || 1,
+            batchFailed: applied.failures.length || 1,
             errorMessage,
-            errorDetail: failure.error?.stack,
+            errorDetail: failure.error.stack,
           });
           uploadFailed = true;
-        } else {
-          for (const it of items) {
-            if (it.result) uploaded.set(pending[it.index].index, it.result);
-          }
         }
       }
 
       // Rebuild rawFiles in the original file order (master = index 0).
       if (!uploadFailed) {
-        for (let i = 0; i < files.length; i++) {
-          const f = files[i];
+        for (let i = 0; i < filesForCard.length; i++) {
+          const f = filesForCard[i];
           if (f.driveUrl) {
             rawFiles.push({
               name: f.name,
@@ -247,26 +238,16 @@ export function CreatePostModal({ open, onClose }: Props) {
               fileId: f.driveFileId,
               usageType: i === 0 ? "master" : "supplementary",
               mimeType: f.mimeType || (f.type === "video" ? "video/mp4" : "image/jpeg"),
-              size: 0,
+              size: f.driveSize || 0,
               uploadedAt: new Date().toISOString(),
             });
             if (i === 0) thumbnailUrl = f.driveUrl;
             continue;
           }
-          const rawFile = rawFilesRef.current.get(f.id);
-          if (!rawFile) continue;
-          const result = uploaded.get(i);
-          if (!result) continue;
-          rawFiles.push({
-            name: rawFile.name,
-            url: result.url,
-            fileId: result.fileId,
-            usageType: i === 0 ? "master" : "supplementary",
-            mimeType: result.mimeType || rawFile.type,
-            size: result.size || rawFile.size,
-            uploadedAt: new Date().toISOString(),
-          });
-          if (i === 0) thumbnailUrl = result.url;
+        }
+        if (rawFiles.length < filesForCard.length) {
+          addToast("Some files are not uploaded yet. Retry the failed uploads before creating the post.", "error");
+          uploadFailed = true;
         }
       }
     }
@@ -652,6 +633,7 @@ export function CreatePostModal({ open, onClose }: Props) {
             driveUrl: result.url,
             driveFileId: result.fileId,
             mimeType: result.mimeType,
+            driveSize: result.size,
           }]);
           setShowMediaPicker(false);
         }}
