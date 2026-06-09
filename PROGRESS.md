@@ -1,71 +1,90 @@
-# The Reach Clone Progress
+# The Reach SMM Portal Progress
 
-updated-at: 2026-06-04T21:31:00Z
+updated-at: 2026-06-09T21:40:55+08:00
 
-phase: HARDENING
+phase: PHASE 1 COMPLETE - upload pipeline investigation and plan
 
-item: Reach Portal drag surface changed from handle-only to whole-card drag. Manual Posted moves are now controlled by an admin-only Settings toggle and persisted through a service-role API route that writes `posted_at`.
+current slice:
 
-last SHA: pending
+- Phase 1 only. No runtime application code changed.
+- Wrote `PLAN-upload-fix.md`.
+- STOP after push and wait for written user approval before Phase 2.
 
-next:
+current repo:
 
-- User should test locally at `http://localhost:3001` with Settings > Publishing > Manual Posted moves enabled.
+- `/Users/ace/Documents/CURSOR MAIN/THE REACH SMM PORTAL`
+- Package: `the-reach-portal`
+- Correct production target: `https://thereach.ten80ten.com`
+- Left untouched: `/Users/ace/Documents/CURSOR MAIN/ten80ten-smm-portal`
+- Left untouched: in-repo `MAIN/ten80ten-smm-portal`
+
+last commit SHA:
+
+- Before Phase 1 doc commit: `2f051b4`
+- Phase 1 doc commit: pending
+
+investigation summary:
+
+- Confirmed Create Post passes `stopOnError: true` into `uploadManyToDrive`.
+- Confirmed `uploadManyToDrive` aborts launching new files after first failure when `stopOnError` is true.
+- Reproduced a 30-file batch where one forced failure yields only 3 started results, 2 successes, and 1 failure.
+- Confirmed current retry logic treats Drive quota-shaped `429`, `rateLimitExceeded`, and `userRateLimitExceeded` failures as terminal.
+- Confirmed `/api/drive/finalize` resolves all three managed folders on every finalize request.
+- Confirmed Media Page already uses bounded batch upload.
+- Confirmed Media Picker, Asset Review Drawer upload paths, and Create Post license upload still call `uploadToDrive` directly.
+- Confirmed `.env.local` contains Google Drive and Supabase keys by name; values were not printed.
+- Confirmed `GOOGLE_DRIVE_IMPERSONATE_EMAIL` exists but is not used by `src/lib/google-drive.ts`.
+
+files touched in Phase 1:
+
+- `PLAN-upload-fix.md`
+- `PROGRESS.md`
+
+files audited:
+
+- `src/lib/drive-upload.ts`
+- `src/lib/google-drive.ts`
+- `src/lib/drive-policy.ts`
+- `src/lib/upload-alerts.ts`
+- `src/lib/media-assets.ts`
+- `src/app/api/drive/upload/route.ts`
+- `src/app/api/drive/proxy-upload/route.ts`
+- `src/app/api/drive/finalize/route.ts`
+- `src/app/api/drive/upload-failure/route.ts`
+- `src/app/api/drive/stream/route.ts`
+- `src/components/create-post-modal.tsx`
+- `src/components/pages/media-page.tsx`
+- `src/components/media-picker.tsx`
+- `src/components/asset-review-drawer.tsx`
+- `src/lib/support/use-support.ts`
+- `src/app/api/support/uploads/route.ts`
+- `src/app/api/admin/backfill-media/route.ts`
+
+evidence captured:
+
+- `tsx` reproduction with real `uploadManyToDrive`: `stopOnError=true results: 3`, `successes: 2`, `failures: 1`; `stopOnError=false results: 30`, `successes: 29`, `failures: 1`.
+- `tsx` retry reproduction with real `uploadToDrive`: generic 500 retried and succeeded after 2 sends; 429 and 403 rate-limit-shaped failures stopped after 1 send.
+- Official Google Drive docs checked for quota/error handling. Drive can return 403 user-rate-limit and 429 rate-limit responses and recommends jittered exponential backoff. Service-account API calls count as a single account.
+- Local Next 16 route handler docs read before planning API route changes: `node_modules/next/dist/docs/01-app/01-getting-started/15-route-handlers.md` and maxDuration config doc.
+
+next step:
+
+- Commit Phase 1 docs.
+- Run `npm run verify:target`.
+- Push to `origin/main` only if `verify:target` passes.
+- Stop and wait for written approval before Phase 2 code.
 
 blockers:
 
-- Local Playwright drag matrix could not reach `kanban-board` from its injected Supabase storage state; seeded rows/users/workspaces cleaned up successfully.
+- None for Phase 1.
 
-files:
+hard invariants:
 
-- `src/components/content-card.tsx`
-- `src/components/kanban-board.tsx`
-- `src/components/pages/settings-page.tsx`
-- `src/lib/pipeline-context.tsx`
-- `src/lib/manual-posted-settings.ts`
-- `src/app/api/admin/posts/[id]/manual-posted/route.ts`
-- `src/lib/__tests__/iron-law-static.test.ts`
-- `PROGRESS.md`
-- `The Reach/FULL_TECHNICAL_FEATURE_AUDIT.md`
-
-invariants:
-
-- Correct repo only: `/Users/ace/Documents/CURSOR MAIN/THE REACH SMM PORTAL`.
-- Left untouched: `/Users/ace/Documents/CURSOR MAIN/ten80ten-smm-portal`.
-- No DB schema, RLS, trigger, or migration changes.
-- Direct browser-authenticated Supabase writes to `stage='posted'` remain blocked by migration `0046_post_stage_transition_guard.sql`.
-- Manual Posted moves use an admin-only Next route with `requireBearerTeamRole(request, ["superadmin", "admin", "owner"])`.
 - Posts must never disappear.
-
-evidence:
-
-- `npm run typecheck`: passed.
-- `npm test -- --run src/lib/__tests__/iron-law-static.test.ts`: passed, 26 tests.
-- `npm run lint`: passed with existing `src/lib/ai/worker.ts` warning.
-- `npm test`: passed, 30 files / 271 tests.
-- `npm run build`: passed; route table includes `/api/admin/posts/[id]/manual-posted`.
-- `git diff --check`: passed.
-- `curl -X POST /api/admin/posts/.../manual-posted` without bearer token: `401 Unauthorized`.
-- Local Playwright run id `drag-reach-manual-posted`: failed before board render; cleanup counts all zero.
-
-named users:
-
-- Aldridge Dagos, `aldridge@ten80ten.com`, `auth.users.id=f4d6c15a-7b94-4e58-ac8b-4de98aa0d644`, `superadmin`.
-- Hanes Lawrence Abasola, `hanes@ten80ten.com`, `auth.users.id=952b51be-9037-4da3-8364-5b52bf894347`, `admin`.
-- Shahannie Manuel, `shang.ten80ten@gmail.com`, `auth.users.id=a7f2165d-d667-4bf8-ab37-383ffc485323`, `creative_director`.
-- Muaaz and Carlo are intentionally excluded from Reach because the user clarified they belong to the Ten80Ten SMM Portal, not this Reach Portal.
-
-verification:
-
-- `npm run typecheck`: passed.
-- `npm run lint`: passed with the existing `src/lib/ai/worker.ts` warning.
-- `git diff --check`: passed.
-- `npm test`: passed, 30 files / 271 tests.
-- `npm run build`: passed.
-- `PLAYWRIGHT_BASE_URL=http://127.0.0.1:3001 PLAYWRIGHT_RUN_ID=drag-reach-manual-posted npx playwright test e2e/drag.spec.ts --project=chromium`: failed before drag because `kanban-board` never rendered from the harness auth state; cleanup succeeded.
-
-changes report:
-
-- EDITED: `src/components/content-card.tsx`, `src/components/kanban-board.tsx`, `src/components/pages/settings-page.tsx`, `src/lib/pipeline-context.tsx`, `src/lib/__tests__/iron-law-static.test.ts`, `PROGRESS.md`, `The Reach/FULL_TECHNICAL_FEATURE_AUDIT.md`
-- ADDED: `src/lib/manual-posted-settings.ts`, `src/app/api/admin/posts/[id]/manual-posted/route.ts`
-- LEFT UNTOUCHED: `/Users/ace/Documents/CURSOR MAIN/ten80ten-smm-portal`, DB migrations, RLS, triggers, design, brand, copy
+- `pipeline-context.tsx` load must call `/api/workspace/provision` before selecting posts.
+- Empty DB post results are valid and must not fall back to placeholders.
+- Every DB insert must include `workspace_id`.
+- Supabase operations on card IDs must guard with `isValidUuid()`.
+- No `blob:` URLs may be persisted.
+- Upload status must be honest per file.
+- Do not edit, import from, or deploy the Ten80Ten SMM portal paths.
