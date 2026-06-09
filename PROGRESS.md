@@ -1,8 +1,8 @@
 # The Reach SMM Portal Progress
 
-updated-at: 2026-06-09T23:26:00+08:00
+updated-at: 2026-06-09T23:43:20+08:00
 
-phase: FIELD REGRESSION - Preparing preflight stall fix in final verification
+phase: DONE - upload pipeline Preparing stall fix pushed and production-smoked
 
 current slice:
 
@@ -10,7 +10,8 @@ current slice:
 - Confirmed a client-side root cause in `src/lib/drive-upload.ts`: Supabase `auth.getSession()` ran before proxy/resumable upload requests with no timeout, so a stalled session read could keep progress at `0%` forever and never open upload requests.
 - Confirmed a progress-honesty bug in `uploadManyToDrive`: large batches could have active per-file work greater than zero but round the size-weighted aggregate back to `0%`, keeping the UI label on `Preparing`.
 - Fixed both in local commit `9723fc4`: bounded auth preflight with a sanitized non-retryable auth error, reused one testable Supabase client import, emitted started progress before proxy/resumable preflight, clamped nonzero aggregate progress to at least `1%`, and covered proxy image plus resumable video auth stalls in Vitest.
-- `npm run verify:target` passed after the local fix; final push and production smoke are pending.
+- `npm run verify:target` passed after the local fix; commits `9723fc4` and `7212783` were pushed to `origin/main`.
+- Production smoke passed against `https://thereach.ten80ten.com` with a temporary active Supabase user for proxy, resumable session, Google PUT, finalize, and stream range routes.
 - Completed Slice 4: multi-select upload surfaces, atomic Media Picker batch callbacks, mixed image/video batch proof, and drawer cover audit honesty fix.
 - Completed Slice 3: finalize folder narrowing and tests.
 - Completed Slice 2: structured retry classification, app-limiter backoff distinction, sanitized server errors, and proxy/resumable route tests.
@@ -48,7 +49,8 @@ last commit SHA:
 - Post-audit P1 fix pushed commit: `8621467`
 - PHG audit pass 2 pushed commit: `7b2e323`
 - Final progress ledger pushed commit: `0fad2b7`
-- Field regression fix local commit: `9723fc4` (push pending)
+- Field regression fix pushed commit: `9723fc4`
+- Preparing stall progress pushed commit: `7212783`
 
 investigation summary:
 
@@ -217,10 +219,22 @@ evidence captured:
 - Preparing stall `npm run build`: passed.
 - Preparing stall `git diff --check`: passed.
 - Preparing stall `npm run verify:target`: passed with `[verify-the-reach-target] OK: active targets point at thereach.ten80ten.com`.
+- Preparing stall production smoke used a temporary active Supabase user and bearer token:
+  - `/api/drive/proxy-upload` -> HTTP 200 in 7132ms.
+  - `/api/drive/upload` resumable-session creation -> HTTP 200 in 3509ms.
+  - Google resumable `PUT` -> HTTP 200 in 4975ms.
+  - `/api/drive/finalize` -> HTTP 200 in 6852ms.
+  - `/api/drive/stream` range request -> HTTP 206 in 2782ms.
+- Preparing stall smoke cleanup:
+  - Pre-smoke stale cleanup found `auth_users=0`, `team_members=0`.
+  - Temporary `workspace_members`, `team_members`, and auth user rows were deleted.
+  - Post-clean verification found `auth_users=0`, `team_members=0` for `codex-smoke+*@ten80ten.com`.
+  - Drive cleanup attempted to delete smoke file IDs `16zAiBnn_1hu4CofHgYN-d408A91Yrv1i` and `1u752oBPLKd78jRDqgZObKQ5nQbkQEsJq`; Google returned HTTP 404 through local credentials, so deletion could not be independently confirmed from this workstation.
+- `origin/main` and local `HEAD` matched at `7212783beadc3ff4d0d60362a6a48d5c56162689` before this final smoke ledger edit.
 
 next step:
 
-- Commit the progress/change ledger, push to `origin/main`, run production smoke for proxy and resumable routes, then stop with final report.
+- Commit and push this final smoke ledger, then stop with final report.
 
 blockers:
 
