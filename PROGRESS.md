@@ -1,6 +1,6 @@
 # The Reach SMM Portal Progress
 
-updated-at: 2026-06-09T23:43:20+08:00
+updated-at: 2026-06-09T23:54:13+08:00
 
 phase: DONE - upload pipeline Preparing stall fix pushed and production-smoked
 
@@ -12,6 +12,8 @@ current slice:
 - Fixed both in local commit `9723fc4`: bounded auth preflight with a sanitized non-retryable auth error, reused one testable Supabase client import, emitted started progress before proxy/resumable preflight, clamped nonzero aggregate progress to at least `1%`, and covered proxy image plus resumable video auth stalls in Vitest.
 - `npm run verify:target` passed after the local fix; commits `9723fc4` and `7212783` were pushed to `origin/main`.
 - Production smoke passed against `https://thereach.ten80ten.com` with a temporary active Supabase user for proxy, resumable session, Google PUT, finalize, and stream range routes.
+- Production batch smoke passed against `https://thereach.ten80ten.com` through the real `uploadManyToDrive` helper: 4 files, concurrency 3, 3 proxy successes, 1 resumable success, 0 failures, progress from `1` to `100`.
+- Smoke Drive artifacts had public `anyone` permissions removed and were trashed; Supabase temp auth/member rows were deleted and stale-principal checks returned zero.
 - Completed Slice 4: multi-select upload surfaces, atomic Media Picker batch callbacks, mixed image/video batch proof, and drawer cover audit honesty fix.
 - Completed Slice 3: finalize folder narrowing and tests.
 - Completed Slice 2: structured retry classification, app-limiter backoff distinction, sanitized server errors, and proxy/resumable route tests.
@@ -229,12 +231,20 @@ evidence captured:
   - Pre-smoke stale cleanup found `auth_users=0`, `team_members=0`.
   - Temporary `workspace_members`, `team_members`, and auth user rows were deleted.
   - Post-clean verification found `auth_users=0`, `team_members=0` for `codex-smoke+*@ten80ten.com`.
-  - Drive cleanup attempted to delete smoke file IDs `16zAiBnn_1hu4CofHgYN-d408A91Yrv1i` and `1u752oBPLKd78jRDqgZObKQ5nQbkQEsJq`; Google returned HTTP 404 through local credentials, so deletion could not be independently confirmed from this workstation.
+  - Drive permanent delete is not available to this service account (`canDelete=false`), so smoke file IDs `16zAiBnn_1hu4CofHgYN-d408A91Yrv1i` and `1u752oBPLKd78jRDqgZObKQ5nQbkQEsJq` were cleaned by removing public `anyone` permissions and setting `trashed=true`.
 - `origin/main` and local `HEAD` matched at `7212783beadc3ff4d0d60362a6a48d5c56162689` before this final smoke ledger edit.
+- Preparing stall production batch smoke through real `uploadManyToDrive`:
+  - Batch composition: 4 files in one helper call, concurrency `3`, target folder `media-library`.
+  - Result: `results=4`, `successes=4`, `failures=0`, elapsed `16743ms`.
+  - Path coverage: 3 proxy uploads and 1 resumable upload.
+  - Settled order was non-input-order (`2:ok,0:ok,1:ok,3:ok`), confirming concurrent batch behavior.
+  - Progress samples moved from `1` to max `100` across 38 samples.
+  - Batch cleanup removed one public `anyone` permission per file and set `trashed=true`, `anyone_left=false` for file IDs `1y5Gwvg7Fo5WJUP8WfsliLnrHRr8AFNyP`, `1TVh5XrsHo0I0Fi5rZK9-HJSxMYTUj07Q`, `1X4oqZNH08Bd7QBM6wCGSDHyUfhD3maEg`, and `1jizVZNarofsC2YBqY0LnJWUEuDAizoIP`.
+  - Post-clean verification found `auth_users=0`, `team_members=0` for both `codex-smoke+*@ten80ten.com` and `codex-smoke-batch+*@ten80ten.com`.
 
 next step:
 
-- Commit and push this final smoke ledger, then stop with final report.
+- Commit and push this final batch-smoke ledger, then stop with final report.
 
 blockers:
 
