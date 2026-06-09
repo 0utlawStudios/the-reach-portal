@@ -41,7 +41,12 @@ function makeRequest(body: Record<string, unknown>) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  authMocks.requireBearerTeamRole.mockResolvedValue({ user: { id: "user-1" } });
+  authMocks.requireBearerTeamRole.mockResolvedValue({
+    user: { id: "user-1" },
+    email: "creator@example.com",
+    role: "editor",
+    workspaceId: "00000000-0000-0000-0000-000000000001",
+  });
   rateLimitMocks.getClientIp.mockReturnValue("1.2.3.4");
   rateLimitMocks.consume.mockResolvedValue({ allowed: true, remaining: 60, resetAt: new Date() });
   driveMocks.getRootFolderId.mockReturnValue("root-folder");
@@ -135,5 +140,44 @@ describe("POST /api/drive/upload", () => {
       "sub-folder",
       2048,
     );
+  });
+
+  it("marks this app's 60/min limiter as appRateLimited and does not create a Drive session", async () => {
+    rateLimitMocks.consume.mockResolvedValueOnce({
+      allowed: false,
+      remaining: 0,
+      resetAt: new Date(Date.now() + 30_000),
+    });
+
+    const res = await POST(makeRequest({
+      fileName: "video.mp4",
+      mimeType: "video/mp4",
+      folder: "raw-files",
+      fileSize: 5 * 1024 * 1024,
+    }));
+    const data = await res.json();
+
+    expect(res.status).toBe(429);
+    expect(data).toMatchObject({ errorReason: "appRateLimited", retryable: false });
+    expect(driveMocks.ensureSubfolder).not.toHaveBeenCalled();
+    expect(driveMocks.createResumableUploadSession).not.toHaveBeenCalled();
+  });
+
+  it("sanitizes Google Drive quota failures on resumable session creation", async () => {
+    driveMocks.createResumableUploadSession.mockRejectedValueOnce(new Error(
+      'Failed to create resumable session: 403 {"error":{"message":"raw quota details","errors":[{"reason":"userRateLimitExceeded","message":"raw quota details"}]}}',
+    ));
+
+    const res = await POST(makeRequest({
+      fileName: "video.mp4",
+      mimeType: "video/mp4",
+      folder: "raw-files",
+      fileSize: 5 * 1024 * 1024,
+    }));
+    const data = await res.json();
+
+    expect(res.status).toBe(429);
+    expect(data).toMatchObject({ errorReason: "driveRateLimited", retryable: true });
+    expect(JSON.stringify(data)).not.toContain("raw quota details");
   });
 });

@@ -27,6 +27,12 @@ import {
   MAX_DRIVE_MEDIA_FILE_SIZE,
   normalizeDriveMimeType,
 } from "@/lib/drive-policy";
+import {
+  type DriveErrorReason,
+  type SanitizedDriveError,
+  sanitizeGoogleDriveError,
+  sanitizeUnknownUploadError,
+} from "@/lib/drive-errors";
 
 export interface DriveUploadResult {
   fileId: string;
@@ -57,11 +63,11 @@ export interface UploadFailureReport {
 // Interactive-friendly backoff. The old [2000, 8000, 32000] meant a single
 // transient hiccup cost up to 42s of dead waiting (and the proxy path re-sent
 // the whole file each time). Worst case is now ~11s.
-const RETRY_DELAYS = [1000, 3000, 7000];
+const RETRY_DELAYS = process.env.NODE_ENV === "test" ? [1, 3, 7] : [1000, 3000, 7000];
 
 // A large direct-to-Google upload is expensive to repeat, so it gets a single
 // gentle retry rather than the full ladder.
-const PUT_RETRY_DELAYS = [3000];
+const PUT_RETRY_DELAYS = process.env.NODE_ENV === "test" ? [1] : [3000];
 
 // Abort an upload that makes no progress for this long. XMLHttpRequest has no
 // default timeout, so without this a stalled connection hangs with no end —
@@ -84,6 +90,75 @@ const DIRECT_RESPONSE_TIMEOUT_MS = 120000;
 // retries on the proxy path, so the proxy is the right home for anything < 4 MB.
 const RESUMABLE_THRESHOLD = 4 * 1024 * 1024; // 4 MB
 
+export class DriveUploadError extends Error {
+  status?: number;
+  reason: DriveErrorReason;
+  retryable: boolean;
+  retryAfterMs?: number;
+
+  constructor(message: string, opts: {
+    status?: number;
+    reason?: DriveErrorReason;
+    retryable?: boolean;
+    retryAfterMs?: number;
+  } = {}) {
+    super(message);
+    this.name = "DriveUploadError";
+    this.status = opts.status;
+    this.reason = opts.reason || "unknown";
+    this.retryable = opts.retryable ?? false;
+    this.retryAfterMs = opts.retryAfterMs;
+  }
+}
+
+export function retryDelayWithJitter(baseDelayMs: number, jitter = Math.random()): number {
+  return baseDelayMs + Math.floor(Math.max(0, Math.min(1, jitter)) * 1000);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function parseJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+function toDriveUploadError(payload: SanitizedDriveError, status?: number): DriveUploadError {
+  return new DriveUploadError(payload.error, {
+    status,
+    reason: payload.errorReason,
+    retryable: payload.retryable,
+    retryAfterMs: payload.retryAfterMs,
+  });
+}
+
+function errorFromPayload(status: number, payload: unknown): DriveUploadError {
+  if (isRecord(payload) && typeof payload.errorReason === "string") {
+    return toDriveUploadError({
+      error: typeof payload.error === "string" ? payload.error : "Upload failed. Please try again.",
+      errorReason: payload.errorReason as DriveErrorReason,
+      retryable: payload.retryable === true,
+      retryAfterMs: typeof payload.retryAfterMs === "number" ? payload.retryAfterMs : undefined,
+    }, status);
+  }
+  return toDriveUploadError(sanitizeGoogleDriveError(status, payload), status);
+}
+
+async function errorFromResponse(res: Response): Promise<DriveUploadError> {
+  const text = await res.text();
+  return errorFromPayload(res.status, parseJson(text));
+}
+
+function isRetryableUploadError(error: Error): boolean {
+  if (error instanceof DriveUploadError) return error.retryable;
+  const sanitized = sanitizeUnknownUploadError(error);
+  return sanitized.retryable;
+}
+
 async function withRetry<T>(fn: () => Promise<T>, label: string, delays: number[] = RETRY_DELAYS): Promise<T> {
   let lastError: Error | null = null;
   for (let attempt = 0; attempt <= delays.length; attempt++) {
@@ -91,20 +166,16 @@ async function withRetry<T>(fn: () => Promise<T>, label: string, delays: number[
       return await fn();
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
-      // Permanent failures — do not retry
-      if (
-        lastError.message.includes("400") ||
-        lastError.message.includes("401") ||
-        lastError.message.includes("403") ||
-        lastError.message.includes("404") ||
-        lastError.message.includes("429") ||
-        lastError.message.includes("413")
-      ) {
+      if (!isRetryableUploadError(lastError)) {
         throw lastError;
       }
       if (attempt < delays.length) {
-        console.warn(`[drive-upload] ${label} attempt ${attempt + 1} failed, retrying in ${delays[attempt]}ms...`);
-        await new Promise((r) => setTimeout(r, delays[attempt]));
+        const baseDelay = lastError instanceof DriveUploadError && lastError.retryAfterMs
+          ? Math.max(delays[attempt], lastError.retryAfterMs)
+          : delays[attempt];
+        const delay = retryDelayWithJitter(baseDelay);
+        console.warn(`[drive-upload] ${label} attempt ${attempt + 1} failed, retrying in ${delay}ms...`);
+        await new Promise((r) => setTimeout(r, delay));
       }
     }
   }
@@ -199,7 +270,7 @@ async function uploadViaProxy(
           try {
             const data = JSON.parse(xhr.responseText);
             if (data.error) {
-              fail(new Error(data.error));
+              fail(errorFromPayload(xhr.status || 500, data));
             } else {
               onProgress?.(100);
               done({
@@ -215,15 +286,15 @@ async function uploadViaProxy(
         } else {
           try {
             const data = JSON.parse(xhr.responseText);
-            fail(new Error(data.error || `Upload failed: ${xhr.status}`));
+            fail(errorFromPayload(xhr.status, data));
           } catch {
-            fail(new Error(`Upload failed: ${xhr.status}`));
+            fail(errorFromPayload(xhr.status, xhr.responseText));
           }
         }
       };
 
-      xhr.onerror = () => fail(new Error("Network error during upload"));
-      xhr.ontimeout = () => fail(new Error("Upload timed out"));
+      xhr.onerror = () => fail(new DriveUploadError("Network error during upload.", { reason: "network", retryable: true }));
+      xhr.ontimeout = () => fail(new DriveUploadError("Upload timed out.", { reason: "timeout", retryable: true }));
       xhr.onabort = () => fail(new Error("Upload aborted"));
       watchdog.kick();
       xhr.send(formData);
@@ -262,12 +333,7 @@ async function getUploadSession(
   });
 
   if (!res.ok) {
-    let msg = `Session creation failed: ${res.status}`;
-    try {
-      const data = await res.json();
-      if (data.error) msg = data.error;
-    } catch { /* ignore */ }
-    throw new Error(msg);
+    throw await errorFromResponse(res);
   }
 
   const data = await res.json();
@@ -326,12 +392,12 @@ async function putToGoogle(
           fail(new Error("Invalid response from storage after upload"));
         }
       } else {
-        fail(new Error(`Upload to storage failed: ${xhr.status}`));
+        fail(errorFromPayload(xhr.status, parseJson(xhr.responseText || "")));
       }
     };
 
-    xhr.onerror = () => fail(new Error("Network error during upload"));
-    xhr.ontimeout = () => fail(new Error("Upload timed out"));
+    xhr.onerror = () => fail(new DriveUploadError("Network error during upload.", { reason: "network", retryable: true }));
+    xhr.ontimeout = () => fail(new DriveUploadError("Upload timed out.", { reason: "timeout", retryable: true }));
     xhr.onabort = () => fail(new Error("Upload aborted"));
     watchdog.kick();
     xhr.send(file);
@@ -347,12 +413,7 @@ async function finalizeUpload(fileId: string): Promise<DriveUploadResult> {
   });
 
   if (!res.ok) {
-    let msg = `Finalize failed: ${res.status}`;
-    try {
-      const data = await res.json();
-      if (data.error) msg = data.error;
-    } catch { /* ignore */ }
-    throw new Error(msg);
+    throw await errorFromResponse(res);
   }
 
   const data = await res.json();

@@ -1,15 +1,19 @@
 # The Reach SMM Portal Progress
 
-updated-at: 2026-06-09T22:29:14+08:00
+updated-at: 2026-06-09T22:37:28+08:00
 
-phase: PHASE 2 - Slice 1 committed, pending verify/push
+phase: PHASE 2 - Slice 2 complete locally, pending commit/push
 
 current slice:
 
-- Slice 1: batch isolation contract and Create Post partial-success retention.
+- Completed Slice 2 locally: structured retry classification, app-limiter backoff distinction, sanitized server errors, and proxy/resumable route tests.
+- Completed Slice 1: batch isolation contract and Create Post partial-success retention.
 - `uploadManyToDrive` now always settles every input file; `stopOnError` is retained only as deprecated compatibility and no longer aborts siblings.
 - Create Post stores successful Drive results on each selected file before returning on a partial failure, so a retry uploads only failed files while post creation remains fail-closed.
 - Added `.claude/settings.local.json` to `.gitignore`.
+- Drive quota 403/429 returns sanitized `driveRateLimited` and retries with jitter.
+- App 60/min upload limiter 429 returns sanitized `appRateLimited` and is not retried by the client.
+- Proxy, resumable session, and finalize routes now return allowlisted upload error reasons instead of raw Google text.
 
 current repo:
 
@@ -22,7 +26,8 @@ current repo:
 last commit SHA:
 
 - Last pushed commit before Slice 1: `14ff28d`
-- Slice 1 commit: committed locally; exact pushed SHA is recorded by `git log -1` after push.
+- Slice 1 pushed commit: `d384875`
+- Slice 2 commit: committed locally; exact pushed SHA is recorded by `git log -1` after push.
 
 investigation summary:
 
@@ -49,6 +54,18 @@ files touched in Slice 1:
 - `src/lib/__tests__/drive-upload.test.ts`
 - `src/lib/__tests__/create-post-upload-state.test.ts`
 - `src/components/create-post-modal.tsx`
+- `PROGRESS.md`
+
+files touched in Slice 2:
+
+- `src/lib/drive-errors.ts`
+- `src/lib/drive-upload.ts`
+- `src/lib/__tests__/drive-upload.test.ts`
+- `src/app/api/drive/proxy-upload/route.ts`
+- `src/app/api/drive/proxy-upload/__tests__/route.test.ts`
+- `src/app/api/drive/upload/route.ts`
+- `src/app/api/drive/upload/__tests__/route.test.ts`
+- `src/app/api/drive/finalize/route.ts`
 - `PROGRESS.md`
 
 files audited:
@@ -82,12 +99,19 @@ evidence captured:
 - `npm run lint`: passed with one pre-existing warning in `src/lib/ai/worker.ts`.
 - `npm test`: passed, 38 files / 296 tests.
 - `npm run build`: passed.
+- Focused Slice 2 tests: `npm test -- --run src/lib/__tests__/drive-upload.test.ts src/app/api/drive/proxy-upload/__tests__/route.test.ts src/app/api/drive/upload/__tests__/route.test.ts` passed, 3 files / 18 tests.
+- `npm run typecheck`: passed after Slice 2.
+- `npm run lint`: passed after Slice 2 with one pre-existing warning in `src/lib/ai/worker.ts`.
+- `npm test`: passed after Slice 2, 38 files / 301 tests.
+- `npm run build`: passed after Slice 2.
 
 next step:
 
+- Run `git diff --check`.
+- Commit Slice 2.
 - Run `npm run verify:target`.
-- Push to `origin/main` only if `verify:target` passes.
-- Continue to Slice 2 after push: structured retry classification, app-limiter backoff distinction, and sanitized server errors for both proxy and resumable routes.
+- Push Slice 2 if target verification passes.
+- Continue to Slice 3: finalize folder narrowing and tests.
 
 blockers:
 

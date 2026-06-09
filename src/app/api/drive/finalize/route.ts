@@ -4,6 +4,11 @@ import { requireBearerTeamRole } from "@/lib/auth/require";
 import { consume, getClientIp } from "@/lib/rate-limit";
 import { isAllowedDriveMediaMime, MAX_DRIVE_MEDIA_FILE_SIZE, normalizeDriveMimeType, VALID_DRIVE_FOLDERS } from "@/lib/drive-policy";
 import { notifyUploadFailure } from "@/lib/upload-alerts";
+import {
+  appRateLimitError,
+  sanitizeUnknownUploadError,
+  statusForSanitizedDriveError,
+} from "@/lib/drive-errors";
 
 export const maxDuration = 60;
 
@@ -47,8 +52,9 @@ export async function POST(request: NextRequest) {
     const rlKey = `user:${user.id}|ip:${getClientIp(request)}`;
     const rl = await consume("drive-finalize:user", rlKey, 60, 60);
     if (!rl.allowed) {
+      const limited = appRateLimitError(rl.resetAt);
       return NextResponse.json(
-        { error: "Too many finalize requests. Please slow down." },
+        limited,
         { status: 429 },
       );
     }
@@ -108,6 +114,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
+    const sanitized = sanitizeUnknownUploadError(err);
     console.error("[drive/finalize]", message);
     if (authContext) {
       await notifyUploadFailure({
@@ -120,12 +127,14 @@ export async function POST(request: NextRequest) {
         userEmail: authContext.email,
         userRole: authContext.role,
         fileName: fileId,
-        errorMessage: message,
+        errorMessage: sanitized.error,
+        errorStatus: statusForSanitizedDriveError(sanitized),
+        errorDetail: message,
         userAgent: request.headers.get("user-agent"),
         ip: getClientIp(request),
         requestUrl: request.url,
       });
     }
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(sanitized, { status: statusForSanitizedDriveError(sanitized) });
   }
 }

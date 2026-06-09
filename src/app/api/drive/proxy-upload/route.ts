@@ -17,11 +17,17 @@ import {
   VALID_DRIVE_FOLDERS,
 } from "@/lib/drive-policy";
 import { notifyUploadFailure } from "@/lib/upload-alerts";
+import {
+  appRateLimitError,
+  sanitizeGoogleDriveError,
+  sanitizeUnknownUploadError,
+  statusForSanitizedDriveError,
+} from "@/lib/drive-errors";
 
 export const maxDuration = 60;
 
 // Helper: always return clean JSON (no control characters ever)
-function jsonResponse(data: Record<string, unknown>, status = 200) {
+function jsonResponse(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
     headers: { "Content-Type": "application/json" },
@@ -46,7 +52,7 @@ export async function POST(request: NextRequest) {
     const rlKey = `user:${user.id}|ip:${getClientIp(request)}`;
     const rl = await consume("drive-proxy-upload:user", rlKey, 60, 60);
     if (!rl.allowed) {
-      return jsonResponse({ error: "Too many uploads. Please slow down." }, 429);
+      return jsonResponse(appRateLimitError(rl.resetAt), 429);
     }
 
     const formData = await request.formData();
@@ -131,6 +137,7 @@ export async function POST(request: NextRequest) {
     if (!uploadRes.ok) {
       // Log the full error server-side, return clean message to client
       const rawErr = await uploadRes.text();
+      const sanitized = sanitizeGoogleDriveError(uploadRes.status, rawErr);
       console.error("[proxy-upload] Google Drive error:", uploadRes.status, rawErr);
       await notifyUploadFailure({
         source: "server",
@@ -146,13 +153,13 @@ export async function POST(request: NextRequest) {
         mimeType,
         fileSize,
         errorStatus: uploadRes.status,
-        errorMessage: "Storage rejected the proxied upload",
+        errorMessage: sanitized.error,
         errorDetail: rawErr,
         userAgent: request.headers.get("user-agent"),
         ip: getClientIp(request),
         requestUrl: request.url,
       });
-      return jsonResponse({ error: `The upload was rejected by storage (HTTP ${uploadRes.status}). Please try again, or contact an admin if this keeps happening.` }, 500);
+      return jsonResponse(sanitized, statusForSanitizedDriveError(sanitized, 500));
     }
 
     const driveFile = await uploadRes.json();
@@ -180,6 +187,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown server error";
+    const sanitized = sanitizeUnknownUploadError(err);
     console.error("[proxy-upload] Error:", message);
     if (authContext) {
       await notifyUploadFailure({
@@ -195,13 +203,15 @@ export async function POST(request: NextRequest) {
         fileName,
         mimeType,
         fileSize,
-        errorMessage: message,
+        errorMessage: sanitized.error,
+        errorStatus: statusForSanitizedDriveError(sanitized),
+        errorDetail: message,
         userAgent: request.headers.get("user-agent"),
         ip: getClientIp(request),
         requestUrl: request.url,
       });
     }
     // Return clean error — never include raw stack traces or Google API responses
-    return jsonResponse({ error: message.slice(0, 200) }, 500);
+    return jsonResponse(sanitized, statusForSanitizedDriveError(sanitized));
   }
 }

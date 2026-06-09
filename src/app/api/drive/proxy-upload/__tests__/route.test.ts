@@ -1,78 +1,162 @@
 // Contract-level tests for POST /api/drive/proxy-upload.
-//
-// SEC-001: this route streams bytes into the team's Google Drive. It was
-// previously unauthenticated — anyone could write to the Drive folder. The
-// Bearer-token gate must reject unauthenticated callers BEFORE any upload work.
-//
-// These tests assert ONLY HTTP status codes (the stable contract). Error
-// message text is being changed by other agents in parallel.
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { NextResponse } from "next/server";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-// ── Configurable Supabase auth, reset per test. ───────────────────────────
-type AuthResult = { data: { user: unknown }; error: unknown };
-let getUserResult: AuthResult;
-vi.mock("@supabase/supabase-js", () => ({
-  createClient: vi.fn(() => ({
-    auth: { getUser: vi.fn(() => Promise.resolve(getUserResult)) },
-  })),
+const authMocks = vi.hoisted(() => ({
+  requireBearerTeamRole: vi.fn(),
 }));
 
-// Rate-limit always allows — auth is what these tests assert.
+const rateLimitMocks = vi.hoisted(() => ({
+  consume: vi.fn(),
+  getClientIp: vi.fn(),
+}));
+
+const driveMocks = vi.hoisted(() => ({
+  getRootFolderId: vi.fn(),
+  ensureSubfolder: vi.fn(),
+  setPublicPermission: vi.fn(),
+  getAccessToken: vi.fn(),
+  getStreamUrl: vi.fn(),
+}));
+
+const alertMocks = vi.hoisted(() => ({
+  notifyUploadFailure: vi.fn(),
+}));
+
+vi.mock("@/lib/auth/require", () => ({
+  requireBearerTeamRole: authMocks.requireBearerTeamRole,
+}));
+
 vi.mock("@/lib/rate-limit", () => ({
-  consume: vi.fn(() =>
-    Promise.resolve({ allowed: true, remaining: 30, resetAt: new Date() }),
-  ),
-  getClientIp: vi.fn(() => "1.2.3.4"),
+  consume: rateLimitMocks.consume,
+  getClientIp: rateLimitMocks.getClientIp,
 }));
 
-// Google Drive layer — never actually called in the auth-rejection paths,
-// mocked so an accidental reach does not hit the network.
 vi.mock("@/lib/google-drive", () => ({
-  getRootFolderId: vi.fn(() => "root-folder"),
-  ensureSubfolder: vi.fn(() => Promise.resolve("sub-folder")),
-  setPublicPermission: vi.fn(() => Promise.resolve()),
-  getAccessToken: vi.fn(() => Promise.resolve("drive-token")),
+  getRootFolderId: driveMocks.getRootFolderId,
+  ensureSubfolder: driveMocks.ensureSubfolder,
+  setPublicPermission: driveMocks.setPublicPermission,
+  getAccessToken: driveMocks.getAccessToken,
+  getStreamUrl: driveMocks.getStreamUrl,
+}));
+
+vi.mock("@/lib/upload-alerts", () => ({
+  notifyUploadFailure: alertMocks.notifyUploadFailure,
 }));
 
 import { POST } from "../route";
 
-function makeRequest(headers: Record<string, string>) {
+const originalFetch = global.fetch;
+
+function makeRequest(headers: Record<string, string>, formData = new FormData()) {
   const lower: Record<string, string> = {};
   for (const [k, v] of Object.entries(headers)) lower[k.toLowerCase()] = v;
   return {
     headers: { get: (n: string) => lower[n.toLowerCase()] ?? null },
-    formData: () => Promise.resolve(new FormData()),
+    url: "https://thereach.ten80ten.com/api/drive/proxy-upload",
+    formData: () => Promise.resolve(formData),
   } as unknown as Parameters<typeof POST>[0];
+}
+
+function makeUploadForm(file = new File(["image"], "hero.jpg", { type: "image/jpeg" })) {
+  if (typeof file.arrayBuffer !== "function") {
+    Object.defineProperty(file, "arrayBuffer", {
+      value: () => Promise.resolve(new TextEncoder().encode("image").buffer),
+    });
+  }
+  const form = new FormData();
+  form.append("file", file);
+  form.append("folder", "media-library");
+  form.append("fileName", file.name);
+  form.append("mimeType", file.type);
+  return form;
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
-  process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
-  process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-key";
-  getUserResult = { data: { user: null }, error: null };
+  authMocks.requireBearerTeamRole.mockResolvedValue({
+    user: { id: "user-1" },
+    email: "creator@example.com",
+    role: "editor",
+    workspaceId: "00000000-0000-0000-0000-000000000001",
+  });
+  rateLimitMocks.getClientIp.mockReturnValue("1.2.3.4");
+  rateLimitMocks.consume.mockResolvedValue({
+    allowed: true,
+    remaining: 30,
+    resetAt: new Date(Date.now() + 30_000),
+  });
+  driveMocks.getRootFolderId.mockReturnValue("root-folder");
+  driveMocks.ensureSubfolder.mockResolvedValue("sub-folder");
+  driveMocks.setPublicPermission.mockResolvedValue(undefined);
+  driveMocks.getAccessToken.mockResolvedValue("drive-token");
+  driveMocks.getStreamUrl.mockReturnValue("/api/drive/stream?id=file-1");
+  alertMocks.notifyUploadFailure.mockResolvedValue({ emailSent: false, telegramSent: false });
+  global.fetch = vi.fn(() => Promise.resolve(new Response(JSON.stringify({
+    id: "file-1",
+    mimeType: "image/jpeg",
+    size: "5",
+  }), { status: 200 }))) as typeof fetch;
 });
 
-describe("POST /api/drive/proxy-upload — auth contract", () => {
+afterEach(() => {
+  global.fetch = originalFetch;
+});
+
+describe("POST /api/drive/proxy-upload", () => {
   it("rejects a request with no Authorization header with 401", async () => {
+    authMocks.requireBearerTeamRole.mockResolvedValueOnce(NextResponse.json({ error: "Unauthorized" }, { status: 401 }));
+
     const res = await POST(makeRequest({}));
-    expect(res.status).toBe(401);
-  });
 
-  it("rejects a request whose Bearer token fails getUser with 401", async () => {
-    getUserResult = { data: { user: null }, error: { message: "invalid token" } };
-    const res = await POST(makeRequest({ Authorization: "Bearer bad-token" }));
     expect(res.status).toBe(401);
-  });
-
-  it("rejects a request whose getUser resolves with no user with 401", async () => {
-    getUserResult = { data: { user: null }, error: null };
-    const res = await POST(makeRequest({ Authorization: "Bearer stale-token" }));
-    expect(res.status).toBe(401);
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 
   it("does not return 2xx for any unauthenticated request", async () => {
+    authMocks.requireBearerTeamRole.mockResolvedValueOnce(NextResponse.json({ error: "Unauthorized" }, { status: 401 }));
+
     const res = await POST(makeRequest({}));
+
     expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("marks this app's 60/min limiter as appRateLimited and does not call Drive", async () => {
+    rateLimitMocks.consume.mockResolvedValueOnce({
+      allowed: false,
+      remaining: 0,
+      resetAt: new Date(Date.now() + 30_000),
+    });
+
+    const res = await POST(makeRequest({ Authorization: "Bearer token" }, makeUploadForm()));
+    const data = await res.json();
+
+    expect(res.status).toBe(429);
+    expect(data).toMatchObject({ errorReason: "appRateLimited", retryable: false });
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("sanitizes Google Drive quota failures on the proxy path", async () => {
+    global.fetch = vi.fn(() => Promise.resolve(new Response(JSON.stringify({
+      error: {
+        code: 403,
+        message: "raw quota details should stay server-side",
+        errors: [{ reason: "userRateLimitExceeded", message: "raw quota details should stay server-side" }],
+      },
+    }), { status: 403 }))) as typeof fetch;
+
+    const res = await POST(makeRequest({ Authorization: "Bearer token" }, makeUploadForm()));
+    const data = await res.json();
+
+    expect(res.status).toBe(429);
+    expect(data).toMatchObject({ errorReason: "driveRateLimited", retryable: true });
+    expect(JSON.stringify(data)).not.toContain("raw quota details");
+    expect(alertMocks.notifyUploadFailure).toHaveBeenCalledWith(expect.objectContaining({
+      errorMessage: "Storage is busy. Retrying automatically.",
+      errorStatus: 403,
+      errorDetail: expect.stringContaining("raw quota details"),
+    }));
   });
 });
