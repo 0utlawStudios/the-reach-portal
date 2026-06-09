@@ -1,8 +1,8 @@
 # The Reach SMM Portal Progress
 
-updated-at: 2026-06-09T22:52:12+08:00
+updated-at: 2026-06-09T22:55:26+08:00
 
-phase: PHASE 2 - Slice 4 committed, push pending
+phase: PHASE 2 - CHANGES doc verified, commit pending
 
 current slice:
 
@@ -20,6 +20,7 @@ current slice:
 - Asset Review Drawer raw/source upload inputs are multi-select and route through `uploadManyToDrive` with isolated per-file failure reporting.
 - Create Post, Media Picker, Asset Review Drawer, and Media Page are guarded by a static test against direct component-level `uploadToDrive` calls.
 - Mixed proxy/resumable Vitest now proves small images and large videos can upload together while one large video Drive quota 403 fails without aborting the other files.
+- `CHANGES-upload-fix.md` now lists edited files, moved/renamed files, and untouched areas for Phase 2 blast-radius discipline.
 
 current repo:
 
@@ -35,7 +36,7 @@ last commit SHA:
 - Slice 1 pushed commit: `d384875`
 - Slice 2 pushed commit: `fc8779d`
 - Slice 3 pushed commit: `2dcd51f`
-- Slice 4 commit: `8a0d8bd` (push pending)
+- Slice 4 pushed commit: `8e3645d`
 
 investigation summary:
 
@@ -93,6 +94,11 @@ files touched in Slice 4:
 - `src/lib/__tests__/upload-surfaces-static.test.ts`
 - `PROGRESS.md`
 
+files touched in CHANGES doc slice:
+
+- `CHANGES-upload-fix.md`
+- `PROGRESS.md`
+
 files audited:
 
 - `src/lib/drive-upload.ts`
@@ -140,11 +146,18 @@ evidence captured:
 - `npm test`: passed after Slice 4, 40 files / 308 tests.
 - `npm run build`: passed after Slice 4.
 - `git diff --check`: passed after Slice 4.
+- CHANGES doc slice verification:
+  - `npm run typecheck`: passed.
+  - `npm test`: passed, 40 files / 308 tests.
+  - `npm run lint`: passed with one pre-existing warning in `src/lib/ai/worker.ts`.
+  - `npm run build`: passed.
+  - `git diff --check`: passed.
+  - `npm run verify:target`: passed.
 
 next step:
 
-- Commit and push Slice 4 after `npm run verify:target`.
-- Then create `CHANGES-upload-fix.md` for Phase 2 blast-radius accounting.
+- Commit and push the CHANGES doc slice.
+- After that, begin the read-only PHG audit and write `AUDIT-upload-hardening.md`.
 
 blockers:
 
