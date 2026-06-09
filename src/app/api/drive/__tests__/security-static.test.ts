@@ -25,10 +25,15 @@ describe("Drive route security contracts", () => {
     const metadataIdx = DRIVE_FINALIZE_SRC.indexOf("const meta = await getFileMetadata(fileId)");
     const parentCheckIdx = DRIVE_FINALIZE_SRC.indexOf("belongsToAppFolder");
     const permissionIdx = DRIVE_FINALIZE_SRC.indexOf("await setPublicPermission(fileId)");
+    const folderValidationIdx = DRIVE_FINALIZE_SRC.indexOf("VALID_DRIVE_FOLDERS.includes(folder)");
+    const singleFolderIdx = DRIVE_FINALIZE_SRC.indexOf("const allowedParentId = await ensureSubfolder(folder, rootId)");
     expect(metadataIdx).toBeGreaterThan(-1);
+    expect(folderValidationIdx).toBeGreaterThan(-1);
+    expect(folderValidationIdx).toBeLessThan(metadataIdx);
     expect(parentCheckIdx).toBeGreaterThan(metadataIdx);
     expect(permissionIdx).toBeGreaterThan(parentCheckIdx);
-    expect(DRIVE_FINALIZE_SRC).toContain("VALID_DRIVE_FOLDERS.map");
+    expect(singleFolderIdx).toBeGreaterThan(metadataIdx);
+    expect(DRIVE_FINALIZE_SRC).not.toContain("VALID_DRIVE_FOLDERS.map");
     expect(DRIVE_FINALIZE_SRC).toContain("isAllowedDriveMediaMime(mimeType)");
     expect(DRIVE_FINALIZE_SRC).toContain("meta.size > MAX_DRIVE_MEDIA_FILE_SIZE");
     expect(GOOGLE_DRIVE_SRC).toContain("fields=id,name,mimeType,size,parents");

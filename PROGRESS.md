@@ -1,12 +1,13 @@
 # The Reach SMM Portal Progress
 
-updated-at: 2026-06-09T22:37:28+08:00
+updated-at: 2026-06-09T22:40:36+08:00
 
-phase: PHASE 2 - Slice 2 complete locally, pending commit/push
+phase: PHASE 2 - Slice 3 complete locally, pending commit/push
 
 current slice:
 
-- Completed Slice 2 locally: structured retry classification, app-limiter backoff distinction, sanitized server errors, and proxy/resumable route tests.
+- Completed Slice 3 locally: finalize folder narrowing and tests.
+- Completed Slice 2: structured retry classification, app-limiter backoff distinction, sanitized server errors, and proxy/resumable route tests.
 - Completed Slice 1: batch isolation contract and Create Post partial-success retention.
 - `uploadManyToDrive` now always settles every input file; `stopOnError` is retained only as deprecated compatibility and no longer aborts siblings.
 - Create Post stores successful Drive results on each selected file before returning on a partial failure, so a retry uploads only failed files while post creation remains fail-closed.
@@ -27,7 +28,8 @@ last commit SHA:
 
 - Last pushed commit before Slice 1: `14ff28d`
 - Slice 1 pushed commit: `d384875`
-- Slice 2 commit: committed locally; exact pushed SHA is recorded by `git log -1` after push.
+- Slice 2 pushed commit: `fc8779d`
+- Slice 3 commit: committed locally; exact pushed SHA is recorded by `git log -1` after push.
 
 investigation summary:
 
@@ -68,6 +70,14 @@ files touched in Slice 2:
 - `src/app/api/drive/finalize/route.ts`
 - `PROGRESS.md`
 
+files touched in Slice 3:
+
+- `src/lib/drive-upload.ts`
+- `src/app/api/drive/finalize/route.ts`
+- `src/app/api/drive/finalize/__tests__/route.test.ts`
+- `src/app/api/drive/__tests__/security-static.test.ts`
+- `PROGRESS.md`
+
 files audited:
 
 - `src/lib/drive-upload.ts`
@@ -104,14 +114,19 @@ evidence captured:
 - `npm run lint`: passed after Slice 2 with one pre-existing warning in `src/lib/ai/worker.ts`.
 - `npm test`: passed after Slice 2, 38 files / 301 tests.
 - `npm run build`: passed after Slice 2.
+- Focused Slice 3 tests: `npm test -- --run src/app/api/drive/finalize/__tests__/route.test.ts src/app/api/drive/__tests__/security-static.test.ts` passed, 2 files / 8 tests.
+- `npm run typecheck`: passed after Slice 3.
+- `npm run lint`: passed after Slice 3 with one pre-existing warning in `src/lib/ai/worker.ts`.
+- `npm test`: passed after Slice 3, 39 files / 305 tests.
+- `npm run build`: passed after Slice 3.
 
 next step:
 
 - Run `git diff --check`.
-- Commit Slice 2.
+- Commit Slice 3.
 - Run `npm run verify:target`.
-- Push Slice 2 if target verification passes.
-- Continue to Slice 3: finalize folder narrowing and tests.
+- Push Slice 3 if target verification passes.
+- Continue to Slice 4: multi-select batch upload surfaces and mixed image/video batch proof.
 
 blockers:
 

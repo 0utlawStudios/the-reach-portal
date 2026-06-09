@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { ensureSubfolder, getRootFolderId, setPublicPermission, getStreamUrl, getFileMetadata } from "@/lib/google-drive";
 import { requireBearerTeamRole } from "@/lib/auth/require";
 import { consume, getClientIp } from "@/lib/rate-limit";
-import { isAllowedDriveMediaMime, MAX_DRIVE_MEDIA_FILE_SIZE, normalizeDriveMimeType, VALID_DRIVE_FOLDERS } from "@/lib/drive-policy";
+import {
+  type DriveFolderName,
+  isAllowedDriveMediaMime,
+  MAX_DRIVE_MEDIA_FILE_SIZE,
+  normalizeDriveMimeType,
+  VALID_DRIVE_FOLDERS,
+} from "@/lib/drive-policy";
 import { notifyUploadFailure } from "@/lib/upload-alerts";
 import {
   appRateLimitError,
@@ -37,6 +43,7 @@ const ALLOWED_FINALIZE_ROLES: ReadonlyArray<string> = [
 export async function POST(request: NextRequest) {
   let authContext: { user: { id: string }; email: string; role: string; workspaceId: string } | null = null;
   let fileId: string | null = null;
+  let folder: DriveFolderName | null = null;
   try {
     // SEC-002: Gate on bearer-team-role. Without this, an unauthenticated
     // caller could iterate fileIds and force-publicize unrelated workspace
@@ -61,9 +68,13 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     fileId = typeof body?.fileId === "string" ? body.fileId : null;
+    folder = typeof body?.folder === "string" ? body.folder as DriveFolderName : null;
 
     if (!fileId) {
       return NextResponse.json({ error: "Missing fileId" }, { status: 400 });
+    }
+    if (!folder || !VALID_DRIVE_FOLDERS.includes(folder)) {
+      return NextResponse.json({ error: "Invalid folder" }, { status: 400 });
     }
     // SEC-002: Reject malformed fileIds before we hand them to the Drive API.
     if (!DRIVE_FILE_ID_RE.test(fileId)) {
@@ -75,8 +86,8 @@ export async function POST(request: NextRequest) {
     // publicize arbitrary Drive content.
     const meta = await getFileMetadata(fileId);
     const rootId = getRootFolderId();
-    const allowedParentIds = await Promise.all(VALID_DRIVE_FOLDERS.map((folder) => ensureSubfolder(folder, rootId)));
-    const belongsToAppFolder = meta.parents.some((parentId) => allowedParentIds.includes(parentId));
+    const allowedParentId = await ensureSubfolder(folder, rootId);
+    const belongsToAppFolder = meta.parents.includes(allowedParentId);
     if (!belongsToAppFolder) {
       return NextResponse.json({ error: "File is not in an app-managed Drive folder" }, { status: 403 });
     }
@@ -126,6 +137,7 @@ export async function POST(request: NextRequest) {
         userId: authContext.user.id,
         userEmail: authContext.email,
         userRole: authContext.role,
+        folder,
         fileName: fileId,
         errorMessage: sanitized.error,
         errorStatus: statusForSanitizedDriveError(sanitized),

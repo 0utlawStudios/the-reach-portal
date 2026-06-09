@@ -404,12 +404,12 @@ async function putToGoogle(
   });
 }
 
-async function finalizeUpload(fileId: string): Promise<DriveUploadResult> {
+async function finalizeUpload(fileId: string, folder: string): Promise<DriveUploadResult> {
   const headers = await getAuthHeaders();
   const res = await fetchWithTimeout("/api/drive/finalize", {
     method: "POST",
     headers,
-    body: JSON.stringify({ fileId }),
+    body: JSON.stringify({ fileId, folder }),
   });
 
   if (!res.ok) {
@@ -452,7 +452,7 @@ async function uploadViaResumable(
 
   // Step 3: set permissions and get serving URL
   const result = await withRetry(
-    () => finalizeUpload(fileId),
+    () => finalizeUpload(fileId, folder),
     "Finalize"
   );
   onProgress?.(100);
