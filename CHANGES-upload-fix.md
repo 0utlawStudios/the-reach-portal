@@ -1,12 +1,13 @@
 # THE REACH Upload Pipeline Changes
 
-updated-at: 2026-06-09T22:54:20+08:00
-phase: PHASE 2 change ledger
+updated-at: 2026-06-09T23:25:08+08:00
+phase: PHASE 2 change ledger plus field regression fix
 commits:
 - `d384875` Fix upload batch isolation
 - `fc8779d` Harden Drive upload retry errors
 - `2dcd51f` Narrow Drive finalize folder checks
 - `8e3645d` Wire upload surfaces through batch helper
+- `9723fc4` Fix upload preparing preflight stall
 
 ## Edited Files
 
@@ -19,6 +20,8 @@ commits:
   - Kept `stopOnError` only as deprecated compatibility; it no longer stops sibling uploads.
   - Added structured upload errors, sanitized browser-facing reasons, Drive quota retry classification, jittered backoff, and app-limiter no-retry behavior.
   - Sent the expected Drive folder to `/api/drive/finalize` so finalize verifies only the intended folder.
+  - Bounded Supabase auth-session preflight before proxy, resumable, finalize, and upload-failure calls so a stalled session read cannot leave the UI at `Preparing`.
+  - Emitted started progress before proxy/resumable preflight and clamped nonzero weighted batch progress to at least `1%`, so large batches do not round active work back to `0%`.
 - `src/lib/drive-errors.ts`
   - Added the allowlisted upload error model used by Drive API routes and the browser client.
 - `src/lib/create-post-upload-state.ts`
@@ -57,6 +60,7 @@ commits:
 
 - `src/lib/__tests__/drive-upload.test.ts`
   - Added batch isolation, hostile unsupported input, Drive quota retry, app-limiter no-hammer, and mixed image/video proxy/resumable coverage.
+  - Added 30-photo proxy preflight progress coverage and a stalled-auth test proving proxy image plus resumable video uploads settle as isolated auth failures without sending upload bytes.
 - `src/lib/__tests__/create-post-upload-state.test.ts`
   - Proves partial Create Post successes are retained and failed files stay pending.
 - `src/lib/__tests__/upload-surfaces-static.test.ts`

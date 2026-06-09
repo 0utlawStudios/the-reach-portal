@@ -1,11 +1,16 @@
 # The Reach SMM Portal Progress
 
-updated-at: 2026-06-09T23:06:08+08:00
+updated-at: 2026-06-09T23:26:00+08:00
 
-phase: DONE - upload pipeline root-cause fix complete
+phase: FIELD REGRESSION - Preparing preflight stall fix in final verification
 
 current slice:
 
+- User reported a live upload remained stuck on `Preparing` while the browser tab kept loading.
+- Confirmed a client-side root cause in `src/lib/drive-upload.ts`: Supabase `auth.getSession()` ran before proxy/resumable upload requests with no timeout, so a stalled session read could keep progress at `0%` forever and never open upload requests.
+- Confirmed a progress-honesty bug in `uploadManyToDrive`: large batches could have active per-file work greater than zero but round the size-weighted aggregate back to `0%`, keeping the UI label on `Preparing`.
+- Fixed both in local commit `9723fc4`: bounded auth preflight with a sanitized non-retryable auth error, reused one testable Supabase client import, emitted started progress before proxy/resumable preflight, clamped nonzero aggregate progress to at least `1%`, and covered proxy image plus resumable video auth stalls in Vitest.
+- `npm run verify:target` passed after the local fix; final push and production smoke are pending.
 - Completed Slice 4: multi-select upload surfaces, atomic Media Picker batch callbacks, mixed image/video batch proof, and drawer cover audit honesty fix.
 - Completed Slice 3: finalize folder narrowing and tests.
 - Completed Slice 2: structured retry classification, app-limiter backoff distinction, sanitized server errors, and proxy/resumable route tests.
@@ -42,6 +47,8 @@ last commit SHA:
 - PHG audit pass 1 pushed commit: `1e789e4`
 - Post-audit P1 fix pushed commit: `8621467`
 - PHG audit pass 2 pushed commit: `7b2e323`
+- Final progress ledger pushed commit: `0fad2b7`
+- Field regression fix local commit: `9723fc4` (push pending)
 
 investigation summary:
 
@@ -120,6 +127,16 @@ files touched in PHG audit pass 2:
 - `AUDIT-upload-hardening.md`
 - `PROGRESS.md`
 
+files touched in Preparing preflight stall fix:
+
+- `src/lib/drive-upload.ts`
+- `src/lib/__tests__/drive-upload.test.ts`
+
+files touched in Preparing preflight stall ledger update:
+
+- `CHANGES-upload-fix.md`
+- `PROGRESS.md`
+
 files audited:
 
 - `src/lib/drive-upload.ts`
@@ -193,10 +210,17 @@ evidence captured:
 - Final `npm run verify:target`: passed.
 - Production smoke: `GET / -> HTTP 200 in 1.407392s`.
 - Production smoke: `POST /api/drive/upload without auth -> HTTP 401 in 5.832716s`.
+- Preparing stall focused verification: `npm test -- --run src/lib/__tests__/drive-upload.test.ts` passed, 1 file / 10 tests.
+- Preparing stall `npm run typecheck`: passed.
+- Preparing stall `npm test`: passed, 40 files / 312 tests.
+- Preparing stall `npm run lint`: passed with one pre-existing warning in `src/lib/ai/worker.ts`.
+- Preparing stall `npm run build`: passed.
+- Preparing stall `git diff --check`: passed.
+- Preparing stall `npm run verify:target`: passed with `[verify-the-reach-target] OK: active targets point at thereach.ten80ten.com`.
 
 next step:
 
-- Stop with final report. No unaddressed P0/P1 remains after PHG audit pass 2.
+- Commit the progress/change ledger, push to `origin/main`, run production smoke for proxy and resumable routes, then stop with final report.
 
 blockers:
 
