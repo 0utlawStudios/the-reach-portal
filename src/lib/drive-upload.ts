@@ -33,6 +33,7 @@ import {
   sanitizeGoogleDriveError,
   sanitizeUnknownUploadError,
 } from "@/lib/drive-errors";
+import { supabase } from "@/lib/supabaseClient";
 
 export interface DriveUploadResult {
   fileId: string;
@@ -76,6 +77,7 @@ const PUT_RETRY_DELAYS = process.env.NODE_ENV === "test" ? [1] : [3000];
 const STALL_TIMEOUT_MS = 30000;
 const PROXY_TOTAL_TIMEOUT_MS = 120000;
 const DIRECT_RESPONSE_TIMEOUT_MS = 120000;
+const AUTH_SESSION_TIMEOUT_MS = 10000;
 
 // Files at or above this threshold upload directly to storage (client PUTs bytes
 // straight to Google; the server only mints the session + finalizes). Below it,
@@ -218,6 +220,30 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = FETC
   }
 }
 
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, error: Error): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(error), timeoutMs);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+async function getAccessTokenFromCurrentSession(): Promise<string | undefined> {
+  const { data } = await withTimeout(
+    supabase.auth.getSession(),
+    AUTH_SESSION_TIMEOUT_MS,
+    new DriveUploadError("Upload authorization failed. Please sign in again.", {
+      reason: "auth",
+      retryable: false,
+    }),
+  );
+  return data.session?.access_token;
+}
+
 // ─── Proxy path (< 4 MB) ───────────────────────────────────────────────────
 
 async function uploadViaProxy(
@@ -229,9 +255,9 @@ async function uploadViaProxy(
   return withRetry(async () => {
     // The proxy route requires a Bearer token (SEC-001 hardening). Attach the
     // caller's current session token, mirroring the resumable path's headers.
-    const { supabase } = await import("@/lib/supabaseClient");
-    const { data: sessionData } = await supabase.auth.getSession();
-    const accessToken = sessionData.session?.access_token;
+    onProgress?.(2);
+    const accessToken = await getAccessTokenFromCurrentSession();
+    onProgress?.(4);
 
     const mimeType = normalizeDriveMimeType(file.type, file.name);
     const formData = new FormData();
@@ -297,6 +323,7 @@ async function uploadViaProxy(
       xhr.ontimeout = () => fail(new DriveUploadError("Upload timed out.", { reason: "timeout", retryable: true }));
       xhr.onabort = () => fail(new Error("Upload aborted"));
       watchdog.kick();
+      onProgress?.(5);
       xhr.send(formData);
     });
   }, "Proxy upload");
@@ -305,11 +332,10 @@ async function uploadViaProxy(
 // ─── Resumable path (≥ 4 MB) ──────────────────────────────────────────────
 
 async function getAuthHeaders(): Promise<HeadersInit> {
-  const { supabase } = await import("@/lib/supabaseClient");
-  const { data } = await supabase.auth.getSession();
+  const accessToken = await getAccessTokenFromCurrentSession();
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (data.session?.access_token) {
-    headers.Authorization = `Bearer ${data.session.access_token}`;
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
   }
   return headers;
 }
@@ -431,7 +457,7 @@ async function uploadViaResumable(
   cardId: string | undefined,
   onProgress: ProgressCallback | undefined
 ): Promise<DriveUploadResult> {
-  onProgress?.(0);
+  onProgress?.(2);
 
   // Steps 1+2 together, under one retry. Each attempt mints a FRESH session and
   // then PUTs the bytes: re-PUTting a partially-consumed session URI is not
@@ -472,7 +498,7 @@ export async function uploadToDrive(
   if (file.size > MAX_DRIVE_MEDIA_FILE_SIZE) throw new Error(`File exceeds ${MAX_DRIVE_MEDIA_FILE_SIZE / (1024 * 1024)}MB limit.`);
   if (!isAllowedDriveUploadForFolder(folder, file.type, file.name)) throw new Error("Unsupported file type for this upload location.");
 
-  onProgress?.(0);
+  onProgress?.(1);
 
   if (file.size >= RESUMABLE_THRESHOLD) {
     return uploadViaResumable(file, folder, cardId, onProgress);
@@ -482,9 +508,7 @@ export async function uploadToDrive(
 
 export async function reportUploadFailure(report: UploadFailureReport): Promise<void> {
   try {
-    const { supabase } = await import("@/lib/supabaseClient");
-    const { data } = await supabase.auth.getSession();
-    const accessToken = data.session?.access_token;
+    const accessToken = await getAccessTokenFromCurrentSession();
     if (!accessToken) return;
     await fetch("/api/drive/upload-failure", {
       method: "POST",
@@ -541,7 +565,8 @@ export async function uploadManyToDrive(
     if (!onProgress) return;
     let weighted = 0;
     for (let i = 0; i < total; i++) weighted += (files[i].size || 1) * filePercent[i];
-    onProgress(Math.round(weighted / totalBytes));
+    const rounded = Math.round(weighted / totalBytes);
+    onProgress(weighted > 0 && rounded === 0 ? 1 : rounded);
   };
 
   const settled = new Array<BatchItemResult | undefined>(total);

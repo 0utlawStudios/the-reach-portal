@@ -1,4 +1,15 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const mockGetSession = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/supabaseClient", () => ({
+  supabase: {
+    auth: {
+      getSession: mockGetSession,
+    },
+  },
+}));
+
 import { retryDelayWithJitter, uploadManyToDrive } from "@/lib/drive-upload";
 
 const originalXhr = globalThis.XMLHttpRequest;
@@ -159,9 +170,15 @@ function makeImage(name: string) {
   return new File(["0123456789"], name, { type: "image/jpeg" });
 }
 
+beforeEach(() => {
+  mockGetSession.mockReset();
+  mockGetSession.mockResolvedValue({ data: { session: { access_token: "test-token" } } });
+});
+
 afterEach(() => {
   globalThis.XMLHttpRequest = originalXhr;
   globalThis.fetch = originalFetch;
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -189,6 +206,73 @@ describe("uploadManyToDrive", () => {
     expect(results.find((item) => item.error)?.file.name).toBe("photo-08.jpg");
     expect(run.sends).toHaveLength(30);
     expect(run.maxActive).toBeLessThanOrEqual(3);
+  });
+
+  it("leaves Preparing immediately while a 30-photo proxy batch waits on auth preflight", async () => {
+    let releaseSession!: (value: unknown) => void;
+    mockGetSession.mockReturnValue(new Promise((resolve) => { releaseSession = resolve; }));
+    const run: MockUploadRun = {
+      sends: [],
+      active: 0,
+      maxActive: 0,
+      failNames: new Set(),
+    };
+    installProxyUploadXhrMock(run);
+    const files = Array.from({ length: 30 }, (_, i) => makeImage(`photo-${String(i + 1).padStart(2, "0")}.jpg`));
+    const progress: number[] = [];
+
+    const pending = uploadManyToDrive(files, "raw-files", {
+      concurrency: 3,
+      onProgress: (p) => progress.push(p),
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(progress.some((p) => p > 0)).toBe(true);
+    expect(run.sends).toEqual([]);
+
+    releaseSession({ data: { session: { access_token: "test-token" } } });
+    const results = await pending;
+
+    expect(results).toHaveLength(30);
+    expect(results.every((item) => item.result && !item.error)).toBe(true);
+    expect(run.sends).toHaveLength(30);
+  });
+
+  it("times out stalled auth preflight on proxy and resumable paths instead of hanging at Preparing", async () => {
+    vi.useFakeTimers();
+    mockGetSession.mockReturnValue(new Promise(() => {}));
+    const run: MixedUploadRun = {
+      proxySends: [],
+      directSends: [],
+      sessionRequests: [],
+      finalizeRequests: [],
+      active: 0,
+      maxActive: 0,
+      failDirectNames: new Set(),
+    };
+    installMixedUploadMocks(run);
+    const largeVideo = new Uint8Array(4 * 1024 * 1024 + 1);
+    const progress: number[] = [];
+
+    const pending = uploadManyToDrive([
+      makeImage("photo-preflight.jpg"),
+      new File([largeVideo], "video-preflight.mp4", { type: "video/mp4" }),
+    ], "raw-files", {
+      concurrency: 2,
+      onProgress: (p) => progress.push(p),
+    });
+
+    await vi.advanceTimersByTimeAsync(10_001);
+    const results = await pending;
+
+    expect(results).toHaveLength(2);
+    expect(results.every((item) => item.error?.message === "Upload authorization failed. Please sign in again.")).toBe(true);
+    expect(progress.some((p) => p > 0)).toBe(true);
+    expect(run.proxySends).toEqual([]);
+    expect(run.directSends).toEqual([]);
+    expect(run.sessionRequests).toEqual([]);
+    expect(run.finalizeRequests).toEqual([]);
   });
 
   it("isolates a hostile unsupported file without blocking valid siblings", async () => {
