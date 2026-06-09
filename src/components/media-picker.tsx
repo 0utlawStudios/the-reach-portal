@@ -42,16 +42,35 @@ interface MediaAssetRow {
   workspace_id?: string | null;
 }
 
+export interface MediaPickerSelection {
+  url: string;
+  fileId?: string;
+  name: string;
+  mimeType?: string;
+  size?: number;
+}
+
 interface MediaPickerProps {
   open: boolean;
   onClose: () => void;
-  onSelect: (result: { url: string; fileId?: string; name: string; mimeType?: string; size?: number }) => void;
+  onSelect: (result: MediaPickerSelection) => void;
+  onSelectMany?: (results: MediaPickerSelection[]) => void;
   folder?: "thumbnails" | "raw-files" | "media-library";
   cardId?: string;
   defaultTab?: PickerTab;
+  allowMultipleUpload?: boolean;
 }
 
-export function MediaPicker({ open, onClose, onSelect, folder = "raw-files", cardId, defaultTab = "upload" }: MediaPickerProps) {
+export function MediaPicker({
+  open,
+  onClose,
+  onSelect,
+  onSelectMany,
+  folder = "raw-files",
+  cardId,
+  defaultTab = "upload",
+  allowMultipleUpload = true,
+}: MediaPickerProps) {
   const { cards, workspaceId } = usePipeline();
   const { addToast } = useToast();
   const [mediaAssets, setMediaAssets] = useState<MediaAssetRow[]>([]);
@@ -202,35 +221,69 @@ export function MediaPicker({ open, onClose, onSelect, folder = "raw-files", car
   const handleUpload = async () => {
     const input = document.createElement("input");
     input.type = "file";
+    input.multiple = allowMultipleUpload;
     input.accept = "image/*,video/*";
     input.onchange = async (ev) => {
-      const file = (ev.target as HTMLInputElement).files?.[0];
-      if (!file) return;
+      const selected = Array.from((ev.target as HTMLInputElement).files || []);
+      if (selected.length === 0) return;
       if (!assetSource.trim()) { addToast("Asset source is required before uploading", "error"); return; }
-      if (!isDrivePublishableMediaMime(file.type, file.name)) {
+      const fileList = selected.filter((file) => isDrivePublishableMediaMime(file.type, file.name));
+      if (fileList.length !== selected.length) {
         addToast("This picker only accepts image or video files.", "error");
-        return;
       }
+      if (fileList.length === 0) return;
       setUploading(true);
       setUploadProgress(0);
       try {
-        const { uploadToDrive } = await import("@/lib/drive-upload");
-        const result = await uploadToDrive(file, folder, cardId, setUploadProgress);
-        onSelect({ url: result.url, fileId: result.fileId, name: file.name, mimeType: result.mimeType || file.type, size: result.size || file.size });
-        addToast(`${file.name} uploaded`, "success");
-        onClose();
+        const { uploadManyToDrive, reportUploadFailure } = await import("@/lib/drive-upload");
+        const items = await uploadManyToDrive(fileList, folder, { cardId, concurrency: 3, onProgress: setUploadProgress });
+        const failures = items.filter((item) => item.error || !item.result);
+        for (const failure of failures) {
+          const errorMessage = uploadErrorMessage(failure.error);
+          await reportUploadFailure({
+            phase: "media_picker_upload",
+            route: "/api/drive/upload-failure",
+            uploadPath: uploadPathForSize(failure.file),
+            cardId,
+            folder,
+            fileName: failure.file.name,
+            mimeType: normalizeDriveMimeType(failure.file.type, failure.file.name),
+            fileSize: failure.file.size,
+            batchTotal: fileList.length,
+            batchFailed: failures.length,
+            errorMessage,
+            errorDetail: failure.error instanceof Error ? failure.error.stack : undefined,
+          });
+          addToast(`Upload failed: ${errorMessage}`, "error");
+        }
+        const successes = items.filter((item) => item.result);
+        const selections: MediaPickerSelection[] = successes.map((item) => {
+          const result = item.result!;
+          return { url: result.url, fileId: result.fileId, name: item.file.name, mimeType: result.mimeType || item.file.type, size: result.size || item.file.size };
+        });
+        if (selections.length > 0) {
+          if (onSelectMany) onSelectMany(selections);
+          else selections.forEach(onSelect);
+        }
+        if (successes.length > 0) {
+          addToast(successes.length === 1 ? `${successes[0].file.name} uploaded` : `${successes.length} files uploaded`, "success");
+          onClose();
+        }
       } catch (err) {
         const { reportUploadFailure } = await import("@/lib/drive-upload");
         const errorMessage = uploadErrorMessage(err);
+        const first = fileList[0];
         await reportUploadFailure({
           phase: "media_picker_upload",
           route: "/api/drive/upload-failure",
-          uploadPath: uploadPathForSize(file),
+          uploadPath: first ? uploadPathForSize(first) : "unknown",
           cardId,
           folder,
-          fileName: file.name,
-          mimeType: normalizeDriveMimeType(file.type, file.name),
-          fileSize: file.size,
+          fileName: first?.name,
+          mimeType: first ? normalizeDriveMimeType(first.type, first.name) : undefined,
+          fileSize: first?.size,
+          batchTotal: fileList.length,
+          batchFailed: fileList.length,
           errorMessage,
           errorDetail: err instanceof Error ? err.stack : undefined,
         });

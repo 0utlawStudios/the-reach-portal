@@ -13,7 +13,7 @@ import { ensureMediaAsset } from "@/lib/media-assets";
 import { isDrivePublishableMediaMime, normalizeDriveMimeType } from "@/lib/drive-policy";
 import { MentionTextarea } from "./mention-textarea";
 import { formatDateTimeCompact } from "@/lib/utils";
-import { MediaPicker } from "./media-picker";
+import { MediaPicker, type MediaPickerSelection } from "./media-picker";
 import { ValidationErrorModal } from "./validation-error-modal";
 import { useFocusTrap } from "./use-focus-trap";
 import {
@@ -304,6 +304,25 @@ export function CreatePostModal({ open, onClose }: Props) {
     onClose();
   };
 
+  const addMediaPickerSelections = (results: MediaPickerSelection[]) => {
+    setFiles((prev) => [...prev, ...results.map((result) => {
+      const id = Date.now().toString() + Math.random().toString(36).slice(2);
+      const isVideo = result.mimeType?.startsWith("video") || false;
+      return {
+        id,
+        name: result.name,
+        size: "Library",
+        type: isVideo ? "video" : "image",
+        preview: result.url,
+        driveUrl: result.url,
+        driveFileId: result.fileId,
+        mimeType: result.mimeType,
+        driveSize: result.size,
+      } satisfies UploadedFile;
+    })]);
+    setShowMediaPicker(false);
+  };
+
   const inputClass = "w-full h-9 px-3 rounded-lg bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-[12px] text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 dark:focus:ring-orange-500/10 transition-all";
 
   const tabs: { id: ModalTab; label: string; icon: React.ReactNode }[] = [
@@ -517,9 +536,11 @@ export function CreatePostModal({ open, onClose }: Props) {
                         const file = (ev.target as HTMLInputElement).files?.[0];
                         if (!file) return;
                         addToast("Uploading license...", "info");
-                        const { reportUploadFailure, uploadToDrive } = await import("@/lib/drive-upload");
+                        const { reportUploadFailure, uploadManyToDrive } = await import("@/lib/drive-upload");
                         try {
-                          const result = await uploadToDrive(file, "raw-files");
+                          const [item] = await uploadManyToDrive([file], "raw-files", { concurrency: 1 });
+                          if (!item?.result) throw item?.error || new Error("License upload failed");
+                          const result = item.result;
                           setLicenseFileId(result.fileId);
                           addToast("License uploaded", "success");
                         } catch (err) {
@@ -622,21 +643,9 @@ export function CreatePostModal({ open, onClose }: Props) {
         folder="raw-files"
         defaultTab="library"
         onSelect={(result) => {
-          const id = Date.now().toString() + Math.random().toString(36).slice(2);
-          const isVideo = result.mimeType?.startsWith("video") || false;
-          setFiles((prev) => [...prev, {
-            id,
-            name: result.name,
-            size: "Library",
-            type: isVideo ? "video" : "image",
-            preview: result.url,
-            driveUrl: result.url,
-            driveFileId: result.fileId,
-            mimeType: result.mimeType,
-            driveSize: result.size,
-          }]);
-          setShowMediaPicker(false);
+          addMediaPickerSelections([result]);
         }}
+        onSelectMany={addMediaPickerSelections}
       />
 
       {/* Validation Error Modal */}

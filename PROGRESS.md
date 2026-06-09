@@ -1,12 +1,13 @@
 # The Reach SMM Portal Progress
 
-updated-at: 2026-06-09T22:40:36+08:00
+updated-at: 2026-06-09T22:52:12+08:00
 
-phase: PHASE 2 - Slice 3 complete locally, pending commit/push
+phase: PHASE 2 - Slice 4 committed, push pending
 
 current slice:
 
-- Completed Slice 3 locally: finalize folder narrowing and tests.
+- Completed Slice 4: multi-select upload surfaces, atomic Media Picker batch callbacks, mixed image/video batch proof, and drawer cover audit honesty fix.
+- Completed Slice 3: finalize folder narrowing and tests.
 - Completed Slice 2: structured retry classification, app-limiter backoff distinction, sanitized server errors, and proxy/resumable route tests.
 - Completed Slice 1: batch isolation contract and Create Post partial-success retention.
 - `uploadManyToDrive` now always settles every input file; `stopOnError` is retained only as deprecated compatibility and no longer aborts siblings.
@@ -15,6 +16,10 @@ current slice:
 - Drive quota 403/429 returns sanitized `driveRateLimited` and retries with jitter.
 - App 60/min upload limiter 429 returns sanitized `appRateLimited` and is not retried by the client.
 - Proxy, resumable session, and finalize routes now return allowlisted upload error reasons instead of raw Google text.
+- Media Picker upload now enables multi-select by default, routes through `uploadManyToDrive`, and delivers successful batch selections atomically to callers that need one state update.
+- Asset Review Drawer raw/source upload inputs are multi-select and route through `uploadManyToDrive` with isolated per-file failure reporting.
+- Create Post, Media Picker, Asset Review Drawer, and Media Page are guarded by a static test against direct component-level `uploadToDrive` calls.
+- Mixed proxy/resumable Vitest now proves small images and large videos can upload together while one large video Drive quota 403 fails without aborting the other files.
 
 current repo:
 
@@ -29,7 +34,8 @@ last commit SHA:
 - Last pushed commit before Slice 1: `14ff28d`
 - Slice 1 pushed commit: `d384875`
 - Slice 2 pushed commit: `fc8779d`
-- Slice 3 commit: committed locally; exact pushed SHA is recorded by `git log -1` after push.
+- Slice 3 pushed commit: `2dcd51f`
+- Slice 4 commit: `8a0d8bd` (push pending)
 
 investigation summary:
 
@@ -78,6 +84,15 @@ files touched in Slice 3:
 - `src/app/api/drive/__tests__/security-static.test.ts`
 - `PROGRESS.md`
 
+files touched in Slice 4:
+
+- `src/components/media-picker.tsx`
+- `src/components/asset-review-drawer.tsx`
+- `src/components/create-post-modal.tsx`
+- `src/lib/__tests__/drive-upload.test.ts`
+- `src/lib/__tests__/upload-surfaces-static.test.ts`
+- `PROGRESS.md`
+
 files audited:
 
 - `src/lib/drive-upload.ts`
@@ -119,14 +134,17 @@ evidence captured:
 - `npm run lint`: passed after Slice 3 with one pre-existing warning in `src/lib/ai/worker.ts`.
 - `npm test`: passed after Slice 3, 39 files / 305 tests.
 - `npm run build`: passed after Slice 3.
+- Focused Slice 4 tests: `npm test -- --run src/lib/__tests__/drive-upload.test.ts src/lib/__tests__/upload-surfaces-static.test.ts` passed, 2 files / 9 tests.
+- `npm run typecheck`: passed after Slice 4.
+- `npm run lint`: passed after Slice 4 with one pre-existing warning in `src/lib/ai/worker.ts`.
+- `npm test`: passed after Slice 4, 40 files / 308 tests.
+- `npm run build`: passed after Slice 4.
+- `git diff --check`: passed after Slice 4.
 
 next step:
 
-- Run `git diff --check`.
-- Commit Slice 3.
-- Run `npm run verify:target`.
-- Push Slice 3 if target verification passes.
-- Continue to Slice 4: multi-select batch upload surfaces and mixed image/video batch proof.
+- Commit and push Slice 4 after `npm run verify:target`.
+- Then create `CHANGES-upload-fix.md` for Phase 2 blast-radius accounting.
 
 blockers:
 

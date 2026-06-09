@@ -19,7 +19,7 @@ import {
 import { PlatformIcon } from "./platform-icons";
 import { MentionTextarea } from "./mention-textarea";
 import { RichComment } from "./rich-comment";
-import { MediaPicker } from "./media-picker";
+import { MediaPicker, type MediaPickerSelection } from "./media-picker";
 import { InlineEdit } from "./inline-edit";
 import { ValidationErrorModal } from "./validation-error-modal";
 import { useAuth } from "@/lib/auth-context";
@@ -304,8 +304,14 @@ export function AssetReviewDrawer() {
     const blobUrl = URL.createObjectURL(file);
     updateCard(selectedCard.id, { thumbnailUrl: blobUrl }); // Optimistic preview
     try {
-      const { uploadToDrive } = await import("@/lib/drive-upload");
-      const result = await uploadToDrive(file, "thumbnails", selectedCard.id, setUploadProgress);
+      const { uploadManyToDrive } = await import("@/lib/drive-upload");
+      const [item] = await uploadManyToDrive([file], "thumbnails", {
+        cardId: selectedCard.id,
+        concurrency: 1,
+        onProgress: setUploadProgress,
+      });
+      if (!item?.result) throw item?.error || new Error("Cover upload failed");
+      const result = item.result;
       URL.revokeObjectURL(blobUrl);
       updateCard(selectedCard.id, { thumbnailUrl: result.url });
       // Sync to Media Library — fire and catch so primary op is never blocked
@@ -318,6 +324,7 @@ export function AssetReviewDrawer() {
         workspaceId,
         usedIn: selectedCard.id,
       }).catch((err) => console.error("[drawer] media_assets sync failed:", err));
+      logAudit(selectedCard.id, currentUser.name, "asset_replaced", `Replaced cover with ${file.name}`);
       addToast("Cover image uploaded", "success");
     } catch (err) {
       // REVERT — never persist blob URL
@@ -341,7 +348,6 @@ export function AssetReviewDrawer() {
       addToast(`Cover upload failed: ${errorMessage}. Try again.`, "error");
     }
     if (prevUrl?.startsWith("blob:")) URL.revokeObjectURL(prevUrl);
-    logAudit(selectedCard.id, currentUser.name, "asset_replaced", `Replaced cover with ${file.name}`);
     if (assetInputRef.current) assetInputRef.current.value = "";
     setUploading(false);
     setUploadProgress(0);
@@ -360,56 +366,93 @@ export function AssetReviewDrawer() {
 
   // ─── Raw file upload (→ raw-files/) — NEVER stores blob URLs ───
   const handleRawFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || uploading) return;
+    const selectedFiles = Array.from(e.target.files || []);
+    if (selectedFiles.length === 0 || uploading) return;
     setUploading(true);
-    setUploadingFileName(file.name);
+    setUploadingFileName(selectedFiles.length === 1 ? selectedFiles[0].name : `Uploading ${selectedFiles.length} files`);
     setUploadProgress(0);
     try {
-      const { uploadToDrive } = await import("@/lib/drive-upload");
-      const result = await uploadToDrive(file, "raw-files", selectedCard.id, setUploadProgress);
-      const resultMimeType = result.mimeType || normalizeDriveMimeType(file.type, file.name);
+      const { uploadManyToDrive, reportUploadFailure } = await import("@/lib/drive-upload");
+      const items = await uploadManyToDrive(selectedFiles, "raw-files", {
+        cardId: selectedCard.id,
+        concurrency: 3,
+        onProgress: setUploadProgress,
+      });
       const existingFiles = selectedCard.sourceVault?.rawFiles || [];
-      const isFirstFile = existingFiles.length === 0;
-      const newFile = {
-        name: file.name,
-        url: result.url,
-        fileId: result.fileId,
-        usageType: (isFirstFile ? "master" : "supplementary") as "master" | "supplementary",
-        mimeType: resultMimeType,
-        size: result.size || file.size,
-        uploadedAt: new Date().toISOString(),
-      };
-      const rawFiles = [...existingFiles, newFile];
-      updateCard(selectedCard.id, { sourceVault: { ...(selectedCard.sourceVault || {}), rawFiles } });
-      // Sync to Media Library
-      if (isDrivePublishableMediaMime(resultMimeType, file.name)) {
-        ensureMediaAsset({
+      const rawFiles = [...existingFiles];
+      const failures = items.filter((item) => item.error || !item.result);
+      for (const item of items) {
+        const file = item.file;
+        if (item.error || !item.result) {
+          const errorMessage = uploadErrorMessage(item.error);
+          await reportUploadFailure({
+            phase: "drawer_raw_file_upload",
+            route: "/api/drive/upload-failure",
+            uploadPath: uploadPathForSize(file),
+            cardId: selectedCard.id,
+            postTitle: selectedCard.title,
+            folder: "raw-files",
+            fileName: file.name,
+            mimeType: normalizeDriveMimeType(file.type, file.name),
+            fileSize: file.size,
+            batchTotal: selectedFiles.length,
+            batchFailed: failures.length,
+            errorMessage,
+            errorDetail: item.error instanceof Error ? item.error.stack : undefined,
+          });
+          addToast(`Upload failed: ${errorMessage}. Try again.`, "error");
+          continue;
+        }
+
+        const result = item.result;
+        const resultMimeType = result.mimeType || normalizeDriveMimeType(file.type, file.name);
+        const isFirstFile = rawFiles.length === 0;
+        const newFile = {
           name: file.name,
           url: result.url,
-          fileType: resultMimeType.startsWith("video") ? "video" : "image",
-          folder: "Pipeline Uploads",
-          addedBy: currentUser.name,
-          workspaceId,
-          usedIn: selectedCard.id,
-        }).catch((err) => console.error("[drawer] media_assets sync failed:", err));
+          fileId: result.fileId,
+          usageType: (isFirstFile ? "master" : "supplementary") as "master" | "supplementary",
+          mimeType: resultMimeType,
+          size: result.size || file.size,
+          uploadedAt: new Date().toISOString(),
+        };
+        rawFiles.push(newFile);
+        // Sync to Media Library
+        if (isDrivePublishableMediaMime(resultMimeType, file.name)) {
+          ensureMediaAsset({
+            name: file.name,
+            url: result.url,
+            fileType: resultMimeType.startsWith("video") ? "video" : "image",
+            folder: "Pipeline Uploads",
+            addedBy: currentUser.name,
+            workspaceId,
+            usedIn: selectedCard.id,
+          }).catch((err) => console.error("[drawer] media_assets sync failed:", err));
+        }
+        logAudit(selectedCard.id, currentUser.name, "raw_file_uploaded", `Uploaded ${file.name} (${newFile.usageType})`);
       }
-      logAudit(selectedCard.id, currentUser.name, "raw_file_uploaded", `Uploaded ${file.name} (${newFile.usageType})`);
-      addToast(`${file.name} uploaded`, "success");
+      if (rawFiles.length > existingFiles.length) {
+        updateCard(selectedCard.id, { sourceVault: { ...(selectedCard.sourceVault || {}), rawFiles } });
+        const uploadedCount = rawFiles.length - existingFiles.length;
+        addToast(uploadedCount === 1 ? `${items.find((item) => item.result)?.file.name} uploaded` : `${uploadedCount} files uploaded`, "success");
+      }
     } catch (err) {
       // NO BLOB FALLBACK — show error, let user retry
       const errorMessage = uploadErrorMessage(err);
       const { reportUploadFailure } = await import("@/lib/drive-upload");
+      const first = selectedFiles[0];
       await reportUploadFailure({
         phase: "drawer_raw_file_upload",
         route: "/api/drive/upload-failure",
-        uploadPath: uploadPathForSize(file),
+        uploadPath: first ? uploadPathForSize(first) : "unknown",
         cardId: selectedCard.id,
         postTitle: selectedCard.title,
         folder: "raw-files",
-        fileName: file.name,
-        mimeType: normalizeDriveMimeType(file.type, file.name),
-        fileSize: file.size,
+        fileName: first?.name,
+        mimeType: first ? normalizeDriveMimeType(first.type, first.name) : undefined,
+        fileSize: first?.size,
+        batchTotal: selectedFiles.length,
+        batchFailed: selectedFiles.length,
         errorMessage,
         errorDetail: err instanceof Error ? err.stack : undefined,
       });
@@ -419,6 +462,38 @@ export function AssetReviewDrawer() {
     setUploading(false);
     setUploadProgress(0);
     setUploadingFileName("");
+  };
+
+  const applyMediaPickerSelections = (results: MediaPickerSelection[]) => {
+    if (results.length === 0) return;
+    if (showMediaPicker === "thumbnail") {
+      const [result] = results;
+      updateCard(selectedCard.id, { thumbnailUrl: result.url });
+      logAudit(selectedCard.id, currentUser.name, "asset_replaced", `Thumbnail: ${result.name}`);
+      addToast("Thumbnail updated", "success");
+      setShowMediaPicker(null);
+      return;
+    }
+
+    const existingFiles = selectedCard.sourceVault?.rawFiles || [];
+    const newFiles = results.map((result, offset) => {
+      const isFirstFile = existingFiles.length + offset === 0;
+      return {
+        name: result.name,
+        url: result.url,
+        fileId: result.fileId,
+        usageType: (isFirstFile ? "master" : "supplementary") as "master" | "supplementary",
+        mimeType: result.mimeType,
+        size: result.size,
+        uploadedAt: new Date().toISOString(),
+      };
+    });
+    updateCard(selectedCard.id, { sourceVault: { ...(selectedCard.sourceVault || {}), rawFiles: [...existingFiles, ...newFiles] } });
+    newFiles.forEach((file) => {
+      logAudit(selectedCard.id, currentUser.name, "raw_file_uploaded", `Added ${file.name} (${file.usageType})`);
+    });
+    addToast(results.length === 1 ? `${results[0].name} added as content` : `${results.length} files added as content`, "success");
+    setShowMediaPicker(null);
   };
 
   return (
@@ -739,7 +814,7 @@ export function AssetReviewDrawer() {
             )}
 
             {/* Dropzone */}
-            <input ref={rawFileInputRef} type="file" accept="image/*,video/*,.pdf,.txt,.doc,.docx,.csv,.xls,.xlsx,.ppt,.pptx,.zip,.psd,.ai,.prproj,.aep,.sketch,.fig" onChange={handleRawFileUpload} className="hidden" />
+            <input ref={rawFileInputRef} type="file" multiple accept="image/*,video/*,.pdf,.txt,.doc,.docx,.csv,.xls,.xlsx,.ppt,.pptx,.zip,.psd,.ai,.prproj,.aep,.sketch,.fig" onChange={handleRawFileUpload} className="hidden" />
             <div className="flex gap-2">
               <button disabled={uploading} onClick={() => rawFileInputRef.current?.click()} className={`flex-1 border border-dashed rounded-xl py-3 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
                 !(selectedCard.sourceVault?.rawFiles?.length)
@@ -828,8 +903,10 @@ export function AssetReviewDrawer() {
                             if (!file) return;
                             addToast("Uploading license...", "info");
                             try {
-                              const { uploadToDrive } = await import("@/lib/drive-upload");
-                              const result = await uploadToDrive(file, "raw-files", selectedCard.id);
+                              const { uploadManyToDrive } = await import("@/lib/drive-upload");
+                              const [item] = await uploadManyToDrive([file], "raw-files", { cardId: selectedCard.id, concurrency: 1 });
+                              if (!item?.result) throw item?.error || new Error("License upload failed");
+                              const result = item.result;
                               updateCard(selectedCard.id, { licenseFileId: result.fileId });
                               logAudit(selectedCard.id, currentUser.name, "license_uploaded", `Uploaded license: ${file.name}`);
                               addToast("License uploaded", "success");
@@ -983,7 +1060,7 @@ export function AssetReviewDrawer() {
                 <div className="space-y-3">
                   <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em] flex items-center gap-1.5"><Paperclip className="w-3 h-3 text-violet-500" />Raw Project Files</label>
 
-                  <input ref={rawFileInputRef} type="file" accept="image/*,video/*,.pdf,.txt,.doc,.docx,.csv,.xls,.xlsx,.ppt,.pptx,.zip,.psd,.ai,.prproj,.aep,.sketch,.fig" onChange={handleRawFileUpload} className="hidden" />
+                  <input ref={rawFileInputRef} type="file" multiple accept="image/*,video/*,.pdf,.txt,.doc,.docx,.csv,.xls,.xlsx,.ppt,.pptx,.zip,.psd,.ai,.prproj,.aep,.sketch,.fig" onChange={handleRawFileUpload} className="hidden" />
                   <button onClick={() => rawFileInputRef.current?.click()} className="w-full border-2 border-dashed border-gray-200 dark:border-white/[0.08] rounded-xl py-5 flex flex-col items-center gap-1.5 text-gray-400 hover:text-gray-500 hover:border-gray-300 dark:hover:border-white/[0.15] transition-colors cursor-pointer">
                     <Upload className="w-5 h-5" />
                     <span className="text-[11px]">Upload .prproj, .zip, .psd, or any project file</span>
@@ -1264,29 +1341,11 @@ export function AssetReviewDrawer() {
         onClose={() => setShowMediaPicker(null)}
         folder={showMediaPicker === "thumbnail" ? "thumbnails" : "raw-files"}
         cardId={selectedCard.id}
+        allowMultipleUpload={showMediaPicker !== "thumbnail"}
         onSelect={(result) => {
-          if (showMediaPicker === "thumbnail") {
-            updateCard(selectedCard.id, { thumbnailUrl: result.url });
-            logAudit(selectedCard.id, currentUser.name, "asset_replaced", `Thumbnail: ${result.name}`);
-            addToast("Thumbnail updated", "success");
-          } else {
-            const existingFiles = selectedCard.sourceVault?.rawFiles || [];
-            const isFirstFile = existingFiles.length === 0;
-            const newFile = {
-              name: result.name,
-              url: result.url,
-              fileId: result.fileId,
-              usageType: (isFirstFile ? "master" : "supplementary") as "master" | "supplementary",
-              mimeType: result.mimeType,
-              size: result.size,
-              uploadedAt: new Date().toISOString(),
-            };
-            updateCard(selectedCard.id, { sourceVault: { ...(selectedCard.sourceVault || {}), rawFiles: [...existingFiles, newFile] } });
-            logAudit(selectedCard.id, currentUser.name, "raw_file_uploaded", `Added ${result.name} (${newFile.usageType})`);
-            addToast(`${result.name} added as content`, "success");
-          }
-          setShowMediaPicker(null);
+          applyMediaPickerSelections([result]);
         }}
+        onSelectMany={applyMediaPickerSelections}
       />
     </>
   );
