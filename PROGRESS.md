@@ -1,8 +1,8 @@
 # The Reach SMM Portal Progress
 
-updated-at: 2026-06-09T23:04:51+08:00
+updated-at: 2026-06-09T23:06:08+08:00
 
-phase: PHASE 3 - re-audit pass 2 verified, commit pending
+phase: DONE - upload pipeline root-cause fix complete
 
 current slice:
 
@@ -41,7 +41,7 @@ last commit SHA:
 - Progress ledger pushed commit: `3f2215b`
 - PHG audit pass 1 pushed commit: `1e789e4`
 - Post-audit P1 fix pushed commit: `8621467`
-- PHG audit pass 2 commit: pending
+- PHG audit pass 2 pushed commit: `7b2e323`
 
 investigation summary:
 
@@ -191,11 +191,12 @@ evidence captured:
 - Final `npm run build`: passed.
 - Final `git diff --check`: passed.
 - Final `npm run verify:target`: passed.
+- Production smoke: `GET / -> HTTP 200 in 1.407392s`.
+- Production smoke: `POST /api/drive/upload without auth -> HTTP 401 in 5.832716s`.
 
 next step:
 
-- Commit and push PHG audit pass 2 after another pre-push `npm run verify:target`.
-- Run production smoke on `https://thereach.ten80ten.com`, then stop with final report.
+- Stop with final report. No unaddressed P0/P1 remains after PHG audit pass 2.
 
 blockers:
 
