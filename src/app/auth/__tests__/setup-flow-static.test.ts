@@ -157,6 +157,8 @@ describe("Support Inbox navigation", () => {
     expect(APP_SHELL_SRC).not.toContain("saveState(PIN_KEY");
     expect(GLOBALS_SRC).toContain("@keyframes reach-sidebar-pin-hint");
     expect(GLOBALS_SRC).toContain("@keyframes reach-sidebar-pin-hint-icon");
+    expect(GLOBALS_SRC).toContain("@keyframes reach-sidebar-pin-hint-sheen");
+    expect(GLOBALS_SRC).toContain("scale(2.8)");
     expect(GLOBALS_SRC).toContain("@media (prefers-reduced-motion: reduce)");
   });
 });

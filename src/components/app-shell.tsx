@@ -278,7 +278,7 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
             <button
               onClick={handleTogglePin}
               aria-label={sidebarPinned ? "Unpin sidebar" : "Pin sidebar"}
-              className={`w-full flex items-center gap-2 rounded-lg px-2.5 py-[7px] transition-all duration-150 cursor-pointer ${
+              className={`relative isolate w-full flex items-center gap-2 overflow-visible rounded-lg px-2.5 py-[7px] transition-all duration-150 cursor-pointer ${
                 showPinTeaser
                   ? "reach-sidebar-pin-hint text-[#E1DFD5] bg-[#975428]/20"
                   : sidebarPinned
