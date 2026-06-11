@@ -101,11 +101,28 @@ describe("media resolver", () => {
   it("keeps raw file URLs publish-safe instead of storing only the app stream proxy", () => {
     const createPostSrc = readFileSync(join(process.cwd(), "src/components/create-post-modal.tsx"), "utf8");
     const drawerSrc = readFileSync(join(process.cwd(), "src/components/asset-review-drawer.tsx"), "utf8");
+    const pickerSrc = readFileSync(join(process.cwd(), "src/components/media-picker.tsx"), "utf8");
     expect(createPostSrc).toContain("const publishUrl = f.publishUrl ||");
     expect(createPostSrc).toContain("url: publishUrl");
     expect(createPostSrc).toContain("driveProxyUrl");
+    expect(createPostSrc).toContain("driveFileIdFromUrl(result.driveProxyUrl || result.url)");
     expect(drawerSrc).toContain("const publishUrl = result.publishUrl ||");
     expect(drawerSrc).toContain("url: publishUrl");
     expect(drawerSrc).toContain("playbackUrl");
+    expect(drawerSrc).toContain("driveFileIdFromUrl(result.driveProxyUrl || result.url)");
+    expect(pickerSrc).toContain("enrichFromRawFile(existing, f)");
+    expect(pickerSrc).toContain("selectionFromAsset(selectedAsset)");
+    expect(pickerSrc).toContain("missing its Drive publishing source");
+  });
+
+  it("keeps playback storage policy enforced by the bucket, not only client metadata", () => {
+    const routeSrc = readFileSync(join(process.cwd(), "src/app/api/media/playback-upload/route.ts"), "utf8");
+    const migrationSrc = readFileSync(join(process.cwd(), "supabase/migrations/0049_media_playback_bucket.sql"), "utf8");
+    expect(routeSrc).toContain("fileSizeLimit: MAX_PLAYBACK_VIDEO_FILE_SIZE");
+    expect(routeSrc).toContain("allowedMimeTypes: [...PLAYBACK_VIDEO_MIME_TYPES]");
+    expect(routeSrc).toContain("extensionFor(mimeType)");
+    expect(migrationSrc).toContain("file_size_limit");
+    expect(migrationSrc).toContain("allowed_mime_types");
+    expect(migrationSrc).toContain("52428800");
   });
 });

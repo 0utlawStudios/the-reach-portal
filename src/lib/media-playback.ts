@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabaseClient";
 import { normalizeDriveMimeType } from "@/lib/drive-policy";
+import { MAX_PLAYBACK_VIDEO_FILE_SIZE, PLAYBACK_VIDEO_MIME_TYPES } from "@/lib/media-playback-policy";
 
 export interface PlaybackUploadResult {
   playbackUrl: string;
@@ -20,6 +21,12 @@ interface PlaybackUploadTarget {
 async function getAccessTokenFromCurrentSession(): Promise<string | undefined> {
   const { data } = await supabase.auth.getSession();
   return data.session?.access_token;
+}
+
+export function canUploadPlaybackCopy(file: File, mimeType = normalizeDriveMimeType(file.type, file.name)): boolean {
+  return PLAYBACK_VIDEO_MIME_TYPES.includes(mimeType as typeof PLAYBACK_VIDEO_MIME_TYPES[number])
+    && file.size > 0
+    && file.size <= MAX_PLAYBACK_VIDEO_FILE_SIZE;
 }
 
 async function getPlaybackUploadTarget(file: File, cardId?: string): Promise<PlaybackUploadTarget> {
@@ -54,8 +61,11 @@ async function getPlaybackUploadTarget(file: File, cardId?: string): Promise<Pla
 
 export async function uploadVideoPlaybackCopy(file: File, cardId?: string): Promise<PlaybackUploadResult> {
   const mimeType = normalizeDriveMimeType(file.type, file.name);
-  if (!mimeType.startsWith("video/")) {
-    throw new Error("Playback copy is only supported for videos");
+  if (!PLAYBACK_VIDEO_MIME_TYPES.includes(mimeType as typeof PLAYBACK_VIDEO_MIME_TYPES[number])) {
+    throw new Error("Playback copy is only supported for supported video files");
+  }
+  if (file.size > MAX_PLAYBACK_VIDEO_FILE_SIZE) {
+    throw new Error(`Playback copy exceeds ${MAX_PLAYBACK_VIDEO_FILE_SIZE / (1024 * 1024)}MB limit`);
   }
 
   const target = await getPlaybackUploadTarget(file, cardId);

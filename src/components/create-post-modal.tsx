@@ -13,6 +13,7 @@ import { useAuth } from "@/lib/auth-context";
 import { ensureMediaAsset } from "@/lib/media-assets";
 import { isDrivePublishableMediaMime, normalizeDriveMimeType } from "@/lib/drive-policy";
 import { getPublicDriveDownloadUrl } from "@/lib/drive-url-utils";
+import { driveFileIdFromUrl } from "@/lib/media-resolver";
 import { MentionTextarea } from "./mention-textarea";
 import { formatDateTimeCompact } from "@/lib/utils";
 import type { MediaPickerSelection } from "./media-picker";
@@ -235,25 +236,38 @@ export function CreatePostModal({ open, onClose }: Props) {
 
       if (!uploadFailed) {
         const withPlayback = filesForCard.map((file) => ({ ...file }));
+        const playbackModule = await import("@/lib/media-playback");
         for (let i = 0; i < withPlayback.length; i++) {
           const f = withPlayback[i];
           const rawMimeType = f.mimeType || (f.type === "video" ? "video/mp4" : "image/jpeg");
           if (!rawMimeType.startsWith("video/") || f.playbackUrl) continue;
           const sourceFile = rawFilesRef.current.get(f.id);
           if (!sourceFile) continue;
+          if (!playbackModule.canUploadPlaybackCopy(sourceFile, rawMimeType)) continue;
 
           try {
             setUploadingFileName(`Optimizing playback for ${f.name}`);
             setUploadProgress(0);
-            const { uploadVideoPlaybackCopy } = await import("@/lib/media-playback");
-            const playback = await uploadVideoPlaybackCopy(sourceFile);
+            const playback = await playbackModule.uploadVideoPlaybackCopy(sourceFile);
             withPlayback[i] = {
               ...f,
               playbackUrl: playback.playbackUrl,
               playbackStorageKey: playback.playbackStorageKey,
             };
           } catch (err) {
-            console.error("[create-post] playback upload failed:", err);
+            const errorMessage = uploadErrorMessage(err);
+            await reportUploadFailure({
+              phase: "create_post_playback_upload",
+              route: "/api/media/playback-upload",
+              uploadPath: uploadPathForSize(sourceFile),
+              postTitle: title.trim(),
+              folder: "raw-files",
+              fileName: sourceFile.name,
+              mimeType: rawMimeType,
+              fileSize: sourceFile.size,
+              errorMessage,
+              errorDetail: err instanceof Error ? err.stack : undefined,
+            });
             addToast(`Couldn't optimize playback for ${f.name}. Retry this upload before creating the post.`, "error");
             uploadFailed = true;
             break;
@@ -381,6 +395,7 @@ export function CreatePostModal({ open, onClose }: Props) {
     setFiles((prev) => [...prev, ...results.map((result) => {
       const id = Date.now().toString() + Math.random().toString(36).slice(2);
       const isVideo = result.mimeType?.startsWith("video") || false;
+      const fileId = result.fileId || driveFileIdFromUrl(result.driveProxyUrl || result.url) || undefined;
       return {
         id,
         name: result.name,
@@ -389,10 +404,10 @@ export function CreatePostModal({ open, onClose }: Props) {
         preview: result.url,
         driveUrl: result.url,
         driveProxyUrl: result.driveProxyUrl || result.url,
-        publishUrl: result.publishUrl || (result.fileId ? getPublicDriveDownloadUrl(result.fileId) : result.url),
+        publishUrl: result.publishUrl || (fileId ? getPublicDriveDownloadUrl(fileId) : result.url),
         playbackUrl: result.playbackUrl,
         playbackStorageKey: result.playbackStorageKey,
-        driveFileId: result.fileId,
+        driveFileId: fileId,
         mimeType: result.mimeType,
         driveSize: result.size,
       } satisfies UploadedFile;

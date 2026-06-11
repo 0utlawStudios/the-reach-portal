@@ -5,8 +5,10 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { usePipeline } from "@/lib/pipeline-context";
 import { useToast } from "@/lib/toast-context";
 import { supabase } from "@/lib/supabaseClient";
+import type { RawFile } from "@/lib/types";
 import { isDrivePublishableMediaMime, normalizeDriveMimeType } from "@/lib/drive-policy";
 import { getPublicDriveDownloadUrl } from "@/lib/drive-url-utils";
+import { driveFileIdFromUrl } from "@/lib/media-resolver";
 import { X, Upload, FolderOpen, Image as ImageIcon, Film, Search, CheckCircle, Clock, Link2, ExternalLink } from "lucide-react";
 import { PLACEHOLDER_MEDIA } from "@/lib/placeholder-data";
 import { useFocusTrap } from "./use-focus-trap";
@@ -68,6 +70,31 @@ interface MediaPickerProps {
   cardId?: string;
   defaultTab?: PickerTab;
   allowMultipleUpload?: boolean;
+}
+
+function enrichFromRawFile(entry: MediaEntry, file: RawFile) {
+  const fileId = file.fileId || driveFileIdFromUrl(file.driveProxyUrl || file.url) || undefined;
+  entry.publishUrl = file.publishUrl || (fileId ? getPublicDriveDownloadUrl(fileId) : file.url);
+  entry.driveProxyUrl = file.driveProxyUrl || entry.driveProxyUrl;
+  entry.playbackUrl = file.playbackUrl || entry.playbackUrl;
+  entry.playbackStorageKey = file.playbackStorageKey || entry.playbackStorageKey;
+  entry.fileId = fileId || entry.fileId;
+  entry.type = file.mimeType?.startsWith("video") ? "video" : entry.type;
+}
+
+function selectionFromAsset(asset: MediaEntry): MediaPickerSelection {
+  const fileId = asset.fileId || driveFileIdFromUrl(asset.driveProxyUrl || asset.url) || undefined;
+  const publishUrl = asset.publishUrl || (fileId ? getPublicDriveDownloadUrl(fileId) : undefined);
+  return {
+    url: asset.url,
+    publishUrl,
+    driveProxyUrl: asset.driveProxyUrl || (driveFileIdFromUrl(asset.url) ? asset.url : undefined),
+    playbackUrl: asset.playbackUrl,
+    playbackStorageKey: asset.playbackStorageKey,
+    fileId,
+    name: asset.name,
+    mimeType: asset.type === "video" ? "video/mp4" : "image/jpeg",
+  };
 }
 
 export function MediaPicker({
@@ -161,12 +188,16 @@ export function MediaPicker({
 
     mediaAssets.forEach((asset) => {
       if (!asset.url) return;
+      const fileId = driveFileIdFromUrl(asset.url) || undefined;
       const usedInCards = (asset.used_in || [])
         .map((id) => cardsById.get(id))
         .filter(Boolean)
         .map((c) => ({ id: c!.id, title: c!.title }));
       urlMap.set(asset.url, {
         url: asset.url,
+        publishUrl: fileId ? getPublicDriveDownloadUrl(fileId) : undefined,
+        driveProxyUrl: fileId ? asset.url : undefined,
+        fileId,
         name: asset.name || "Media Library asset",
         type: asset.file_type === "video" ? "video" : "image",
         usedInCards,
@@ -193,6 +224,7 @@ export function MediaPicker({
         const displayUrl = f.playbackUrl || f.driveProxyUrl || f.url;
         const existing = urlMap.get(displayUrl);
         if (existing) {
+          enrichFromRawFile(existing, f);
           if (!existing.usedInCards.find((u) => u.id === c.id)) {
             existing.usedInCards.push({ id: c.id, title: c.title });
           }
@@ -278,27 +310,29 @@ export function MediaPicker({
           let playbackUrl: string | undefined;
           let playbackStorageKey: string | undefined;
           if (mimeType.startsWith("video/")) {
-            try {
-              const { uploadVideoPlaybackCopy } = await import("@/lib/media-playback");
-              const playback = await uploadVideoPlaybackCopy(item.file, cardId);
-              playbackUrl = playback.playbackUrl;
-              playbackStorageKey = playback.playbackStorageKey;
-            } catch (err) {
-              const errorMessage = uploadErrorMessage(err);
-              await reportUploadFailure({
-                phase: "media_picker_playback_upload",
-                route: "/api/media/playback-upload",
-                uploadPath: uploadPathForSize(item.file),
-                cardId,
-                folder,
-                fileName: item.file.name,
-                mimeType,
-                fileSize: item.file.size,
-                errorMessage,
-                errorDetail: err instanceof Error ? err.stack : undefined,
-              });
-              addToast(`Playback optimization failed for ${item.file.name}`, "error");
-              continue;
+            const playbackModule = await import("@/lib/media-playback");
+            if (playbackModule.canUploadPlaybackCopy(item.file, mimeType)) {
+              try {
+                const playback = await playbackModule.uploadVideoPlaybackCopy(item.file, cardId);
+                playbackUrl = playback.playbackUrl;
+                playbackStorageKey = playback.playbackStorageKey;
+              } catch (err) {
+                const errorMessage = uploadErrorMessage(err);
+                await reportUploadFailure({
+                  phase: "media_picker_playback_upload",
+                  route: "/api/media/playback-upload",
+                  uploadPath: uploadPathForSize(item.file),
+                  cardId,
+                  folder,
+                  fileName: item.file.name,
+                  mimeType,
+                  fileSize: item.file.size,
+                  errorMessage,
+                  errorDetail: err instanceof Error ? err.stack : undefined,
+                });
+                addToast(`Playback optimization failed for ${item.file.name}`, "error");
+                continue;
+              }
             }
           }
           selections.push({
@@ -515,7 +549,15 @@ export function MediaPicker({
                   </div>
 
                   {/* Select button */}
-                  <button onClick={() => { onSelect({ url: selectedAsset.url, publishUrl: selectedAsset.publishUrl, driveProxyUrl: selectedAsset.driveProxyUrl, playbackUrl: selectedAsset.playbackUrl, playbackStorageKey: selectedAsset.playbackStorageKey, fileId: selectedAsset.fileId, name: selectedAsset.name, mimeType: selectedAsset.type === "video" ? "video/mp4" : "image/jpeg" }); onClose(); }}
+                  <button onClick={() => {
+                    const selection = selectionFromAsset(selectedAsset);
+                    if (folder === "raw-files" && selectedAsset.type === "video" && !selection.publishUrl) {
+                      addToast("This video is missing its Drive publishing source. Re-upload it before using it as post content.", "error");
+                      return;
+                    }
+                    onSelect(selection);
+                    onClose();
+                  }}
                     className="reach-action-button w-full h-10 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-[13px] font-semibold shadow-sm cursor-pointer transition-colors">
                     Use This Asset
                   </button>
