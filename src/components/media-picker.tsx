@@ -9,7 +9,7 @@ import type { RawFile } from "@/lib/types";
 import { isDrivePublishableMediaMime, normalizeDriveMimeType } from "@/lib/drive-policy";
 import { getPublicDriveDownloadUrl } from "@/lib/drive-url-utils";
 import { driveFileIdFromUrl } from "@/lib/media-resolver";
-import { X, Upload, FolderOpen, Image as ImageIcon, Film, Search, CheckCircle, Clock, Link2, ExternalLink } from "lucide-react";
+import { X, Upload, FolderOpen, Image as ImageIcon, Search, CheckCircle, Clock, Link2, ExternalLink } from "lucide-react";
 import { PLACEHOLDER_MEDIA } from "@/lib/placeholder-data";
 import { useFocusTrap } from "./use-focus-trap";
 
@@ -95,6 +95,10 @@ function selectionFromAsset(asset: MediaEntry): MediaPickerSelection {
     name: asset.name,
     mimeType: asset.type === "video" ? "video/mp4" : "image/jpeg",
   };
+}
+
+function mediaDisplayUrl(asset: Pick<MediaEntry, "url" | "driveProxyUrl" | "playbackUrl">): string {
+  return asset.playbackUrl || asset.driveProxyUrl || asset.url;
 }
 
 export function MediaPicker({
@@ -479,9 +483,16 @@ export function MediaPicker({
                         <button key={i} onClick={() => setSelectedAsset(asset)}
                           className={`group relative aspect-square rounded-xl overflow-hidden border-2 transition-all cursor-pointer bg-gray-50 dark:bg-white/[0.03] ${isSelected ? "border-orange-500 ring-2 ring-orange-200 dark:ring-orange-500/20" : "border-transparent hover:border-orange-400"}`}>
                           {asset.type === "image" ? (
-                            <RawImage src={asset.url} alt={asset.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
+                            <RawImage src={mediaDisplayUrl(asset)} alt={asset.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
                           ) : (
-                            <div className="w-full h-full flex flex-col items-center justify-center"><Film className="w-6 h-6 text-gray-400" /><p className="text-[8px] text-gray-400 mt-1 truncate max-w-full px-1">{asset.name}</p></div>
+                            <video
+                              src={mediaDisplayUrl(asset)}
+                              muted
+                              playsInline
+                              preload="metadata"
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200 bg-black"
+                              aria-label={`${asset.name} video preview`}
+                            />
                           )}
                           <div className="absolute top-1.5 left-1.5">
                             {asset.usedInCards.length > 0 ? (
@@ -511,9 +522,16 @@ export function MediaPicker({
                   {/* Preview */}
                   <div className="rounded-xl overflow-hidden bg-white dark:bg-white/[0.03] border border-gray-200/60 dark:border-white/[0.06] shadow-sm">
                     {selectedAsset.type === "image" ? (
-                      <RawImage src={selectedAsset.url} alt={selectedAsset.name} className="w-full aspect-video object-cover" />
+                      <RawImage src={mediaDisplayUrl(selectedAsset)} alt={selectedAsset.name} className="w-full aspect-video object-cover" />
                     ) : (
-                      <div className="w-full aspect-video flex items-center justify-center bg-gray-100 dark:bg-white/[0.04]"><Film className="w-8 h-8 text-gray-400" /></div>
+                      <video
+                        src={mediaDisplayUrl(selectedAsset)}
+                        controls
+                        playsInline
+                        preload="metadata"
+                        className="w-full aspect-video object-contain bg-black"
+                        aria-label={`${selectedAsset.name} video preview`}
+                      />
                     )}
                   </div>
 

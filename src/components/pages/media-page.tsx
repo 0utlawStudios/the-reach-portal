@@ -143,7 +143,11 @@ export function MediaPage() {
     const map = new Map<string, ContentCard[]>();
     for (const card of cards) {
       addUsage(map, card.thumbnailUrl, card);
-      card.sourceVault?.rawFiles?.forEach((file) => addUsage(map, file.url, card));
+      card.sourceVault?.rawFiles?.forEach((file) => {
+        addUsage(map, file.url, card);
+        addUsage(map, file.driveProxyUrl, card);
+        addUsage(map, file.playbackUrl, card);
+      });
     }
     return map;
   }, [cards]);
@@ -464,7 +468,14 @@ export function MediaPage() {
                         {asset.type === "image" ? (
                           <RawImage src={asset.url} alt={asset.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                         ) : (
-                          <div className="w-full h-full flex flex-col items-center justify-center bg-gray-100 dark:bg-white/[0.04]"><Film className="w-8 h-8 text-gray-300 dark:text-gray-600" /></div>
+                          <video
+                            src={asset.url}
+                            muted
+                            playsInline
+                            preload="metadata"
+                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 bg-black"
+                            aria-label={`${asset.name} video preview`}
+                          />
                         )}
                         <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded-md bg-black/50 backdrop-blur-sm text-[8px] text-white font-medium uppercase">{asset.type}</div>
                         {usage && usage.length > 0 ? (
@@ -513,7 +524,18 @@ export function MediaPage() {
                             {selected && <CheckCircle className="w-3 h-3 text-white" />}
                           </button>
                           <div className="w-8 h-8 rounded-lg overflow-hidden bg-gray-100 dark:bg-white/[0.04] shrink-0">
-                            {asset.type === "image" ? <RawImage src={asset.url} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><Film className="w-4 h-4 text-gray-400" /></div>}
+                            {asset.type === "image" ? (
+                              <RawImage src={asset.url} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <video
+                                src={asset.url}
+                                muted
+                                playsInline
+                                preload="metadata"
+                                className="w-full h-full object-cover bg-black"
+                                aria-label={`${asset.name} video preview`}
+                              />
+                            )}
                           </div>
                           <p className="text-[11px] font-medium text-gray-700 dark:text-gray-300 truncate">{asset.name}</p>
                         </div>
@@ -577,7 +599,7 @@ export function MediaPage() {
                 {lightboxAsset.type === "image" ? (
                   <RawImage src={lightboxAsset.url} alt={lightboxAsset.name} className="max-w-full max-h-[60vh] object-contain rounded-lg select-none" draggable={false} />
                 ) : (
-                  <video src={lightboxAsset.url} controls playsInline className="max-w-full max-h-[60vh] rounded-lg bg-black" />
+                  <video src={lightboxAsset.url} controls playsInline preload="metadata" className="max-w-full max-h-[60vh] object-contain rounded-lg bg-black" />
                 )}
                 {hasPrev && (
                   <button onClick={() => setLightboxAsset(filteredMedia[lightboxIndex - 1])} className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/60 transition-all cursor-pointer shadow-lg opacity-70 md:opacity-0 md:group-hover/lb:opacity-100">

@@ -850,10 +850,11 @@ export function AssetReviewDrawer() {
                 {(selectedCard.sourceVault?.rawFiles || []).map((file, i) => {
                   const isImage = /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(file.name);
                   const isVideo = /\.(mp4|mov|avi|webm|mkv)$/i.test(file.name);
+                  const displayUrl = file.playbackUrl || file.driveProxyUrl || file.url;
                   return (
                     <div key={i} className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-white dark:bg-white/[0.02] border border-gray-100 dark:border-white/[0.05] hover:border-orange-200 dark:hover:border-orange-500/20 transition-colors group">
                       {isImage ? (
-                        <RawImage src={file.url} alt={file.name} className="w-8 h-8 rounded object-cover shrink-0" />
+                        <RawImage src={displayUrl} alt={file.name} className="w-8 h-8 rounded object-cover shrink-0" />
                       ) : isVideo ? (
                         <div className="w-8 h-8 rounded bg-violet-50 dark:bg-violet-500/10 flex items-center justify-center shrink-0"><FileVideo className="w-3.5 h-3.5 text-violet-500" /></div>
                       ) : (

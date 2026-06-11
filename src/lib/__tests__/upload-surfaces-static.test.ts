@@ -43,4 +43,22 @@ describe("Drive upload surfaces", () => {
     expect(mediaPage).toContain('ref={fileInputRef} type="file" multiple accept="image/*,video/*"');
     expect(mediaPage).toContain('uploadManyToDrive(fileList, "media-library"');
   });
+
+  it("renders preview-safe media URLs without changing publish-safe raw URLs", () => {
+    const mediaPicker = source("src/components/media-picker.tsx");
+    expect(mediaPicker).toContain('function mediaDisplayUrl(asset: Pick<MediaEntry, "url" | "driveProxyUrl" | "playbackUrl">): string');
+    expect(mediaPicker).toContain("return asset.playbackUrl || asset.driveProxyUrl || asset.url");
+    expect(mediaPicker).toContain('preload="metadata"');
+    expect(mediaPicker).toContain('controls');
+
+    const mediaPage = source("src/components/pages/media-page.tsx");
+    expect(mediaPage).toContain("addUsage(map, file.driveProxyUrl, card)");
+    expect(mediaPage).toContain("addUsage(map, file.playbackUrl, card)");
+    expect(mediaPage).toContain('aria-label={`${asset.name} video preview`}');
+    expect(mediaPage).toContain('className="max-w-full max-h-[60vh] object-contain rounded-lg bg-black"');
+
+    const drawer = source("src/components/asset-review-drawer.tsx");
+    expect(drawer).toContain("const displayUrl = file.playbackUrl || file.driveProxyUrl || file.url");
+    expect(drawer).toContain('href={file.url}');
+  });
 });
