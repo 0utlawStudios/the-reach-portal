@@ -330,7 +330,7 @@ describe("iron-law guards in pipeline-context.tsx", () => {
     expect(loadFnMatch).not.toBeNull();
     const body = loadFnMatch![0];
     const provisionIdx = body.indexOf("/api/workspace/provision");
-    const selectIdx = body.indexOf('supabase.from("posts").select');
+    const selectIdx = body.search(/supabase\s*\.\s*from\("posts"\)\s*\.\s*select/);
     expect(provisionIdx).toBeGreaterThan(-1);
     expect(selectIdx).toBeGreaterThan(-1);
     expect(provisionIdx).toBeLessThan(selectIdx);

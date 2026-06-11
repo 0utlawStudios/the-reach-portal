@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { RawImage } from "@/components/raw-image";
 import { useState, useRef, useEffect } from "react";
 import { usePipeline } from "@/lib/pipeline-context";
@@ -13,7 +14,7 @@ import { ensureMediaAsset } from "@/lib/media-assets";
 import { isDrivePublishableMediaMime, normalizeDriveMimeType } from "@/lib/drive-policy";
 import { MentionTextarea } from "./mention-textarea";
 import { formatDateTimeCompact } from "@/lib/utils";
-import { MediaPicker, type MediaPickerSelection } from "./media-picker";
+import type { MediaPickerSelection } from "./media-picker";
 import { ValidationErrorModal } from "./validation-error-modal";
 import { useFocusTrap } from "./use-focus-trap";
 import {
@@ -21,6 +22,8 @@ import {
   getPendingCreatePostUploads,
   type CreatePostUploadFileState,
 } from "@/lib/create-post-upload-state";
+
+const MediaPicker = dynamic(() => import("./media-picker").then((mod) => mod.MediaPicker));
 
 const contentTypes: { id: ContentType; label: string; icon: React.ReactNode }[] = [
   { id: "image", label: "Image", icon: <ImageIcon className="w-3.5 h-3.5" /> },
@@ -670,16 +673,18 @@ export function CreatePostModal({ open, onClose }: Props) {
       </div>
 
       {/* Media Library Picker */}
-      <MediaPicker
-        open={showMediaPicker}
-        onClose={() => setShowMediaPicker(false)}
-        folder="raw-files"
-        defaultTab="library"
-        onSelect={(result) => {
-          addMediaPickerSelections([result]);
-        }}
-        onSelectMany={addMediaPickerSelections}
-      />
+      {showMediaPicker && (
+        <MediaPicker
+          open
+          onClose={() => setShowMediaPicker(false)}
+          folder="raw-files"
+          defaultTab="library"
+          onSelect={(result) => {
+            addMediaPickerSelections([result]);
+          }}
+          onSelectMany={addMediaPickerSelections}
+        />
+      )}
 
       {/* Validation Error Modal */}
       <ValidationErrorModal errors={validationErrors} onClose={() => setValidationErrors([])} />

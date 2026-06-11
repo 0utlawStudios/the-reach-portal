@@ -4,6 +4,7 @@ import { join } from "path";
 
 const SETUP_SRC = readFileSync(join(process.cwd(), "src/app/auth/setup/page.tsx"), "utf8");
 const APP_SHELL_SRC = readFileSync(join(process.cwd(), "src/components/app-shell.tsx"), "utf8");
+const AUTHENTICATED_APP_SHELL_SRC = readFileSync(join(process.cwd(), "src/components/authenticated-app-shell.tsx"), "utf8");
 const GLOBALS_SRC = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
 const NAVIGATION_SRC = readFileSync(join(process.cwd(), "src/lib/navigation-context.tsx"), "utf8");
 const SETTINGS_SRC = readFileSync(join(process.cwd(), "src/components/pages/settings-page.tsx"), "utf8");
@@ -89,7 +90,8 @@ describe("Supabase IO hardening", () => {
   });
 
   it("keeps team and request access state fresh through revalidation and realtime invalidation", () => {
-    expect(AUTH_CONTEXT_SRC).toContain("const ACCESS_REVALIDATE_MS = 60 * 1000");
+    expect(AUTH_CONTEXT_SRC).toContain("const ACCESS_REVALIDATE_MS = 10 * 60 * 1000");
+    expect(AUTH_CONTEXT_SRC).toContain("needsFullCheck");
     expect(AUTH_CONTEXT_SRC).toContain("applyAccessState(session)");
     expect(AUTH_CONTEXT_SRC).toContain("provisionWorkspace(session.access_token)");
     expect(TEAM_CONTEXT_SRC).toContain("const TEAM_REFRESH_MS = 5 * 60 * 1000");
@@ -132,8 +134,8 @@ describe("Support Inbox navigation", () => {
   it("moves the Support Inbox out of Settings and into a superadmin-only sidebar page", () => {
     expect(NAVIGATION_SRC).toContain('"support"');
     expect(NAVIGATION_SRC).toContain('setCurrentPage("support")');
-    expect(APP_SHELL_SRC).toContain('id: "support"');
-    expect(APP_SHELL_SRC).toContain("isSuperadmin ? <SupportInboxPage /> : <DashboardPage />");
+    expect(AUTHENTICATED_APP_SHELL_SRC).toContain('id: "support"');
+    expect(AUTHENTICATED_APP_SHELL_SRC).toContain("isSuperadmin ? <SupportInboxPage /> : <DashboardPage />");
     expect(SETTINGS_SRC).not.toContain("SupportInbox");
     expect(SETTINGS_SRC).not.toContain("Support Inbox");
   });
@@ -143,18 +145,18 @@ describe("Support Inbox navigation", () => {
     expect(NAVIGATION_SRC).toContain("setSidebarCollapsedState(true);");
     expect(NAVIGATION_SRC).toContain("saveState(SIDEBAR_KEY, true);");
     expect(NAVIGATION_SRC).not.toContain("setSidebarCollapsedState(v);\n    saveState(SIDEBAR_KEY, v);");
-    expect(APP_SHELL_SRC).toContain("hoverExpandRef.current || !sidebarCollapsed");
+    expect(AUTHENTICATED_APP_SHELL_SRC).toContain("hoverExpandRef.current || !sidebarCollapsed");
   });
 
   it("teases the desktop pin control for three seconds without persisting pinned state", () => {
-    expect(APP_SHELL_SRC).toContain("const SIDEBAR_PIN_TEASER_MS = 3000;");
-    expect(APP_SHELL_SRC).toContain("pinTeaserStartedRef.current = true;");
-    expect(APP_SHELL_SRC).toContain("setSidebarCollapsed(false);");
-    expect(APP_SHELL_SRC).toContain("setSidebarCollapsed(true);");
-    expect(APP_SHELL_SRC).toContain("if (!sidebarPinnedRef.current)");
-    expect(APP_SHELL_SRC).toContain("clearTimeout(pinTeaserTimerRef.current);");
-    expect(APP_SHELL_SRC).toContain("reach-sidebar-pin-hint");
-    expect(APP_SHELL_SRC).not.toContain("saveState(PIN_KEY");
+    expect(AUTHENTICATED_APP_SHELL_SRC).toContain("const SIDEBAR_PIN_TEASER_MS = 3000;");
+    expect(AUTHENTICATED_APP_SHELL_SRC).toContain("pinTeaserStartedRef.current = true;");
+    expect(AUTHENTICATED_APP_SHELL_SRC).toContain("setSidebarCollapsed(false);");
+    expect(AUTHENTICATED_APP_SHELL_SRC).toContain("setSidebarCollapsed(true);");
+    expect(AUTHENTICATED_APP_SHELL_SRC).toContain("if (!sidebarPinnedRef.current)");
+    expect(AUTHENTICATED_APP_SHELL_SRC).toContain("clearTimeout(pinTeaserTimerRef.current);");
+    expect(AUTHENTICATED_APP_SHELL_SRC).toContain("reach-sidebar-pin-hint");
+    expect(AUTHENTICATED_APP_SHELL_SRC).not.toContain("saveState(PIN_KEY");
     expect(GLOBALS_SRC).toContain("@keyframes reach-sidebar-pin-hint");
     expect(GLOBALS_SRC).toContain("@keyframes reach-sidebar-pin-hint-icon");
     expect(GLOBALS_SRC).toContain("@keyframes reach-sidebar-pin-hint-sheen");
@@ -172,6 +174,8 @@ describe("AI generation surface removal", () => {
     expect(NAVIGATION_SRC).not.toContain('"studio"');
     expect(APP_SHELL_SRC).not.toContain(removedGenerationPage);
     expect(APP_SHELL_SRC).not.toContain(removedGenerationLabel);
+    expect(AUTHENTICATED_APP_SHELL_SRC).not.toContain(removedGenerationPage);
+    expect(AUTHENTICATED_APP_SHELL_SRC).not.toContain(removedGenerationLabel);
     expect(SETTINGS_SRC).not.toContain(removedGenerationLabel);
     expect(SETTINGS_SRC).not.toContain(removedGenerationEndpoint);
   });

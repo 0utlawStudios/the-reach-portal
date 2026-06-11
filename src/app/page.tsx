@@ -2,16 +2,13 @@
 
 import { AuthProvider } from "@/lib/auth-context";
 import { ThemeEngineProvider } from "@/lib/theme-engine";
-import { PresenceProvider } from "@/lib/use-presence";
 import { AppShell } from "@/components/app-shell";
 
 export default function Home() {
   return (
     <ThemeEngineProvider>
       <AuthProvider>
-        <PresenceProvider>
-          <AppShell />
-        </PresenceProvider>
+        <AppShell />
       </AuthProvider>
     </ThemeEngineProvider>
   );

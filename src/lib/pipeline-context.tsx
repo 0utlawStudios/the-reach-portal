@@ -19,6 +19,7 @@ const STORAGE_KEY = "pipeline_cards";
 const BASELINE_WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 const POSTS_SELECT_FULL = "*, publish_jobs(state, platform_publish_attempts(platform, state, external_post_id))";
 const POSTS_SELECT_BASIC = "*";
+const POSTS_SELECT_STORAGE_KEY = "reach_posts_select_shape";
 
 // ─── Supabase <-> ContentCard mappers ───
 
@@ -256,6 +257,16 @@ function loadCardBackup(): ContentCard[] {
   return loadState(STORAGE_KEY, PLACEHOLDER_CARDS).filter((card) => !isInitialSampleCard(card));
 }
 
+function getInitialPostsSelect(): string {
+  if (typeof window === "undefined") return POSTS_SELECT_FULL;
+  return window.sessionStorage.getItem(POSTS_SELECT_STORAGE_KEY) === "basic" ? POSTS_SELECT_BASIC : POSTS_SELECT_FULL;
+}
+
+function rememberBasicPostsSelect(): void {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.setItem(POSTS_SELECT_STORAGE_KEY, "basic");
+}
+
 type StageMoveCommitRow = Pick<PostRow, "id" | "stage"> | null | undefined;
 
 export function assertStageMoveCommitted(
@@ -369,8 +380,9 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
   const [pendingKickback, setPendingKickback] = useState<PendingKickback | null>(null);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const hydrated = useRef(false);
-  const postsSelect = useRef(POSTS_SELECT_FULL);
+  const postsSelect = useRef(getInitialPostsSelect());
   const workspaceIdRef = useRef<string | null>(null);
+  const accessTokenRef = useRef<string | null>(accessToken);
   const useSupabase = isSupabaseConfigured();
 
   // Latest-value ref: lets the action callbacks read the current cards array
@@ -395,8 +407,12 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
 
   const activeWorkspaceId = workspaceId || BASELINE_WORKSPACE_ID;
 
+  useEffect(() => {
+    accessTokenRef.current = accessToken;
+  }, [accessToken]);
+
   const postNotification = useCallback(async (path: string, body: Record<string, unknown>) => {
-    const token = accessToken || (await supabase.auth.getSession()).data.session?.access_token;
+    const token = accessTokenRef.current || (await supabase.auth.getSession()).data.session?.access_token;
     const headers: HeadersInit = { "Content-Type": "application/json" };
     if (token) headers.Authorization = `Bearer ${token}`;
     const res = await fetch(path, {
@@ -408,7 +424,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
       const detail = await res.text().catch(() => "");
       throw new Error(`${path} failed with HTTP ${res.status}${detail ? `: ${detail.slice(0, 220)}` : ""}`);
     }
-  }, [accessToken]);
+  }, []);
 
   // ─── Initial data load ───
   useEffect(() => {
@@ -424,7 +440,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
               setWorkspaceId(provisionResult.workspaceId);
             } else {
               // Fallback: provision wasn't pre-fetched (e.g. first login), fetch now
-              const token = accessToken || (await supabase.auth.getSession()).data.session?.access_token;
+              const token = accessTokenRef.current || (await supabase.auth.getSession()).data.session?.access_token;
               if (token) {
                 const res = await fetch("/api/workspace/provision", {
                   headers: { Authorization: `Bearer ${token}` },
@@ -445,10 +461,17 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
           }
 
           // Try full select (with publish_jobs join); fall back if tables missing
-          let result = await supabase.from("posts").select(POSTS_SELECT_FULL).order("created_at", { ascending: false });
-          if (result.error) {
+          let result = await supabase
+            .from("posts")
+            .select(postsSelect.current)
+            .order("created_at", { ascending: false }) as { error: unknown; data: PostRow[] | null };
+          if (result.error && postsSelect.current !== POSTS_SELECT_BASIC) {
             postsSelect.current = POSTS_SELECT_BASIC;
-            result = await supabase.from("posts").select(POSTS_SELECT_BASIC).order("created_at", { ascending: false });
+            rememberBasicPostsSelect();
+            result = await supabase
+              .from("posts")
+              .select(POSTS_SELECT_BASIC)
+              .order("created_at", { ascending: false }) as { error: unknown; data: PostRow[] | null };
           }
           // Iron-law §1b: an empty array is a valid empty board. resolveLoadedCards
           // falls back to the localStorage backup ONLY on a real DB error.
@@ -463,7 +486,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
     }
     load();
-  }, [useSupabase, provisionResult?.workspaceId, accessToken]);
+  }, [useSupabase, provisionResult?.workspaceId]);
 
   // ─── Realtime subscription ───
   useEffect(() => {
@@ -1018,7 +1041,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
       markMutation(cardId);
       (async () => {
         try {
-          const token = accessToken || (await supabase.auth.getSession()).data.session?.access_token;
+          const token = accessTokenRef.current || (await supabase.auth.getSession()).data.session?.access_token;
           if (!token) throw new Error("Missing session token");
           const res = await fetch(`/api/posts/${cardId}`, {
             method: "DELETE",
@@ -1055,7 +1078,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
         }
       })();
     }
-  }, [selectedCard, useSupabase, accessToken, addToast]);
+  }, [selectedCard, useSupabase, addToast]);
 
   const value = useMemo(
     () => ({ cards, isLoading, selectedCard, isDrawerOpen, isEditingOnOpen, pendingReapproval, pendingKickback, workspaceId: activeWorkspaceId, selectCard, selectCardForEditing, closeDrawer, moveCard, requestReapproval, submitReapproval, cancelReapproval, requestKickback, submitKickback, cancelKickback, updateCard, createCard, deleteCard }),

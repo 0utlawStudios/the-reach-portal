@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { RawImage } from "@/components/raw-image";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { usePipeline } from "@/lib/pipeline-context";
@@ -19,7 +20,7 @@ import {
 import { PlatformIcon } from "./platform-icons";
 import { MentionTextarea } from "./mention-textarea";
 import { RichComment } from "./rich-comment";
-import { MediaPicker, type MediaPickerSelection } from "./media-picker";
+import type { MediaPickerSelection } from "./media-picker";
 import { InlineEdit } from "./inline-edit";
 import { ValidationErrorModal } from "./validation-error-modal";
 import { useAuth } from "@/lib/auth-context";
@@ -31,6 +32,8 @@ import { isVideoContentType, resolveCardVideoUrl, thumbnailIsDefinitelyImage } f
 import { formatDate, formatDateTime, formatDateShort, formatDateTimeCompact } from "@/lib/utils";
 import { useFocusTrap } from "./use-focus-trap";
 import { canDeletePostRole, isPipelineApproverRole } from "@/lib/roles";
+
+const MediaPicker = dynamic(() => import("./media-picker").then((mod) => mod.MediaPicker));
 
 // Strict @mention pattern — an @ followed by a name-like token. Used so a
 // pasted email or URL containing "@" does not trigger a phantom mention.
@@ -1360,17 +1363,19 @@ export function AssetReviewDrawer() {
       <ValidationErrorModal errors={validationErrors} onClose={() => setValidationErrors([])} />
 
       {/* ─── Media Library Picker ─── */}
-      <MediaPicker
-        open={!!showMediaPicker}
-        onClose={() => setShowMediaPicker(null)}
-        folder={showMediaPicker === "thumbnail" ? "thumbnails" : "raw-files"}
-        cardId={selectedCard.id}
-        allowMultipleUpload={showMediaPicker !== "thumbnail"}
-        onSelect={(result) => {
-          applyMediaPickerSelections([result]);
-        }}
-        onSelectMany={applyMediaPickerSelections}
-      />
+      {showMediaPicker && (
+        <MediaPicker
+          open
+          onClose={() => setShowMediaPicker(null)}
+          folder={showMediaPicker === "thumbnail" ? "thumbnails" : "raw-files"}
+          cardId={selectedCard.id}
+          allowMultipleUpload={showMediaPicker !== "thumbnail"}
+          onSelect={(result) => {
+            applyMediaPickerSelections([result]);
+          }}
+          onSelectMany={applyMediaPickerSelections}
+        />
+      )}
     </>
   );
 }

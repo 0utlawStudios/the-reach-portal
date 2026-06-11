@@ -12,6 +12,15 @@ export type ManualPostedMovesSetting = {
 
 const DEFAULT_SETTING: ManualPostedMovesSetting = { enabled: false, canToggle: false };
 let cachedSetting: ManualPostedMovesSetting = DEFAULT_SETTING;
+let cachedSettingLoaded = false;
+let cachedSettingFetchedAt = 0;
+let cachedSettingPromise: Promise<ManualPostedMovesSetting> | null = null;
+const SETTING_CACHE_MS = 5 * 60 * 1000;
+
+type IdleCallbackWindow = Window & {
+  requestIdleCallback?: (cb: () => void, options?: { timeout?: number }) => number;
+  cancelIdleCallback?: (id: number) => void;
+};
 
 async function authHeaders(): Promise<HeadersInit> {
   const { data } = await supabase.auth.getSession();
@@ -22,30 +31,40 @@ async function authHeaders(): Promise<HeadersInit> {
 
 function publish(setting: ManualPostedMovesSetting): void {
   cachedSetting = setting;
+  cachedSettingLoaded = true;
+  cachedSettingFetchedAt = Date.now();
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(CHANGE_EVENT, { detail: setting }));
   }
 }
 
-export async function getManualPostedMovesSetting(): Promise<ManualPostedMovesSetting> {
-  try {
-    const res = await fetch("/api/admin/manual-posted-settings", {
-      method: "GET",
-      headers: await authHeaders(),
-      cache: "no-store",
-    });
-    if (!res.ok) return cachedSetting;
-    const data = await res.json();
-    const setting = {
-      enabled: data?.enabled === true,
-      canToggle: data?.canToggle === true,
-    };
-    publish(setting);
-    return setting;
-  } catch (err) {
-    console.error("[manual-posted-settings] read failed:", err instanceof Error ? err.message : err);
-    return cachedSetting;
-  }
+export async function getManualPostedMovesSetting(options: { force?: boolean } = {}): Promise<ManualPostedMovesSetting> {
+  const freshEnough = cachedSettingLoaded && Date.now() - cachedSettingFetchedAt < SETTING_CACHE_MS;
+  if (!options.force && freshEnough) return cachedSetting;
+  if (!options.force && cachedSettingPromise) return cachedSettingPromise;
+  cachedSettingPromise = (async () => {
+    try {
+      const res = await fetch("/api/admin/manual-posted-settings", {
+        method: "GET",
+        headers: await authHeaders(),
+        cache: "no-store",
+      });
+      if (!res.ok) return cachedSetting;
+      const data = await res.json();
+      const setting = {
+        enabled: data?.enabled === true,
+        canToggle: data?.canToggle === true,
+      };
+      publish(setting);
+      return setting;
+    } catch (err) {
+      console.error("[manual-posted-settings] read failed:", err instanceof Error ? err.message : err);
+      return cachedSetting;
+    } finally {
+      cachedSettingPromise = null;
+    }
+  })();
+  return cachedSettingPromise;
 }
 
 export async function setManualPostedMovesEnabled(enabled: boolean): Promise<ManualPostedMovesSetting> {
@@ -85,6 +104,8 @@ export function useManualPostedMovesSetting(): ManualPostedMovesSetting & { load
   }, []);
 
   useEffect(() => {
+    let idleId: number | undefined;
+    let timerId: ReturnType<typeof setTimeout> | undefined;
     const sync = (event?: Event) => {
       const detail = event instanceof CustomEvent ? event.detail : cachedSetting;
       setSetting({
@@ -92,9 +113,17 @@ export function useManualPostedMovesSetting(): ManualPostedMovesSetting & { load
         canToggle: detail?.canToggle === true,
       });
     };
-    void refresh();
+    const w = window as IdleCallbackWindow;
+    const refreshWhenIdle = () => { void refresh(); };
+    if (w.requestIdleCallback) {
+      idleId = w.requestIdleCallback(refreshWhenIdle, { timeout: 2500 });
+    } else {
+      timerId = setTimeout(refreshWhenIdle, 1200);
+    }
     window.addEventListener(CHANGE_EVENT, sync);
     return () => {
+      if (idleId !== undefined && w.cancelIdleCallback) w.cancelIdleCallback(idleId);
+      if (timerId) clearTimeout(timerId);
       window.removeEventListener(CHANGE_EVENT, sync);
     };
   }, [refresh]);

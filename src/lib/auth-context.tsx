@@ -16,6 +16,7 @@ type ProvisionStatus = "unknown" | "active" | "pending" | "denied" | "error";
 
 interface AuthContextType {
   isAuthenticated: boolean;
+  isLoading: boolean;
   currentUser: UserProfile;
   accessToken: string | null;
   provisionResult: { workspaceId: string } | null;
@@ -48,7 +49,8 @@ const DEFAULT_USER: UserProfile = {
   email: "",
   initials: "G",
 };
-const ACCESS_REVALIDATE_MS = 60 * 1000;
+const ACCESS_REVALIDATE_MS = 10 * 60 * 1000;
+type AuthSession = NonNullable<Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"]>;
 
 /** Build a profile from auth metadata, with proper capitalization */
 function buildProfile(email: string, meta: Record<string, unknown>): UserProfile {
@@ -131,35 +133,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // so we keep the dashboard mounted and just refresh the access token.
   const provisionedEmailRef = useRef<string | null>(null);
   const currentUserRef = useRef<UserProfile>(DEFAULT_USER);
+  const provisionStatusRef = useRef<ProvisionStatus>("unknown");
+  const lastFullAccessCheckRef = useRef(0);
+  const accessStateInFlightRef = useRef<{ key: string; promise: Promise<void> } | null>(null);
 
   useEffect(() => {
     currentUserRef.current = currentUser;
   }, [currentUser]);
 
-  const applyAccessState = useCallback(async (session: NonNullable<Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"]>) => {
+  useEffect(() => {
+    provisionStatusRef.current = provisionStatus;
+  }, [provisionStatus]);
+
+  const applyAccessState = useCallback((session: AuthSession) => {
     const email = session.user.email || "";
-    if (!email) return;
-    const meta = session.user.user_metadata || {};
-    const fallbackProfile = currentUserRef.current.email.toLowerCase() === email.toLowerCase()
-      ? currentUserRef.current
-      : buildProfile(email, meta);
-    const [enriched, provisioned] = await Promise.all([
-      enrichFromTeamMembers(email, fallbackProfile),
-      provisionWorkspace(session.access_token),
-    ]);
-    setAccessToken(session.access_token);
-    setCurrentUser((prev) =>
-      enriched.name === prev.name &&
-      enriched.email === prev.email &&
-      enriched.role === prev.role &&
-      enriched.avatar === prev.avatar
-        ? prev
-        : enriched
-    );
-    setProvisionResult(provisioned.result);
-    setProvisionStatus(provisioned.status);
-    setProvisionMessage(provisioned.message);
-    provisionedEmailRef.current = provisioned.status === "active" ? email : null;
+    if (!email) return Promise.resolve();
+    const key = session.user.id || email.toLowerCase();
+    if (accessStateInFlightRef.current?.key === key) {
+      return accessStateInFlightRef.current.promise;
+    }
+    const promise = (async () => {
+      const meta = session.user.user_metadata || {};
+      const fallbackProfile = currentUserRef.current.email.toLowerCase() === email.toLowerCase()
+        ? currentUserRef.current
+        : buildProfile(email, meta);
+      const [enriched, provisioned] = await Promise.all([
+        enrichFromTeamMembers(email, fallbackProfile),
+        provisionWorkspace(session.access_token),
+      ]);
+      setIsAuthenticated(true);
+      setAccessToken(session.access_token);
+      setCurrentUser((prev) =>
+        enriched.name === prev.name &&
+        enriched.email === prev.email &&
+        enriched.role === prev.role &&
+        enriched.avatar === prev.avatar
+          ? prev
+          : enriched
+      );
+      setProvisionResult(provisioned.result);
+      setProvisionStatus(provisioned.status);
+      setProvisionMessage(provisioned.message);
+      provisionStatusRef.current = provisioned.status;
+      provisionedEmailRef.current = provisioned.status === "active" ? email : null;
+      lastFullAccessCheckRef.current = Date.now();
+    })().finally(() => {
+      if (accessStateInFlightRef.current?.promise === promise) {
+        accessStateInFlightRef.current = null;
+      }
+    });
+    accessStateInFlightRef.current = { key, promise };
+    return promise;
   }, []);
 
   // Check for existing Supabase session on mount
@@ -168,23 +192,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
-          const token = session.access_token;
-          const email = session.user.email || "";
-          const meta = session.user.user_metadata || {};
-          const profile = buildProfile(email, meta);
-          // Fire provision and team enrich in parallel — provision completes
-          // before PipelineProvider ever mounts, eliminating the waterfall.
-          const [enriched, provisioned] = await Promise.all([
-            enrichFromTeamMembers(email, profile),
-            provisionWorkspace(token),
-          ]);
-          setCurrentUser(enriched);
-          setIsAuthenticated(true);
-          setAccessToken(token);
-          setProvisionResult(provisioned.result);
-          setProvisionStatus(provisioned.status);
-          setProvisionMessage(provisioned.message);
-          if (provisioned.status === "active") provisionedEmailRef.current = email;
+          await applyAccessState(session);
         }
       } catch (err) {
         console.error("[auth] init failed:", err);
@@ -214,7 +222,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           (provisionedEmailRef.current !== null && email === provisionedEmailRef.current);
         if (isReEmitForSameUser) {
           setAccessToken(session.access_token);
-          void applyAccessState(session).catch((err) => console.error("[auth] access refresh failed:", err));
           return;
         }
         const meta = session.user.user_metadata || {};
@@ -228,22 +235,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // PERF-004: only call setCurrentUser a second time when the enriched
         // profile actually differs (name/role/avatar). Mirrors the AvatarSync
         // equality guard so a no-op enrich does not trigger a cascade re-render.
-        Promise.all([
-          enrichFromTeamMembers(email, profile),
-          provisionWorkspace(session.access_token),
-        ]).then(([enriched, provisioned]) => {
-          setCurrentUser((prev) =>
-            enriched.name === prev.name &&
-            enriched.role === prev.role &&
-            enriched.avatar === prev.avatar
-              ? prev
-              : enriched
-          );
-          setProvisionResult(provisioned.result);
-          setProvisionStatus(provisioned.status);
-          setProvisionMessage(provisioned.message);
-          if (provisioned.status === "active") provisionedEmailRef.current = email;
-        }).catch(() => {});
+        void applyAccessState(session).catch((err) => console.error("[auth] sign-in access check failed:", err));
       } else {
         setIsAuthenticated(false);
         setCurrentUser(DEFAULT_USER);
@@ -264,7 +256,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
       supabase.auth.getSession()
         .then(({ data: { session } }) => {
-          if (session?.user) return applyAccessState(session);
+          if (!session?.user) return;
+          const email = session.user.email || "";
+          setAccessToken(session.access_token);
+          const needsFullCheck =
+            provisionStatusRef.current !== "active" ||
+            provisionedEmailRef.current?.toLowerCase() !== email.toLowerCase() ||
+            Date.now() - lastFullAccessCheckRef.current > ACCESS_REVALIDATE_MS;
+          if (needsFullCheck) return applyAccessState(session);
         })
         .catch((err) => console.error("[auth] scheduled access refresh failed:", err));
     };
@@ -303,6 +302,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProvisionResult(provisioned.result);
     setProvisionStatus(provisioned.status);
     setProvisionMessage(provisioned.message);
+    provisionStatusRef.current = provisioned.status;
+    lastFullAccessCheckRef.current = Date.now();
     // Mark this identity as already-provisioned so the SIGNED_IN re-emit
     // that fires immediately after signInWithPassword is treated as a no-op
     // and does not flash the "Checking workspace access" gate.
@@ -323,6 +324,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProvisionStatus("unknown");
     setProvisionMessage(null);
     provisionedEmailRef.current = null;
+    provisionStatusRef.current = "unknown";
+    lastFullAccessCheckRef.current = 0;
   }, []);
 
   const updateCurrentUserAvatar = useCallback((avatar: string | undefined) => {
@@ -332,6 +335,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       isAuthenticated,
+      isLoading: !hydrated,
       currentUser,
       accessToken,
       provisionResult,
@@ -341,10 +345,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       logout,
     }),
-    [isAuthenticated, currentUser, accessToken, provisionResult, provisionStatus, provisionMessage, updateCurrentUserAvatar, login, logout]
+    [isAuthenticated, hydrated, currentUser, accessToken, provisionResult, provisionStatus, provisionMessage, updateCurrentUserAvatar, login, logout]
   );
-
-  if (!hydrated) return null;
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
