@@ -7,6 +7,10 @@ export interface CreatePostUploadFileState {
   type: "image" | "video";
   preview: string;
   driveUrl?: string;
+  driveProxyUrl?: string;
+  publishUrl?: string;
+  playbackUrl?: string;
+  playbackStorageKey?: string;
   driveFileId?: string;
   mimeType?: string;
   driveSize?: number;
@@ -66,6 +70,8 @@ export function applyCreatePostUploadResults<T extends CreatePostUploadFileState
       next[pendingItem.index] = {
         ...next[pendingItem.index],
         driveUrl: item.result.url,
+        driveProxyUrl: item.result.driveProxyUrl || item.result.url,
+        publishUrl: item.result.publishUrl || item.result.url,
         driveFileId: item.result.fileId,
         mimeType: item.result.mimeType,
         driveSize: item.result.size,

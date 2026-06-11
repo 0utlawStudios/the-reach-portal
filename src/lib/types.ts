@@ -23,8 +23,14 @@ export interface ChecklistItem {
 
 export interface RawFile {
   name: string;
+  // Canonical automation/publishing URL. This must not point at the browser
+  // stream proxy, because n8n should pull source media directly.
   url: string;
   fileId?: string;
+  publishUrl?: string;
+  driveProxyUrl?: string;
+  playbackUrl?: string;
+  playbackStorageKey?: string;
   usageType: "master" | "supplementary";
   mimeType?: string;
   size?: number;

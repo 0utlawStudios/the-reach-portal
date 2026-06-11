@@ -39,6 +39,8 @@ import { supabase } from "@/lib/supabaseClient";
 export interface DriveUploadResult {
   fileId: string;
   url: string;
+  publishUrl?: string;
+  driveProxyUrl?: string;
   mimeType?: string;
   size?: number;
 }
@@ -303,6 +305,8 @@ async function uploadViaProxy(
               done({
                 fileId: data.fileId,
                 url: data.url,
+                publishUrl: data.publishUrl,
+                driveProxyUrl: data.driveProxyUrl || data.url,
                 mimeType: data.mimeType,
                 size: data.size,
               });
@@ -482,6 +486,8 @@ async function finalizeUpload(fileId: string, folder: string): Promise<DriveUplo
   return {
     fileId: data.fileId,
     url: data.url,
+    publishUrl: data.publishUrl,
+    driveProxyUrl: data.driveProxyUrl || data.url,
     mimeType: data.mimeType,
     size: data.size,
   };

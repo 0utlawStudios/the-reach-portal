@@ -5,6 +5,7 @@ import {
   setPublicPermission,
   getAccessToken,
   getStreamUrl,
+  getDriveDownloadUrl,
 } from "@/lib/google-drive";
 import { consume, getClientIp } from "@/lib/rate-limit";
 import { requireBearerTeamRole } from "@/lib/auth/require";
@@ -178,9 +179,14 @@ export async function POST(request: NextRequest) {
       // Don't fail — file is uploaded, just not public yet
     }
 
+    const driveProxyUrl = getStreamUrl(fileId);
+    const publishUrl = getDriveDownloadUrl(fileId);
+
     return jsonResponse({
       fileId,
-      url: getStreamUrl(fileId),
+      url: driveProxyUrl,
+      driveProxyUrl,
+      publishUrl,
       mimeType: driveFile.mimeType || mimeType,
       size: Number(driveFile.size || file.size),
       driveFileName,

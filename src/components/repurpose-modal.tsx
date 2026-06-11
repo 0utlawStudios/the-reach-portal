@@ -92,7 +92,7 @@ export function RepurposeModal({ card, onClose }: Props) {
         if (!isDrivePublishableMediaMime(rf.mimeType, rf.name)) continue;
         ensureMediaAsset({
           name: rf.name,
-          url: rf.url,
+          url: rf.playbackUrl || rf.driveProxyUrl || rf.url,
           fileType: rf.mimeType?.startsWith("video") ? "video" : "image",
           folder: "Content Engine Uploads",
           addedBy: currentUser.name,

@@ -20,6 +20,8 @@ export function resolveCardVideoUrl(card: Pick<ContentCard, "contentType" | "thu
   if (!isVideoContentType(card.contentType)) return null;
 
   const rawVideo = firstVideoRawFile(card);
+  if (rawVideo?.playbackUrl) return rawVideo.playbackUrl;
+  if (rawVideo?.driveProxyUrl) return rawVideo.driveProxyUrl;
   if (rawVideo?.url) return rawVideo.url;
 
   const thumbFileId = driveFileIdFromUrl(card.thumbnailUrl);

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ensureSubfolder, getRootFolderId, setPublicPermission, getStreamUrl, getFileMetadata } from "@/lib/google-drive";
+import { ensureSubfolder, getRootFolderId, setPublicPermission, getStreamUrl, getFileMetadata, getDriveDownloadUrl } from "@/lib/google-drive";
 import { requireBearerTeamRole } from "@/lib/auth/require";
 import { consume, getClientIp } from "@/lib/rate-limit";
 import {
@@ -114,12 +114,15 @@ export async function POST(request: NextRequest) {
     // Always use our stream proxy as primary URL — it's authenticated server-side
     // and works immediately (lh3 URLs break during Google permission propagation)
     const proxyUrl = getStreamUrl(fileId);
+    const publishUrl = getDriveDownloadUrl(fileId);
 
     return NextResponse.json({
       fileId,
       imageUrl: isImage ? proxyUrl : null,
       streamUrl: isVideo ? proxyUrl : null,
       url: proxyUrl,
+      driveProxyUrl: proxyUrl,
+      publishUrl,
       mimeType,
       size: meta.size,
     });

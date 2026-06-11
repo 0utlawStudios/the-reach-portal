@@ -39,6 +39,28 @@ describe("media resolver", () => {
     expect(resolveCardVideoUrl(c)).toBe("/api/drive/stream?id=raw-video");
   });
 
+  it("prefers optimized playback URLs over publishing source URLs for video UI", () => {
+    const c = card({
+      thumbnailUrl: "/api/drive/stream?id=poster",
+      sourceVault: {
+        rawFiles: [{
+          name: "clip.mov",
+          url: "https://drive.google.com/uc?export=download&id=raw-video",
+          publishUrl: "https://drive.google.com/uc?export=download&id=raw-video",
+          driveProxyUrl: "/api/drive/stream?id=raw-video&token=signed",
+          playbackUrl: "https://project.supabase.co/storage/v1/object/public/media-playback/workspace/post/clip.mov",
+          playbackStorageKey: "workspace/post/clip.mov",
+          fileId: "raw-video",
+          usageType: "master",
+          mimeType: "video/quicktime",
+          uploadedAt: "2026-06-11T00:00:00.000Z",
+        }],
+      },
+    });
+
+    expect(resolveCardVideoUrl(c)).toBe("https://project.supabase.co/storage/v1/object/public/media-playback/workspace/post/clip.mov");
+  });
+
   it("falls back to thumbnailUrl when a legacy video post stored the video as the thumbnail", () => {
     const c = card({ thumbnailUrl: "/api/drive/stream?id=legacy-video" });
 
@@ -74,5 +96,16 @@ describe("media resolver", () => {
       expect(src, file).toContain("CardThumbnailMedia");
       expect(src, file).not.toMatch(/RawImage\s+src=\{(?:card|selectedCard)\.thumbnailUrl\}/);
     }
+  });
+
+  it("keeps raw file URLs publish-safe instead of storing only the app stream proxy", () => {
+    const createPostSrc = readFileSync(join(process.cwd(), "src/components/create-post-modal.tsx"), "utf8");
+    const drawerSrc = readFileSync(join(process.cwd(), "src/components/asset-review-drawer.tsx"), "utf8");
+    expect(createPostSrc).toContain("const publishUrl = f.publishUrl ||");
+    expect(createPostSrc).toContain("url: publishUrl");
+    expect(createPostSrc).toContain("driveProxyUrl");
+    expect(drawerSrc).toContain("const publishUrl = result.publishUrl ||");
+    expect(drawerSrc).toContain("url: publishUrl");
+    expect(drawerSrc).toContain("playbackUrl");
   });
 });

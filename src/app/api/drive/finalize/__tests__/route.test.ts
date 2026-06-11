@@ -14,6 +14,7 @@ const driveMocks = vi.hoisted(() => ({
   getRootFolderId: vi.fn(),
   setPublicPermission: vi.fn(),
   getStreamUrl: vi.fn(),
+  getDriveDownloadUrl: vi.fn(),
   getFileMetadata: vi.fn(),
 }));
 
@@ -35,6 +36,7 @@ vi.mock("@/lib/google-drive", () => ({
   getRootFolderId: driveMocks.getRootFolderId,
   setPublicPermission: driveMocks.setPublicPermission,
   getStreamUrl: driveMocks.getStreamUrl,
+  getDriveDownloadUrl: driveMocks.getDriveDownloadUrl,
   getFileMetadata: driveMocks.getFileMetadata,
 }));
 
@@ -68,6 +70,7 @@ beforeEach(() => {
   driveMocks.ensureSubfolder.mockResolvedValue("raw-folder");
   driveMocks.setPublicPermission.mockResolvedValue(undefined);
   driveMocks.getStreamUrl.mockReturnValue("/api/drive/stream?id=abcdefghijklmnopqrst");
+  driveMocks.getDriveDownloadUrl.mockReturnValue("https://drive.google.com/uc?export=download&id=abcdefghijklmnopqrst");
   driveMocks.getFileMetadata.mockResolvedValue({
     id: FILE_ID,
     name: "clip.mp4",
@@ -84,7 +87,12 @@ describe("POST /api/drive/finalize", () => {
     const data = await res.json();
 
     expect(res.status).toBe(200);
-    expect(data).toMatchObject({ fileId: FILE_ID, url: "/api/drive/stream?id=abcdefghijklmnopqrst" });
+    expect(data).toMatchObject({
+      fileId: FILE_ID,
+      url: "/api/drive/stream?id=abcdefghijklmnopqrst",
+      driveProxyUrl: "/api/drive/stream?id=abcdefghijklmnopqrst",
+      publishUrl: "https://drive.google.com/uc?export=download&id=abcdefghijklmnopqrst",
+    });
     expect(driveMocks.ensureSubfolder).toHaveBeenCalledTimes(1);
     expect(driveMocks.ensureSubfolder).toHaveBeenCalledWith("raw-files", "root-folder");
     expect(driveMocks.setPublicPermission).toHaveBeenCalledWith(FILE_ID);

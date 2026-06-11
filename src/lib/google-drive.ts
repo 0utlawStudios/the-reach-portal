@@ -1,5 +1,6 @@
 import { GoogleAuth } from "google-auth-library";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { getPublicDriveDownloadUrl } from "@/lib/drive-url-utils";
 
 // ─── Drive API base URLs ───
 const DRIVE_API = "https://www.googleapis.com/drive/v3";
@@ -176,6 +177,10 @@ export async function setPublicPermission(fileId: string): Promise<void> {
 
 export function getImageUrl(fileId: string): string {
   return `https://lh3.googleusercontent.com/d/${fileId}=s0`;
+}
+
+export function getDriveDownloadUrl(fileId: string): string {
+  return getPublicDriveDownloadUrl(fileId);
 }
 
 function streamSigningSecret(): string {

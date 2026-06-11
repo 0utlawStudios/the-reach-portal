@@ -12,6 +12,7 @@ import { useToast } from "@/lib/toast-context";
 import { useAuth } from "@/lib/auth-context";
 import { ensureMediaAsset } from "@/lib/media-assets";
 import { isDrivePublishableMediaMime, normalizeDriveMimeType } from "@/lib/drive-policy";
+import { getPublicDriveDownloadUrl } from "@/lib/drive-url-utils";
 import { MentionTextarea } from "./mention-textarea";
 import { formatDateTimeCompact } from "@/lib/utils";
 import type { MediaPickerSelection } from "./media-picker";
@@ -232,23 +233,59 @@ export function CreatePostModal({ open, onClose }: Props) {
         }
       }
 
+      if (!uploadFailed) {
+        const withPlayback = filesForCard.map((file) => ({ ...file }));
+        for (let i = 0; i < withPlayback.length; i++) {
+          const f = withPlayback[i];
+          const rawMimeType = f.mimeType || (f.type === "video" ? "video/mp4" : "image/jpeg");
+          if (!rawMimeType.startsWith("video/") || f.playbackUrl) continue;
+          const sourceFile = rawFilesRef.current.get(f.id);
+          if (!sourceFile) continue;
+
+          try {
+            setUploadingFileName(`Optimizing playback for ${f.name}`);
+            setUploadProgress(0);
+            const { uploadVideoPlaybackCopy } = await import("@/lib/media-playback");
+            const playback = await uploadVideoPlaybackCopy(sourceFile);
+            withPlayback[i] = {
+              ...f,
+              playbackUrl: playback.playbackUrl,
+              playbackStorageKey: playback.playbackStorageKey,
+            };
+          } catch (err) {
+            console.error("[create-post] playback upload failed:", err);
+            addToast(`Couldn't optimize playback for ${f.name}. Retry this upload before creating the post.`, "error");
+            uploadFailed = true;
+            break;
+          }
+        }
+        filesForCard = withPlayback;
+        setFiles(withPlayback);
+      }
+
       // Rebuild rawFiles in the original file order (master = index 0).
       if (!uploadFailed) {
         for (let i = 0; i < filesForCard.length; i++) {
           const f = filesForCard[i];
           if (f.driveUrl) {
             const rawMimeType = f.mimeType || (f.type === "video" ? "video/mp4" : "image/jpeg");
+            const publishUrl = f.publishUrl || (f.driveFileId ? getPublicDriveDownloadUrl(f.driveFileId) : f.driveUrl);
+            const driveProxyUrl = f.driveProxyUrl || f.driveUrl;
             rawFiles.push({
               name: f.name,
-              url: f.driveUrl,
+              url: publishUrl,
               fileId: f.driveFileId,
+              publishUrl,
+              driveProxyUrl,
+              playbackUrl: f.playbackUrl,
+              playbackStorageKey: f.playbackStorageKey,
               usageType: i === 0 ? "master" : "supplementary",
               mimeType: rawMimeType,
               size: f.driveSize || 0,
               uploadedAt: new Date().toISOString(),
             });
             if (i === 0) {
-              thumbnailUrl = f.driveUrl;
+              thumbnailUrl = driveProxyUrl;
               thumbnailFileId = f.driveFileId;
               thumbnailMimeType = rawMimeType;
               if (rawMimeType.startsWith("video/")) {
@@ -320,7 +357,7 @@ export function CreatePostModal({ open, onClose }: Props) {
       try {
         await ensureMediaAsset({
           name: rf.name,
-          url: rf.url,
+          url: rf.playbackUrl || rf.driveProxyUrl || rf.url,
           fileType: rf.mimeType?.startsWith("video") ? "video" : "image",
           folder: "Content Engine Uploads",
           addedBy: currentUser.name,
@@ -351,6 +388,10 @@ export function CreatePostModal({ open, onClose }: Props) {
         type: isVideo ? "video" : "image",
         preview: result.url,
         driveUrl: result.url,
+        driveProxyUrl: result.driveProxyUrl || result.url,
+        publishUrl: result.publishUrl || (result.fileId ? getPublicDriveDownloadUrl(result.fileId) : result.url),
+        playbackUrl: result.playbackUrl,
+        playbackStorageKey: result.playbackStorageKey,
         driveFileId: result.fileId,
         mimeType: result.mimeType,
         driveSize: result.size,

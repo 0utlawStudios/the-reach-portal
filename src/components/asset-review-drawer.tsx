@@ -29,6 +29,7 @@ import { useTeam } from "@/lib/team-context";
 import { useToast } from "@/lib/toast-context";
 import { ensureMediaAsset } from "@/lib/media-assets";
 import { isDrivePublishableMediaMime, normalizeDriveMimeType } from "@/lib/drive-policy";
+import { getPublicDriveDownloadUrl } from "@/lib/drive-url-utils";
 import { isVideoContentType, resolveCardVideoUrl, thumbnailIsDefinitelyImage } from "@/lib/media-resolver";
 import { formatDate, formatDateTime, formatDateShort, formatDateTimeCompact } from "@/lib/utils";
 import { useFocusTrap } from "./use-focus-trap";
@@ -422,10 +423,44 @@ export function AssetReviewDrawer() {
         const result = item.result;
         const resultMimeType = result.mimeType || normalizeDriveMimeType(file.type, file.name);
         const isFirstFile = rawFiles.length === 0;
+        let playbackUrl: string | undefined;
+        let playbackStorageKey: string | undefined;
+        if (resultMimeType.startsWith("video/")) {
+          try {
+            setUploadingFileName(`Optimizing playback for ${file.name}`);
+            const { uploadVideoPlaybackCopy } = await import("@/lib/media-playback");
+            const playback = await uploadVideoPlaybackCopy(file, selectedCard.id);
+            playbackUrl = playback.playbackUrl;
+            playbackStorageKey = playback.playbackStorageKey;
+          } catch (err) {
+            const errorMessage = uploadErrorMessage(err);
+            await reportUploadFailure({
+              phase: "drawer_playback_upload",
+              route: "/api/media/playback-upload",
+              uploadPath: uploadPathForSize(file),
+              cardId: selectedCard.id,
+              postTitle: selectedCard.title,
+              folder: "raw-files",
+              fileName: file.name,
+              mimeType: resultMimeType,
+              fileSize: file.size,
+              errorMessage,
+              errorDetail: err instanceof Error ? err.stack : undefined,
+            });
+            addToast(`Playback optimization failed for ${file.name}. Try the upload again.`, "error");
+            continue;
+          }
+        }
+        const publishUrl = result.publishUrl || getPublicDriveDownloadUrl(result.fileId);
+        const driveProxyUrl = result.driveProxyUrl || result.url;
         const newFile = {
           name: file.name,
-          url: result.url,
+          url: publishUrl,
           fileId: result.fileId,
+          publishUrl,
+          driveProxyUrl,
+          playbackUrl,
+          playbackStorageKey,
           usageType: (isFirstFile ? "master" : "supplementary") as "master" | "supplementary",
           mimeType: resultMimeType,
           size: result.size || file.size,
@@ -436,7 +471,7 @@ export function AssetReviewDrawer() {
         if (isDrivePublishableMediaMime(resultMimeType, file.name)) {
           ensureMediaAsset({
             name: file.name,
-            url: result.url,
+            url: playbackUrl || driveProxyUrl,
             fileType: resultMimeType.startsWith("video") ? "video" : "image",
             folder: "Content Engine Uploads",
             addedBy: currentUser.name,
@@ -484,7 +519,7 @@ export function AssetReviewDrawer() {
     if (showMediaPicker === "thumbnail") {
       const [result] = results;
       updateCard(selectedCard.id, {
-        thumbnailUrl: result.url,
+        thumbnailUrl: result.driveProxyUrl || result.url,
         sourceVault: {
           ...(selectedCard.sourceVault || {}),
           thumbnailFileId: result.fileId,
@@ -500,10 +535,15 @@ export function AssetReviewDrawer() {
     const existingFiles = selectedCard.sourceVault?.rawFiles || [];
     const newFiles = results.map((result, offset) => {
       const isFirstFile = existingFiles.length + offset === 0;
+      const publishUrl = result.publishUrl || (result.fileId ? getPublicDriveDownloadUrl(result.fileId) : result.url);
       return {
         name: result.name,
-        url: result.url,
+        url: publishUrl,
         fileId: result.fileId,
+        publishUrl,
+        driveProxyUrl: result.driveProxyUrl || result.url,
+        playbackUrl: result.playbackUrl,
+        playbackStorageKey: result.playbackStorageKey,
         usageType: (isFirstFile ? "master" : "supplementary") as "master" | "supplementary",
         mimeType: result.mimeType,
         size: result.size,

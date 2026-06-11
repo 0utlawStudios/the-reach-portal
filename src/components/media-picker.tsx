@@ -6,6 +6,7 @@ import { usePipeline } from "@/lib/pipeline-context";
 import { useToast } from "@/lib/toast-context";
 import { supabase } from "@/lib/supabaseClient";
 import { isDrivePublishableMediaMime, normalizeDriveMimeType } from "@/lib/drive-policy";
+import { getPublicDriveDownloadUrl } from "@/lib/drive-url-utils";
 import { X, Upload, FolderOpen, Image as ImageIcon, Film, Search, CheckCircle, Clock, Link2, ExternalLink } from "lucide-react";
 import { PLACEHOLDER_MEDIA } from "@/lib/placeholder-data";
 import { useFocusTrap } from "./use-focus-trap";
@@ -25,6 +26,10 @@ type PickerTab = "upload" | "library";
 
 interface MediaEntry {
   url: string;
+  publishUrl?: string;
+  driveProxyUrl?: string;
+  playbackUrl?: string;
+  playbackStorageKey?: string;
   name: string;
   type: "image" | "video";
   fileId?: string;
@@ -44,6 +49,10 @@ interface MediaAssetRow {
 
 export interface MediaPickerSelection {
   url: string;
+  publishUrl?: string;
+  driveProxyUrl?: string;
+  playbackUrl?: string;
+  playbackStorageKey?: string;
   fileId?: string;
   name: string;
   mimeType?: string;
@@ -181,14 +190,19 @@ export function MediaPicker({
       // Raw files (content for publishing)
       c.sourceVault?.rawFiles?.forEach((f) => {
         if (f.url.startsWith("blob:")) return;
-        const existing = urlMap.get(f.url);
+        const displayUrl = f.playbackUrl || f.driveProxyUrl || f.url;
+        const existing = urlMap.get(displayUrl);
         if (existing) {
           if (!existing.usedInCards.find((u) => u.id === c.id)) {
             existing.usedInCards.push({ id: c.id, title: c.title });
           }
         } else {
-          urlMap.set(f.url, {
-            url: f.url,
+          urlMap.set(displayUrl, {
+            url: displayUrl,
+            publishUrl: f.publishUrl || f.url,
+            driveProxyUrl: f.driveProxyUrl,
+            playbackUrl: f.playbackUrl,
+            playbackStorageKey: f.playbackStorageKey,
             name: f.name,
             type: f.mimeType?.startsWith("video") ? "video" : "image",
             fileId: f.fileId,
@@ -257,16 +271,54 @@ export function MediaPicker({
           addToast(`Upload failed: ${errorMessage}`, "error");
         }
         const successes = items.filter((item) => item.result);
-        const selections: MediaPickerSelection[] = successes.map((item) => {
+        const selections: MediaPickerSelection[] = [];
+        for (const item of successes) {
           const result = item.result!;
-          return { url: result.url, fileId: result.fileId, name: item.file.name, mimeType: result.mimeType || item.file.type, size: result.size || item.file.size };
-        });
+          const mimeType = result.mimeType || normalizeDriveMimeType(item.file.type, item.file.name);
+          let playbackUrl: string | undefined;
+          let playbackStorageKey: string | undefined;
+          if (mimeType.startsWith("video/")) {
+            try {
+              const { uploadVideoPlaybackCopy } = await import("@/lib/media-playback");
+              const playback = await uploadVideoPlaybackCopy(item.file, cardId);
+              playbackUrl = playback.playbackUrl;
+              playbackStorageKey = playback.playbackStorageKey;
+            } catch (err) {
+              const errorMessage = uploadErrorMessage(err);
+              await reportUploadFailure({
+                phase: "media_picker_playback_upload",
+                route: "/api/media/playback-upload",
+                uploadPath: uploadPathForSize(item.file),
+                cardId,
+                folder,
+                fileName: item.file.name,
+                mimeType,
+                fileSize: item.file.size,
+                errorMessage,
+                errorDetail: err instanceof Error ? err.stack : undefined,
+              });
+              addToast(`Playback optimization failed for ${item.file.name}`, "error");
+              continue;
+            }
+          }
+          selections.push({
+            url: playbackUrl || result.url,
+            publishUrl: result.publishUrl || getPublicDriveDownloadUrl(result.fileId),
+            driveProxyUrl: result.driveProxyUrl || result.url,
+            playbackUrl,
+            playbackStorageKey,
+            fileId: result.fileId,
+            name: item.file.name,
+            mimeType,
+            size: result.size || item.file.size,
+          });
+        }
         if (selections.length > 0) {
           if (onSelectMany) onSelectMany(selections);
           else selections.forEach(onSelect);
         }
-        if (successes.length > 0) {
-          addToast(successes.length === 1 ? `${successes[0].file.name} uploaded` : `${successes.length} files uploaded`, "success");
+        if (selections.length > 0) {
+          addToast(selections.length === 1 ? `${selections[0].name} uploaded` : `${selections.length} files uploaded`, "success");
           onClose();
         }
       } catch (err) {
@@ -463,7 +515,7 @@ export function MediaPicker({
                   </div>
 
                   {/* Select button */}
-                  <button onClick={() => { onSelect({ url: selectedAsset.url, fileId: selectedAsset.fileId, name: selectedAsset.name, mimeType: selectedAsset.type === "video" ? "video/mp4" : "image/jpeg" }); onClose(); }}
+                  <button onClick={() => { onSelect({ url: selectedAsset.url, publishUrl: selectedAsset.publishUrl, driveProxyUrl: selectedAsset.driveProxyUrl, playbackUrl: selectedAsset.playbackUrl, playbackStorageKey: selectedAsset.playbackStorageKey, fileId: selectedAsset.fileId, name: selectedAsset.name, mimeType: selectedAsset.type === "video" ? "video/mp4" : "image/jpeg" }); onClose(); }}
                     className="reach-action-button w-full h-10 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-[13px] font-semibold shadow-sm cursor-pointer transition-colors">
                     Use This Asset
                   </button>
