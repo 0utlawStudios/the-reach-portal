@@ -213,3 +213,16 @@ Required behavior:
 - Pinning expands and persists the sidebar
 - Unpinning collapses immediately
 - Mouse leave collapses any unpinned expanded state
+
+### 9c. Finish active work before starting new requests
+When the user sends a new request while an agent is already implementing,
+testing, committing, or shipping an active task, treat the new request as an
+additional queued task by default, not as a redirect.
+
+Required behavior:
+- Finish the active task to a clean stopping point first
+- Do not switch scope mid-task unless the user explicitly says to pause, stop,
+  or redirect
+- Acknowledge queued additions briefly, then continue the active task
+- After the active task is shipped or otherwise cleanly stopped, move to the
+  queued task in order
