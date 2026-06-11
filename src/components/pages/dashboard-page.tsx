@@ -1,6 +1,7 @@
 "use client";
 
 import { RawImage } from "@/components/raw-image";
+import { CardThumbnailMedia } from "@/components/card-thumbnail-media";
 import { useMemo, useState, useEffect, useRef } from "react";
 import { usePipeline } from "@/lib/pipeline-context";
 import { Page, useNavigation } from "@/lib/navigation-context";
@@ -264,7 +265,7 @@ export function DashboardPage() {
                 const daysUntil = card.scheduledDate ? Math.ceil((new Date(card.scheduledDate).getTime() - renderTime) / (1000 * 60 * 60 * 24)) : null;
                 return (
                   <button key={card.id} onClick={() => navigate("pipeline")} className="w-full flex items-center gap-3 px-2 py-1.5 sm:py-2.5 rounded-xl hover:bg-gray-50/80 dark:hover:bg-white/[0.02] transition-all duration-300 cursor-pointer text-left group">
-                    <RawImage src={card.thumbnailUrl} alt="" className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg object-cover shrink-0 shadow-sm group-hover:shadow-md transition-shadow duration-300" />
+                    <CardThumbnailMedia card={card} className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg object-cover shrink-0 shadow-sm group-hover:shadow-md transition-shadow duration-300" />
                     <div className="flex-1 min-w-0">
                       <p className="text-[12px] text-gray-800 dark:text-gray-200 font-medium truncate">{card.title}</p>
                       <div className="flex items-center gap-1 mt-0.5">{card.platforms.slice(0, 3).map((p) => <span key={p} className="text-gray-400"><PlatformIcon platform={p} className="w-2.5 h-2.5" /></span>)}</div>
@@ -292,7 +293,7 @@ export function DashboardPage() {
           <div className="flex-1 flex flex-col justify-evenly gap-1 min-h-0">
             {recentPosted.map((card) => (
               <div key={card.id} className="flex items-center gap-3 px-2 py-2.5 rounded-xl hover:bg-gray-50/80 dark:hover:bg-white/[0.02] transition-all duration-300">
-                <RawImage src={card.thumbnailUrl} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0 shadow-sm" />
+                <CardThumbnailMedia card={card} className="w-10 h-10 rounded-lg object-cover shrink-0 shadow-sm" />
                 <div className="flex-1 min-w-0">
                   <p className="text-[12px] text-gray-800 dark:text-gray-200 font-medium truncate">{card.title}</p>
                   <div className="flex items-center gap-1.5 mt-0.5">

@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { RawImage } from "@/components/raw-image";
+import { CardThumbnailMedia } from "@/components/card-thumbnail-media";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { usePipeline } from "@/lib/pipeline-context";
 import { PIPELINE_COLUMNS, PipelineStage, ALL_PLATFORMS, Platform } from "@/lib/types";
@@ -665,7 +666,7 @@ export function AssetReviewDrawer() {
                   className="w-full flex items-center justify-center bg-black cursor-pointer"
                   onClick={() => selectedCard.thumbnailUrl && setShowLightbox(true)}
                 >
-                  <RawImage src={selectedCard.thumbnailUrl} alt={selectedCard.title} className="block max-h-[70dvh] max-w-full w-auto object-contain" />
+                  <CardThumbnailMedia card={selectedCard} className="block max-h-[70dvh] max-w-full w-auto object-contain" />
                   <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
                     <div className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center">
                       <Maximize2 className="w-4 h-4 text-white" />
@@ -713,7 +714,7 @@ export function AssetReviewDrawer() {
               </div>
             ) : selectedCard.contentType === "carousel" ? (
               <div className="flex gap-2 overflow-x-auto pb-1">
-                <div className="w-16 h-16 rounded-lg overflow-hidden border-2 border-orange-500 shrink-0"><RawImage src={selectedCard.thumbnailUrl} alt="Slide 1" className="w-full h-full object-cover" /></div>
+                <div className="w-16 h-16 rounded-lg overflow-hidden border-2 border-orange-500 shrink-0"><CardThumbnailMedia card={selectedCard} className="w-full h-full object-cover" /></div>
                 {[2, 3, 4].map((n) => (
                   <div key={n} className="w-16 h-16 rounded-lg border-2 border-dashed border-gray-200 dark:border-white/[0.08] flex items-center justify-center shrink-0 text-gray-300 dark:text-gray-600 hover:border-orange-300 dark:hover:border-orange-500/30 transition-colors cursor-pointer">
                     <span className="text-[9px] font-medium">Slide {n}</span>
@@ -1303,11 +1304,7 @@ export function AssetReviewDrawer() {
           className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 sm:p-8"
         >
           <div className="relative max-w-4xl w-full max-h-[90dvh]">
-            <RawImage
-              src={selectedCard.thumbnailUrl}
-              alt={selectedCard.title}
-              className="max-w-full max-h-[85dvh] object-contain mx-auto"
-            />
+            <CardThumbnailMedia card={selectedCard} className="max-w-full max-h-[85dvh] object-contain mx-auto" />
             <button
               onClick={() => setShowLightbox(false)}
               aria-label="Close preview"

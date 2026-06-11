@@ -5,7 +5,7 @@ import { usePipeline } from "@/lib/pipeline-context";
 import { PIPELINE_COLUMNS, ContentCard } from "@/lib/types";
 import { ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import { PlatformIcon } from "@/components/platform-icons";
-import { RawImage } from "@/components/raw-image";
+import { CardThumbnailMedia } from "@/components/card-thumbnail-media";
 import { formatDate, isOverdue } from "@/lib/utils";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -25,13 +25,7 @@ function CalendarChip({ card, onClick }: { card: ContentCard; onClick: () => voi
       className="w-full flex items-center gap-1 py-1.5 px-2 rounded text-left cursor-pointer hover:brightness-95 transition-all overflow-hidden"
       style={{ backgroundColor: bgColor, borderLeft: `3px solid ${borderColor}` }}
     >
-      {card.thumbnailUrl && (
-        <RawImage
-          src={card.thumbnailUrl}
-          alt=""
-          className="w-5 h-5 rounded object-cover shrink-0"
-        />
-      )}
+      <CardThumbnailMedia card={card} className="w-5 h-5 rounded object-cover shrink-0" />
       <div className="flex items-center gap-0.5 shrink-0">
         {card.platforms.map((p) => (
           <span key={p} className="text-gray-400 dark:text-gray-500">

@@ -1,6 +1,6 @@
 "use client";
 
-import { RawImage } from "@/components/raw-image";
+import { CardThumbnailMedia } from "@/components/card-thumbnail-media";
 import { useState, useEffect, useRef } from "react";
 import { ContentCard, Platform, ALL_PLATFORMS, ContentType } from "@/lib/types";
 import { usePipeline } from "@/lib/pipeline-context";
@@ -126,7 +126,7 @@ export function RepurposeModal({ card, onClose }: Props) {
             {/* Original post preview */}
             <div className="px-5 pt-4 pb-3">
               <div className="flex gap-3 p-3 rounded-xl bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/[0.06]">
-                <RawImage src={card.thumbnailUrl} alt="" className="w-16 h-16 rounded-lg object-cover shrink-0" />
+                <CardThumbnailMedia card={card} className="w-16 h-16 rounded-lg object-cover shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-medium text-gray-800 dark:text-gray-200 line-clamp-1">{card.title}</p>
                   <div className="flex items-center gap-1.5 mt-1">

@@ -1,6 +1,6 @@
 "use client";
 
-import { RawImage } from "@/components/raw-image";
+import { CardThumbnailMedia } from "@/components/card-thumbnail-media";
 import { useCallback, useState, useMemo, useEffect, useRef } from "react";
 import {
   DndContext, DragEndEvent, DragStartEvent, DragOverlay,
@@ -429,7 +429,7 @@ export function KanbanBoard() {
               <div className="space-y-2">
                 {archivedCards.map((card) => (
                   <div key={card.id} onClick={() => selectCard(card)} className="flex items-center gap-3 p-3 bg-white dark:bg-[#151518] rounded-xl border border-gray-200/80 dark:border-white/[0.06] shadow-sm hover:shadow-md transition-shadow cursor-pointer">
-                    <RawImage src={card.thumbnailUrl} alt="" className="w-16 h-12 rounded-lg object-cover shrink-0" />
+                    <CardThumbnailMedia card={card} className="w-16 h-12 rounded-lg object-cover shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-[13px] font-medium text-gray-800 dark:text-gray-200 truncate">{card.title}</p>
                       <div className="flex items-center gap-2 mt-1">

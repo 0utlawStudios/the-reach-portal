@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { driveFileIdFromUrl, resolveCardVideoUrl, thumbnailIsDefinitelyImage } from "../media-resolver";
 import type { ContentCard } from "../types";
 
@@ -54,5 +56,23 @@ describe("media resolver", () => {
 
   it("extracts Drive stream file ids", () => {
     expect(driveFileIdFromUrl("/api/drive/stream?id=abc123&token=secret")).toBe("abc123");
+  });
+
+  it("routes card thumbnails through the shared video-aware renderer across app surfaces", () => {
+    const files = [
+      "src/components/content-card.tsx",
+      "src/components/pages/dashboard-page.tsx",
+      "src/components/pages/calendar-page.tsx",
+      "src/components/kanban-board.tsx",
+      "src/components/pages/post-preview-page.tsx",
+      "src/components/repurpose-modal.tsx",
+      "src/components/asset-review-drawer.tsx",
+    ];
+
+    for (const file of files) {
+      const src = readFileSync(join(process.cwd(), file), "utf8");
+      expect(src, file).toContain("CardThumbnailMedia");
+      expect(src, file).not.toMatch(/RawImage\s+src=\{(?:card|selectedCard)\.thumbnailUrl\}/);
+    }
   });
 });
