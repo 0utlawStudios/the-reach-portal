@@ -113,6 +113,8 @@ function DashboardLayout() {
 
 // ─── Sidebar ───
 
+const SIDEBAR_PIN_TEASER_MS = 3000;
+
 function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
   onCreatePost: () => void;
   mobileOpen: boolean;
@@ -123,6 +125,39 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
   const isSuperadmin = (currentUser.role || "").toLowerCase() === "superadmin";
   const supportAlert = useSupportAlert(isSuperadmin);
   const hoverExpandRef = useRef(false);
+  const pinTeaserStartedRef = useRef(false);
+  const pinTeaserTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sidebarPinnedRef = useRef(sidebarPinned);
+  const [pinTeaserActive, setPinTeaserActive] = useState(() => !sidebarPinned);
+
+  useEffect(() => {
+    sidebarPinnedRef.current = sidebarPinned;
+  }, [sidebarPinned]);
+
+  useEffect(() => {
+    if (pinTeaserStartedRef.current) return;
+    pinTeaserStartedRef.current = true;
+    if (sidebarPinnedRef.current) return;
+
+    hoverExpandRef.current = false;
+    setSidebarCollapsed(false);
+
+    pinTeaserTimerRef.current = setTimeout(() => {
+      pinTeaserTimerRef.current = null;
+      setPinTeaserActive(false);
+      hoverExpandRef.current = false;
+      if (!sidebarPinnedRef.current) {
+        setSidebarCollapsed(true);
+      }
+    }, SIDEBAR_PIN_TEASER_MS);
+
+    return () => {
+      if (pinTeaserTimerRef.current) {
+        clearTimeout(pinTeaserTimerRef.current);
+        pinTeaserTimerRef.current = null;
+      }
+    };
+  }, [setSidebarCollapsed]);
 
   // Desktop hover handlers
   const handleMouseEnter = () => {
@@ -131,7 +166,17 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
   };
   const handleMouseLeave = () => {
     if (sidebarPinned) return;
+    if (pinTeaserActive) return;
     if (hoverExpandRef.current || !sidebarCollapsed) { hoverExpandRef.current = false; setSidebarCollapsed(true); }
+  };
+
+  const handleTogglePin = () => {
+    if (pinTeaserTimerRef.current) {
+      clearTimeout(pinTeaserTimerRef.current);
+      pinTeaserTimerRef.current = null;
+    }
+    setPinTeaserActive(false);
+    togglePin();
   };
 
   const closeMobile = () => setMobileOpen(false);
@@ -159,6 +204,7 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
 
   const sidebarContent = (isMobile: boolean) => {
     const expanded = isMobile || !sidebarCollapsed;
+    const showPinTeaser = !isMobile && expanded && pinTeaserActive && !sidebarPinned;
     return (
       <>
         {/* Logo */}
@@ -229,7 +275,17 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
         {/* Pin (desktop only) */}
         {!isMobile && (
           <div className="px-3 py-3 shrink-0 border-t border-[#E1DFD5]/[0.15] dark:border-white/[0.04]">
-            <button onClick={togglePin} className={`w-full flex items-center gap-2 rounded-lg px-2.5 py-[7px] transition-all duration-150 cursor-pointer ${sidebarPinned ? "text-[#E1DFD5] bg-[#E1DFD5]/[0.12] dark:bg-orange-500/10 hover:bg-[#E1DFD5]/[0.16] dark:hover:bg-orange-500/15" : "text-[#E1DFD5]/[0.55] hover:text-[#E1DFD5] dark:hover:text-gray-300 hover:bg-[#E1DFD5]/[0.08] dark:hover:bg-white/[0.03]"}`}>
+            <button
+              onClick={handleTogglePin}
+              aria-label={sidebarPinned ? "Unpin sidebar" : "Pin sidebar"}
+              className={`w-full flex items-center gap-2 rounded-lg px-2.5 py-[7px] transition-all duration-150 cursor-pointer ${
+                showPinTeaser
+                  ? "reach-sidebar-pin-hint text-[#E1DFD5] bg-[#975428]/20"
+                  : sidebarPinned
+                    ? "text-[#E1DFD5] bg-[#E1DFD5]/[0.12] dark:bg-orange-500/10 hover:bg-[#E1DFD5]/[0.16] dark:hover:bg-orange-500/15"
+                    : "text-[#E1DFD5]/[0.55] hover:text-[#E1DFD5] dark:hover:text-gray-300 hover:bg-[#E1DFD5]/[0.08] dark:hover:bg-white/[0.03]"
+              }`}
+            >
               {!expanded ? (
                 <Pin className="w-4 h-4 mx-auto" />
               ) : sidebarPinned ? (
