@@ -14,12 +14,13 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync, statSync } from "fs";
 import { join } from "path";
 import { assertStageMoveCommitted, formatPipelineError, resolveLoadedCards, type PostRow } from "../pipeline-context";
-import { isPipelineApproverRole } from "../roles";
+import { canDeletePostRole, isPipelineApproverRole } from "../roles";
 
 const PIPELINE_PATH = join(process.cwd(), "src/lib/pipeline-context.tsx");
 const PIPELINE_SRC = readFileSync(PIPELINE_PATH, "utf8");
 const KANBAN_BOARD_SRC = readFileSync(join(process.cwd(), "src/components/kanban-board.tsx"), "utf8");
 const ASSET_DRAWER_SRC = readFileSync(join(process.cwd(), "src/components/asset-review-drawer.tsx"), "utf8");
+const POST_DELETE_ROUTE_SRC = readFileSync(join(process.cwd(), "src/app/api/posts/[id]/route.ts"), "utf8");
 const CONTENT_CARD_SRC = readFileSync(join(process.cwd(), "src/components/content-card.tsx"), "utf8");
 const MANUAL_POSTED_ROUTE_SRC = readFileSync(
   join(process.cwd(), "src/app/api/admin/posts/[id]/manual-posted/route.ts"),
@@ -256,6 +257,33 @@ describe("iron-law guards in pipeline-context.tsx", () => {
     expect(guardSites.length).toBeGreaterThanOrEqual(5);
   });
 
+  it("post deletes go through the server route and require a confirmed deleted row", () => {
+    expect(PIPELINE_SRC).toContain("fetch(`/api/posts/${cardId}`");
+    expect(PIPELINE_SRC).toContain('method: "DELETE"');
+    expect(PIPELINE_SRC).not.toMatch(/from\(["']posts["']\)\.delete\(\)\.eq\(["']id["'],\s*cardId\)/);
+    expect(POST_DELETE_ROUTE_SRC).toContain("requireBearerTeamRole(request, POST_DELETE_ALLOWED_ROLES)");
+    expect(POST_DELETE_ROUTE_SRC).toContain('PROTECTED_DELETE_STAGES = new Set(["approved_scheduled", "posted"])');
+    expect(POST_DELETE_ROUTE_SRC).toContain(".select(\"id, title, stage, workspace_id\")");
+    expect(POST_DELETE_ROUTE_SRC).toContain('"no_row_deleted"');
+  });
+
+  it("creative directors have delete access through the confirmed server route", () => {
+    expect(canDeletePostRole("superadmin")).toBe(true);
+    expect(canDeletePostRole("admin")).toBe(true);
+    expect(canDeletePostRole("creative_director")).toBe(true);
+    expect(canDeletePostRole("approver")).toBe(false);
+    expect(canDeletePostRole("editor")).toBe(false);
+    expect(ASSET_DRAWER_SRC).toContain("canDeletePostRole(currentMember?.role || currentUser.role)");
+    expect(ASSET_DRAWER_SRC).toContain('selectedCard.stage === "approved_scheduled" || selectedCard.stage === "posted"');
+  });
+
+  it("localStorage fallback strips initial seeded sample/demo cards", () => {
+    expect(PIPELINE_SRC).toContain("function loadCardBackup()");
+    expect(PIPELINE_SRC).toContain("!isInitialSampleCard(card)");
+    expect(PIPELINE_SRC).toMatch(/\^Sample\\b/i);
+    expect(PIPELINE_SRC).toMatch(/\^Demo Archive Post\\b/i);
+  });
+
   it("asset drawer revision requests use submitKickback instead of split note/stage/notification writes", () => {
     expect(ASSET_DRAWER_SRC).toMatch(/submitKickback\s*\(\s*selectedCard\.id\s*,\s*feedback\s*\)/);
     expect(ASSET_DRAWER_SRC).not.toMatch(
@@ -287,7 +315,9 @@ describe("iron-law guards in pipeline-context.tsx", () => {
     }
     // Sanity: the mutation sites still exist; the regex did not silently
     // match zero occurrences due to a refactor of the call shape.
-    expect(checked).toBeGreaterThanOrEqual(5);
+    // Delete moved to /api/posts/[id], so the remaining direct Supabase
+    // id-keyed mutation sites are move/reapproval/kickback/update.
+    expect(checked).toBeGreaterThanOrEqual(4);
   });
 
   it("provision is called before posts SELECT in load(), and not inside a comment (AGENTS.md §1b, §4)", () => {

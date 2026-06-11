@@ -82,7 +82,7 @@ export function RepurposeModal({ card, onClose }: Props) {
         name: card.title || "Repurposed asset",
         url: card.thumbnailUrl,
         fileType: card.contentType === "video" || card.contentType === "reel" ? "video" : "image",
-        folder: "Pipeline Uploads",
+        folder: "Content Engine Uploads",
         addedBy: currentUser.name,
         workspaceId,
       }).catch((err) => console.error("[repurpose] media_assets sync failed:", err));
@@ -94,7 +94,7 @@ export function RepurposeModal({ card, onClose }: Props) {
           name: rf.name,
           url: rf.url,
           fileType: rf.mimeType?.startsWith("video") ? "video" : "image",
-          folder: "Pipeline Uploads",
+          folder: "Content Engine Uploads",
           addedBy: currentUser.name,
           workspaceId,
         }).catch((err) => console.error("[repurpose] media_assets sync failed:", err));

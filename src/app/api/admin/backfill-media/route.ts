@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
         name: entry.name,
         url: entry.url,
         file_type: entry.fileType,
-        folder: "Pipeline Uploads",
+        folder: "Content Engine Uploads",
         added_by: post.created_by || "System Backfill",
         workspace_id: wsId,
         used_in: usedInArray,

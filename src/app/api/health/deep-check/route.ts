@@ -599,13 +599,13 @@ export async function GET(req: Request) {
     const issues: string[] = [];
     if (overdue.length > 0) issues.push(`${overdue.length} overdue scheduled post(s)`);
     if (stuck.length > 0) issues.push(`${stuck.length} post(s) stuck in ideas/revision >14 days`);
-    if (bottleneck && bottleneck[1] > 10) issues.push(`Pipeline bottleneck: ${bottleneck[1]} posts in "${bottleneck[0]}"`);
+    if (bottleneck && bottleneck[1] > 10) issues.push(`Content Engine bottleneck: ${bottleneck[1]} posts in "${bottleneck[0]}"`);
 
     checks["15_pipeline_flow"] = issues.length > 0
       ? warn(issues.join("; "), { stages, overdue: overdue.length, stuck: stuck.length, futureDraftTargets: futureDraftTargets.length, bottleneck: bottleneck ? { stage: bottleneck[0], count: bottleneck[1] } : null })
-      : pass(`Pipeline healthy — ${posts.length} total posts`, { stages, futureDraftTargets: futureDraftTargets.length, bottleneck: bottleneck ? { stage: bottleneck[0], count: bottleneck[1] } : null });
+      : pass(`Content Engine healthy — ${posts.length} total posts`, { stages, futureDraftTargets: futureDraftTargets.length, bottleneck: bottleneck ? { stage: bottleneck[0], count: bottleneck[1] } : null });
   } catch (e: unknown) {
-    checks["15_pipeline_flow"] = fail(`Pipeline analysis error: ${errorMessage(e)}`);
+    checks["15_pipeline_flow"] = fail(`Content Engine analysis error: ${errorMessage(e)}`);
   }
 
   // ═══ 16. CONTENT QUALITY ═══

@@ -247,6 +247,15 @@ export function resolveLoadedCards(
   return fallback();
 }
 
+export function isInitialSampleCard(card: Pick<ContentCard, "title">): boolean {
+  const title = card.title.trim();
+  return /^Sample\b/i.test(title) || /^Demo Archive Post\b/i.test(title);
+}
+
+function loadCardBackup(): ContentCard[] {
+  return loadState(STORAGE_KEY, PLACEHOLDER_CARDS).filter((card) => !isInitialSampleCard(card));
+}
+
 type StageMoveCommitRow = Pick<PostRow, "id" | "stage"> | null | undefined;
 
 export function assertStageMoveCommitted(
@@ -443,12 +452,12 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
           }
           // Iron-law §1b: an empty array is a valid empty board. resolveLoadedCards
           // falls back to the localStorage backup ONLY on a real DB error.
-          setCards(resolveLoadedCards(result, () => loadState(STORAGE_KEY, PLACEHOLDER_CARDS)));
+          setCards(resolveLoadedCards(result, loadCardBackup));
         } catch {
-          setCards(loadState(STORAGE_KEY, PLACEHOLDER_CARDS));
+          setCards(loadCardBackup());
         }
       } else {
-        setCards(loadState(STORAGE_KEY, PLACEHOLDER_CARDS));
+        setCards(loadCardBackup());
       }
       hydrated.current = true;
       setIsLoading(false);
@@ -1007,9 +1016,22 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     });
     if (useSupabase && isValidUuid(cardId)) {
       markMutation(cardId);
-      supabase.from("posts").delete().eq("id", cardId).then(({ error }) => {
-        if (error) {
-          console.error("[pipeline] deleteCard sync failed:", error.message);
+      (async () => {
+        try {
+          const token = accessToken || (await supabase.auth.getSession()).data.session?.access_token;
+          if (!token) throw new Error("Missing session token");
+          const res = await fetch(`/api/posts/${cardId}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const payload = await res.json().catch(() => ({}));
+          if (!res.ok || payload?.success !== true) {
+            throw new Error(payload?.error || `Delete failed with HTTP ${res.status}`);
+          }
+          addToast("Post deleted.", "success");
+        } catch (error) {
+          const message = formatPipelineError(error);
+          console.error("[pipeline] deleteCard sync failed:", message);
           // Restore the card — DB rejected the delete (RLS or protect-trigger).
           if (previousCard) {
             setCards((prev) => prev.some((c) => c.id === cardId) ? prev : [previousCard, ...prev]);
@@ -1020,20 +1042,20 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
             if (previousSelected?.id === cardId) setIsDrawerOpen(true);
             // Clear the dedup mark so a realtime echo can re-sync the card.
             recentMutations.current.delete(cardId);
-            const isProtected = /protected|approved|posted|cannot.*delete/i.test(error.message);
+            const isProtected = /protected|approved|posted|locked|cannot.*delete/i.test(message);
             addToast(
               isProtected
                 ? "This post is locked because it has been approved or posted. Move it back to Revision Needed first."
-                : `Delete failed: ${error.message}. Card restored.`,
+                : `Delete failed: ${message}. Card restored.`,
               "error",
             );
           } else {
-            addToast(`Delete failed: ${error.message}.`, "error");
+            addToast(`Delete failed: ${message}.`, "error");
           }
         }
-      });
+      })();
     }
-  }, [selectedCard, useSupabase, addToast]);
+  }, [selectedCard, useSupabase, accessToken, addToast]);
 
   const value = useMemo(
     () => ({ cards, isLoading, selectedCard, isDrawerOpen, isEditingOnOpen, pendingReapproval, pendingKickback, workspaceId: activeWorkspaceId, selectCard, selectCardForEditing, closeDrawer, moveCard, requestReapproval, submitReapproval, cancelReapproval, requestKickback, submitKickback, cancelKickback, updateCard, createCard, deleteCard }),

@@ -14,7 +14,7 @@ import {
   X, Calendar, Clock, ChevronRight, CheckCircle2, MessageSquare,
   ArrowRightLeft, Pencil, Save, ExternalLink, Type, Trash2, Send,
   Upload, FolderOpen, Link2, FileText, History, Image as ImageIcon,
-  FileVideo, Paperclip, AlertCircle, Maximize2, Sparkles, Star,
+  FileVideo, Paperclip, AlertCircle, Maximize2, Sparkles, Star, Lock,
 } from "lucide-react";
 import { PlatformIcon } from "./platform-icons";
 import { MentionTextarea } from "./mention-textarea";
@@ -29,7 +29,7 @@ import { ensureMediaAsset } from "@/lib/media-assets";
 import { isDrivePublishableMediaMime, normalizeDriveMimeType } from "@/lib/drive-policy";
 import { formatDate, formatDateTime, formatDateShort, formatDateTimeCompact } from "@/lib/utils";
 import { useFocusTrap } from "./use-focus-trap";
-import { isPipelineApproverRole } from "@/lib/roles";
+import { canDeletePostRole, isPipelineApproverRole } from "@/lib/roles";
 
 // Strict @mention pattern — an @ followed by a name-like token. Used so a
 // pasted email or URL containing "@" does not trigger a phantom mention.
@@ -56,6 +56,9 @@ export function AssetReviewDrawer() {
   );
   const userIsApprover = useMemo(() => {
     return isPipelineApproverRole(currentMember?.role || currentUser.role);
+  }, [currentMember?.role, currentUser.role]);
+  const userCanDeletePost = useMemo(() => {
+    return canDeletePostRole(currentMember?.role || currentUser.role);
   }, [currentMember?.role, currentUser.role]);
   const [revisionMode, setRevisionMode] = useState(false);
   const [revisionFeedback, setRevisionFeedback] = useState("");
@@ -201,6 +204,12 @@ export function AssetReviewDrawer() {
   const totalChecklist = checklist.length;
   const allChecked = checkedCount === totalChecklist;
   const isRepurposed = selectedCard.title?.startsWith("[Repurposed]") || false;
+  const deleteLockedByStage = selectedCard.stage === "approved_scheduled" || selectedCard.stage === "posted";
+  const deleteDisabledReason = deleteLockedByStage
+    ? "Approved and posted posts are locked. Move this post back to Revision Needed before deleting."
+    : !userCanDeletePost
+      ? "Only admins and creative directors can delete posts."
+      : "";
 
   const toggleChecklistItem = (itemId: string) => {
     updateCard(selectedCard.id, { checklist: checklist.map((c) => c.id === itemId ? { ...c, checked: !c.checked } : c) });
@@ -319,7 +328,7 @@ export function AssetReviewDrawer() {
         name: file.name,
         url: result.url,
         fileType: file.type.startsWith("video") ? "video" : "image",
-        folder: "Pipeline Uploads",
+        folder: "Content Engine Uploads",
         addedBy: currentUser.name,
         workspaceId,
         usedIn: selectedCard.id,
@@ -423,7 +432,7 @@ export function AssetReviewDrawer() {
             name: file.name,
             url: result.url,
             fileType: resultMimeType.startsWith("video") ? "video" : "image",
-            folder: "Pipeline Uploads",
+            folder: "Content Engine Uploads",
             addedBy: currentUser.name,
             workspaceId,
             usedIn: selectedCard.id,
@@ -510,7 +519,15 @@ export function AssetReviewDrawer() {
             {selectedCard.revised && <Badge variant="outline" className="text-[9px] h-4 px-1.5 border-violet-200 dark:border-violet-500/20 text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-500/10">Revised</Badge>}
           </div>
           <div className="flex items-center gap-1.5">
-            <button onClick={() => setPendingDelete(true)} aria-label="Delete post" className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 text-gray-400 hover:text-red-500 transition-all duration-150" title="Delete"><Trash2 className="w-3.5 h-3.5" aria-hidden="true" /></button>
+            <button
+              onClick={() => { if (!deleteDisabledReason) setPendingDelete(true); }}
+              disabled={!!deleteDisabledReason}
+              aria-label={deleteDisabledReason || "Delete post"}
+              className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 text-gray-400 hover:text-red-500 disabled:hover:bg-transparent disabled:hover:text-gray-400 disabled:opacity-45 disabled:cursor-not-allowed transition-all duration-150"
+              title={deleteDisabledReason || "Delete"}
+            >
+              {deleteDisabledReason ? <Lock className="w-3.5 h-3.5" aria-hidden="true" /> : <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />}
+            </button>
             <button onClick={closeDrawer} aria-label="Close drawer" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-400 transition-all duration-150"><X className="w-4 h-4" aria-hidden="true" /></button>
           </div>
         </div>

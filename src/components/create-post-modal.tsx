@@ -286,7 +286,7 @@ export function CreatePostModal({ open, onClose }: Props) {
           name: rf.name,
           url: rf.url,
           fileType: rf.mimeType?.startsWith("video") ? "video" : "image",
-          folder: "Pipeline Uploads",
+          folder: "Content Engine Uploads",
           addedBy: currentUser.name,
           workspaceId,
         });

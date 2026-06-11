@@ -142,7 +142,7 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
 
   const NAV_ITEMS = [
     { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" />, section: "plan" },
-    { id: "pipeline", label: "Content Pipeline", icon: <Kanban className="w-4 h-4" />, section: "plan" },
+    { id: "pipeline", label: "Content Engine", icon: <Kanban className="w-4 h-4" />, section: "plan" },
     { id: "calendar", label: "Content Calendar", icon: <CalendarDays className="w-4 h-4" />, section: "plan" },
     { id: "preview", label: "Post Preview", icon: <Eye className="w-4 h-4" />, section: "publish" },
     { id: "media", label: "Media Library", icon: <FolderOpen className="w-4 h-4" />, section: "publish" },
