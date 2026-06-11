@@ -1,11 +1,12 @@
 "use client";
 
-import { memo, useMemo } from "react";
+import { memo, useMemo, useState } from "react";
 import { RawImage } from "@/components/raw-image";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { ContentCard as ContentCardType, Platform, isPlatform } from "@/lib/types";
 import { usePipeline } from "@/lib/pipeline-context";
+import { isVideoContentType, resolveCardVideoUrl, thumbnailIsDefinitelyImage } from "@/lib/media-resolver";
 import { PlatformIcon } from "./platform-icons";
 import { Calendar, AlertCircle, Bot, Sparkles, GripVertical } from "lucide-react";
 import { isUrgent, isOverdue, formatDateShort } from "@/lib/utils";
@@ -14,6 +15,48 @@ interface Props {
   card: ContentCardType;
   isDragOverlay?: boolean;
   stageColor?: string;
+}
+
+function CardThumbnailMedia({ card }: { card: ContentCardType }) {
+  const videoUrl = useMemo(() => resolveCardVideoUrl(card), [card]);
+  const mediaKey = `${card.thumbnailUrl || ""}|${videoUrl || ""}`;
+  const [failedMediaKey, setFailedMediaKey] = useState<string | null>(null);
+  const isVideoCard = isVideoContentType(card.contentType);
+  const hasReliableImageThumbnail = card.thumbnailUrl && (!isVideoCard || thumbnailIsDefinitelyImage(card));
+  const imageFailed = failedMediaKey === mediaKey;
+  const shouldRenderVideo = isVideoCard && videoUrl && (!hasReliableImageThumbnail || imageFailed);
+
+  if (shouldRenderVideo) {
+    return (
+      <video
+        key={videoUrl}
+        src={videoUrl}
+        muted
+        playsInline
+        preload="metadata"
+        className="w-full h-full object-cover"
+        aria-label={`${card.title} video preview`}
+      />
+    );
+  }
+
+  if (card.thumbnailUrl) {
+    return (
+      <RawImage
+        src={card.thumbnailUrl}
+        alt={card.title}
+        className="w-full h-full object-cover"
+        draggable={false}
+        onError={() => setFailedMediaKey(mediaKey)}
+      />
+    );
+  }
+
+  return (
+    <div className="flex h-full w-full items-center justify-center bg-[#6C655A]/15 text-[10px] font-semibold text-[#6C655A]/60 dark:bg-white/[0.04] dark:text-gray-500">
+      No media
+    </div>
+  );
 }
 
 function ContentCardInner({ card, isDragOverlay, stageColor }: Props) {
@@ -58,7 +101,7 @@ function ContentCardInner({ card, isDragOverlay, stageColor }: Props) {
       {/* Colored top accent bar */}
       <div className="h-[3px] w-full" style={{ backgroundColor: overdue ? "#dc2626" : (stageColor || "#3b82f6") }} />
       <div className="relative h-[76px] w-full overflow-hidden bg-gray-50 dark:bg-white/[0.03]">
-        <RawImage src={card.thumbnailUrl} alt={card.title} className="w-full h-full object-cover" draggable={false} />
+        <CardThumbnailMedia card={card} />
         <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded bg-black/50 backdrop-blur-sm text-white text-[9px] font-medium capitalize flex items-center gap-1">
           {card.contentType}
           {card.contentType === "carousel" && (card.sourceVault?.rawFiles?.length || 0) > 1 && (

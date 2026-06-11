@@ -34,6 +34,8 @@ export interface RawFile {
 export interface SourceVault {
   designLink?: string;
   driveFolder?: string;
+  thumbnailFileId?: string;
+  thumbnailMimeType?: string;
   rawFiles?: RawFile[];
 }
 

@@ -27,6 +27,7 @@ import { useTeam } from "@/lib/team-context";
 import { useToast } from "@/lib/toast-context";
 import { ensureMediaAsset } from "@/lib/media-assets";
 import { isDrivePublishableMediaMime, normalizeDriveMimeType } from "@/lib/drive-policy";
+import { isVideoContentType, resolveCardVideoUrl, thumbnailIsDefinitelyImage } from "@/lib/media-resolver";
 import { formatDate, formatDateTime, formatDateShort, formatDateTimeCompact } from "@/lib/utils";
 import { useFocusTrap } from "./use-focus-trap";
 import { canDeletePostRole, isPipelineApproverRole } from "@/lib/roles";
@@ -74,18 +75,11 @@ export function AssetReviewDrawer() {
   // Resolve actual video URL for video/reel cards (may differ from thumbnailUrl)
   const resolvedVideoUrl = useMemo(() => {
     if (!selectedCard) return null;
-    if (selectedCard.contentType !== "video" && selectedCard.contentType !== "reel") return null;
-
-    // Check sourceVault.rawFiles for a video file
-    const rawVideo = selectedCard.sourceVault?.rawFiles?.find((f) => f.mimeType?.startsWith("video/"));
-    if (rawVideo) return rawVideo.url;
-
-    // Check media_ids for a file that isn't the thumbnail image
-    const thumbFileId = selectedCard.thumbnailUrl?.match(/[?&]id=([^&]+)/)?.[1];
-    const videoId = selectedCard.mediaIds?.find((id) => id !== thumbFileId);
-    if (videoId) return `/api/drive/stream?id=${videoId}`;
-
-    return null;
+    return resolveCardVideoUrl(selectedCard);
+  }, [selectedCard]);
+  const resolvedPosterUrl = useMemo(() => {
+    if (!selectedCard || !selectedCard.thumbnailUrl) return undefined;
+    return thumbnailIsDefinitelyImage(selectedCard) ? selectedCard.thumbnailUrl : undefined;
   }, [selectedCard]);
 
   // Source Vault state
@@ -321,13 +315,21 @@ export function AssetReviewDrawer() {
       });
       if (!item?.result) throw item?.error || new Error("Cover upload failed");
       const result = item.result;
+      const resultMimeType = result.mimeType || normalizeDriveMimeType(file.type, file.name);
       URL.revokeObjectURL(blobUrl);
-      updateCard(selectedCard.id, { thumbnailUrl: result.url });
+      updateCard(selectedCard.id, {
+        thumbnailUrl: result.url,
+        sourceVault: {
+          ...(selectedCard.sourceVault || {}),
+          thumbnailFileId: result.fileId,
+          thumbnailMimeType: resultMimeType,
+        },
+      });
       // Sync to Media Library — fire and catch so primary op is never blocked
       ensureMediaAsset({
         name: file.name,
         url: result.url,
-        fileType: file.type.startsWith("video") ? "video" : "image",
+        fileType: resultMimeType.startsWith("video") ? "video" : "image",
         folder: "Content Engine Uploads",
         addedBy: currentUser.name,
         workspaceId,
@@ -477,7 +479,14 @@ export function AssetReviewDrawer() {
     if (results.length === 0) return;
     if (showMediaPicker === "thumbnail") {
       const [result] = results;
-      updateCard(selectedCard.id, { thumbnailUrl: result.url });
+      updateCard(selectedCard.id, {
+        thumbnailUrl: result.url,
+        sourceVault: {
+          ...(selectedCard.sourceVault || {}),
+          thumbnailFileId: result.fileId,
+          thumbnailMimeType: result.mimeType,
+        },
+      });
       logAudit(selectedCard.id, currentUser.name, "asset_replaced", `Thumbnail: ${result.name}`);
       addToast("Thumbnail updated", "success");
       setShowMediaPicker(null);
@@ -635,27 +644,25 @@ export function AssetReviewDrawer() {
               <p className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.1em]">Card Thumbnail <span className="text-red-400">*</span></p>
               <span className="text-[8px] text-gray-400 dark:text-gray-600 font-medium">Preview only — not posted</span>
             </div>
-            <div className="relative w-full rounded-2xl overflow-hidden bg-gray-50 dark:bg-white/[0.03] group shadow-sm">
-              {selectedCard.contentType === "video" ? (
-                resolvedVideoUrl ? (
-                  <video key={resolvedVideoUrl} src={resolvedVideoUrl} controls poster={selectedCard.thumbnailUrl || undefined} className="w-full aspect-video rounded-2xl bg-black object-contain" />
-                ) : (
-                  <video src={selectedCard.thumbnailUrl} controls className="w-full aspect-video rounded-2xl bg-black object-contain" />
-                )
-              ) : selectedCard.contentType === "reel" ? (
-                <div className="w-full max-h-[400px] flex items-center justify-center bg-black">
-                  {resolvedVideoUrl ? (
-                    <video key={resolvedVideoUrl} src={resolvedVideoUrl} controls poster={selectedCard.thumbnailUrl || undefined} className="w-full max-h-[400px] rounded-2xl bg-black object-contain" />
-                  ) : (
-                    <video src={selectedCard.thumbnailUrl} controls className="w-full max-h-[400px] rounded-2xl bg-black object-contain" />
-                  )}
+            <div className="relative w-full overflow-hidden bg-black group">
+              {isVideoContentType(selectedCard.contentType) ? (
+                <div className="flex w-full items-center justify-center bg-black">
+                  <video
+                    key={resolvedVideoUrl || selectedCard.thumbnailUrl}
+                    src={resolvedVideoUrl || selectedCard.thumbnailUrl}
+                    controls
+                    playsInline
+                    preload="metadata"
+                    poster={resolvedPosterUrl}
+                    className="block max-h-[70dvh] max-w-full w-auto bg-black object-contain"
+                  />
                 </div>
               ) : (
                 <div
-                  className="w-full flex items-center justify-center bg-gray-100 dark:bg-black/40 cursor-pointer"
+                  className="w-full flex items-center justify-center bg-black cursor-pointer"
                   onClick={() => selectedCard.thumbnailUrl && setShowLightbox(true)}
                 >
-                  <RawImage src={selectedCard.thumbnailUrl} alt={selectedCard.title} className="w-full h-auto object-contain transition-transform duration-300 group-hover:scale-[1.01]" />
+                  <RawImage src={selectedCard.thumbnailUrl} alt={selectedCard.title} className="block max-h-[70dvh] max-w-full w-auto object-contain" />
                   <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
                     <div className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center">
                       <Maximize2 className="w-4 h-4 text-white" />
@@ -1015,7 +1022,7 @@ export function AssetReviewDrawer() {
                       <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-[8px] font-bold text-white shrink-0 mt-0.5">{currentUser.initials}</div>
                     )}
                     <div className="flex-1 relative">
-                      <MentionTextarea value={newComment} onChange={setNewComment} placeholder="Write a comment or note..." className="w-full min-h-[36px] bg-gray-50 dark:bg-white/[0.03] border border-gray-200 dark:border-white/[0.08] rounded-xl px-3 py-2 pr-10 text-[12px] text-gray-800 dark:text-gray-200 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-500/20 focus:border-blue-300 dark:focus:border-blue-500/30 resize-none transition-all duration-150" rows={1} />
+                      <MentionTextarea value={newComment} onChange={setNewComment} placeholder="Add a note. Type @ to mention someone." className="w-full min-h-[36px] bg-gray-50 dark:bg-white/[0.03] border border-gray-200 dark:border-white/[0.08] rounded-xl px-3 py-2 pr-10 text-[12px] text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-500/20 focus:border-blue-300 dark:focus:border-blue-500/30 resize-none transition-all duration-150" rows={1} />
                       <button onClick={addComment} disabled={!newComment.trim()} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 disabled:text-gray-300 dark:disabled:text-gray-600 disabled:hover:bg-transparent cursor-pointer transition-all duration-150"><Send className="w-4 h-4" /></button>
                     </div>
                   </div>
@@ -1296,7 +1303,7 @@ export function AssetReviewDrawer() {
             <RawImage
               src={selectedCard.thumbnailUrl}
               alt={selectedCard.title}
-              className="max-w-full max-h-[85dvh] object-contain mx-auto rounded-lg shadow-2xl"
+              className="max-w-full max-h-[85dvh] object-contain mx-auto"
             />
             <button
               onClick={() => setShowLightbox(false)}

@@ -177,6 +177,8 @@ export function CreatePostModal({ open, onClose }: Props) {
     setSubmitting(true);
 
     let thumbnailUrl = "";
+    let thumbnailFileId: string | undefined;
+    let thumbnailMimeType = "";
     const rawFiles: import("@/lib/types").RawFile[] = [];
     let uploadFailed = false;
 
@@ -232,16 +234,45 @@ export function CreatePostModal({ open, onClose }: Props) {
         for (let i = 0; i < filesForCard.length; i++) {
           const f = filesForCard[i];
           if (f.driveUrl) {
+            const rawMimeType = f.mimeType || (f.type === "video" ? "video/mp4" : "image/jpeg");
             rawFiles.push({
               name: f.name,
               url: f.driveUrl,
               fileId: f.driveFileId,
               usageType: i === 0 ? "master" : "supplementary",
-              mimeType: f.mimeType || (f.type === "video" ? "video/mp4" : "image/jpeg"),
+              mimeType: rawMimeType,
               size: f.driveSize || 0,
               uploadedAt: new Date().toISOString(),
             });
-            if (i === 0) thumbnailUrl = f.driveUrl;
+            if (i === 0) {
+              thumbnailUrl = f.driveUrl;
+              thumbnailFileId = f.driveFileId;
+              thumbnailMimeType = rawMimeType;
+              if (rawMimeType.startsWith("video/")) {
+                const sourceFile = rawFilesRef.current.get(f.id);
+                if (sourceFile) {
+                  try {
+                    setUploadingFileName(`Generating thumbnail for ${f.name}`);
+                    setUploadProgress(0);
+                    const { createVideoPosterFile } = await import("@/lib/video-poster");
+                    const posterFile = await createVideoPosterFile(sourceFile);
+                    const [posterItem] = await uploadManyToDrive([posterFile], "thumbnails", {
+                      concurrency: 1,
+                      onProgress: setUploadProgress,
+                    });
+                    if (posterItem?.result) {
+                      thumbnailUrl = posterItem.result.url;
+                      thumbnailFileId = posterItem.result.fileId;
+                      thumbnailMimeType = posterItem.result.mimeType || "image/jpeg";
+                    } else if (posterItem?.error) {
+                      console.warn("[create-post] video poster upload failed:", posterItem.error.message);
+                    }
+                  } catch (err) {
+                    console.warn("[create-post] video poster generation failed:", err);
+                  }
+                }
+              }
+            }
             continue;
           }
         }
@@ -274,6 +305,8 @@ export function CreatePostModal({ open, onClose }: Props) {
       sourceVault: (designLink || driveFolder || rawFiles.length > 0) ? {
         designLink: designLink || undefined,
         driveFolder: driveFolder || undefined,
+        thumbnailFileId,
+        thumbnailMimeType: thumbnailMimeType || undefined,
         rawFiles: rawFiles.length > 0 ? rawFiles : undefined,
       } : undefined,
     });
