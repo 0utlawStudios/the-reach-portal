@@ -3,6 +3,7 @@ import { supabase } from "./supabaseClient";
 // the canonical guard (it lacked the version/variant nibble checks and so
 // accepted the zero-UUID) — see AGENTS.md §5. Always import the strict one.
 import { isValidUuid } from "./utils";
+import { mediaUrlAliases } from "./media-usage";
 
 interface EnsureMediaAssetParams {
   name: string;
@@ -27,12 +28,14 @@ export async function ensureMediaAsset(params: EnsureMediaAssetParams): Promise<
   // RLS already gates this at the DB level, but the explicit workspace_id
   // filter is belt-and-suspenders against a future code path that mistakenly
   // uses the admin client here.
-  const { data: existing } = await supabase
+  const aliases = Array.from(mediaUrlAliases({ url }));
+  const { data: existingRows } = await supabase
     .from("media_assets")
     .select("id, used_in")
-    .eq("url", url)
+    .in("url", aliases.length > 0 ? aliases : [url])
     .eq("workspace_id", wsId)
-    .maybeSingle();
+    .limit(1);
+  const existing = existingRows?.[0];
 
   if (existing) {
     // Row exists — only update used_in if we have a real post UUID to add

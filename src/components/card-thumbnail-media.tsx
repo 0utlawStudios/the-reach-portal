@@ -5,6 +5,7 @@ import { ImageOff } from "lucide-react";
 import { RawImage } from "@/components/raw-image";
 import type { ContentCard } from "@/lib/types";
 import { isVideoContentType, resolveCardVideoUrl, thumbnailIsDefinitelyImage } from "@/lib/media-resolver";
+import { videoPreviewFrameUrl } from "@/lib/media-usage";
 
 type CardThumbnailMediaProps = {
   card: Pick<ContentCard, "title" | "contentType" | "thumbnailUrl" | "mediaIds" | "sourceVault">;
@@ -31,7 +32,7 @@ export function CardThumbnailMedia({
     return (
       <video
         key={videoUrl}
-        src={videoUrl}
+        src={videoPreviewFrameUrl(videoUrl)}
         muted
         playsInline
         preload="metadata"

@@ -1,12 +1,20 @@
 "use client";
 
 import { RawImage } from "@/components/raw-image";
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { ContentCard, MediaAsset } from "@/lib/types";
 import { usePipeline } from "@/lib/pipeline-context";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
 import { supabase } from "@/lib/supabaseClient";
+import {
+  getAutomaticMediaUsage,
+  hasManualUsedTag,
+  MEDIA_MANUAL_USED_TAG,
+  sameUsedIn,
+  syncedUsedInValue,
+  videoPreviewFrameUrl,
+} from "@/lib/media-usage";
 import { isDrivePublishableMediaMime, normalizeDriveMimeType } from "@/lib/drive-policy";
 import { formatDateShort, formatDateTimeCompact } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -14,11 +22,18 @@ import { Input } from "@/components/ui/input";
 import {
   FolderOpen, Upload, Film, Image as ImageIcon, Search, Grid3X3, List,
   CheckCircle, Clock, X, Trash2, Eye, Link2, ExternalLink,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, Tag,
 } from "lucide-react";
 
 type StatusFilter = "all" | "unused" | "inuse";
 const BASELINE_WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
+type AssetUsage = {
+  cards: ContentCard[];
+  automaticCards: ContentCard[];
+  manual: boolean;
+  used: boolean;
+  source: "automatic" | "manual" | "unused";
+};
 type MediaAssetRow = {
   id?: string;
   name?: string;
@@ -28,6 +43,7 @@ type MediaAssetRow = {
   uploaded_at?: string | null;
   added_by?: string | null;
   used_in?: string[] | null;
+  workspace_id?: string | null;
 };
 
 function isSupabaseConfigured(): boolean {
@@ -45,13 +61,6 @@ function dbToAsset(row: MediaAssetRow): MediaAsset {
     addedBy: row.added_by || undefined,
     usedIn: row.used_in || undefined,
   };
-}
-
-function addUsage(map: Map<string, ContentCard[]>, url: string | undefined, card: ContentCard) {
-  if (!url || url.startsWith("blob:")) return;
-  const existing = map.get(url) || [];
-  if (!existing.some((c) => c.id === card.id)) existing.push(card);
-  map.set(url, existing);
 }
 
 function uploadErrorMessage(error: unknown): string {
@@ -85,24 +94,32 @@ export function MediaPage() {
   // ─── Load media from Supabase ───
   useEffect(() => {
     if (!useDb) return;
+    const wsId = workspaceId || BASELINE_WORKSPACE_ID;
     supabase
       .from("media_assets")
       .select("*")
+      .eq("workspace_id", wsId)
       .order("uploaded_at", { ascending: false })
-      .then(({ data }) => {
-        if (data && data.length > 0) setMedia(data.map(dbToAsset));
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("[media] media_assets load failed:", error.message);
+          setMedia([]);
+          return;
+        }
+        setMedia((data || []).map(dbToAsset));
       });
-  }, [useDb]);
+  }, [useDb, workspaceId]);
 
   // Realtime subscription — keeps media library in sync with DB inserts/updates/deletes
   useEffect(() => {
     if (!useDb) return;
+    const wsId = workspaceId || BASELINE_WORKSPACE_ID;
 
     const channel = supabase
-      .channel("media-assets-realtime")
+      .channel(`media-assets-realtime-${wsId}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "media_assets" },
+        { event: "INSERT", schema: "public", table: "media_assets", filter: `workspace_id=eq.${wsId}` },
         (payload) => {
           const newAsset = dbToAsset(payload.new as MediaAssetRow);
           setMedia((prev) => {
@@ -113,7 +130,7 @@ export function MediaPage() {
       )
       .on(
         "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "media_assets" },
+        { event: "UPDATE", schema: "public", table: "media_assets", filter: `workspace_id=eq.${wsId}` },
         (payload) => {
           const updated = dbToAsset(payload.new as MediaAssetRow);
           setMedia((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
@@ -121,7 +138,7 @@ export function MediaPage() {
       )
       .on(
         "postgres_changes",
-        { event: "DELETE", schema: "public", table: "media_assets" },
+        { event: "DELETE", schema: "public", table: "media_assets", filter: `workspace_id=eq.${wsId}` },
         (payload) => {
           const deletedId = (payload.old as Partial<MediaAssetRow>).id;
           if (deletedId) {
@@ -134,47 +151,56 @@ export function MediaPage() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [useDb]);
+  }, [useDb, workspaceId]);
 
   const folders = useMemo(() => Array.from(new Set(media.map((m) => m.folder))).sort(), [media]);
 
-  const cardsById = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards]);
-  const cardsByMediaUrl = useMemo(() => {
-    const map = new Map<string, ContentCard[]>();
-    for (const card of cards) {
-      addUsage(map, card.thumbnailUrl, card);
-      card.sourceVault?.rawFiles?.forEach((file) => {
-        addUsage(map, file.url, card);
-        addUsage(map, file.driveProxyUrl, card);
-        addUsage(map, file.playbackUrl, card);
-      });
-    }
-    return map;
-  }, [cards]);
-
   const usageByAssetId = useMemo(() => {
-    const usage = new Map<string, ContentCard[]>();
+    const usage = new Map<string, AssetUsage>();
     for (const asset of media) {
-      const byCardId = new Map<string, ContentCard>();
-      (asset.usedIn || []).forEach((id) => {
-        const card = cardsById.get(id);
-        if (card) byCardId.set(card.id, card);
+      const automaticCards = getAutomaticMediaUsage(asset, cards);
+      const manual = hasManualUsedTag(asset.usedIn);
+      const used = automaticCards.length > 0 || manual;
+      usage.set(asset.id, {
+        automaticCards,
+        cards: automaticCards,
+        manual,
+        used,
+        source: automaticCards.length > 0 ? "automatic" : manual ? "manual" : "unused",
       });
-      (cardsByMediaUrl.get(asset.url) || []).forEach((card) => byCardId.set(card.id, card));
-      if (byCardId.size > 0) usage.set(asset.id, Array.from(byCardId.values()));
     }
     return usage;
-  }, [media, cardsById, cardsByMediaUrl]);
+  }, [media, cards]);
 
   const filteredMedia = useMemo(() => {
     let items = [...media];
     if (activeFolder !== "all") items = items.filter((m) => m.folder === activeFolder);
     if (activeType !== "all") items = items.filter((m) => m.type === activeType);
-    if (statusFilter === "unused") items = items.filter((m) => !usageByAssetId.has(m.id));
-    if (statusFilter === "inuse") items = items.filter((m) => usageByAssetId.has(m.id));
+    if (statusFilter === "unused") items = items.filter((m) => !usageByAssetId.get(m.id)?.used);
+    if (statusFilter === "inuse") items = items.filter((m) => usageByAssetId.get(m.id)?.used);
     if (search) items = items.filter((m) => m.name.toLowerCase().includes(search.toLowerCase()));
     return items.sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
   }, [media, activeFolder, activeType, statusFilter, search, usageByAssetId]);
+
+  useEffect(() => {
+    if (!useDb || media.length === 0) return;
+    const wsId = workspaceId || BASELINE_WORKSPACE_ID;
+    for (const asset of media) {
+      const usage = usageByAssetId.get(asset.id);
+      const nextUsedIn = syncedUsedInValue(asset.usedIn, usage?.automaticCards || []);
+      if (sameUsedIn(asset.usedIn, nextUsedIn)) continue;
+
+      supabase
+        .from("media_assets")
+        .update({ used_in: nextUsedIn })
+        .eq("id", asset.id)
+        .eq("workspace_id", wsId)
+        .then(({ error }) => {
+          if (!error) return;
+          console.error("[media] automatic used_in sync failed:", error.message);
+        });
+    }
+  }, [useDb, media, usageByAssetId, workspaceId]);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -318,6 +344,38 @@ export function MediaPage() {
   };
 
   const getUsageInfo = (asset: MediaAsset) => usageByAssetId.get(asset.id) || null;
+
+  const toggleManualUsed = useCallback((asset: MediaAsset) => {
+    const current = asset.usedIn || [];
+    const usage = usageByAssetId.get(asset.id);
+    const next = new Set(syncedUsedInValue(current, usage?.automaticCards || []));
+    const nextManual = !hasManualUsedTag(current);
+    if (nextManual) next.add(MEDIA_MANUAL_USED_TAG);
+    else next.delete(MEDIA_MANUAL_USED_TAG);
+    const nextUsedIn = Array.from(next).sort();
+    if (sameUsedIn(current, nextUsedIn)) return;
+
+    setMedia((prev) => prev.map((m) => (m.id === asset.id ? { ...m, usedIn: nextUsedIn } : m)));
+    if (!useDb) {
+      addToast(nextManual ? "Marked as used locally." : "Manual used tag cleared locally.", "success");
+      return;
+    }
+
+    supabase
+      .from("media_assets")
+      .update({ used_in: nextUsedIn })
+      .eq("id", asset.id)
+      .eq("workspace_id", workspaceId || BASELINE_WORKSPACE_ID)
+      .then(({ error }) => {
+        if (!error) {
+          addToast(nextManual ? "Marked as used." : "Manual used tag cleared.", "success");
+          return;
+        }
+        console.error("[media] manual used tag update failed:", error.message);
+        setMedia((prev) => prev.map((m) => (m.id === asset.id ? { ...m, usedIn: current } : m)));
+        addToast(`Tag update failed: ${error.message}`, "error");
+      });
+  }, [addToast, useDb, usageByAssetId, workspaceId]);
 
   const copyShareLink = (asset: MediaAsset) => {
     const siteUrl = typeof window !== "undefined" ? window.location.origin : "";
@@ -469,7 +527,7 @@ export function MediaPage() {
                           <RawImage src={asset.url} alt={asset.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                         ) : (
                           <video
-                            src={asset.url}
+                            src={videoPreviewFrameUrl(asset.url)}
                             muted
                             playsInline
                             preload="metadata"
@@ -478,14 +536,25 @@ export function MediaPage() {
                           />
                         )}
                         <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded-md bg-black/50 backdrop-blur-sm text-[8px] text-white font-medium uppercase">{asset.type}</div>
-                        {usage && usage.length > 0 ? (
-                          <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded-md bg-emerald-500/90 text-[8px] text-white font-medium flex items-center gap-0.5"><CheckCircle className="w-2.5 h-2.5" />In use</div>
+                        {usage?.used ? (
+                          <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded-md bg-emerald-500/90 text-[8px] text-white font-medium flex items-center gap-0.5">
+                            <CheckCircle className="w-2.5 h-2.5" />{usage.source === "manual" ? "Manual" : "In use"}
+                          </div>
                         ) : (
                           <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded-md bg-gray-500/70 text-[8px] text-white font-medium flex items-center gap-0.5"><Clock className="w-2.5 h-2.5" />Unused</div>
                         )}
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-200 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
                           <button onClick={(e) => { e.stopPropagation(); copyShareLink(asset); }} className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow-lg hover:bg-white transition-colors" title="Copy link"><Link2 className="w-3.5 h-3.5 text-gray-700" /></button>
                           <div className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow-lg"><Eye className="w-3.5 h-3.5 text-gray-700" /></div>
+                          {(!usage?.used || usage.source === "manual") && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); toggleManualUsed(asset); }}
+                              className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow-lg hover:bg-white transition-colors"
+                              title={usage?.manual ? "Clear manual used tag" : "Mark used manually"}
+                            >
+                              <Tag className="w-3.5 h-3.5 text-gray-700" />
+                            </button>
+                          )}
                           <button onClick={(e) => { e.stopPropagation(); openInNewTab(asset); }} className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow-lg hover:bg-white transition-colors" title="Open"><ExternalLink className="w-3.5 h-3.5 text-gray-700" /></button>
                         </div>
                       </div>
@@ -508,8 +577,8 @@ export function MediaPage() {
               </div>
             ) : (
               <div className="overflow-x-auto -mx-4 px-4">
-                <div className="bg-white dark:bg-[#151518] rounded-xl border border-gray-100 dark:border-white/[0.06] overflow-hidden shadow-sm min-w-[700px]">
-                  <div className="grid grid-cols-[1fr_80px_100px_90px_80px_140px] gap-2 px-4 py-2.5 border-b border-gray-100 dark:border-white/[0.06] text-[9px] font-bold text-gray-400 uppercase tracking-wider">
+                <div className="bg-white dark:bg-[#151518] rounded-xl border border-gray-100 dark:border-white/[0.06] overflow-hidden shadow-sm min-w-[760px]">
+                  <div className="grid grid-cols-[1fr_80px_100px_130px_80px_140px] gap-2 px-4 py-2.5 border-b border-gray-100 dark:border-white/[0.06] text-[9px] font-bold text-gray-400 uppercase tracking-wider">
                     <div>File</div><div>Type</div><div>Folder</div><div>Status</div><div>Added By</div><div>Timestamp</div>
                   </div>
                   {filteredMedia.map((asset) => {
@@ -517,7 +586,7 @@ export function MediaPage() {
                     const selected = selectedIds.has(asset.id);
                     return (
                       <div key={asset.id}
-                        className={`grid grid-cols-[1fr_80px_100px_90px_80px_140px] gap-2 px-4 py-2.5 border-b border-gray-50 dark:border-white/[0.03] last:border-0 hover:bg-slate-50 dark:hover:bg-white/[0.02] cursor-pointer transition-all duration-150 ${selected ? "bg-blue-50/50 dark:bg-blue-500/5" : ""}`}>
+                        className={`grid grid-cols-[1fr_80px_100px_130px_80px_140px] gap-2 px-4 py-2.5 border-b border-gray-50 dark:border-white/[0.03] last:border-0 hover:bg-slate-50 dark:hover:bg-white/[0.02] cursor-pointer transition-all duration-150 ${selected ? "bg-blue-50/50 dark:bg-blue-500/5" : ""}`}>
                         <div className="flex items-center gap-2.5" onClick={() => setLightboxAsset(asset)}>
                           <button onClick={(e) => { e.stopPropagation(); toggleSelect(asset.id); }}
                             className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all duration-200 ${selected ? "bg-blue-500 border-blue-500" : "border-gray-300 dark:border-gray-600 hover:border-blue-400"}`}>
@@ -528,7 +597,7 @@ export function MediaPage() {
                               <RawImage src={asset.url} alt="" className="w-full h-full object-cover" />
                             ) : (
                               <video
-                                src={asset.url}
+                                src={videoPreviewFrameUrl(asset.url)}
                                 muted
                                 playsInline
                                 preload="metadata"
@@ -545,11 +614,22 @@ export function MediaPage() {
                           </Badge>
                         </div>
                         <div className="flex items-center text-[10px] text-gray-500 dark:text-gray-400">{asset.folder}</div>
-                        <div className="flex items-center">
-                          {usage && usage.length > 0 ? (
-                            <Badge variant="outline" className="text-[9px] h-[18px] px-1.5 text-emerald-600 border-emerald-200 bg-emerald-50 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20"><CheckCircle className="w-2.5 h-2.5 mr-0.5" />In use</Badge>
+                        <div className="flex items-center gap-1.5">
+                          {usage?.used ? (
+                            <Badge variant="outline" className="text-[9px] h-[18px] px-1.5 text-emerald-600 border-emerald-200 bg-emerald-50 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20">
+                              <CheckCircle className="w-2.5 h-2.5 mr-0.5" />{usage.source === "manual" ? "Manual" : "In use"}
+                            </Badge>
                           ) : (
                             <Badge variant="outline" className="text-[9px] h-[18px] px-1.5 text-gray-500 border-gray-200 bg-gray-50 dark:bg-white/[0.04] dark:text-gray-400 dark:border-white/[0.08]"><Clock className="w-2.5 h-2.5 mr-0.5" />Unused</Badge>
+                          )}
+                          {(!usage?.used || usage.source === "manual") && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); toggleManualUsed(asset); }}
+                              className="h-[18px] px-1.5 rounded-md border border-gray-200 dark:border-white/[0.08] text-[9px] font-medium text-gray-500 hover:text-orange-600 hover:border-orange-300 dark:hover:text-orange-400 dark:hover:border-orange-500/30 transition-colors"
+                              title={usage?.manual ? "Clear manual used tag" : "Mark used manually"}
+                            >
+                              {usage?.manual ? "Clear" : "Mark"}
+                            </button>
                           )}
                         </div>
                         <div className="flex items-center gap-1.5">

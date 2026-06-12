@@ -9,6 +9,7 @@ import type { RawFile } from "@/lib/types";
 import { isDrivePublishableMediaMime, normalizeDriveMimeType } from "@/lib/drive-policy";
 import { getPublicDriveDownloadUrl } from "@/lib/drive-url-utils";
 import { driveFileIdFromUrl } from "@/lib/media-resolver";
+import { videoPreviewFrameUrl } from "@/lib/media-usage";
 import { X, Upload, FolderOpen, Image as ImageIcon, Search, CheckCircle, Clock, Link2, ExternalLink } from "lucide-react";
 import { PLACEHOLDER_MEDIA } from "@/lib/placeholder-data";
 import { useFocusTrap } from "./use-focus-trap";
@@ -27,6 +28,7 @@ function uploadPathForSize(file: File): "proxy" | "resumable" {
 type PickerTab = "upload" | "library";
 
 interface MediaEntry {
+  assetId?: string;
   url: string;
   publishUrl?: string;
   driveProxyUrl?: string;
@@ -56,6 +58,7 @@ export interface MediaPickerSelection {
   playbackUrl?: string;
   playbackStorageKey?: string;
   fileId?: string;
+  mediaAssetId?: string;
   name: string;
   mimeType?: string;
   size?: number;
@@ -92,6 +95,7 @@ function selectionFromAsset(asset: MediaEntry): MediaPickerSelection {
     playbackUrl: asset.playbackUrl,
     playbackStorageKey: asset.playbackStorageKey,
     fileId,
+    mediaAssetId: asset.assetId,
     name: asset.name,
     mimeType: asset.type === "video" ? "video/mp4" : "image/jpeg",
   };
@@ -198,6 +202,7 @@ export function MediaPicker({
         .filter(Boolean)
         .map((c) => ({ id: c!.id, title: c!.title }));
       urlMap.set(asset.url, {
+        assetId: asset.id,
         url: asset.url,
         publishUrl: fileId ? getPublicDriveDownloadUrl(fileId) : undefined,
         driveProxyUrl: fileId ? asset.url : undefined,
@@ -486,7 +491,7 @@ export function MediaPicker({
                             <RawImage src={mediaDisplayUrl(asset)} alt={asset.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
                           ) : (
                             <video
-                              src={mediaDisplayUrl(asset)}
+                              src={videoPreviewFrameUrl(mediaDisplayUrl(asset))}
                               muted
                               playsInline
                               preload="metadata"

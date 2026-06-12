@@ -520,8 +520,12 @@ export function AssetReviewDrawer() {
     if (results.length === 0) return;
     if (showMediaPicker === "thumbnail") {
       const [result] = results;
+      const mediaIds = result.mediaAssetId
+        ? Array.from(new Set([...(selectedCard.mediaIds || []), result.mediaAssetId]))
+        : selectedCard.mediaIds;
       updateCard(selectedCard.id, {
         thumbnailUrl: result.driveProxyUrl || result.url,
+        mediaIds,
         sourceVault: {
           ...(selectedCard.sourceVault || {}),
           thumbnailFileId: result.fileId,
@@ -553,7 +557,11 @@ export function AssetReviewDrawer() {
         uploadedAt: new Date().toISOString(),
       };
     });
-    updateCard(selectedCard.id, { sourceVault: { ...(selectedCard.sourceVault || {}), rawFiles: [...existingFiles, ...newFiles] } });
+    const mediaIds = Array.from(new Set([
+      ...(selectedCard.mediaIds || []),
+      ...results.map((result) => result.mediaAssetId).filter((id): id is string => !!id),
+    ]));
+    updateCard(selectedCard.id, { mediaIds, sourceVault: { ...(selectedCard.sourceVault || {}), rawFiles: [...existingFiles, ...newFiles] } });
     newFiles.forEach((file) => {
       logAudit(selectedCard.id, currentUser.name, "raw_file_uploaded", `Added ${file.name} (${file.usageType})`);
     });

@@ -48,12 +48,16 @@ describe("Drive upload surfaces", () => {
     const mediaPicker = source("src/components/media-picker.tsx");
     expect(mediaPicker).toContain('function mediaDisplayUrl(asset: Pick<MediaEntry, "url" | "driveProxyUrl" | "playbackUrl">): string');
     expect(mediaPicker).toContain("return asset.playbackUrl || asset.driveProxyUrl || asset.url");
+    expect(mediaPicker).toContain("mediaAssetId: asset.assetId");
+    expect(mediaPicker).toContain("videoPreviewFrameUrl(mediaDisplayUrl(asset))");
     expect(mediaPicker).toContain('preload="metadata"');
     expect(mediaPicker).toContain('controls');
 
     const mediaPage = source("src/components/pages/media-page.tsx");
-    expect(mediaPage).toContain("addUsage(map, file.driveProxyUrl, card)");
-    expect(mediaPage).toContain("addUsage(map, file.playbackUrl, card)");
+    expect(mediaPage).toContain("getAutomaticMediaUsage(asset, cards)");
+    expect(mediaPage).toContain("syncedUsedInValue(asset.usedIn, usage?.automaticCards || [])");
+    expect(mediaPage).toContain("MEDIA_MANUAL_USED_TAG");
+    expect(mediaPage).toContain("toggleManualUsed");
     expect(mediaPage).toContain('aria-label={`${asset.name} video preview`}');
     expect(mediaPage).toContain('className="max-w-full max-h-[60vh] object-contain rounded-lg bg-black"');
 

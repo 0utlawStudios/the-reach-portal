@@ -80,6 +80,10 @@ describe("media resolver", () => {
     expect(driveFileIdFromUrl("/api/drive/stream?id=abc123&token=secret")).toBe("abc123");
   });
 
+  it("extracts Drive file ids from standard shared file URLs", () => {
+    expect(driveFileIdFromUrl("https://drive.google.com/file/d/abc123/view?usp=sharing")).toBe("abc123");
+  });
+
   it("routes card thumbnails through the shared video-aware renderer across app surfaces", () => {
     const files = [
       "src/components/content-card.tsx",

@@ -12,6 +12,7 @@ export interface CreatePostUploadFileState {
   playbackUrl?: string;
   playbackStorageKey?: string;
   driveFileId?: string;
+  mediaAssetId?: string;
   mimeType?: string;
   driveSize?: number;
 }

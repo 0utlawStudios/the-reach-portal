@@ -33,7 +33,7 @@ describe("CardThumbnailMedia", () => {
       />,
     );
 
-    expect(screen.getByLabelText("Greece, quietly. video preview")).toHaveAttribute("src", "/api/drive/stream?id=raw-video");
+    expect(screen.getByLabelText("Greece, quietly. video preview")).toHaveAttribute("src", "/api/drive/stream?id=raw-video#t=0.1");
   });
 
   it("keeps reliable image posters as images", () => {

@@ -8,8 +8,10 @@ export function isVideoContentType(contentType: ContentType): boolean {
 
 export function driveFileIdFromUrl(url: string | null | undefined): string | null {
   if (!url) return null;
-  const match = url.match(/[?&]id=([^&]+)/);
-  return match?.[1] ? decodeURIComponent(match[1]) : null;
+  const queryMatch = url.match(/[?&]id=([^&]+)/);
+  if (queryMatch?.[1]) return decodeURIComponent(queryMatch[1]);
+  const filePathMatch = url.match(/\/file\/d\/([^/]+)/);
+  return filePathMatch?.[1] ? decodeURIComponent(filePathMatch[1]) : null;
 }
 
 export function firstVideoRawFile(card: Pick<ContentCard, "sourceVault">): RawFile | null {

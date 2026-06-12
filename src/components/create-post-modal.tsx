@@ -185,6 +185,7 @@ export function CreatePostModal({ open, onClose }: Props) {
     let thumbnailFileId: string | undefined;
     let thumbnailMimeType = "";
     const rawFiles: import("@/lib/types").RawFile[] = [];
+    let filesForCard: UploadedFile[] = files;
     let uploadFailed = false;
 
     // Upload all files to Drive — NO BLOB FALLBACK.
@@ -199,7 +200,6 @@ export function CreatePostModal({ open, onClose }: Props) {
       // partial failure only sends the failed files.
       const pending = getPendingCreatePostUploads(files, rawFilesRef.current);
 
-      let filesForCard = files;
       if (pending.length > 0) {
         setUploadingFileName(pending.length === 1 ? pending[0].file.name : `Uploading ${pending.length} files`);
         setUploadProgress(0);
@@ -355,6 +355,7 @@ export function CreatePostModal({ open, onClose }: Props) {
       assetSource: assetSource || undefined,
       checklist,
       licenseFileId: licenseFileId || undefined,
+      mediaIds: filesForCard.map((file) => file.mediaAssetId).filter((id): id is string => !!id),
       notes: notes.trim() ? `${currentUser.name} (${formatDateTimeCompact(new Date())}): ${notes.trim()}` : undefined,
       sourceVault: (designLink || driveFolder || rawFiles.length > 0) ? {
         designLink: designLink || undefined,
@@ -408,6 +409,7 @@ export function CreatePostModal({ open, onClose }: Props) {
         playbackUrl: result.playbackUrl,
         playbackStorageKey: result.playbackStorageKey,
         driveFileId: fileId,
+        mediaAssetId: result.mediaAssetId,
         mimeType: result.mimeType,
         driveSize: result.size,
       } satisfies UploadedFile;
