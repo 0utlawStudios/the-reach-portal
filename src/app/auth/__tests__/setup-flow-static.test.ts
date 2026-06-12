@@ -145,7 +145,17 @@ describe("Support Inbox navigation", () => {
     expect(NAVIGATION_SRC).toContain("setSidebarCollapsedState(true);");
     expect(NAVIGATION_SRC).toContain("saveState(SIDEBAR_KEY, true);");
     expect(NAVIGATION_SRC).not.toContain("setSidebarCollapsedState(v);\n    saveState(SIDEBAR_KEY, v);");
-    expect(AUTHENTICATED_APP_SHELL_SRC).toContain("hoverExpandRef.current || !sidebarCollapsed");
+    expect(AUTHENTICATED_APP_SHELL_SRC).not.toContain("onMouseEnter=");
+    expect(AUTHENTICATED_APP_SHELL_SRC).not.toContain("onMouseLeave=");
+    expect(AUTHENTICATED_APP_SHELL_SRC).not.toContain("hoverExpandRef");
+    expect(AUTHENTICATED_APP_SHELL_SRC).not.toContain("setSidebarCollapsed(false)");
+    expect(AUTHENTICATED_APP_SHELL_SRC).toContain('data-sidebar-state="auto-hide"');
+    expect(AUTHENTICATED_APP_SHELL_SRC).toContain('className="group relative z-30 hidden h-dvh w-[52px] shrink-0 overflow-visible md:block"');
+    expect(AUTHENTICATED_APP_SHELL_SRC).toContain("const autoHideSidebarContent = () =>");
+    expect(AUTHENTICATED_APP_SHELL_SRC).toContain("absolute inset-y-0 left-0 z-40 flex w-[52px] flex-col overflow-hidden");
+    expect(AUTHENTICATED_APP_SHELL_SRC).toContain("group-hover:w-[218px]");
+    expect(AUTHENTICATED_APP_SHELL_SRC).toContain("grid-cols-[32px_1fr_auto]");
+    expect(AUTHENTICATED_APP_SHELL_SRC).toContain("absolute left-0 top-0 flex h-[60px] w-[52px]");
   });
 
   it("keeps the desktop pin control lightweight with no load-time teaser motion", () => {
@@ -156,9 +166,21 @@ describe("Support Inbox navigation", () => {
     expect(AUTHENTICATED_APP_SHELL_SRC).not.toContain("if (pinTeaserActive) return;");
     expect(AUTHENTICATED_APP_SHELL_SRC).not.toContain("reach-sidebar-pin-hint");
     expect(AUTHENTICATED_APP_SHELL_SRC).not.toContain("saveState(PIN_KEY");
-    expect(AUTHENTICATED_APP_SHELL_SRC).toContain('sidebarCollapsed ? "w-[52px]" : "w-[218px]"');
+    expect(AUTHENTICATED_APP_SHELL_SRC).not.toContain("const SIDEBAR_CHROME_REVEAL_MS");
+    expect(AUTHENTICATED_APP_SHELL_SRC).not.toContain("desktopChromeReady");
+    expect(AUTHENTICATED_APP_SHELL_SRC).not.toContain("data-sidebar-chrome");
+    expect(AUTHENTICATED_APP_SHELL_SRC).not.toContain("transition-[width]");
+    expect(AUTHENTICATED_APP_SHELL_SRC).not.toContain("group-hover:px");
+    expect(AUTHENTICATED_APP_SHELL_SRC).not.toContain("group-hover:gap");
+    expect(AUTHENTICATED_APP_SHELL_SRC).not.toContain("group-hover:justify");
+    expect(AUTHENTICATED_APP_SHELL_SRC).not.toContain("group-hover:flex");
+    expect(AUTHENTICATED_APP_SHELL_SRC).toContain('data-sidebar-state="pinned"');
+    expect(AUTHENTICATED_APP_SHELL_SRC).toContain("group-hover:w-[198px]");
+    expect(AUTHENTICATED_APP_SHELL_SRC).toContain('w-[218px]');
+    expect(AUTHENTICATED_APP_SHELL_SRC).toContain('w-[52px]');
     expect(AUTHENTICATED_APP_SHELL_SRC).toContain("whitespace-nowrap");
-    expect(AUTHENTICATED_APP_SHELL_SRC).toContain('"mx-auto h-8 w-8 justify-center p-0"');
+    expect(AUTHENTICATED_APP_SHELL_SRC).toContain("justify-start gap-2.5");
+    expect(AUTHENTICATED_APP_SHELL_SRC).toContain("text-left");
     expect(GLOBALS_SRC).not.toContain("@keyframes reach-sidebar-pin-hint");
     expect(GLOBALS_SRC).not.toContain("@keyframes reach-sidebar-pin-hint-icon");
     expect(GLOBALS_SRC).not.toContain("@keyframes reach-sidebar-pin-hint-sheen");
