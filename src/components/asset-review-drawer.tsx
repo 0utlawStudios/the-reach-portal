@@ -707,7 +707,7 @@ export function AssetReviewDrawer() {
                     src={resolvedVideoUrl || selectedCard.thumbnailUrl}
                     controls
                     playsInline
-                    preload="metadata"
+                    preload={resolvedPosterUrl ? "none" : "metadata"}
                     poster={resolvedPosterUrl}
                     className="block max-h-[70dvh] max-w-full w-auto bg-black object-contain"
                   />

@@ -17,8 +17,9 @@ describe("CardThumbnailMedia", () => {
     render(
       <CardThumbnailMedia
         card={card({
-          thumbnailUrl: "/api/drive/stream?id=poster",
+          thumbnailUrl: "/api/drive/stream?id=raw-video",
           sourceVault: {
+            thumbnailFileId: "raw-video",
             rawFiles: [{
               name: "greece.mp4",
               url: "/api/drive/stream?id=raw-video",
@@ -34,6 +35,32 @@ describe("CardThumbnailMedia", () => {
     );
 
     expect(screen.getByLabelText("Greece, quietly. video preview")).toHaveAttribute("src", "/api/drive/stream?id=raw-video#t=0.1");
+  });
+
+  it("renders distinct Drive poster files as images instead of loading the video", () => {
+    render(
+      <CardThumbnailMedia
+        card={card({
+          title: "Poster",
+          thumbnailUrl: "/api/drive/stream?id=poster",
+          sourceVault: {
+            thumbnailFileId: "poster",
+            thumbnailMimeType: "image/jpeg",
+            rawFiles: [{
+              name: "greece.mp4",
+              url: "/api/drive/stream?id=raw-video",
+              fileId: "raw-video",
+              usageType: "master",
+              mimeType: "video/mp4",
+              uploadedAt: "2026-06-11T00:00:00.000Z",
+            }],
+          },
+        })}
+        className="thumb"
+      />,
+    );
+
+    expect(screen.getByAltText("Poster").tagName).toBe("IMG");
   });
 
   it("keeps reliable image posters as images", () => {

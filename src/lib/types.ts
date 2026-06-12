@@ -42,6 +42,8 @@ export interface SourceVault {
   driveFolder?: string;
   thumbnailFileId?: string;
   thumbnailMimeType?: string;
+  thumbnailStorageBucket?: string;
+  thumbnailStorageKey?: string;
   rawFiles?: RawFile[];
 }
 

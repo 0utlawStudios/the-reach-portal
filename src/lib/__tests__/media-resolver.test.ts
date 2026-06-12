@@ -76,6 +76,45 @@ describe("media resolver", () => {
     expect(thumbnailIsDefinitelyImage(c)).toBe(true);
   });
 
+  it("does not infer image posters from distinct Drive file ids without MIME proof", () => {
+    const c = card({
+      thumbnailUrl: "/api/drive/stream?id=poster&token=signed",
+      sourceVault: {
+        rawFiles: [{
+          name: "clip.mov",
+          url: "https://drive.google.com/uc?export=download&id=raw-video",
+          driveProxyUrl: "/api/drive/stream?id=raw-video&token=signed",
+          playbackUrl: "https://project.supabase.co/storage/v1/object/public/media-playback/workspace/post/clip.mov",
+          fileId: "raw-video",
+          usageType: "master",
+          mimeType: "video/quicktime",
+          uploadedAt: "2026-06-11T00:00:00.000Z",
+        }],
+      },
+    });
+
+    expect(thumbnailIsDefinitelyImage(c)).toBe(false);
+  });
+
+  it("does not treat the raw Drive video file as an image poster", () => {
+    const c = card({
+      thumbnailUrl: "/api/drive/stream?id=raw-video&token=signed",
+      sourceVault: {
+        thumbnailFileId: "raw-video",
+        rawFiles: [{
+          name: "clip.mov",
+          url: "https://drive.google.com/uc?export=download&id=raw-video",
+          fileId: "raw-video",
+          usageType: "master",
+          mimeType: "video/quicktime",
+          uploadedAt: "2026-06-11T00:00:00.000Z",
+        }],
+      },
+    });
+
+    expect(thumbnailIsDefinitelyImage(c)).toBe(false);
+  });
+
   it("extracts Drive stream file ids", () => {
     expect(driveFileIdFromUrl("/api/drive/stream?id=abc123&token=secret")).toBe("abc123");
   });
@@ -114,6 +153,7 @@ describe("media resolver", () => {
     expect(drawerSrc).toContain("url: publishUrl");
     expect(drawerSrc).toContain("playbackUrl");
     expect(drawerSrc).toContain("driveFileIdFromUrl(result.driveProxyUrl || result.url)");
+    expect(drawerSrc).toContain('preload={resolvedPosterUrl ? "none" : "metadata"}');
     expect(pickerSrc).toContain("enrichFromRawFile(existing, f)");
     expect(pickerSrc).toContain("selectionFromAsset(selectedAsset)");
     expect(pickerSrc).toContain("missing its Drive publishing source");
