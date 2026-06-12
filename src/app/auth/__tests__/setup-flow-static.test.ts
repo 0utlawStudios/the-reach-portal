@@ -148,20 +148,21 @@ describe("Support Inbox navigation", () => {
     expect(AUTHENTICATED_APP_SHELL_SRC).toContain("hoverExpandRef.current || !sidebarCollapsed");
   });
 
-  it("teases the desktop pin control for three seconds without persisting pinned state", () => {
-    expect(AUTHENTICATED_APP_SHELL_SRC).toContain("const SIDEBAR_PIN_TEASER_MS = 3000;");
-    expect(AUTHENTICATED_APP_SHELL_SRC).toContain("pinTeaserStartedRef.current = true;");
-    expect(AUTHENTICATED_APP_SHELL_SRC).toContain("setSidebarCollapsed(false);");
-    expect(AUTHENTICATED_APP_SHELL_SRC).toContain("setSidebarCollapsed(true);");
-    expect(AUTHENTICATED_APP_SHELL_SRC).toContain("if (!sidebarPinnedRef.current)");
-    expect(AUTHENTICATED_APP_SHELL_SRC).toContain("clearTimeout(pinTeaserTimerRef.current);");
-    expect(AUTHENTICATED_APP_SHELL_SRC).toContain("reach-sidebar-pin-hint");
+  it("keeps the desktop pin control lightweight with no load-time teaser motion", () => {
+    expect(AUTHENTICATED_APP_SHELL_SRC).not.toContain("SIDEBAR_PIN_TEASER_MS");
+    expect(AUTHENTICATED_APP_SHELL_SRC).not.toContain("pinTeaserStartedRef");
+    expect(AUTHENTICATED_APP_SHELL_SRC).not.toContain("pinTeaserActive");
+    expect(AUTHENTICATED_APP_SHELL_SRC).not.toContain("pinTeaserTimerRef");
+    expect(AUTHENTICATED_APP_SHELL_SRC).not.toContain("if (pinTeaserActive) return;");
+    expect(AUTHENTICATED_APP_SHELL_SRC).not.toContain("reach-sidebar-pin-hint");
     expect(AUTHENTICATED_APP_SHELL_SRC).not.toContain("saveState(PIN_KEY");
-    expect(GLOBALS_SRC).toContain("@keyframes reach-sidebar-pin-hint");
-    expect(GLOBALS_SRC).toContain("@keyframes reach-sidebar-pin-hint-icon");
-    expect(GLOBALS_SRC).toContain("@keyframes reach-sidebar-pin-hint-sheen");
-    expect(GLOBALS_SRC).toContain("scale(2.8)");
-    expect(GLOBALS_SRC).toContain("@media (prefers-reduced-motion: reduce)");
+    expect(AUTHENTICATED_APP_SHELL_SRC).toContain('sidebarCollapsed ? "w-[52px]" : "w-[218px]"');
+    expect(AUTHENTICATED_APP_SHELL_SRC).toContain("whitespace-nowrap");
+    expect(AUTHENTICATED_APP_SHELL_SRC).toContain('"mx-auto h-8 w-8 justify-center p-0"');
+    expect(GLOBALS_SRC).not.toContain("@keyframes reach-sidebar-pin-hint");
+    expect(GLOBALS_SRC).not.toContain("@keyframes reach-sidebar-pin-hint-icon");
+    expect(GLOBALS_SRC).not.toContain("@keyframes reach-sidebar-pin-hint-sheen");
+    expect(GLOBALS_SRC).not.toContain("scale(2.8)");
   });
 });
 

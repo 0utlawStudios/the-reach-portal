@@ -170,8 +170,6 @@ function IdleSupportWidget() {
 
 // ─── Sidebar ───
 
-const SIDEBAR_PIN_TEASER_MS = 3000;
-
 function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
   onCreatePost: () => void;
   mobileOpen: boolean;
@@ -182,39 +180,6 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
   const isSuperadmin = (currentUser.role || "").toLowerCase() === "superadmin";
   const supportAlert = useSupportAlert(isSuperadmin);
   const hoverExpandRef = useRef(false);
-  const pinTeaserStartedRef = useRef(false);
-  const pinTeaserTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const sidebarPinnedRef = useRef(sidebarPinned);
-  const [pinTeaserActive, setPinTeaserActive] = useState(() => !sidebarPinned);
-
-  useEffect(() => {
-    sidebarPinnedRef.current = sidebarPinned;
-  }, [sidebarPinned]);
-
-  useEffect(() => {
-    if (pinTeaserStartedRef.current) return;
-    pinTeaserStartedRef.current = true;
-    if (sidebarPinnedRef.current) return;
-
-    hoverExpandRef.current = false;
-    setSidebarCollapsed(false);
-
-    pinTeaserTimerRef.current = setTimeout(() => {
-      pinTeaserTimerRef.current = null;
-      setPinTeaserActive(false);
-      hoverExpandRef.current = false;
-      if (!sidebarPinnedRef.current) {
-        setSidebarCollapsed(true);
-      }
-    }, SIDEBAR_PIN_TEASER_MS);
-
-    return () => {
-      if (pinTeaserTimerRef.current) {
-        clearTimeout(pinTeaserTimerRef.current);
-        pinTeaserTimerRef.current = null;
-      }
-    };
-  }, [setSidebarCollapsed]);
 
   // Desktop hover handlers
   const handleMouseEnter = () => {
@@ -223,16 +188,10 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
   };
   const handleMouseLeave = () => {
     if (sidebarPinned) return;
-    if (pinTeaserActive) return;
     if (hoverExpandRef.current || !sidebarCollapsed) { hoverExpandRef.current = false; setSidebarCollapsed(true); }
   };
 
   const handleTogglePin = () => {
-    if (pinTeaserTimerRef.current) {
-      clearTimeout(pinTeaserTimerRef.current);
-      pinTeaserTimerRef.current = null;
-    }
-    setPinTeaserActive(false);
     togglePin();
   };
 
@@ -261,7 +220,6 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
 
   const sidebarContent = (isMobile: boolean) => {
     const expanded = isMobile || !sidebarCollapsed;
-    const showPinTeaser = !isMobile && expanded && pinTeaserActive && !sidebarPinned;
     return (
       <>
         {/* Logo */}
@@ -281,14 +239,14 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
         {/* Create */}
         {expanded ? (
           <div className="px-3 pt-1 pb-2">
-            <button onClick={() => { onCreatePost(); if (isMobile) closeMobile(); }} className="w-full flex items-center justify-center gap-2 h-[36px] rounded-lg bg-[#975428] hover:bg-[#975428]/90 text-[#E1DFD5] text-[12px] font-semibold transition-all duration-150 cursor-pointer shadow-sm shadow-[#975428]/20">
-              <Plus className="w-3.5 h-3.5" />Create Post
+            <button onClick={() => { onCreatePost(); if (isMobile) closeMobile(); }} className="w-full min-w-0 flex items-center justify-center gap-2 h-8 rounded-md bg-[#975428]/80 hover:bg-[#975428] text-[#E1DFD5] text-[11px] font-semibold whitespace-nowrap transition-colors duration-150 cursor-pointer">
+              <Plus className="w-3.5 h-3.5 shrink-0" /><span className="truncate">Create Post</span>
             </button>
           </div>
         ) : (
-          <div className="px-2 pt-1 pb-2">
-            <button onClick={onCreatePost} className="w-full flex items-center justify-center h-[36px] rounded-lg bg-[#975428] text-[#E1DFD5] transition-colors cursor-pointer shadow-sm shadow-[#975428]/20" title="Create Post">
-              <Plus className="w-4 h-4" />
+          <div className="flex justify-center pt-1 pb-2">
+            <button onClick={onCreatePost} className="flex h-8 w-8 items-center justify-center rounded-md bg-[#975428]/70 text-[#E1DFD5] transition-colors duration-150 hover:bg-[#975428] cursor-pointer" title="Create Post">
+              <Plus className="w-3.5 h-3.5" />
             </button>
           </div>
         )}
@@ -335,20 +293,20 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
             <button
               onClick={handleTogglePin}
               aria-label={sidebarPinned ? "Unpin sidebar" : "Pin sidebar"}
-              className={`relative isolate w-full flex items-center gap-2 overflow-visible rounded-lg px-2.5 py-[7px] transition-all duration-150 cursor-pointer ${
-                showPinTeaser
-                  ? "reach-sidebar-pin-hint text-[#E1DFD5] bg-[#975428]/20"
-                  : sidebarPinned
-                    ? "text-[#E1DFD5] bg-[#E1DFD5]/[0.12] dark:bg-orange-500/10 hover:bg-[#E1DFD5]/[0.16] dark:hover:bg-orange-500/15"
-                    : "text-[#E1DFD5]/[0.55] hover:text-[#E1DFD5] dark:hover:text-gray-300 hover:bg-[#E1DFD5]/[0.08] dark:hover:bg-white/[0.03]"
+              className={`relative isolate flex items-center overflow-hidden rounded-lg transition-all duration-150 cursor-pointer ${
+                expanded ? "w-full gap-2 px-2.5 py-[7px]" : "mx-auto h-8 w-8 justify-center p-0"
+              } ${
+                sidebarPinned
+                  ? "text-[#E1DFD5] bg-[#E1DFD5]/[0.12] dark:bg-orange-500/10 hover:bg-[#E1DFD5]/[0.16] dark:hover:bg-orange-500/15"
+                  : "text-[#E1DFD5]/[0.55] hover:text-[#E1DFD5] dark:hover:text-gray-300 hover:bg-[#E1DFD5]/[0.08] dark:hover:bg-white/[0.03]"
               }`}
             >
               {!expanded ? (
-                <Pin className="w-4 h-4 mx-auto" />
+                <Pin className="w-4 h-4 shrink-0" />
               ) : sidebarPinned ? (
-                <><PinOff className="w-4 h-4" /><span className="text-[12px] font-medium">Unpin Sidebar</span></>
+                <><PinOff className="w-4 h-4 shrink-0" /><span className="truncate whitespace-nowrap text-[12px] font-medium">Unpin Sidebar</span></>
               ) : (
-                <><Pin className="w-4 h-4" /><span className="text-[12px] font-medium">Pin Sidebar</span></>
+                <><Pin className="w-4 h-4 shrink-0" /><span className="truncate whitespace-nowrap text-[12px] font-medium">Pin Sidebar</span></>
               )}
             </button>
           </div>
@@ -373,7 +331,7 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
       <aside
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className={`hidden md:flex h-dvh flex-col bg-[#6C655A] dark:bg-[#0c0c0f] shrink-0 overflow-hidden transition-[width] duration-200 ease-out shadow-[1px_0_0_rgba(108,101,90,0.28)] dark:shadow-[1px_0_0_rgba(255,255,255,0.04)] ${sidebarCollapsed ? "w-[56px]" : "w-[230px]"}`}
+        className={`hidden md:flex h-dvh flex-col bg-[#6C655A] dark:bg-[#0c0c0f] shrink-0 overflow-hidden transition-[width] duration-200 ease-out shadow-[1px_0_0_rgba(108,101,90,0.28)] dark:shadow-[1px_0_0_rgba(255,255,255,0.04)] ${sidebarCollapsed ? "w-[52px]" : "w-[218px]"}`}
       >
         {sidebarContent(false)}
       </aside>
