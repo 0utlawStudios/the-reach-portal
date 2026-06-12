@@ -128,6 +128,113 @@
 }
 
 @layer utilities {
+  .reach-sidebar-auto {
+    --reach-sidebar-rail: 52px;
+    --reach-sidebar-open: 218px;
+    --reach-sidebar-item: 198px;
+    position: relative;
+    z-index: 30;
+    width: var(--reach-sidebar-rail);
+    height: 100dvh;
+    flex-shrink: 0;
+    overflow: visible;
+  }
+
+  .reach-sidebar-auto-panel {
+    position: absolute;
+    inset: 0 auto 0 0;
+    display: flex;
+    width: var(--reach-sidebar-open);
+    flex-direction: column;
+    overflow: hidden;
+    background-color: #6C655A;
+    clip-path: inset(0 calc(var(--reach-sidebar-open) - var(--reach-sidebar-rail)) 0 0);
+    box-shadow: 1px 0 0 rgb(108 101 90 / 0.28);
+    contain: layout paint;
+  }
+
+  .dark .reach-sidebar-auto-panel {
+    background-color: #0c0c0f;
+    box-shadow: 1px 0 0 rgb(255 255 255 / 0.04);
+  }
+
+  .reach-sidebar-auto:hover .reach-sidebar-auto-panel,
+  .reach-sidebar-auto:focus-within .reach-sidebar-auto-panel {
+    clip-path: inset(0 0 0 0);
+    box-shadow: 1px 0 0 rgb(108 101 90 / 0.28), 18px 0 34px rgb(0 0 0 / 0.18);
+  }
+
+  .dark .reach-sidebar-auto:hover .reach-sidebar-auto-panel,
+  .dark .reach-sidebar-auto:focus-within .reach-sidebar-auto-panel {
+    box-shadow: 1px 0 0 rgb(255 255 255 / 0.04), 18px 0 34px rgb(0 0 0 / 0.32);
+  }
+
+  .reach-sidebar-auto-expanded {
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .reach-sidebar-auto:hover .reach-sidebar-auto-expanded,
+  .reach-sidebar-auto:focus-within .reach-sidebar-auto-expanded {
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  .reach-sidebar-auto:hover .reach-sidebar-auto-rail-only,
+  .reach-sidebar-auto:focus-within .reach-sidebar-auto-rail-only {
+    visibility: hidden;
+  }
+
+  .reach-sidebar-auto-item {
+    width: var(--reach-sidebar-item);
+  }
+
+  .reach-sidebar-auto-icon-cell {
+    width: 32px;
+    height: 32px;
+  }
+
+  .reach-sidebar-auto-create .reach-sidebar-auto-icon-cell {
+    background-color: rgb(151 84 40 / 0.8);
+  }
+
+  .reach-sidebar-auto:hover .reach-sidebar-auto-create,
+  .reach-sidebar-auto:focus-within .reach-sidebar-auto-create {
+    background-color: rgb(151 84 40 / 0.8);
+  }
+
+  .reach-sidebar-auto:hover .reach-sidebar-auto-create .reach-sidebar-auto-icon-cell,
+  .reach-sidebar-auto:focus-within .reach-sidebar-auto-create .reach-sidebar-auto-icon-cell {
+    background-color: transparent;
+  }
+
+  .reach-sidebar-auto-item-active .reach-sidebar-auto-icon-cell {
+    background-color: rgb(225 223 213 / 0.14);
+    color: #E1DFD5;
+  }
+
+  .dark .reach-sidebar-auto-item-active .reach-sidebar-auto-icon-cell {
+    background-color: rgb(249 115 22 / 0.1);
+    color: rgb(251 146 60);
+  }
+
+  .reach-sidebar-auto:hover .reach-sidebar-auto-item-active,
+  .reach-sidebar-auto:focus-within .reach-sidebar-auto-item-active {
+    background-color: rgb(225 223 213 / 0.14);
+    color: #E1DFD5;
+  }
+
+  .dark .reach-sidebar-auto:hover .reach-sidebar-auto-item-active,
+  .dark .reach-sidebar-auto:focus-within .reach-sidebar-auto-item-active {
+    background-color: rgb(249 115 22 / 0.1);
+    color: rgb(251 146 60);
+  }
+
+  .reach-sidebar-auto:hover .reach-sidebar-auto-item-active .reach-sidebar-auto-icon-cell,
+  .reach-sidebar-auto:focus-within .reach-sidebar-auto-item-active .reach-sidebar-auto-icon-cell {
+    background-color: transparent;
+  }
+
   html:not(.dark) :where(body) {
     background: var(--reach-page) !important;
     color: var(--reach-stone);

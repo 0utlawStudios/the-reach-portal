@@ -293,13 +293,15 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
     <>
       <div className="relative h-[60px] shrink-0">
         <span className="absolute left-0 top-0 flex h-[60px] w-[52px] items-center justify-center font-heading text-[17px] font-semibold text-[#E1DFD5] tracking-[0.22em]" aria-label="The Reach">R</span>
-        <ReachWordmark className="absolute left-[66px] top-1/2 hidden h-[13px] w-[132px] -translate-y-1/2 text-[#E1DFD5] group-hover:block" />
+        <ReachWordmark className="reach-sidebar-auto-expanded absolute left-[66px] top-1/2 h-[13px] w-[132px] -translate-y-1/2 text-[#E1DFD5]" />
       </div>
 
       <div className="px-2.5 pt-1 pb-2">
-        <button onClick={onCreatePost} className="grid h-8 w-8 grid-cols-[32px_1fr] items-center overflow-hidden rounded-md bg-[#975428]/80 text-[#E1DFD5] transition-colors duration-100 hover:bg-[#975428] group-hover:w-[198px] cursor-pointer" title="Create Post">
-          <Plus className="w-3.5 h-3.5 justify-self-center" />
-          <span className="hidden min-w-0 truncate whitespace-nowrap pr-3 text-left text-[11px] font-semibold group-hover:block">Create Post</span>
+        <button onClick={onCreatePost} className="reach-sidebar-auto-create reach-sidebar-auto-item grid h-8 grid-cols-[32px_1fr] items-center overflow-hidden rounded-md text-[#E1DFD5] transition-colors duration-100 hover:bg-[#975428] cursor-pointer" title="Create Post">
+          <span className="reach-sidebar-auto-icon-cell flex items-center justify-center rounded-md">
+            <Plus className="w-3.5 h-3.5" />
+          </span>
+          <span className="reach-sidebar-auto-expanded min-w-0 truncate whitespace-nowrap pr-3 text-left text-[11px] font-semibold">Create Post</span>
         </button>
       </div>
 
@@ -309,8 +311,8 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
           return (
             <div key={section.key}>
               <div className="relative mb-2 h-5">
-                <div className="absolute left-4 top-1/2 w-5 border-t border-[#E1DFD5]/[0.15] group-hover:hidden dark:border-white/[0.06]" />
-                <p className="absolute left-3 top-0 hidden text-[9px] font-bold text-[#E1DFD5]/[0.50] tracking-[0.1em] uppercase group-hover:block dark:text-gray-600">{section.label}</p>
+                <div className="reach-sidebar-auto-rail-only absolute left-4 top-1/2 w-5 border-t border-[#E1DFD5]/[0.15] dark:border-white/[0.06]" />
+                <p className="reach-sidebar-auto-expanded absolute left-3 top-0 text-[9px] font-bold text-[#E1DFD5]/[0.50] tracking-[0.1em] uppercase dark:text-gray-600">{section.label}</p>
               </div>
               <div className="space-y-0.5">
                 {items.map((item) => {
@@ -319,15 +321,15 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
                     <button
                       key={item.id}
                       onClick={() => handleNav(item.id)}
-                      className={`relative ml-2.5 grid h-8 w-8 grid-cols-[32px_1fr_auto] items-center overflow-hidden rounded-lg text-left transition-colors duration-100 group-hover:w-[198px] cursor-pointer ${
+                      className={`reach-sidebar-auto-item ${active ? "reach-sidebar-auto-item-active" : ""} relative ml-2.5 grid h-8 grid-cols-[32px_1fr_auto] items-center overflow-hidden rounded-lg text-left transition-colors duration-100 cursor-pointer ${
                         active
-                          ? "bg-[#E1DFD5]/[0.14] dark:bg-orange-500/10 text-[#E1DFD5] dark:text-orange-400"
+                          ? "text-[#E1DFD5] dark:text-orange-400"
                           : "text-[#E1DFD5]/[0.65] dark:text-gray-500 hover:text-[#E1DFD5] dark:hover:text-gray-300 hover:bg-[#E1DFD5]/[0.08] dark:hover:bg-white/[0.03]"
                       }`}
                       title={item.label}
                     >
-                      <span className={`justify-self-center ${active ? "text-[#E1DFD5] dark:text-orange-400" : "text-[#E1DFD5]/[0.55] dark:text-gray-500"}`}>{item.icon}</span>
-                      <span className="hidden min-w-0 truncate whitespace-nowrap pr-2 text-[13px] group-hover:block">{item.label}</span>
+                      <span className={`reach-sidebar-auto-icon-cell flex items-center justify-center rounded-lg ${active ? "text-[#E1DFD5] dark:text-orange-400" : "text-[#E1DFD5]/[0.55] dark:text-gray-500"}`}>{item.icon}</span>
+                      <span className="reach-sidebar-auto-expanded min-w-0 truncate whitespace-nowrap pr-2 text-[13px]">{item.label}</span>
                       {"alert" in item && item.alert && (
                         <span aria-hidden="true" className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-[#975428] shadow-[0_0_0_2px_rgba(151,84,40,0.18)] animate-pulse" />
                       )}
@@ -345,10 +347,12 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
           onClick={handleTogglePin}
           aria-label="Pin sidebar"
           title="Pin sidebar"
-          className="grid h-8 w-8 grid-cols-[32px_1fr] items-center overflow-hidden rounded-lg text-[#E1DFD5]/[0.55] transition-colors duration-100 hover:bg-[#E1DFD5]/[0.08] hover:text-[#E1DFD5] group-hover:w-[198px] dark:hover:bg-white/[0.03] dark:hover:text-gray-300 cursor-pointer"
+          className="reach-sidebar-auto-item grid h-8 grid-cols-[32px_1fr] items-center overflow-hidden rounded-lg text-[#E1DFD5]/[0.55] transition-colors duration-100 hover:bg-[#E1DFD5]/[0.08] hover:text-[#E1DFD5] dark:hover:bg-white/[0.03] dark:hover:text-gray-300 cursor-pointer"
         >
-          <Pin className="w-4 h-4 justify-self-center" />
-          <span className="hidden min-w-0 truncate whitespace-nowrap pr-3 text-left text-[12px] font-medium group-hover:block">Pin Sidebar</span>
+          <span className="reach-sidebar-auto-icon-cell flex items-center justify-center rounded-lg">
+            <Pin className="w-4 h-4" />
+          </span>
+          <span className="reach-sidebar-auto-expanded min-w-0 truncate whitespace-nowrap pr-3 text-left text-[12px] font-medium">Pin Sidebar</span>
         </button>
       </div>
     </>
@@ -377,9 +381,9 @@ function Sidebar({ onCreatePost, mobileOpen, setMobileOpen }: {
       ) : (
         <aside
           data-sidebar-state="auto-hide"
-          className="group relative z-30 hidden h-dvh w-[52px] shrink-0 overflow-visible md:block"
+          className="reach-sidebar-auto hidden md:block"
         >
-          <div className="absolute inset-y-0 left-0 z-40 flex w-[52px] flex-col overflow-hidden bg-[#6C655A] shadow-[1px_0_0_rgba(108,101,90,0.28)] group-hover:w-[218px] group-hover:shadow-[1px_0_0_rgba(108,101,90,0.28),18px_0_34px_rgba(0,0,0,0.18)] dark:bg-[#0c0c0f] dark:shadow-[1px_0_0_rgba(255,255,255,0.04)] dark:group-hover:shadow-[1px_0_0_rgba(255,255,255,0.04),18px_0_34px_rgba(0,0,0,0.32)]">
+          <div className="reach-sidebar-auto-panel">
             {autoHideSidebarContent()}
           </div>
         </aside>
