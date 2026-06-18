@@ -1,8 +1,10 @@
+# SUPERSEDED: scheduled keep-alive moved to the budget-free public repo
+# 0utlawStudios/keep-alive (public repo = unlimited Actions, off the 2,000-min
+# private quota). This workflow is manual-only now (workflow_dispatch) as an
+# emergency fallback. Do NOT re-add `schedule:` — it would burn private minutes.
 name: Supabase Keep Alive
 
 on:
-  schedule:
-    - cron: "0 9 */2 * *"
   workflow_dispatch:
 
 jobs:
