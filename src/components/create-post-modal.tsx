@@ -193,6 +193,7 @@ export function CreatePostModal({ open, onClose }: Props) {
     // preserving order: rawFiles[0] stays the master/thumbnail. Any failure is
     // fail-closed, so the card is not created with missing files.
     if (files.length > 0) {
+      try {
       const { uploadManyToDrive, reportUploadFailure } = await import("@/lib/drive-upload");
 
       // New files that actually need uploading, tagged with their original index.
@@ -335,10 +336,20 @@ export function CreatePostModal({ open, onClose }: Props) {
           uploadFailed = true;
         }
       }
+      } catch (err) {
+        // Fail-closed: any throw in the upload phase — including a code-split
+        // chunk that won't load after a deploy — marks the upload failed so the
+        // card is never created with missing files, and `submitting` resets in
+        // the guard below instead of leaving the modal stuck on "Preparing…".
+        addToast(`Couldn't upload your files: ${uploadErrorMessage(err)}. If this keeps happening, refresh the page.`, "error");
+        uploadFailed = true;
+      }
     }
 
     if (uploadFailed) {
       setSubmitting(false);
+      setUploadProgress(0);
+      setUploadingFileName("");
       return; // Don't create card with missing files
     }
 
@@ -630,28 +641,31 @@ export function CreatePostModal({ open, onClose }: Props) {
                         const file = (ev.target as HTMLInputElement).files?.[0];
                         if (!file) return;
                         addToast("Uploading license...", "info");
-                        const { reportUploadFailure, uploadManyToDrive } = await import("@/lib/drive-upload");
+                        let driveModule: typeof import("@/lib/drive-upload") | null = null;
                         try {
-                          const [item] = await uploadManyToDrive([file], "raw-files", { concurrency: 1 });
+                          driveModule = await import("@/lib/drive-upload");
+                          const [item] = await driveModule.uploadManyToDrive([file], "raw-files", { concurrency: 1 });
                           if (!item?.result) throw item?.error || new Error("License upload failed");
                           const result = item.result;
                           setLicenseFileId(result.fileId);
                           addToast("License uploaded", "success");
                         } catch (err) {
                           const errorMessage = uploadErrorMessage(err);
-                          await reportUploadFailure({
-                            phase: "create_post_license_upload",
-                            route: "/api/drive/upload-failure",
-                            uploadPath: uploadPathForSize(file),
-                            postTitle: title.trim(),
-                            folder: "raw-files",
-                            fileName: file.name,
-                            mimeType: normalizeDriveMimeType(file.type, file.name),
-                            fileSize: file.size,
-                            errorMessage,
-                            errorDetail: err instanceof Error ? err.stack : undefined,
-                          });
-                          addToast("License upload failed", "error");
+                          addToast("License upload failed. If this keeps happening, refresh the page.", "error");
+                          try {
+                            await driveModule?.reportUploadFailure({
+                              phase: "create_post_license_upload",
+                              route: "/api/drive/upload-failure",
+                              uploadPath: uploadPathForSize(file),
+                              postTitle: title.trim(),
+                              folder: "raw-files",
+                              fileName: file.name,
+                              mimeType: normalizeDriveMimeType(file.type, file.name),
+                              fileSize: file.size,
+                              errorMessage,
+                              errorDetail: err instanceof Error ? err.stack : undefined,
+                            });
+                          } catch { /* ignore */ }
                         }
                       };
                       input.click();

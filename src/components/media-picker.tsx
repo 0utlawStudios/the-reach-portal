@@ -289,8 +289,10 @@ export function MediaPicker({
       if (fileList.length === 0) return;
       setUploading(true);
       setUploadProgress(0);
+      let driveModule: typeof import("@/lib/drive-upload") | null = null;
       try {
-        const { uploadManyToDrive, reportUploadFailure } = await import("@/lib/drive-upload");
+        driveModule = await import("@/lib/drive-upload");
+        const { uploadManyToDrive, reportUploadFailure } = driveModule;
         const items = await uploadManyToDrive(fileList, folder, { cardId, concurrency: 3, onProgress: setUploadProgress });
         const failures = items.filter((item) => item.error || !item.result);
         for (const failure of failures) {
@@ -365,24 +367,26 @@ export function MediaPicker({
           onClose();
         }
       } catch (err) {
-        const { reportUploadFailure } = await import("@/lib/drive-upload");
         const errorMessage = uploadErrorMessage(err);
-        const first = fileList[0];
-        await reportUploadFailure({
-          phase: "media_picker_upload",
-          route: "/api/drive/upload-failure",
-          uploadPath: first ? uploadPathForSize(first) : "unknown",
-          cardId,
-          folder,
-          fileName: first?.name,
-          mimeType: first ? normalizeDriveMimeType(first.type, first.name) : undefined,
-          fileSize: first?.size,
-          batchTotal: fileList.length,
-          batchFailed: fileList.length,
-          errorMessage,
-          errorDetail: err instanceof Error ? err.stack : undefined,
-        });
-        addToast(`Upload failed: ${errorMessage}`, "error");
+        addToast(`Upload failed: ${errorMessage}. If this keeps happening, refresh the page.`, "error");
+        // Best-effort telemetry; guard so it can never strand the finally cleanup.
+        try {
+          const first = fileList[0];
+          await driveModule?.reportUploadFailure({
+            phase: "media_picker_upload",
+            route: "/api/drive/upload-failure",
+            uploadPath: first ? uploadPathForSize(first) : "unknown",
+            cardId,
+            folder,
+            fileName: first?.name,
+            mimeType: first ? normalizeDriveMimeType(first.type, first.name) : undefined,
+            fileSize: first?.size,
+            batchTotal: fileList.length,
+            batchFailed: fileList.length,
+            errorMessage,
+            errorDetail: err instanceof Error ? err.stack : undefined,
+          });
+        } catch { /* ignore */ }
       } finally { setUploading(false); setUploadProgress(0); }
     };
     input.click();

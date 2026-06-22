@@ -44,6 +44,56 @@ describe("Drive upload surfaces", () => {
     expect(mediaPage).toContain('uploadManyToDrive(fileList, "media-library"');
   });
 
+  // Regression guard for the "stuck on Preparing…" production incident: an
+  // upload handler whose dynamic import (or any pre-send await) threw — e.g. a
+  // stale code-split chunk after a deploy — left `uploading`/`submitting` true
+  // and progress at 0 forever, with no error. Every surface must reset its
+  // loading state on EVERY exit path (finally for the page/picker/drawer; a
+  // fail-closed flag that routes back to setSubmitting(false) for create-post).
+  it("never strands the upload UI on a failed or aborted upload", () => {
+    // media-page, media-picker and the drawer reset uploading state in finally.
+    for (const file of [
+      "src/components/pages/media-page.tsx",
+      "src/components/media-picker.tsx",
+      "src/components/asset-review-drawer.tsx",
+    ]) {
+      const contents = source(file);
+      expect(contents, `${file} must reset uploading state in a finally`).toMatch(
+        /finally \{[\s\S]*?setUploading\(false\)/,
+      );
+    }
+
+    // The drawer has two upload handlers; both need their own finally.
+    const drawer = source("src/components/asset-review-drawer.tsx");
+    expect((drawer.match(/\} finally \{/g) || []).length).toBeGreaterThanOrEqual(2);
+
+    // create-post is fail-closed: an upload throw marks uploadFailed, which the
+    // guard below resets submitting on, instead of rejecting the handler.
+    const createPost = source("src/components/create-post-modal.tsx");
+    expect(createPost).toContain("Couldn't upload your files");
+    expect(createPost).toMatch(/if \(uploadFailed\) \{[\s\S]*?setSubmitting\(false\)/);
+
+    // A catch block that re-imports the drive-upload chunk would re-throw on the
+    // very stale chunk that broke the upload, swallowing the error toast and
+    // (where cleanup is outside the catch) stranding the UI. Telemetry in catch
+    // must use the guarded `driveModule?.` handle instead of a second import.
+    // Line-based check: every drive-upload import must follow a `try` opener,
+    // never a `catch` opener.
+    for (const file of uploadSurfaces) {
+      const lines = source(file).split("\n");
+      for (let i = 0; i < lines.length; i++) {
+        if (!/await import\("@\/lib\/drive-upload"\)/.test(lines[i])) continue;
+        let j = i - 1;
+        while (j >= 0 && lines[j].trim() === "") j--;
+        const prev = j >= 0 ? lines[j].trim() : "";
+        expect(
+          /catch\s*\(/.test(prev),
+          `${file}:${i + 1} re-imports drive-upload directly inside a catch`,
+        ).toBe(false);
+      }
+    }
+  });
+
   it("renders preview-safe media URLs without changing publish-safe raw URLs", () => {
     const mediaPicker = source("src/components/media-picker.tsx");
     expect(mediaPicker).toContain('function mediaDisplayUrl(asset: Pick<MediaEntry, "url" | "driveProxyUrl" | "playbackUrl">): string');

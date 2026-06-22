@@ -215,12 +215,17 @@ export function MediaPage() {
       return;
     }
     setUploading(true);
-    const { reportUploadFailure, uploadManyToDrive } = await import("@/lib/drive-upload");
-
     setUploadingFileName(fileList.length === 1 ? fileList[0].name : `Uploading ${fileList.length} files`);
     setUploadProgress(0);
 
+    // The dynamic import lives INSIDE the try. If its code-split chunk fails to
+    // load — e.g. a stale chunk hash after a deploy, a network blip, or an
+    // ad-blocker — the catch + finally below reset the UI instead of leaving it
+    // stuck on "Preparing…" forever (the exact reported production symptom).
+    let driveModule: typeof import("@/lib/drive-upload") | null = null;
     try {
+      driveModule = await import("@/lib/drive-upload");
+      const { reportUploadFailure, uploadManyToDrive } = driveModule;
       // Upload all files concurrently (3-wide pool) instead of one-at-a-time.
       const items = await uploadManyToDrive(fileList, "media-library", {
         concurrency: 3,
@@ -290,27 +295,33 @@ export function MediaPage() {
         addToast(`${file.name} uploaded`, "success");
       }
     } catch (err) {
-      const first = fileList[0];
-      await reportUploadFailure({
-        phase: "media_library_upload_exception",
-        route: "/api/drive/upload-failure",
-        uploadPath: first ? uploadPathForSize(first) : "unknown",
-        folder: "media-library",
-        fileName: first?.name,
-        mimeType: first ? normalizeDriveMimeType(first.type, first.name) : undefined,
-        fileSize: first?.size,
-        batchTotal: fileList.length,
-        batchFailed: fileList.length,
-        errorMessage: uploadErrorMessage(err),
-        errorDetail: err instanceof Error ? err.stack : undefined,
-      });
-      addToast(`Upload failed: ${uploadErrorMessage(err)}`, "error");
+      addToast(`Upload failed: ${uploadErrorMessage(err)}. If this keeps happening, refresh the page.`, "error");
+      // Best-effort telemetry. driveModule is null when the import itself failed;
+      // guard so a reporting failure can never strand the finally cleanup below.
+      try {
+        const first = fileList[0];
+        await driveModule?.reportUploadFailure({
+          phase: "media_library_upload_exception",
+          route: "/api/drive/upload-failure",
+          uploadPath: first ? uploadPathForSize(first) : "unknown",
+          folder: "media-library",
+          fileName: first?.name,
+          mimeType: first ? normalizeDriveMimeType(first.type, first.name) : undefined,
+          fileSize: first?.size,
+          batchTotal: fileList.length,
+          batchFailed: fileList.length,
+          errorMessage: uploadErrorMessage(err),
+          errorDetail: err instanceof Error ? err.stack : undefined,
+        });
+      } catch { /* telemetry must never block recovery */ }
+    } finally {
+      // ALWAYS runs — even if the import or an unexpected throw happened above —
+      // so the upload UI can never get stuck on "Preparing…".
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      setUploading(false);
+      setUploadProgress(0);
+      setUploadingFileName("");
     }
-
-    if (fileInputRef.current) fileInputRef.current.value = "";
-    setUploading(false);
-    setUploadProgress(0);
-    setUploadingFileName("");
   };
 
   const toggleSelect = (id: string) => {

@@ -311,9 +311,10 @@ export function AssetReviewDrawer() {
     const prevUrl = selectedCard.thumbnailUrl;
     const blobUrl = URL.createObjectURL(file);
     updateCard(selectedCard.id, { thumbnailUrl: blobUrl }); // Optimistic preview
+    let driveModule: typeof import("@/lib/drive-upload") | null = null;
     try {
-      const { uploadManyToDrive } = await import("@/lib/drive-upload");
-      const [item] = await uploadManyToDrive([file], "thumbnails", {
+      driveModule = await import("@/lib/drive-upload");
+      const [item] = await driveModule.uploadManyToDrive([file], "thumbnails", {
         cardId: selectedCard.id,
         concurrency: 1,
         onProgress: setUploadProgress,
@@ -347,27 +348,31 @@ export function AssetReviewDrawer() {
       URL.revokeObjectURL(blobUrl);
       updateCard(selectedCard.id, { thumbnailUrl: prevUrl });
       const errorMessage = uploadErrorMessage(err);
-      const { reportUploadFailure } = await import("@/lib/drive-upload");
-      await reportUploadFailure({
-        phase: "drawer_cover_upload",
-        route: "/api/drive/upload-failure",
-        uploadPath: uploadPathForSize(file),
-        cardId: selectedCard.id,
-        postTitle: selectedCard.title,
-        folder: "thumbnails",
-        fileName: file.name,
-        mimeType: normalizeDriveMimeType(file.type, file.name),
-        fileSize: file.size,
-        errorMessage,
-        errorDetail: err instanceof Error ? err.stack : undefined,
-      });
-      addToast(`Cover upload failed: ${errorMessage}. Try again.`, "error");
+      addToast(`Cover upload failed: ${errorMessage}. If this keeps happening, refresh the page.`, "error");
+      // Best-effort telemetry; guard so a reporting failure (e.g. the same stale
+      // chunk that broke the import) can never strand the finally cleanup.
+      try {
+        await driveModule?.reportUploadFailure({
+          phase: "drawer_cover_upload",
+          route: "/api/drive/upload-failure",
+          uploadPath: uploadPathForSize(file),
+          cardId: selectedCard.id,
+          postTitle: selectedCard.title,
+          folder: "thumbnails",
+          fileName: file.name,
+          mimeType: normalizeDriveMimeType(file.type, file.name),
+          fileSize: file.size,
+          errorMessage,
+          errorDetail: err instanceof Error ? err.stack : undefined,
+        });
+      } catch { /* ignore */ }
+    } finally {
+      if (prevUrl?.startsWith("blob:")) URL.revokeObjectURL(prevUrl);
+      if (assetInputRef.current) assetInputRef.current.value = "";
+      setUploading(false);
+      setUploadProgress(0);
+      setUploadingFileName("");
     }
-    if (prevUrl?.startsWith("blob:")) URL.revokeObjectURL(prevUrl);
-    if (assetInputRef.current) assetInputRef.current.value = "";
-    setUploading(false);
-    setUploadProgress(0);
-    setUploadingFileName("");
   };
 
   // ─── Source Vault save ───
@@ -387,8 +392,10 @@ export function AssetReviewDrawer() {
     setUploading(true);
     setUploadingFileName(selectedFiles.length === 1 ? selectedFiles[0].name : `Uploading ${selectedFiles.length} files`);
     setUploadProgress(0);
+    let driveModule: typeof import("@/lib/drive-upload") | null = null;
     try {
-      const { uploadManyToDrive, reportUploadFailure } = await import("@/lib/drive-upload");
+      driveModule = await import("@/lib/drive-upload");
+      const { uploadManyToDrive, reportUploadFailure } = driveModule;
       const items = await uploadManyToDrive(selectedFiles, "raw-files", {
         cardId: selectedCard.id,
         concurrency: 3,
@@ -491,29 +498,32 @@ export function AssetReviewDrawer() {
     } catch (err) {
       // NO BLOB FALLBACK — show error, let user retry
       const errorMessage = uploadErrorMessage(err);
-      const { reportUploadFailure } = await import("@/lib/drive-upload");
-      const first = selectedFiles[0];
-      await reportUploadFailure({
-        phase: "drawer_raw_file_upload",
-        route: "/api/drive/upload-failure",
-        uploadPath: first ? uploadPathForSize(first) : "unknown",
-        cardId: selectedCard.id,
-        postTitle: selectedCard.title,
-        folder: "raw-files",
-        fileName: first?.name,
-        mimeType: first ? normalizeDriveMimeType(first.type, first.name) : undefined,
-        fileSize: first?.size,
-        batchTotal: selectedFiles.length,
-        batchFailed: selectedFiles.length,
-        errorMessage,
-        errorDetail: err instanceof Error ? err.stack : undefined,
-      });
-      addToast(`Upload failed: ${errorMessage}. Try again.`, "error");
+      addToast(`Upload failed: ${errorMessage}. If this keeps happening, refresh the page.`, "error");
+      // Best-effort telemetry; guard so it can never strand the finally cleanup.
+      try {
+        const first = selectedFiles[0];
+        await driveModule?.reportUploadFailure({
+          phase: "drawer_raw_file_upload",
+          route: "/api/drive/upload-failure",
+          uploadPath: first ? uploadPathForSize(first) : "unknown",
+          cardId: selectedCard.id,
+          postTitle: selectedCard.title,
+          folder: "raw-files",
+          fileName: first?.name,
+          mimeType: first ? normalizeDriveMimeType(first.type, first.name) : undefined,
+          fileSize: first?.size,
+          batchTotal: selectedFiles.length,
+          batchFailed: selectedFiles.length,
+          errorMessage,
+          errorDetail: err instanceof Error ? err.stack : undefined,
+        });
+      } catch { /* ignore */ }
+    } finally {
+      if (rawFileInputRef.current) rawFileInputRef.current.value = "";
+      setUploading(false);
+      setUploadProgress(0);
+      setUploadingFileName("");
     }
-    if (rawFileInputRef.current) rawFileInputRef.current.value = "";
-    setUploading(false);
-    setUploadProgress(0);
-    setUploadingFileName("");
   };
 
   const applyMediaPickerSelections = (results: MediaPickerSelection[]) => {
@@ -982,31 +992,33 @@ export function AssetReviewDrawer() {
                             const file = (ev.target as HTMLInputElement).files?.[0];
                             if (!file) return;
                             addToast("Uploading license...", "info");
+                            let driveModule: typeof import("@/lib/drive-upload") | null = null;
                             try {
-                              const { uploadManyToDrive } = await import("@/lib/drive-upload");
-                              const [item] = await uploadManyToDrive([file], "raw-files", { cardId: selectedCard.id, concurrency: 1 });
+                              driveModule = await import("@/lib/drive-upload");
+                              const [item] = await driveModule.uploadManyToDrive([file], "raw-files", { cardId: selectedCard.id, concurrency: 1 });
                               if (!item?.result) throw item?.error || new Error("License upload failed");
                               const result = item.result;
                               updateCard(selectedCard.id, { licenseFileId: result.fileId });
                               logAudit(selectedCard.id, currentUser.name, "license_uploaded", `Uploaded license: ${file.name}`);
                               addToast("License uploaded", "success");
                             } catch (err) {
-                              const { reportUploadFailure } = await import("@/lib/drive-upload");
                               const errorMessage = uploadErrorMessage(err);
-                              await reportUploadFailure({
-                                phase: "drawer_license_upload",
-                                route: "/api/drive/upload-failure",
-                                uploadPath: uploadPathForSize(file),
-                                cardId: selectedCard.id,
-                                postTitle: selectedCard.title,
-                                folder: "raw-files",
-                                fileName: file.name,
-                                mimeType: normalizeDriveMimeType(file.type, file.name),
-                                fileSize: file.size,
-                                errorMessage,
-                                errorDetail: err instanceof Error ? err.stack : undefined,
-                              });
-                              addToast("License upload failed", "error");
+                              addToast("License upload failed. If this keeps happening, refresh the page.", "error");
+                              try {
+                                await driveModule?.reportUploadFailure({
+                                  phase: "drawer_license_upload",
+                                  route: "/api/drive/upload-failure",
+                                  uploadPath: uploadPathForSize(file),
+                                  cardId: selectedCard.id,
+                                  postTitle: selectedCard.title,
+                                  folder: "raw-files",
+                                  fileName: file.name,
+                                  mimeType: normalizeDriveMimeType(file.type, file.name),
+                                  fileSize: file.size,
+                                  errorMessage,
+                                  errorDetail: err instanceof Error ? err.stack : undefined,
+                                });
+                              } catch { /* ignore */ }
                             }
                           };
                           input.click();
