@@ -353,6 +353,7 @@ export function CreatePostModal({ open, onClose }: Props) {
       return; // Don't create card with missing files
     }
 
+    try {
     createCard({
       title: title.trim(),
       stage: "ideas",
@@ -399,8 +400,15 @@ export function CreatePostModal({ open, onClose }: Props) {
     setScheduledDate(""); setScheduledTime(""); setFiles([]); setAssetSource(""); setAssetSourceOther(false); setLicenseFileId("");
     setDesignLink(""); setDriveFolder(""); setNotes(""); setActiveTab("content");
     setChecklist(DEFAULT_CHECKLIST.map((c) => ({ ...c })));
-    setSubmitting(false);
     onClose();
+    } finally {
+      // Guarantee the submit button re-enables and the progress label clears,
+      // even if createCard or a post-upload step throws synchronously, so the
+      // modal can never strand on "Preparing…"/"Uploading…".
+      setSubmitting(false);
+      setUploadProgress(0);
+      setUploadingFileName("");
+    }
   };
 
   const addMediaPickerSelections = (results: MediaPickerSelection[]) => {

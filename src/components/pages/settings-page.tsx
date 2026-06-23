@@ -183,27 +183,32 @@ function EditProfileModal({
 
     const useDb = !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
-    if (useDb) {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.id) {
-        addToast("Upload failed. Please sign in again.", "error");
-        setUploading(false);
-        return;
-      }
-      const path = `profiles/${user.id}/${member.id}-${Date.now()}.jpg`;
-      const { error } = await supabase.storage.from("avatars").upload(path, croppedBlob, { upsert: true, contentType: "image/jpeg", cacheControl: "31536000" });
-      if (!error) {
-        const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
-        setAvatarUrl(urlData.publicUrl);
-        addToast("Photo cropped & uploaded", "success");
+    try {
+      if (useDb) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user?.id) {
+          addToast("Upload failed. Please sign in again.", "error");
+          return;
+        }
+        const path = `profiles/${user.id}/${member.id}-${Date.now()}.jpg`;
+        const { error } = await supabase.storage.from("avatars").upload(path, croppedBlob, { upsert: true, contentType: "image/jpeg", cacheControl: "31536000" });
+        if (!error) {
+          const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
+          setAvatarUrl(urlData.publicUrl);
+          addToast("Photo cropped & uploaded", "success");
+        } else {
+          addToast("Upload failed. Check Supabase storage bucket.", "error");
+        }
       } else {
-        addToast("Upload failed. Check Supabase storage bucket.", "error");
+        setAvatarUrl(URL.createObjectURL(croppedBlob));
+        addToast("Photo cropped (local only)", "info");
       }
-    } else {
-      setAvatarUrl(URL.createObjectURL(croppedBlob));
-      addToast("Photo cropped (local only)", "info");
+    } catch {
+      // A thrown/hung auth or storage call must never strand the avatar spinner.
+      addToast("Upload failed. Check your connection and try again.", "error");
+    } finally {
+      setUploading(false);
     }
-    setUploading(false);
   };
 
   const handleSave = async () => {

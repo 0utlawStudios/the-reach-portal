@@ -54,31 +54,36 @@ export function KickbackModal() {
   const handleSubmit = async () => {
     if (!isValid) return;
     setUploading(true);
+    try {
+      let attachmentUrl: string | undefined;
 
-    let attachmentUrl: string | undefined;
+      if (file && useSupabase) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user?.id) {
+          addToast("Please sign in again before attaching a revision file.", "error");
+          return;
+        }
+        const ext = file.name.split(".").pop();
+        const path = `kickback/${user.id}/${pendingKickback.cardId}-${Date.now()}.${ext}`;
+        const { error } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
+        if (!error) {
+          const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
+          attachmentUrl = urlData.publicUrl;
+        }
+      } else if (file) {
+        attachmentUrl = filePreview || undefined;
+      }
 
-    if (file && useSupabase) {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.id) {
-        addToast("Please sign in again before attaching a revision file.", "error");
-        setUploading(false);
-        return;
-      }
-      const ext = file.name.split(".").pop();
-      const path = `kickback/${user.id}/${pendingKickback.cardId}-${Date.now()}.${ext}`;
-      const { error } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
-      if (!error) {
-        const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
-        attachmentUrl = urlData.publicUrl;
-      }
-    } else if (file) {
-      attachmentUrl = filePreview || undefined;
+      submitKickback(pendingKickback.cardId, note.trim(), attachmentUrl);
+      setNote("");
+      removeFile();
+    } catch {
+      // A thrown/hung auth or storage call must never strand the "Sending…"
+      // button. Surface it; the finally re-enables the form so the user retries.
+      addToast("Couldn't send the revision. Check your connection and try again.", "error");
+    } finally {
+      setUploading(false);
     }
-
-    submitKickback(pendingKickback.cardId, note.trim(), attachmentUrl);
-    setNote("");
-    removeFile();
-    setUploading(false);
   };
 
   const handleCancel = () => {

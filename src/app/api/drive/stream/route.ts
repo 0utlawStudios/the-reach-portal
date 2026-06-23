@@ -182,8 +182,19 @@ export async function GET(request: NextRequest) {
       driveHeaders["Range"] = rangeHeader;
     }
 
-    // Fetch from Google Drive
-    const driveRes = await fetch(driveUrl, { headers: driveHeaders });
+    // Fetch from Google Drive. Bound the time-to-response with an AbortController
+    // (mirrors proxy-upload / upload-chunk / driveFetch) so a Google connection
+    // that stalls before sending response headers fails fast with a sanitized
+    // error instead of hanging until maxDuration. The timer is cleared the moment
+    // headers arrive, so it never interrupts a legitimate in-flight byte stream.
+    const streamController = new AbortController();
+    const streamTimer = setTimeout(() => streamController.abort(), 45000);
+    let driveRes: Response;
+    try {
+      driveRes = await fetch(driveUrl, { headers: driveHeaders, signal: streamController.signal });
+    } finally {
+      clearTimeout(streamTimer);
+    }
 
     if (!driveRes.ok && driveRes.status !== 206) {
       return new Response(JSON.stringify({ error: "Failed to fetch file from Drive" }), {

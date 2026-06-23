@@ -73,6 +73,14 @@ describe("Drive upload surfaces", () => {
     expect(createPost).toContain("Couldn't upload your files");
     expect(createPost).toMatch(/if \(uploadFailed\) \{[\s\S]*?setSubmitting\(false\)/);
 
+    // Upload-adjacent surfaces hardened in the follow-up sweep (kickback
+    // attachment upload, profile avatar upload) must reset their loading flag in
+    // a finally, not only on the happy path.
+    const kickback = source("src/components/kickback-modal.tsx");
+    expect(kickback).toMatch(/finally \{[\s\S]*?setUploading\(false\)/);
+    const settingsPage = source("src/components/pages/settings-page.tsx");
+    expect(settingsPage).toMatch(/finally \{\s*setUploading\(false\)/);
+
     // A catch block that re-imports the drive-upload chunk would re-throw on the
     // very stale chunk that broke the upload, swallowing the error toast and
     // (where cleanup is outside the catch) stranding the UI. Telemetry in catch

@@ -65,21 +65,27 @@ export default function ResetPasswordPage() {
     setLoading(true);
     setError("");
 
-    const supabase = getSupabase();
-    const { error: pwError } = await supabase.auth.updateUser({ password });
+    try {
+      const supabase = getSupabase();
+      const { error: pwError } = await supabase.auth.updateUser({ password });
 
-    if (pwError) {
-      setError(pwError.message);
+      if (pwError) {
+        setError(pwError.message);
+        return;
+      }
+
+      // Sign out so user must log in with their new password
+      await supabase.auth.signOut();
+
+      setSuccess(true);
+      setTimeout(() => { window.location.href = "/"; }, 2500);
+    } catch {
+      // A thrown/rejected request (offline, network blip) must never leave the
+      // button spinning with no message. Surface it; finally re-enables submit.
+      setError("Network error. Please try again.");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    // Sign out so user must log in with their new password
-    await supabase.auth.signOut();
-
-    setSuccess(true);
-    setLoading(false);
-    setTimeout(() => { window.location.href = "/"; }, 2500);
   };
 
   if (success) {

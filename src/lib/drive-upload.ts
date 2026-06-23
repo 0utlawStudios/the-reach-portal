@@ -452,6 +452,53 @@ async function uploadResumableChunk(
   });
 }
 
+// A single dropped chunk should re-send just that chunk against the still-valid
+// resumable session, not discard the whole multi-chunk upload. Without this, a
+// 100-250MB iPhone video (50-125 chunks) on flaky mobile/wifi got only ONE
+// whole-file retry (PUT_RETRY_DELAYS) — two transient blips anywhere across the
+// file restarted from byte 0 and then failed the entire upload.
+const CHUNK_RETRY_DELAYS = process.env.NODE_ENV === "test" ? [1, 3] : [2000, 5000];
+
+// Only CONNECTION-phase failures are retried in place: Google never returned an
+// HTTP status, so the resumable session offset is intact and re-PUTting just
+// this byte range is safe (the protocol dedups by offset). A server-RETURNED
+// error (a 403 "storage busy", a 5xx) is NOT retried here — it bubbles to the
+// session-level retry in uploadViaResumable, which re-mints the session, the
+// correct recovery for a poisoned/expired session.
+function isResumableChunkRetryableInPlace(error: Error): boolean {
+  if (error instanceof DriveUploadError) {
+    return error.reason === "network" || error.reason === "timeout";
+  }
+  // Generic client-side stall/no-response conditions from the xhr watchdog/timers.
+  return /no progress for 30s|did not respond/i.test(error.message);
+}
+
+async function putResumableChunkWithRetry(
+  file: File,
+  uploadUri: string,
+  folder: string,
+  accessToken: string | undefined,
+  start: number,
+  end: number,
+  onProgress: ProgressCallback | undefined
+): Promise<{ done: boolean; fileId?: string }> {
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt <= CHUNK_RETRY_DELAYS.length; attempt++) {
+    try {
+      return await uploadResumableChunk(file, uploadUri, folder, accessToken, start, end, onProgress);
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      if (!isResumableChunkRetryableInPlace(lastError) || attempt >= CHUNK_RETRY_DELAYS.length) {
+        throw lastError;
+      }
+      const delay = retryDelayWithJitter(CHUNK_RETRY_DELAYS[attempt]);
+      console.warn(`[drive-upload] resumable chunk @${start} attempt ${attempt + 1} failed, retrying in ${delay}ms...`);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  throw lastError || new Error("Resumable chunk failed");
+}
+
 async function putToGoogle(
   file: File,
   uploadUri: string,
@@ -461,7 +508,7 @@ async function putToGoogle(
   const accessToken = await getAccessTokenFromCurrentSession();
   for (let start = 0; start < file.size; start += DRIVE_RESUMABLE_CHUNK_SIZE) {
     const end = Math.min(start + DRIVE_RESUMABLE_CHUNK_SIZE, file.size) - 1;
-    const result = await uploadResumableChunk(file, uploadUri, folder, accessToken, start, end, onProgress);
+    const result = await putResumableChunkWithRetry(file, uploadUri, folder, accessToken, start, end, onProgress);
     if (result.done) {
       if (!result.fileId) throw new Error("Storage did not return a file ID after upload");
       return result.fileId;
