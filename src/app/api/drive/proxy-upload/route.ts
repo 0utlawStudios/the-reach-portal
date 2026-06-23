@@ -25,6 +25,10 @@ import {
   statusForSanitizedDriveError,
 } from "@/lib/drive-errors";
 
+// Pinned: this route uses Node Buffer APIs to assemble the multipart body and
+// relies on Vercel's ~4.5 MB body limit (see MAX_DRIVE_PROXY_FILE_SIZE). Never
+// switch it to the edge runtime.
+export const runtime = "nodejs";
 export const maxDuration = 60;
 
 // Helper: always return clean JSON (no control characters ever)

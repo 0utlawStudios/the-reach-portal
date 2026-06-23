@@ -40,14 +40,14 @@ export default function RequestAccessPage() {
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         setError(data.error || "Request failed. Please try again.");
-        setLoading(false);
         return;
       }
       setSuccess(true);
     } catch {
       setError("Network error. Please try again.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   if (success) {

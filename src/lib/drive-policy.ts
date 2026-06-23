@@ -49,6 +49,12 @@ export const ALLOWED_MEDIA_MIME_TYPES = new Set<string>([
 ]);
 
 export const MAX_DRIVE_MEDIA_FILE_SIZE = 250 * 1024 * 1024;
+// The proxy path sends the whole file in one same-origin POST, so it MUST stay
+// under Vercel's ~4.5 MB serverless request-body limit. Files at or above this
+// route through the resumable (upload/upload-chunk) path instead. Do NOT raise
+// this above ~4.5 MB without also reconfiguring the platform body-size limit, or
+// Vercel rejects the body with an opaque 413 before the route's own size check
+// can run (which the client cannot map to a friendly errorReason).
 export const MAX_DRIVE_PROXY_FILE_SIZE = 4 * 1024 * 1024;
 export const DRIVE_RESUMABLE_CHUNK_SIZE = 2 * 1024 * 1024;
 

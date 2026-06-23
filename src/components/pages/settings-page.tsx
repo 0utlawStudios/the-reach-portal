@@ -589,8 +589,11 @@ export function SettingsPage() {
       } else {
         addToast(data.error || "Action failed", "error");
       }
-    } catch { addToast("Network error", "error"); }
-    setApproving(null);
+    } catch {
+      addToast("Network error", "error");
+    } finally {
+      setApproving(null);
+    }
   };
 
   const handleInvite = async (e: React.FormEvent) => {
@@ -659,9 +662,12 @@ export function SettingsPage() {
       } else {
         addToast(data.error || "Resend failed", "error");
       }
-    } catch { addToast("Network error", "error"); }
-    setResendingInvite(null);
-    void refreshMembers();
+    } catch {
+      addToast("Network error", "error");
+    } finally {
+      setResendingInvite(null);
+      void refreshMembers();
+    }
   };
 
   return (

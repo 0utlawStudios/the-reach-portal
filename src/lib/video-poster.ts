@@ -1,5 +1,21 @@
 const POSTER_MAX_EDGE = 1280;
 const POSTER_QUALITY = 0.84;
+// Overall budget for poster generation. A video the browser cannot decode would
+// otherwise wait out two sequential ~10s per-event timeouts (~20s) before
+// failing. Cap the whole attempt so a bad codec falls back to no-poster fast —
+// callers treat a thrown poster as best-effort and upload the video without a
+// custom thumbnail.
+const POSTER_OVERALL_BUDGET_MS = 8000;
+
+function withOverallTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error(message)), ms);
+    promise.then(
+      (value) => { window.clearTimeout(timer); resolve(value); },
+      (err) => { window.clearTimeout(timer); reject(err); },
+    );
+  });
+}
 
 function baseName(name: string): string {
   return name.replace(/\.[^.]+$/, "") || "video";
@@ -54,6 +70,7 @@ export async function createVideoPosterFile(file: File): Promise<File> {
   video.src = objectUrl;
 
   try {
+    return await withOverallTimeout((async () => {
     await waitForEvent(video, "loadedmetadata");
     const duration = Number.isFinite(video.duration) ? video.duration : 0;
     const targetTime = duration > 0.5 ? 0.25 : 0;
@@ -80,6 +97,7 @@ export async function createVideoPosterFile(file: File): Promise<File> {
 
     const blob = await canvasToJpeg(canvas);
     return new File([blob], `${baseName(file.name)}-poster.jpg`, { type: "image/jpeg" });
+    })(), POSTER_OVERALL_BUDGET_MS, "Timed out generating video thumbnail");
   } finally {
     video.removeAttribute("src");
     video.load();

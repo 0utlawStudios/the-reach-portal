@@ -38,8 +38,9 @@ export default function ForgotPasswordPage() {
       }
     } catch {
       setError("Network error. Please try again.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   if (sent) {

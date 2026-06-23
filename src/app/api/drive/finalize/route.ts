@@ -23,8 +23,16 @@ export const maxDuration = 60;
 // audit logs.
 const DRIVE_FILE_ID_RE = /^[a-zA-Z0-9_-]{20,80}$/;
 
-// Any active team member can finalize, but the file must already live under
-// one of this app's managed Drive folders before permissions are changed.
+// The file must already live under one of this app's managed Drive folders (the
+// parent-folder membership check further below) before any permission is
+// changed — that folder check, NOT this role list, is the real guard against
+// publicizing arbitrary Drive content.
+//
+// This list is intentionally kept in PARITY with ALLOWED_DRIVE_ROLES (the upload
+// gate in proxy-upload / upload). finalize must never be narrower than the upload
+// routes: a role that can upload a large (resumable) file but cannot finalize it
+// would hit a broken upload. If you tighten who may upload, tighten
+// ALLOWED_DRIVE_ROLES and mirror it here — do not diverge them.
 const ALLOWED_FINALIZE_ROLES: ReadonlyArray<string> = [
   "superadmin",
   "admin",

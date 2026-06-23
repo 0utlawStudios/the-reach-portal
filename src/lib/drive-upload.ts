@@ -80,6 +80,12 @@ const PUT_RETRY_DELAYS = process.env.NODE_ENV === "test" ? [1] : [3000];
 const STALL_TIMEOUT_MS = 30000;
 const PROXY_TOTAL_TIMEOUT_MS = 120000;
 const DIRECT_RESPONSE_TIMEOUT_MS = 120000;
+// After a chunk's bytes are fully sent, the server's response should arrive
+// quickly. This bound is intentionally shorter than the xhr.timeout backstop
+// (DIRECT_RESPONSE_TIMEOUT_MS) so a no-response stall fails with the clear
+// "did not respond" message instead of racing the generic "Upload timed out."
+// at the same 120s mark.
+const DIRECT_RESPONSE_WAIT_MS = 60000;
 const AUTH_SESSION_TIMEOUT_MS = 10000;
 
 // Files at or above this threshold upload directly to storage (client PUTs bytes
@@ -273,6 +279,12 @@ async function uploadViaProxy(
     return new Promise<DriveUploadResult>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       let settled = false;
+      // Track whether the browser finished sending every byte. If a network or
+      // timeout error fires AFTER the full body was sent, the server may have
+      // already created the Drive file but lost the response — auto-retrying
+      // would silently create a DUPLICATE. So a post-send failure is reported
+      // as non-retryable with an honest "check the library" message instead.
+      let fullySent = false;
       const fail = (err: Error) => { if (settled) return; settled = true; watchdog.clear(); reject(err); };
       const done = (value: DriveUploadResult) => { if (settled) return; settled = true; watchdog.clear(); resolve(value); };
       const watchdog = makeStallWatchdog(xhr, () => fail(new Error("Upload stalled (no progress for 30s)")));
@@ -286,6 +298,7 @@ async function uploadViaProxy(
         if (e.lengthComputable) {
           onProgress?.(Math.round((e.loaded / e.total) * 90));
           if (e.loaded >= e.total) {
+            fullySent = true;
             watchdog.clear();
             onProgress?.(92);
           }
@@ -324,8 +337,18 @@ async function uploadViaProxy(
         }
       };
 
-      xhr.onerror = () => fail(new DriveUploadError("Network error during upload.", { reason: "network", retryable: true }));
-      xhr.ontimeout = () => fail(new DriveUploadError("Upload timed out.", { reason: "timeout", retryable: true }));
+      xhr.onerror = () => fail(new DriveUploadError(
+        fullySent
+          ? "The upload reached the server but the response was lost. Check the media library before retrying."
+          : "Network error during upload.",
+        { reason: "network", retryable: !fullySent },
+      ));
+      xhr.ontimeout = () => fail(new DriveUploadError(
+        fullySent
+          ? "The upload reached the server but timed out waiting for a response. Check the media library before retrying."
+          : "Upload timed out.",
+        { reason: "timeout", retryable: !fullySent },
+      ));
       xhr.onabort = () => fail(new Error("Upload aborted"));
       watchdog.kick();
       onProgress?.(5);
@@ -395,7 +418,7 @@ async function uploadResumableChunk(
       clearResponseTimer();
       responseTimer = setTimeout(() => {
         fail(new Error("Upload finished sending but storage did not respond"));
-      }, DIRECT_RESPONSE_TIMEOUT_MS);
+      }, DIRECT_RESPONSE_WAIT_MS);
     };
     const fail = (err: Error) => { if (settled) return; settled = true; watchdog.clear(); clearResponseTimer(); reject(err); };
     const done = (value: { done: boolean; fileId?: string }) => { if (settled) return; settled = true; watchdog.clear(); clearResponseTimer(); resolve(value); };

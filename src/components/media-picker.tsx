@@ -315,13 +315,22 @@ export function MediaPicker({
         }
         const successes = items.filter((item) => item.result);
         const selections: MediaPickerSelection[] = [];
+        // Load the playback-optimization module ONCE up front. If its code-split
+        // chunk fails to load, videos still upload (they just skip playback
+        // optimization) instead of the failure throwing mid-loop and dropping
+        // already-uploaded selections that the user expects attached.
+        let playbackModule: typeof import("@/lib/media-playback") | null = null;
+        try {
+          playbackModule = await import("@/lib/media-playback");
+        } catch {
+          playbackModule = null;
+        }
         for (const item of successes) {
           const result = item.result!;
           const mimeType = result.mimeType || normalizeDriveMimeType(item.file.type, item.file.name);
           let playbackUrl: string | undefined;
           let playbackStorageKey: string | undefined;
-          if (mimeType.startsWith("video/")) {
-            const playbackModule = await import("@/lib/media-playback");
+          if (mimeType.startsWith("video/") && playbackModule) {
             if (playbackModule.canUploadPlaybackCopy(item.file, mimeType)) {
               try {
                 const playback = await playbackModule.uploadVideoPlaybackCopy(item.file, cardId);
