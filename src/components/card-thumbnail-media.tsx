@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { ImageOff } from "lucide-react";
 import { PreviewImage } from "@/components/preview-image";
+import { MediaVideo } from "@/components/media-video";
 import type { ContentCard } from "@/lib/types";
 import {
   isVideoContentType,
@@ -38,14 +39,14 @@ export function CardThumbnailMedia({
 
   if (shouldRenderVideo) {
     return (
-      <video
+      <MediaVideo
         key={videoUrl}
-        src={videoPreviewFrameUrl(videoUrl)}
+        sources={[videoPreviewFrameUrl(videoUrl)]}
         muted
         playsInline
         preload="metadata"
         className={className}
-        aria-label={`${card.title} video preview`}
+        label={`${card.title} video preview`}
       />
     );
   }

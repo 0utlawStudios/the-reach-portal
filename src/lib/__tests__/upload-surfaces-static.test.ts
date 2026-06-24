@@ -107,7 +107,7 @@ describe("Drive upload surfaces", () => {
     expect(mediaPicker).toContain('function mediaDisplayUrl(asset: Pick<MediaEntry, "url" | "driveProxyUrl" | "playbackUrl">): string');
     expect(mediaPicker).toContain("return asset.playbackUrl || asset.driveProxyUrl || asset.url");
     expect(mediaPicker).toContain("mediaAssetId: asset.assetId");
-    expect(mediaPicker).toContain("videoPreviewFrameUrl(mediaDisplayUrl(asset))");
+    expect(mediaPicker).toContain("mediaVideoSources(asset, true)");
     expect(mediaPicker).toContain('preload="metadata"');
     expect(mediaPicker).toContain('controls');
 
@@ -116,7 +116,7 @@ describe("Drive upload surfaces", () => {
     expect(mediaPage).toContain("syncedUsedInValue(asset.usedIn, usage?.automaticCards || [])");
     expect(mediaPage).toContain("MEDIA_MANUAL_USED_TAG");
     expect(mediaPage).toContain("toggleManualUsed");
-    expect(mediaPage).toContain('aria-label={`${asset.name} video preview`}');
+    expect(mediaPage).toContain('label={`${asset.name} video preview`}');
     expect(mediaPage).toContain('className="max-w-full max-h-[60vh] object-contain rounded-lg bg-black"');
     expect(mediaPage).toContain('className="w-full h-[60vh] max-w-full max-h-[60vh] object-contain rounded-lg select-none"');
 
@@ -258,7 +258,7 @@ describe("Drive upload surfaces", () => {
     expect(previewImage).toContain("shouldLoadPrimary");
     expect(previewImage).toContain("FALLBACK_PREVIEW_LOAD_TIMEOUT_MS");
     expect(previewImage).toContain("timedOutFallbackSrcs");
-    expect(previewImage).toContain("!fallbackSrc || fallbackLoaded || fallbackFailed || fallbackTimedOut");
+    expect(previewImage).toContain("!fallbackSrc || wantsFullPreview || fallbackLoaded || fallbackFailed || fallbackTimedOut");
 
     for (const file of [
       "src/components/pages/media-page.tsx",
@@ -267,6 +267,15 @@ describe("Drive upload surfaces", () => {
       "src/components/asset-review-drawer.tsx",
     ]) {
       expect(source(file), file).toContain("warmBrowserImagePreview");
+    }
+
+    for (const file of ["src/components/pages/media-page.tsx", "src/components/media-picker.tsx"]) {
+      const src = source(file);
+      expect(src, file).toContain("browserImagePreviewUrl");
+      expect(src, file).toContain('size: "full"');
+      expect(src, file).toContain('size: "thumb"');
+      expect(src, file).toContain("warmedPreviewKeysRef");
+      expect(src, file).toContain("absoluteAppUrl");
     }
   });
 
@@ -289,12 +298,39 @@ describe("Drive upload surfaces", () => {
     expect(persist).not.toContain("asset_urls: assets.map((a) => a.signedUrl)");
   });
 
+  it("renders media-library videos with source fallback instead of a permanent black preview", () => {
+    const mediaVideo = source("src/components/media-video.tsx");
+    expect(mediaVideo).toContain("DEFAULT_VIDEO_LOAD_TIMEOUT_MS");
+    expect(mediaVideo).toContain("advanceSource");
+    expect(mediaVideo).toContain("Video preview unavailable");
+
+    for (const file of [
+      "src/components/pages/media-page.tsx",
+      "src/components/media-picker.tsx",
+      "src/components/asset-review-drawer.tsx",
+      "src/components/card-thumbnail-media.tsx",
+    ]) {
+      const src = source(file);
+      expect(src, file).toContain("MediaVideo");
+      expect(src, file).not.toContain("<video");
+    }
+    expect(source("src/components/pages/media-page.tsx")).toContain("mediaVideoSources");
+    expect(source("src/components/media-picker.tsx")).toContain("mediaVideoSources");
+    expect(source("src/components/card-thumbnail-media.tsx")).toContain("videoPreviewFrameUrl");
+    expect(source("src/components/asset-review-drawer.tsx")).toContain("resolvedVideoSources");
+  });
+
   it("keeps full Drive metadata when mirroring uploaded videos into Media Library", () => {
     const helper = source("src/lib/media-assets.ts");
     for (const field of ["file_id", "publish_url", "drive_proxy_url", "playback_url", "playback_storage_key", "mime_type", "size_bytes"]) {
       expect(helper, field).toContain(field);
     }
     expect(helper).toContain("mediaUrlAliases({ url, fileId, publishUrl, driveProxyUrl, playbackUrl })");
+    expect(helper).toContain("lookupError");
+    expect(helper).toContain("updateError");
+    expect(helper).toContain("throw new Error(`Media asset lookup failed:");
+    expect(helper).toContain("throw new Error(`Media asset update failed:");
+    expect(helper).toContain("throw new Error(`Media asset insert failed:");
 
     for (const file of [
       "src/components/create-post-modal.tsx",
@@ -308,6 +344,18 @@ describe("Drive upload surfaces", () => {
       expect(contents, file).toContain("mimeType:");
       expect(contents, file).toContain("size:");
     }
+  });
+
+  it("does not clear a completed create-post upload until the post insert is confirmed", () => {
+    const pipeline = source("src/lib/pipeline-context.tsx");
+    expect(pipeline).toContain("Promise<ContentCard | null>");
+    expect(pipeline).toContain("No post row was created. Check workspace access and retry.");
+    expect(pipeline).toContain("return savedCard");
+
+    const createPost = source("src/components/create-post-modal.tsx");
+    expect(createPost).toContain("const createdCard = await createCard");
+    expect(createPost).toContain("if (!createdCard) return;");
+    expect(createPost).toContain("usedIn: createdCard.id");
   });
 
   it("renders support attachments through the authenticated proxy, not stored signed URLs", () => {
@@ -347,6 +395,7 @@ describe("Drive upload surfaces", () => {
       const contents = source(file);
       expect(contents, file).toContain("requireRole");
       expect(contents, file).toContain("requiresWorkspaceAppProperty");
+      expect(contents, file).toContain("(!fileWorkspaceId && auth.requiresWorkspaceAppProperty)");
       expect(contents, file).not.toContain('headers.get("referer")');
       expect(contents, file).not.toContain("refOk");
     }

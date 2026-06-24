@@ -270,6 +270,7 @@ function rememberBasicPostsSelect(): void {
 }
 
 type StageMoveCommitRow = Pick<PostRow, "id" | "stage"> | null | undefined;
+type PostUpdateCommitRow = Pick<PostRow, "id"> | null | undefined;
 
 export function assertStageMoveCommitted(
   row: StageMoveCommitRow,
@@ -284,6 +285,15 @@ export function assertStageMoveCommitted(
   }
   if (row.stage !== newStage) {
     throw new Error(`Stage update returned "${row.stage}", expected "${newStage}". Card restored.`);
+  }
+}
+
+export function assertPostUpdateCommitted(row: PostUpdateCommitRow, cardId: string): void {
+  if (!row) {
+    throw new Error("No post row was updated. Check workspace access and reload.");
+  }
+  if (row.id !== cardId) {
+    throw new Error("Update returned a different post. Changes reverted.");
   }
 }
 
@@ -310,9 +320,12 @@ function isSupabaseConfigured(): boolean {
   return !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 }
 
-async function createPublishJob(postId: string): Promise<void> {
+async function createPublishJob(postId: string, workspaceId: string): Promise<void> {
   const { data: { session } } = await supabase.auth.getSession();
-  const headers: HeadersInit = { "Content-Type": "application/json" };
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+    "X-Workspace-Id": workspaceId,
+  };
   if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
 
   const res = await fetch("/api/publish-jobs", {
@@ -363,7 +376,7 @@ interface PipelineContextType {
   submitKickback: (cardId: string, note: string, attachmentUrl?: string) => void;
   cancelKickback: () => void;
   updateCard: (cardId: string, updates: Partial<ContentCard>, onResult?: (persisted: boolean) => void) => void;
-  createCard: (card: Partial<Pick<ContentCard, "checklist">> & Omit<ContentCard, "id" | "createdAt" | "updatedAt" | "checklist">) => void;
+  createCard: (card: Partial<Pick<ContentCard, "checklist">> & Omit<ContentCard, "id" | "createdAt" | "updatedAt" | "checklist">) => Promise<ContentCard | null>;
   deleteCard: (cardId: string) => void;
 }
 
@@ -740,7 +753,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
           const hasSchedule = card?.scheduledDate && card?.scheduledTime;
           if (hasSchedule) {
             try {
-              await createPublishJob(cardId);
+              await createPublishJob(cardId, workspaceIdRef.current || BASELINE_WORKSPACE_ID);
             } catch (jobErr) {
               const m = jobErr instanceof Error ? jobErr.message : String(jobErr);
               console.error("[pipeline] publish job not queued (stage move kept):", m);
@@ -808,7 +821,9 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
         .update({ stage: "awaiting_approval", notes })
         .eq("id", cardId)
         .eq("workspace_id", workspaceIdRef.current || BASELINE_WORKSPACE_ID)
-        .then(({ error }) => {
+        .select("id")
+        .maybeSingle()
+        .then(({ data, error }) => {
         if (error) {
           const message = formatPipelineError(error);
           console.error("[pipeline] reapproval sync failed:", message);
@@ -818,6 +833,19 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
             setSelectedCard(previousSelected);
           }
           // Clear the dedup mark so a realtime echo can re-sync the card (DATA-003).
+          recentMutations.current.delete(cardId);
+          addToast(`Save failed: ${message}. Changes reverted.`, "error");
+          return;
+        }
+        try {
+          assertPostUpdateCommitted(data as PostUpdateCommitRow, cardId);
+        } catch (commitError) {
+          const message = formatPipelineError(commitError);
+          console.error("[pipeline] reapproval sync failed:", message);
+          if (previousCard) {
+            setCards((prev) => prev.map((c) => c.id === cardId ? previousCard : c));
+            setSelectedCard(previousSelected);
+          }
           recentMutations.current.delete(cardId);
           addToast(`Save failed: ${message}. Changes reverted.`, "error");
           return;
@@ -916,7 +944,9 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
         .update({ stage: "revision_needed", notes })
         .eq("id", cardId)
         .eq("workspace_id", workspaceIdRef.current || BASELINE_WORKSPACE_ID)
-        .then(({ error }) => {
+        .select("id")
+        .maybeSingle()
+        .then(({ data, error }) => {
         if (error) {
           const message = formatPipelineError(error);
           console.error("[pipeline] kickback sync failed:", message);
@@ -926,6 +956,19 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
             setSelectedCard(previousSelected);
           }
           // Clear the dedup mark so a realtime echo can re-sync the card (DATA-003).
+          recentMutations.current.delete(cardId);
+          addToast(`Kickback failed: ${message}. Changes reverted.`, "error");
+          return;
+        }
+        try {
+          assertPostUpdateCommitted(data as PostUpdateCommitRow, cardId);
+        } catch (commitError) {
+          const message = formatPipelineError(commitError);
+          console.error("[pipeline] kickback sync failed:", message);
+          if (previousCard) {
+            setCards((prev) => prev.map((c) => c.id === cardId ? previousCard : c));
+            setSelectedCard(previousSelected);
+          }
           recentMutations.current.delete(cardId);
           addToast(`Kickback failed: ${message}. Changes reverted.`, "error");
           return;
@@ -963,7 +1006,9 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
         .update(cardToDb(updates))
         .eq("id", cardId)
         .eq("workspace_id", workspaceIdRef.current || BASELINE_WORKSPACE_ID)
-        .then(({ error }) => {
+        .select("id")
+        .maybeSingle()
+        .then(({ data, error }) => {
         if (error) {
           console.error("[pipeline] updateCard sync failed:", error.message);
           if (previousCard) {
@@ -975,6 +1020,20 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
           addToast(`Save failed: ${error.message}. Changes reverted.`, "error");
           onResult?.(false);
         } else {
+          try {
+            assertPostUpdateCommitted(data as PostUpdateCommitRow, cardId);
+          } catch (commitError) {
+            const message = formatPipelineError(commitError);
+            console.error("[pipeline] updateCard sync failed:", message);
+            if (previousCard) {
+              setCards((prev) => prev.map((c) => c.id === cardId ? previousCard : c));
+              setSelectedCard(previousSelected);
+            }
+            recentMutations.current.delete(cardId);
+            addToast(`Save failed: ${message}. Changes reverted.`, "error");
+            onResult?.(false);
+            return;
+          }
           // The write committed — callers gating a side-effect (e.g. an
           // @mention email) on a confirmed persist can safely fire now.
           onResult?.(true);
@@ -987,7 +1046,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     }
   }, [useSupabase, selectedCard, addToast]);
 
-  const createCard = useCallback((card: Partial<Pick<ContentCard, "checklist">> & Omit<ContentCard, "id" | "createdAt" | "updatedAt" | "checklist">) => {
+  const createCard = useCallback(async (card: Partial<Pick<ContentCard, "checklist">> & Omit<ContentCard, "id" | "createdAt" | "updatedAt" | "checklist">): Promise<ContentCard | null> => {
     const now = new Date().toISOString();
     const tempId = Date.now().toString();
     const newCard: ContentCard = {
@@ -999,51 +1058,64 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     };
     setCards((prev) => [newCard, ...prev]);
 
-    if (useSupabase) {
-      // Mark by tempId so we can match the real insert when it echoes back via
-      // realtime. The previous literal "create" key collided across concurrent
-      // creators — two simultaneous inserts would each suppress the other's
-      // echo until the 2s dedup window expired.
-      markMutation(tempId);
+    if (!useSupabase) return newCard;
+
+    // Mark by tempId so we can match the real insert when it echoes back via
+    // realtime. The previous literal "create" key collided across concurrent
+    // creators — two simultaneous inserts would each suppress the other's
+    // echo until the 2s dedup window expired.
+    markMutation(tempId);
+    const rollback = (message: string) => {
+      console.error("[pipeline] createCard sync failed:", message);
+      // Rollback: the row was never persisted, so remove the local tempId
+      // card to keep UI honest. Surface the failure to the user.
+      setCards((prev) => prev.filter((c) => c.id !== tempId));
+      recentMutations.current.delete(tempId);
+      addToast(`Save failed: ${message}. Card was not created.`, "error");
+    };
+
+    try {
       const dbRow = cardToDb(newCard);
       dbRow.checklist = newCard.checklist;
       const insertRow: Record<string, unknown> = { ...dbRow };
       insertRow.workspace_id = workspaceIdRef.current || "00000000-0000-0000-0000-000000000001";
-      supabase.from("posts").insert(insertRow).select().single().then(({ data, error }) => {
-        if (error) {
-          console.error("[pipeline] createCard sync failed:", error.message);
-          // Rollback: the row was never persisted, so remove the local tempId
-          // card to keep UI honest. Surface the failure to the user.
-          setCards((prev) => prev.filter((c) => c.id !== tempId));
-          recentMutations.current.delete(tempId);
-          addToast(`Save failed: ${error.message}. Card was not created.`, "error");
-        } else if (data) {
-          const savedCard = dbToCard(data as PostRow);
-          setCards((prev) => {
-            let inserted = false;
-            const next: ContentCard[] = [];
-            for (const existing of prev) {
-              if (existing.id === tempId || existing.id === savedCard.id) {
-                if (!inserted) {
-                  next.push(savedCard);
-                  inserted = true;
-                }
-                continue;
-              }
-              next.push(existing);
+      const { data, error } = await supabase.from("posts").insert(insertRow).select().single();
+      if (error) {
+        rollback(error.message);
+        return null;
+      }
+      if (!data) {
+        rollback("No post row was created. Check workspace access and retry.");
+        return null;
+      }
+      const savedCard = dbToCard(data as PostRow);
+      setCards((prev) => {
+        let inserted = false;
+        const next: ContentCard[] = [];
+        for (const existing of prev) {
+          if (existing.id === tempId || existing.id === savedCard.id) {
+            if (!inserted) {
+              next.push(savedCard);
+              inserted = true;
             }
-            return inserted ? next : [savedCard, ...next];
-          });
-          // Remap an open drawer's selectedCard from the temp id to the real
-          // UUID too. Without this, every subsequent save from that drawer
-          // fails the isValidUuid guard and is silently skipped (DATA-005).
-          setSelectedCard((prev) => (prev?.id === tempId || prev?.id === savedCard.id ? savedCard : prev));
-          // Also mark the real id so the realtime INSERT echo (which will
-          // arrive with the real UUID) is suppressed.
-          recentMutations.current.delete(tempId);
-          markMutation(savedCard.id);
+            continue;
+          }
+          next.push(existing);
         }
+        return inserted ? next : [savedCard, ...next];
       });
+      // Remap an open drawer's selectedCard from the temp id to the real
+      // UUID too. Without this, every subsequent save from that drawer
+      // fails the isValidUuid guard and is silently skipped (DATA-005).
+      setSelectedCard((prev) => (prev?.id === tempId || prev?.id === savedCard.id ? savedCard : prev));
+      // Also mark the real id so the realtime INSERT echo (which will
+      // arrive with the real UUID) is suppressed.
+      recentMutations.current.delete(tempId);
+      markMutation(savedCard.id);
+      return savedCard;
+    } catch (error) {
+      rollback(formatPipelineError(error));
+      return null;
     }
   }, [useSupabase, addToast]);
 

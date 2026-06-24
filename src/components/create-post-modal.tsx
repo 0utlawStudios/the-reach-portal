@@ -367,7 +367,7 @@ export function CreatePostModal({ open, onClose }: Props) {
     }
 
     try {
-    createCard({
+    const createdCard = await createCard({
       title: title.trim(),
       stage: "ideas",
       platforms,
@@ -390,9 +390,9 @@ export function CreatePostModal({ open, onClose }: Props) {
         rawFiles: rawFiles.length > 0 ? rawFiles : undefined,
       } : undefined,
     });
+    if (!createdCard) return;
 
     // Insert uploaded files into media_assets so they appear in Media Library
-    // Note: usedIn omitted — post ID is still a temp timestamp at this point
     for (const rf of rawFiles) {
       try {
         await ensureMediaAsset({
@@ -409,6 +409,7 @@ export function CreatePostModal({ open, onClose }: Props) {
           folder: "Content Engine Uploads",
           addedBy: currentUser.name,
           workspaceId,
+          usedIn: createdCard.id,
         });
       } catch (err) {
         console.error("[create-post] media_assets insert failed:", err);

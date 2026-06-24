@@ -12,6 +12,7 @@
 
 import { describe, it, expect } from "vitest";
 import {
+  assertPostUpdateCommitted,
   dbToCard,
   cardToDb,
   normalizePublishJob,
@@ -164,6 +165,27 @@ describe("cardToDb — scheduled_at is only written when schedule fields are tou
     expect(out.title).toBe("Renamed");
     expect(out.stage).toBe("revision_needed");
     expect("caption" in out).toBe(false);
+  });
+});
+
+describe("assertPostUpdateCommitted", () => {
+  it("rejects zero-row updates so optimistic saves do not pretend to persist", () => {
+    expect(() => assertPostUpdateCommitted(null, "33333333-3333-4333-8333-333333333333"))
+      .toThrow(/No post row was updated/);
+  });
+
+  it("rejects mismatched update rows", () => {
+    expect(() => assertPostUpdateCommitted(
+      { id: "44444444-4444-4444-8444-444444444444" },
+      "33333333-3333-4333-8333-333333333333",
+    )).toThrow(/different post/);
+  });
+
+  it("accepts the expected updated row", () => {
+    expect(() => assertPostUpdateCommitted(
+      { id: "33333333-3333-4333-8333-333333333333" },
+      "33333333-3333-4333-8333-333333333333",
+    )).not.toThrow();
   });
 });
 

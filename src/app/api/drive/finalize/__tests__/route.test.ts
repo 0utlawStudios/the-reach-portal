@@ -74,6 +74,7 @@ beforeEach(() => {
     mimeType: "video/mp4",
     size: 5 * 1024 * 1024,
     parents: ["raw-folder"],
+    appProperties: { workspaceId: "00000000-0000-0000-0000-000000000001" },
   });
   alertMocks.notifyUploadFailure.mockResolvedValue({ emailSent: false, telegramSent: false });
 });
@@ -127,6 +128,24 @@ describe("POST /api/drive/finalize", () => {
 
     expect(res.status).toBe(403);
     expect(data.error).toMatch(/workspace/i);
+    expect(driveMocks.getStreamUrl).not.toHaveBeenCalled();
+    expect(driveMocks.getPublishStreamUrl).not.toHaveBeenCalled();
+  });
+
+  it("rejects a managed-folder file missing workspace metadata before URL signing", async () => {
+    driveMocks.getFileMetadata.mockResolvedValueOnce({
+      id: FILE_ID,
+      name: "clip.mp4",
+      mimeType: "video/mp4",
+      size: 5 * 1024 * 1024,
+      parents: ["raw-folder"],
+    });
+
+    const res = await POST(makeRequest({ fileId: FILE_ID, folder: "raw-files" }));
+    const data = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(data.error).toMatch(/workspace ownership/i);
     expect(driveMocks.getStreamUrl).not.toHaveBeenCalled();
     expect(driveMocks.getPublishStreamUrl).not.toHaveBeenCalled();
   });

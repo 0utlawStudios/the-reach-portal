@@ -9,7 +9,7 @@ describe("PreviewImage", () => {
     vi.useRealTimers();
   });
 
-  it("keeps a slow HEIC thumbnail alive while the full preview starts loading", async () => {
+  it("starts the full HEIC preview immediately while keeping the thumbnail fallback alive", async () => {
     vi.useFakeTimers();
     const { container } = render(
       <PreviewImage
@@ -22,8 +22,9 @@ describe("PreviewImage", () => {
     );
 
     let images = Array.from(container.querySelectorAll("img"));
-    expect(images).toHaveLength(1);
+    expect(images).toHaveLength(2);
     expect(images[0]).toHaveAttribute("src", `/api/media/image-preview?id=${FILE_ID}&token=signed&size=thumb`);
+    expect(images[1]).toHaveAttribute("src", `/api/media/image-preview?id=${FILE_ID}&token=signed&size=full`);
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2_501);

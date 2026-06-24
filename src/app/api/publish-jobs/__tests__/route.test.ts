@@ -14,6 +14,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 type AuthResult = { data: { user: unknown }; error: unknown };
 let callerGetUser: AuthResult;
 let tableResults: Record<string, unknown>;
+let rpcMock: ReturnType<typeof vi.fn>;
 
 function makeQuery(table: string) {
   const builder: Record<string, unknown> = {};
@@ -32,7 +33,7 @@ vi.mock("@supabase/supabase-js", () => ({
   createClient: vi.fn(() => ({
     auth: { getUser: vi.fn(() => Promise.resolve(callerGetUser)) },
     from: vi.fn((table: string) => makeQuery(table)),
-    rpc: vi.fn(() => Promise.resolve({ data: { id: "job-1" }, error: null })),
+    rpc: vi.fn((...args: unknown[]) => rpcMock(...args)),
   })),
 }));
 
@@ -47,6 +48,8 @@ vi.mock("@/lib/rate-limit", () => ({
 import { POST } from "../route";
 
 const VALID_UUID = "44444444-4444-4444-8444-444444444444";
+const WORKSPACE_A = "00000000-0000-0000-0000-000000000001";
+const WORKSPACE_B = "11111111-1111-1111-1111-111111111111";
 
 // Minimal NextRequest stand-in: route reads headers + json().
 function makeRequest(headers: Record<string, string>, body: unknown = {}) {
@@ -65,6 +68,7 @@ beforeEach(() => {
   process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-key";
   callerGetUser = { data: { user: null }, error: null };
   tableResults = {};
+  rpcMock = vi.fn(() => Promise.resolve({ data: { id: "job-1" }, error: null }));
 });
 
 describe("POST /api/publish-jobs — auth contract", () => {
@@ -113,5 +117,39 @@ describe("POST /api/publish-jobs — authorization contract", () => {
       makeRequest({ Authorization: "Bearer good" }, { postId: VALID_UUID }),
     );
     expect(res.status).toBe(403);
+  });
+
+  it("rejects a publish job when the post is outside the active workspace", async () => {
+    callerGetUser = { data: { user: { id: "user-3" } }, error: null };
+    tableResults = {
+      posts: {
+        data: {
+          id: VALID_UUID,
+          workspace_id: WORKSPACE_B,
+          stage: "approved_scheduled",
+          scheduled_at: "2026-06-25T12:00:00.000Z",
+        },
+        error: null,
+      },
+      workspace_members: { data: { role: "editor" }, error: null },
+    };
+
+    const res = await POST(
+      makeRequest({ Authorization: "Bearer good", "X-Workspace-Id": WORKSPACE_A }, { postId: VALID_UUID }),
+    );
+
+    expect(res.status).toBe(403);
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a malformed active workspace header before creating a job", async () => {
+    callerGetUser = { data: { user: { id: "user-4" } }, error: null };
+
+    const res = await POST(
+      makeRequest({ Authorization: "Bearer good", "X-Workspace-Id": "not-a-workspace" }, { postId: VALID_UUID }),
+    );
+
+    expect(res.status).toBe(400);
+    expect(rpcMock).not.toHaveBeenCalled();
   });
 });

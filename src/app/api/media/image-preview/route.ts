@@ -37,7 +37,7 @@ const PREVIEW_CONVERSION_TIMEOUT_MS = {
 // while larger panoramas fail closed before raw decode.
 const HEIC_FALLBACK_MAX_PIXELS = 50_000_000;
 const DRIVE_MEDIA_TIMEOUT_MS = 45_000;
-const DRIVE_THUMBNAIL_TIMEOUT_MS = 8_000;
+const DRIVE_THUMBNAIL_TIMEOUT_MS = 1_500;
 const inFlightPreviewBuilds = new Map<string, Promise<Buffer>>();
 
 type PreviewSize = keyof typeof PREVIEW_SIZES;
@@ -486,6 +486,7 @@ export async function GET(request: NextRequest) {
       auth.workspaceId &&
       (
         (fileWorkspaceId && fileWorkspaceId !== auth.workspaceId) ||
+        (!fileWorkspaceId && auth.requiresWorkspaceAppProperty) ||
         (!fileWorkspaceId && !(await metadataIsInAppManagedDriveFolder(meta)))
       )
     ) {

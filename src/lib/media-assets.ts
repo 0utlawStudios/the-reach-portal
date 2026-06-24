@@ -50,12 +50,15 @@ export async function ensureMediaAsset(params: EnsureMediaAssetParams): Promise<
   // filter is belt-and-suspenders against a future code path that mistakenly
   // uses the admin client here.
   const aliases = Array.from(mediaUrlAliases({ url, fileId, publishUrl, driveProxyUrl, playbackUrl }));
-  const { data: existingRows } = await supabase
+  const { data: existingRows, error: lookupError } = await supabase
     .from("media_assets")
     .select("id, used_in")
     .in("url", aliases.length > 0 ? aliases : [url])
     .eq("workspace_id", wsId)
     .limit(1);
+  if (lookupError) {
+    throw new Error(`Media asset lookup failed: ${lookupError.message}`);
+  }
   const existing = existingRows?.[0];
 
   if (existing) {
@@ -64,11 +67,14 @@ export async function ensureMediaAsset(params: EnsureMediaAssetParams): Promise<
     if (usedIn && isValidUuid(usedIn)) {
       nextUsedIn.add(usedIn);
     }
-    await supabase
+    const { error: updateError } = await supabase
       .from("media_assets")
       .update({ ...metadataUpdate, used_in: Array.from(nextUsedIn) })
       .eq("id", existing.id)
       .eq("workspace_id", wsId);
+    if (updateError) {
+      throw new Error(`Media asset update failed: ${updateError.message}`);
+    }
     return;
   }
 
@@ -81,6 +87,6 @@ export async function ensureMediaAsset(params: EnsureMediaAssetParams): Promise<
   });
 
   if (error) {
-    console.error("[media-assets] ensureMediaAsset failed:", error.message);
+    throw new Error(`Media asset insert failed: ${error.message}`);
   }
 }

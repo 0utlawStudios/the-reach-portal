@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { RawImage } from "@/components/raw-image";
 import { CardThumbnailMedia } from "@/components/card-thumbnail-media";
 import { PreviewImage } from "@/components/preview-image";
+import { MediaVideo } from "@/components/media-video";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { usePipeline } from "@/lib/pipeline-context";
 import { PIPELINE_COLUMNS, PipelineStage, ALL_PLATFORMS, Platform } from "@/lib/types";
@@ -84,6 +85,15 @@ export function AssetReviewDrawer() {
     if (!selectedCard) return null;
     return resolveCardVideoUrl(selectedCard);
   }, [selectedCard]);
+  const resolvedVideoSources = useMemo(() => {
+    if (!selectedCard) return [];
+    const rawSources = (selectedCard.sourceVault?.rawFiles || []).flatMap((file) => [
+      file.playbackUrl,
+      file.driveProxyUrl,
+      file.url,
+    ]);
+    return [resolvedVideoUrl, ...rawSources, selectedCard.thumbnailUrl].filter((url): url is string => Boolean(url));
+  }, [resolvedVideoUrl, selectedCard]);
   const resolvedPosterUrl = useMemo(() => {
     if (!selectedCard || !selectedCard.thumbnailUrl) return undefined;
     return thumbnailIsDefinitelyImage(selectedCard) ? selectedCard.thumbnailUrl : undefined;
@@ -740,14 +750,15 @@ export function AssetReviewDrawer() {
             <div className="relative w-full overflow-hidden bg-black group">
               {isVideoContentType(selectedCard.contentType) ? (
                 <div className="flex w-full items-center justify-center bg-black">
-                  <video
+                  <MediaVideo
                     key={resolvedVideoUrl || selectedCard.thumbnailUrl}
-                    src={resolvedVideoUrl || selectedCard.thumbnailUrl}
+                    sources={resolvedVideoSources}
                     controls
                     playsInline
                     preload={resolvedPosterUrl ? "none" : "metadata"}
                     poster={resolvedPosterUrl}
                     className="block max-h-[70dvh] max-w-full w-auto bg-black object-contain"
+                    label={`${selectedCard.title} video preview`}
                   />
                 </div>
               ) : (

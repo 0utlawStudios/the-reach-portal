@@ -111,6 +111,17 @@ describe("multitenant static contracts", () => {
     const presence = source("src/lib/use-presence.tsx");
     expect(presence).toContain('.select("workspace_id, email, presence_last_seen, audit_last, auth_last_sign_in, best_known_seen")');
     expect(presence).toContain('.eq("workspace_id", wsId)');
+    expect(presence).toContain("private: true");
+    expect(presence).toContain("channel(`presence-${wsId}`");
+
+    const privatePresence = source("supabase/migrations/0060_private_presence_channels.sql");
+    expect(privatePresence).toContain("ALTER TABLE realtime.messages ENABLE ROW LEVEL SECURITY");
+    expect(privatePresence).toContain("workspace_presence_listen");
+    expect(privatePresence).toContain("workspace_presence_track");
+    expect(privatePresence).toContain("realtime.messages.extension = 'presence'");
+    expect(privatePresence).toContain("realtime.topic()");
+    expect(privatePresence).toContain("public.workspace_members");
+    expect(privatePresence).toContain("wm.status = 'active'");
 
     const presenceDiag = source("src/app/api/presence/diag/route.ts");
     expect(presenceDiag).toContain('.select("workspace_id, role, status")');

@@ -74,6 +74,15 @@ type PublishJobRequest = {
   postId?: unknown;
 };
 
+const WORKSPACE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function requestedWorkspaceId(request: NextRequest): string | null | undefined {
+  const raw = request.headers.get("x-workspace-id") || request.headers.get("x-reach-workspace-id");
+  if (!raw) return undefined;
+  const value = raw.trim();
+  return WORKSPACE_ID_RE.test(value) ? value : null;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const caller = createCallerClient(request);
@@ -97,6 +106,10 @@ export async function POST(request: NextRequest) {
     if (!isUuid(body.postId)) {
       return NextResponse.json({ error: "Invalid postId" }, { status: 400 });
     }
+    const activeWorkspaceId = requestedWorkspaceId(request);
+    if (activeWorkspaceId === null) {
+      return NextResponse.json({ error: "Invalid workspace id" }, { status: 400 });
+    }
 
     const admin = createAdminClient();
     const { data: post, error: postError } = await admin
@@ -112,6 +125,9 @@ export async function POST(request: NextRequest) {
     }
     if (!post) {
       return NextResponse.json({ error: "Post not found" }, { status: 404 });
+    }
+    if (activeWorkspaceId && post.workspace_id !== activeWorkspaceId) {
+      return NextResponse.json({ error: "Post does not belong to the active workspace" }, { status: 403 });
     }
 
     const { data: membership, error: membershipError } = await admin

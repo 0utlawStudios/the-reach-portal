@@ -18,8 +18,22 @@ interface PlaybackUploadTarget {
   size: number;
 }
 
+const PLAYBACK_AUTH_TIMEOUT_MS = 5_000;
+
 async function getAccessTokenFromCurrentSession(): Promise<string | undefined> {
-  const { data } = await supabase.auth.getSession();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const result = await Promise.race([
+    supabase.auth.getSession(),
+    new Promise<"timeout">((resolve) => {
+      timer = setTimeout(() => resolve("timeout"), PLAYBACK_AUTH_TIMEOUT_MS);
+    }),
+  ]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+  if (result === "timeout") {
+    throw new Error("Playback auth check timed out. The original video uploaded fine; playback optimization can be retried.");
+  }
+  const { data } = result;
   return data.session?.access_token;
 }
 

@@ -75,7 +75,10 @@ export async function POST(request: NextRequest) {
     if (!belongsToAppFolder) {
       return NextResponse.json({ error: "File is not in an app-managed Drive folder" }, { status: 403 });
     }
-    if (meta.appProperties?.workspaceId && meta.appProperties.workspaceId !== authContext.workspaceId) {
+    if (!meta.appProperties?.workspaceId) {
+      return NextResponse.json({ error: "File is missing workspace ownership metadata" }, { status: 403 });
+    }
+    if (meta.appProperties.workspaceId !== authContext.workspaceId) {
       return NextResponse.json({ error: "File does not belong to this workspace" }, { status: 403 });
     }
     const mimeType = normalizeDriveMimeType(meta.mimeType, meta.name);

@@ -1,6 +1,7 @@
 "use client";
 
 import { PreviewImage } from "@/components/preview-image";
+import { MediaVideo } from "@/components/media-video";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { usePipeline } from "@/lib/pipeline-context";
 import { useToast } from "@/lib/toast-context";
@@ -9,7 +10,7 @@ import type { RawFile } from "@/lib/types";
 import { useAuth } from "@/lib/auth-context";
 import { isDrivePublishableMediaMime, normalizeDriveMimeType } from "@/lib/drive-policy";
 import { getPublicDriveDownloadUrl } from "@/lib/drive-url-utils";
-import { warmBrowserImagePreview } from "@/lib/image-preview";
+import { browserImagePreviewUrl, warmBrowserImagePreview } from "@/lib/image-preview";
 import { driveFileIdFromUrl } from "@/lib/media-resolver";
 import { ensureMediaAsset } from "@/lib/media-assets";
 import { videoPreviewFrameUrl } from "@/lib/media-usage";
@@ -124,6 +125,20 @@ function mediaDisplayUrl(asset: Pick<MediaEntry, "url" | "driveProxyUrl" | "play
   return asset.playbackUrl || asset.driveProxyUrl || asset.url;
 }
 
+function mediaVideoSources(asset: Pick<MediaEntry, "url" | "driveProxyUrl" | "playbackUrl">, previewFrame = false): string[] {
+  const sources = [asset.playbackUrl, asset.driveProxyUrl, asset.url].filter((url): url is string => Boolean(url));
+  return previewFrame ? sources.map(videoPreviewFrameUrl) : sources;
+}
+
+function browserViewUrl(asset: Pick<MediaEntry, "url" | "driveProxyUrl" | "playbackUrl" | "mimeType" | "name">): string {
+  return browserImagePreviewUrl(mediaDisplayUrl(asset), { mimeType: asset.mimeType, fileName: asset.name, size: "full" });
+}
+
+function absoluteAppUrl(url: string): string {
+  const siteUrl = typeof window !== "undefined" ? window.location.origin : "";
+  return url.startsWith("/") ? `${siteUrl}${url}` : url;
+}
+
 export function MediaPicker({
   open,
   onClose,
@@ -147,6 +162,7 @@ export function MediaPicker({
   const [unusedOnly, setUnusedOnly] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<MediaEntry | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const warmedPreviewKeysRef = useRef<Set<string>>(new Set());
 
   // Reset tab to defaultTab when picker opens
   useEffect(() => {
@@ -303,6 +319,30 @@ export function MediaPicker({
     return items;
   }, [allMedia, unusedOnly, search]);
 
+  useEffect(() => {
+    if (!open) return;
+    const timer = window.setTimeout(() => {
+      for (const asset of filteredMedia.slice(0, 36)) {
+        if (asset.type !== "image") continue;
+        const url = mediaDisplayUrl(asset);
+        const key = `${asset.assetId || asset.url}:${url}:thumb`;
+        if (warmedPreviewKeysRef.current.has(key)) continue;
+        warmedPreviewKeysRef.current.add(key);
+        warmBrowserImagePreview(url, { mimeType: asset.mimeType, fileName: asset.name, size: "thumb" });
+      }
+    }, 150);
+    return () => window.clearTimeout(timer);
+  }, [filteredMedia, open]);
+
+  useEffect(() => {
+    if (!open || !selectedAsset || selectedAsset.type !== "image") return;
+    warmBrowserImagePreview(mediaDisplayUrl(selectedAsset), {
+      mimeType: selectedAsset.mimeType,
+      fileName: selectedAsset.name,
+      size: "full",
+    });
+  }, [open, selectedAsset]);
+
   if (!open) return null;
 
   const handleUpload = async () => {
@@ -455,8 +495,7 @@ export function MediaPicker({
   };
 
   const copyShareLink = (asset: MediaEntry) => {
-    const siteUrl = typeof window !== "undefined" ? window.location.origin : "";
-    const shareUrl = asset.url.startsWith("/") ? `${siteUrl}${asset.url}` : asset.url;
+    const shareUrl = absoluteAppUrl(asset.type === "image" ? browserViewUrl(asset) : mediaDisplayUrl(asset));
     navigator.clipboard.writeText(shareUrl).then(() => addToast("Link copied. Share with your team.", "success"));
   };
 
@@ -556,13 +595,13 @@ export function MediaPicker({
                           {asset.type === "image" ? (
                             <PreviewImage src={mediaDisplayUrl(asset)} alt={asset.name} mimeType={asset.mimeType} fileName={asset.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
                           ) : (
-                            <video
-                              src={videoPreviewFrameUrl(mediaDisplayUrl(asset))}
+                            <MediaVideo
+                              sources={mediaVideoSources(asset, true)}
                               muted
                               playsInline
                               preload="metadata"
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200 bg-black"
-                              aria-label={`${asset.name} video preview`}
+                              label={`${asset.name} video preview`}
                             />
                           )}
                           <div className="absolute top-1.5 left-1.5">
@@ -595,13 +634,13 @@ export function MediaPicker({
                     {selectedAsset.type === "image" ? (
                       <PreviewImage src={mediaDisplayUrl(selectedAsset)} alt={selectedAsset.name} mimeType={selectedAsset.mimeType} fileName={selectedAsset.name} className="w-full aspect-video object-cover" />
                     ) : (
-                      <video
-                        src={mediaDisplayUrl(selectedAsset)}
+                      <MediaVideo
+                        sources={mediaVideoSources(selectedAsset)}
                         controls
                         playsInline
                         preload="metadata"
                         className="w-full aspect-video object-contain bg-black"
-                        aria-label={`${selectedAsset.name} video preview`}
+                        label={`${selectedAsset.name} video preview`}
                       />
                     )}
                   </div>

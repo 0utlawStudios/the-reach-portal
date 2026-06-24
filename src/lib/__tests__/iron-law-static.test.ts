@@ -262,6 +262,11 @@ describe("iron-law guards in pipeline-context.tsx", () => {
     expect(guardSites.length).toBeGreaterThanOrEqual(5);
   });
 
+  it("post update paths verify Supabase actually updated a row before side effects", () => {
+    expect(PIPELINE_SRC).toContain("assertPostUpdateCommitted");
+    expect(PIPELINE_SRC.match(/\.update\([\s\S]{0,140}\.eq\("id", cardId\)[\s\S]{0,180}\.select\("id"\)[\s\S]{0,60}\.maybeSingle\(\)/g) || []).toHaveLength(3);
+  });
+
   it("post deletes go through the server route and require a confirmed deleted row", () => {
     expect(PIPELINE_SRC).toContain("fetch(`/api/posts/${cardId}`");
     expect(PIPELINE_SRC).toContain('method: "DELETE"');

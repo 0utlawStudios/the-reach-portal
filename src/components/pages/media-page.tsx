@@ -1,6 +1,7 @@
 "use client";
 
 import { PreviewImage } from "@/components/preview-image";
+import { MediaVideo } from "@/components/media-video";
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { ContentCard, MediaAsset } from "@/lib/types";
 import { usePipeline } from "@/lib/pipeline-context";
@@ -16,7 +17,7 @@ import {
   videoPreviewFrameUrl,
 } from "@/lib/media-usage";
 import { isDrivePublishableMediaMime, normalizeDriveMimeType } from "@/lib/drive-policy";
-import { warmBrowserImagePreview } from "@/lib/image-preview";
+import { browserImagePreviewUrl, warmBrowserImagePreview } from "@/lib/image-preview";
 import { formatDateShort, formatDateTimeCompact } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -90,6 +91,20 @@ function mediaDisplayUrl(asset: Pick<MediaAsset, "url" | "driveProxyUrl" | "play
   return asset.playbackUrl || asset.driveProxyUrl || asset.url;
 }
 
+function mediaVideoSources(asset: Pick<MediaAsset, "url" | "driveProxyUrl" | "playbackUrl">, previewFrame = false): string[] {
+  const sources = [asset.playbackUrl, asset.driveProxyUrl, asset.url].filter((url): url is string => Boolean(url));
+  return previewFrame ? sources.map(videoPreviewFrameUrl) : sources;
+}
+
+function browserViewUrl(asset: Pick<MediaAsset, "url" | "driveProxyUrl" | "playbackUrl" | "mimeType" | "name">): string {
+  return browserImagePreviewUrl(mediaDisplayUrl(asset), { mimeType: asset.mimeType, fileName: asset.name, size: "full" });
+}
+
+function absoluteAppUrl(url: string): string {
+  const siteUrl = typeof window !== "undefined" ? window.location.origin : "";
+  return url.startsWith("/") ? `${siteUrl}${url}` : url;
+}
+
 export function MediaPage() {
   const { cards, workspaceId } = usePipeline();
   const { currentUser } = useAuth();
@@ -108,6 +123,7 @@ export function MediaPage() {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const warmedPreviewKeysRef = useRef<Set<string>>(new Set());
   const useDb = isSupabaseConfigured();
 
   // ─── Load media from Supabase ───
@@ -200,6 +216,20 @@ export function MediaPage() {
     if (search) items = items.filter((m) => m.name.toLowerCase().includes(search.toLowerCase()));
     return items.sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
   }, [media, activeFolder, activeType, statusFilter, search, usageByAssetId]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      for (const asset of filteredMedia.slice(0, viewMode === "grid" ? 36 : 24)) {
+        if (asset.type !== "image") continue;
+        const url = mediaDisplayUrl(asset);
+        const key = `${asset.id}:${url}:thumb`;
+        if (warmedPreviewKeysRef.current.has(key)) continue;
+        warmedPreviewKeysRef.current.add(key);
+        warmBrowserImagePreview(url, { mimeType: asset.mimeType, fileName: asset.name, size: "thumb" });
+      }
+    }, 150);
+    return () => window.clearTimeout(timer);
+  }, [filteredMedia, viewMode]);
 
   useEffect(() => {
     if (!useDb || media.length === 0) return;
@@ -459,21 +489,29 @@ export function MediaPage() {
   }, [addToast, useDb, usageByAssetId, workspaceId]);
 
   const copyShareLink = (asset: MediaAsset) => {
-    const siteUrl = typeof window !== "undefined" ? window.location.origin : "";
-    const shareUrl = asset.url.startsWith("/") ? `${siteUrl}${asset.url}` : asset.url;
+    const shareUrl = absoluteAppUrl(asset.type === "image" ? browserViewUrl(asset) : mediaDisplayUrl(asset));
     navigator.clipboard.writeText(shareUrl).then(() => addToast(`Link copied for "${asset.name}"`, "success"));
   };
 
   const openInNewTab = (asset: MediaAsset) => {
-    const siteUrl = typeof window !== "undefined" ? window.location.origin : "";
-    const url = asset.url.startsWith("/") ? `${siteUrl}${asset.url}` : asset.url;
-    window.open(url, "_blank");
+    window.open(absoluteAppUrl(asset.type === "image" ? browserViewUrl(asset) : mediaDisplayUrl(asset)), "_blank");
   };
 
   // ─── Lightbox navigation ───
   const lightboxIndex = lightboxAsset ? filteredMedia.findIndex((m) => m.id === lightboxAsset.id) : -1;
   const hasPrev = lightboxIndex > 0;
   const hasNext = lightboxIndex >= 0 && lightboxIndex < filteredMedia.length - 1;
+
+  useEffect(() => {
+    if (!lightboxAsset || lightboxAsset.type !== "image") return;
+    const currentUrl = mediaDisplayUrl(lightboxAsset);
+    warmBrowserImagePreview(currentUrl, { mimeType: lightboxAsset.mimeType, fileName: lightboxAsset.name, size: "full" });
+
+    for (const neighbor of [filteredMedia[lightboxIndex - 1], filteredMedia[lightboxIndex + 1]]) {
+      if (!neighbor || neighbor.type !== "image") continue;
+      warmBrowserImagePreview(mediaDisplayUrl(neighbor), { mimeType: neighbor.mimeType, fileName: neighbor.name, size: "thumb" });
+    }
+  }, [filteredMedia, lightboxAsset, lightboxIndex]);
 
   useEffect(() => {
     if (!lightboxAsset) return;
@@ -607,13 +645,13 @@ export function MediaPage() {
                         {asset.type === "image" ? (
                           <PreviewImage src={mediaDisplayUrl(asset)} alt={asset.name} mimeType={asset.mimeType} fileName={asset.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                         ) : (
-                          <video
-                            src={videoPreviewFrameUrl(mediaDisplayUrl(asset))}
+                          <MediaVideo
+                            sources={mediaVideoSources(asset, true)}
                             muted
                             playsInline
                             preload="metadata"
                             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 bg-black"
-                            aria-label={`${asset.name} video preview`}
+                            label={`${asset.name} video preview`}
                           />
                         )}
                         <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded-md bg-black/50 backdrop-blur-sm text-[8px] text-white font-medium uppercase">{asset.type}</div>
@@ -677,13 +715,13 @@ export function MediaPage() {
                             {asset.type === "image" ? (
                               <PreviewImage src={mediaDisplayUrl(asset)} alt="" mimeType={asset.mimeType} fileName={asset.name} className="w-full h-full object-cover" />
                             ) : (
-                              <video
-                                src={videoPreviewFrameUrl(mediaDisplayUrl(asset))}
+                              <MediaVideo
+                                sources={mediaVideoSources(asset, true)}
                                 muted
                                 playsInline
                                 preload="metadata"
                                 className="w-full h-full object-cover bg-black"
-                                aria-label={`${asset.name} video preview`}
+                                label={`${asset.name} video preview`}
                               />
                             )}
                           </div>
@@ -760,7 +798,7 @@ export function MediaPage() {
                 {lightboxAsset.type === "image" ? (
                   <PreviewImage src={mediaDisplayUrl(lightboxAsset)} alt={lightboxAsset.name} mimeType={lightboxAsset.mimeType} fileName={lightboxAsset.name} className="w-full h-[60vh] max-w-full max-h-[60vh] object-contain rounded-lg select-none" draggable={false} />
                 ) : (
-                  <video src={mediaDisplayUrl(lightboxAsset)} controls playsInline preload="metadata" className="max-w-full max-h-[60vh] object-contain rounded-lg bg-black" />
+                  <MediaVideo sources={mediaVideoSources(lightboxAsset)} controls playsInline preload="metadata" className="max-w-full max-h-[60vh] object-contain rounded-lg bg-black" label={`${lightboxAsset.name} video preview`} />
                 )}
                 {hasPrev && (
                   <button onClick={() => setLightboxAsset(filteredMedia[lightboxIndex - 1])} className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/60 transition-all cursor-pointer shadow-lg opacity-70 md:opacity-0 md:group-hover/lb:opacity-100">

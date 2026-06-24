@@ -383,7 +383,10 @@ export function PresenceProvider({
     if (!isSupabaseConfigured || !isAuthenticated || !myEmail) return;
 
     const channel = supabase.channel(`presence-${wsId}`, {
-      config: { presence: { key: myEmail } },
+      config: {
+        private: true,
+        presence: { key: myEmail },
+      },
     });
 
     channel

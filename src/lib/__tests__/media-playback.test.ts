@@ -89,4 +89,16 @@ describe("uploadVideoPlaybackCopy", () => {
     await assertion;
     expect(mockUploadToSignedUrl).not.toHaveBeenCalled();
   });
+
+  it("fails closed instead of hanging when playback auth lookup never settles", async () => {
+    vi.useFakeTimers();
+    mockGetSession.mockReturnValue(new Promise(() => {}));
+
+    const pending = uploadVideoPlaybackCopy(makeVideo("auth-stalled.mp4", 10));
+    const assertion = expect(pending).rejects.toThrow(/auth check timed out/i);
+    await vi.advanceTimersByTimeAsync(5_010);
+    await assertion;
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(mockUploadToSignedUrl).not.toHaveBeenCalled();
+  });
 });

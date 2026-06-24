@@ -241,6 +241,7 @@ export async function GET(request: NextRequest) {
       auth.workspaceId &&
       (
         (fileWorkspaceId && fileWorkspaceId !== auth.workspaceId) ||
+        (!fileWorkspaceId && auth.requiresWorkspaceAppProperty) ||
         (!fileWorkspaceId && !(await metadataIsInAppManagedDriveFolder(meta)))
       )
     ) {
