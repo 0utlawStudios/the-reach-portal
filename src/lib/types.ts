@@ -107,6 +107,13 @@ export interface MediaAsset {
   id: string;
   name: string;
   url: string;
+  fileId?: string;
+  publishUrl?: string;
+  driveProxyUrl?: string;
+  playbackUrl?: string;
+  playbackStorageKey?: string;
+  mimeType?: string;
+  size?: number;
   type: "image" | "video";
   folder: string;
   uploadedAt: string;

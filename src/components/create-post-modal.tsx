@@ -13,6 +13,7 @@ import { useAuth } from "@/lib/auth-context";
 import { ensureMediaAsset } from "@/lib/media-assets";
 import { isDrivePublishableMediaMime, normalizeDriveMimeType } from "@/lib/drive-policy";
 import { getPublicDriveDownloadUrl } from "@/lib/drive-url-utils";
+import { warmBrowserImagePreview } from "@/lib/image-preview";
 import { driveFileIdFromUrl } from "@/lib/media-resolver";
 import { MentionTextarea } from "./mention-textarea";
 import { formatDateTimeCompact } from "@/lib/utils";
@@ -293,6 +294,7 @@ export function CreatePostModal({ open, onClose }: Props) {
             const rawMimeType = f.mimeType || (f.type === "video" ? "video/mp4" : "image/jpeg");
             const publishUrl = f.publishUrl || (f.driveFileId ? getPublicDriveDownloadUrl(f.driveFileId) : f.driveUrl);
             const driveProxyUrl = f.driveProxyUrl || f.driveUrl;
+            warmBrowserImagePreview(driveProxyUrl, { mimeType: rawMimeType, fileName: f.name });
             rawFiles.push({
               name: f.name,
               url: publishUrl,

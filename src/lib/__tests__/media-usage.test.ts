@@ -57,7 +57,7 @@ describe("media usage detection", () => {
   });
 
   it("detects a direct card upload whose library row stores the optimized playback URL", () => {
-    const playbackUrl = "https://project.supabase.co/storage/v1/object/public/media-playback/workspace/post/clip.mp4";
+    const playbackUrl = "/api/media/playback?key=workspace%2Fpost%2Fclip.mp4";
     const media = asset({ url: playbackUrl });
     const c = card({
       sourceVault: {

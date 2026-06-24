@@ -16,6 +16,7 @@ import {
   videoPreviewFrameUrl,
 } from "@/lib/media-usage";
 import { isDrivePublishableMediaMime, normalizeDriveMimeType } from "@/lib/drive-policy";
+import { warmBrowserImagePreview } from "@/lib/image-preview";
 import { formatDateShort, formatDateTimeCompact } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -38,6 +39,13 @@ type MediaAssetRow = {
   id?: string;
   name?: string;
   url?: string;
+  file_id?: string | null;
+  publish_url?: string | null;
+  drive_proxy_url?: string | null;
+  playback_url?: string | null;
+  playback_storage_key?: string | null;
+  mime_type?: string | null;
+  size_bytes?: number | null;
   file_type?: MediaAsset["type"];
   folder?: string | null;
   uploaded_at?: string | null;
@@ -55,6 +63,13 @@ function dbToAsset(row: MediaAssetRow): MediaAsset {
     id: row.id || crypto.randomUUID(),
     name: row.name || "Untitled asset",
     url: row.url || "",
+    fileId: row.file_id || undefined,
+    publishUrl: row.publish_url || undefined,
+    driveProxyUrl: row.drive_proxy_url || undefined,
+    playbackUrl: row.playback_url || undefined,
+    playbackStorageKey: row.playback_storage_key || undefined,
+    mimeType: row.mime_type || undefined,
+    size: typeof row.size_bytes === "number" ? row.size_bytes : undefined,
     type: row.file_type || "image",
     folder: row.folder || "Uploads",
     uploadedAt: row.uploaded_at || new Date().toISOString(),
@@ -250,6 +265,13 @@ export function MediaPage() {
         });
       }
 
+      let playbackModule: typeof import("@/lib/media-playback") | null = null;
+      try {
+        playbackModule = await import("@/lib/media-playback");
+      } catch {
+        playbackModule = null;
+      }
+
       // Persist results. Uploads already ran in parallel; the saves below are
       // quick and run after, preserving the original per-file save + toast.
       for (const it of items) {
@@ -260,15 +282,46 @@ export function MediaPage() {
         }
         const result = it.result;
         const mimeType = result.mimeType || normalizeDriveMimeType(file.type, file.name);
+        let playbackUrl: string | undefined;
+        let playbackStorageKey: string | undefined;
+        if (mimeType.startsWith("video/") && playbackModule?.canUploadPlaybackCopy(file, mimeType)) {
+          try {
+            setUploadingFileName(`Optimizing playback for ${file.name}`);
+            const playback = await playbackModule.uploadVideoPlaybackCopy(file, "media-library");
+            playbackUrl = playback.playbackUrl;
+            playbackStorageKey = playback.playbackStorageKey;
+          } catch (playbackErr) {
+            await reportUploadFailure({
+              phase: "media_library_playback_upload",
+              route: "/api/media/playback-upload",
+              uploadPath: "unknown",
+              folder: "media-library",
+              fileName: file.name,
+              mimeType,
+              fileSize: file.size,
+              errorMessage: uploadErrorMessage(playbackErr),
+              errorDetail: playbackErr instanceof Error ? playbackErr.stack : undefined,
+            });
+            addToast(`Uploaded ${file.name}, but fast video playback was skipped.`, "warning");
+          }
+        }
         const asset: MediaAsset = {
           id: `m-${Date.now()}-${Math.random().toString(36).slice(2)}`,
           name: file.name,
-          url: result.url,
+          url: playbackUrl || result.url,
+          fileId: result.fileId,
+          publishUrl: result.publishUrl,
+          driveProxyUrl: result.driveProxyUrl || result.url,
+          playbackUrl,
+          playbackStorageKey,
+          mimeType,
+          size: result.size || file.size,
           type: mimeType.startsWith("video") ? "video" : "image",
           folder: "Media Library",
           uploadedAt: new Date().toISOString(),
           addedBy: currentUser.name,
         };
+        warmBrowserImagePreview(asset.driveProxyUrl || asset.url, { mimeType: asset.mimeType, fileName: asset.name });
 
         // Persist to Supabase
         if (useDb) {
@@ -277,6 +330,13 @@ export function MediaPage() {
             .insert({
               name: asset.name,
               url: asset.url,
+              file_id: asset.fileId,
+              publish_url: asset.publishUrl,
+              drive_proxy_url: asset.driveProxyUrl,
+              playback_url: asset.playbackUrl,
+              playback_storage_key: asset.playbackStorageKey,
+              mime_type: asset.mimeType,
+              size_bytes: asset.size,
               file_type: asset.type,
               folder: asset.folder,
               added_by: asset.addedBy,
@@ -340,7 +400,8 @@ export function MediaPage() {
     setConfirmingDelete(false);
     // Delete from Supabase
     if (useDb && idsToDelete.length > 0) {
-      supabase.from("media_assets").delete().in("id", idsToDelete).then(({ error }) => {
+      const wsId = workspaceId || BASELINE_WORKSPACE_ID;
+      supabase.from("media_assets").delete().in("id", idsToDelete).eq("workspace_id", wsId).then(({ error }) => {
         if (error) {
           console.error("[media] deleteSelected sync failed:", error.message);
           // Restore the removed assets so they do not vanish on a failed delete.

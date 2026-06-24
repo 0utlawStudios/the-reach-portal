@@ -72,6 +72,7 @@ const RETRY_DELAYS = process.env.NODE_ENV === "test" ? [1, 3, 7] : [1000, 3000, 
 // A large resumable upload is expensive to repeat, so it gets a single gentle
 // retry rather than the full ladder. A retry starts a fresh Google session.
 const PUT_RETRY_DELAYS = process.env.NODE_ENV === "test" ? [1] : [3000];
+const UPLOAD_FAILURE_REPORT_TIMEOUT_MS = 3_000;
 
 // Upload liveness is governed by TWO progress-aware timers, never a fixed
 // whole-request ceiling:
@@ -646,14 +647,21 @@ export async function reportUploadFailure(report: UploadFailureReport): Promise<
   try {
     const accessToken = await getAccessTokenFromCurrentSession();
     if (!accessToken) return;
-    await fetch("/api/drive/upload-failure", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify(report),
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), UPLOAD_FAILURE_REPORT_TIMEOUT_MS);
+    try {
+      await fetch("/api/drive/upload-failure", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(report),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
   } catch (err) {
     console.error("[drive-upload] failure report failed:", err instanceof Error ? err.message : err);
   }

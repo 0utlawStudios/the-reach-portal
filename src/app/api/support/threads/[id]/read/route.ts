@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isValidUuid } from "@/lib/utils";
 import { requireBearerUser } from "@/lib/auth/require";
-import { getSupportAdminClient, getTeamRole, resolveWorkspaceId } from "@/lib/support/server";
+import { getSupportAdminClient, getTeamRole, resolveActiveSupportWorkspace } from "@/lib/support/server";
 
 export const runtime = "nodejs";
 export const maxDuration = 15;
@@ -28,25 +28,28 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
   if (!threadRow) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const nowIso = new Date().toISOString();
-  const isOwner = (threadRow as { created_by: string | null }).created_by === auth.user.id;
+  const thread = threadRow as { created_by: string | null; workspace_id: string };
+  const callerWorkspaceId = await resolveActiveSupportWorkspace(admin, auth.user.id, auth.user.email ?? "");
+  const isOwner = thread.created_by === auth.user.id && thread.workspace_id === callerWorkspaceId;
   if (isOwner) {
     await admin
       .from("support_threads")
       .update({ unread_for_user: false, user_last_read_at: nowIso })
-      .eq("id", id);
+      .eq("id", id)
+      .eq("workspace_id", thread.workspace_id);
     return NextResponse.json({ ok: true });
   }
 
   const role = await getTeamRole(admin, auth.user.email ?? "", auth.user.id);
   if (role !== "superadmin") return NextResponse.json({ error: "Not found" }, { status: 404 });
   // Multi-tenant guard: a superadmin only reaches threads in their own workspace.
-  const workspaceId = await resolveWorkspaceId(admin, auth.user.id);
-  if ((threadRow as { workspace_id: string }).workspace_id !== workspaceId) {
+  if (thread.workspace_id !== callerWorkspaceId) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
   await admin
     .from("support_threads")
     .update({ unread_for_admin: false, admin_last_read_at: nowIso })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("workspace_id", thread.workspace_id);
   return NextResponse.json({ ok: true });
 }

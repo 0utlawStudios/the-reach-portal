@@ -210,7 +210,7 @@ describe("POST /api/team/approve-request", () => {
     });
     expect(operations.some((op) => op.table === "team_members" && op.method === "insert")).toBe(false);
     expect(operations).toEqual(expect.arrayContaining([
-      { table: "workspace_members", method: "delete", filters: [["user_id", "old-auth-user"]] },
+      { table: "workspace_members", method: "delete", filters: [["user_id", "old-auth-user"], ["workspace_id", "00000000-0000-0000-0000-000000000001"]] },
       { table: "auth.users", method: "deleteUser", id: "old-auth-user" },
       {
         table: "auth.users",
@@ -246,7 +246,7 @@ describe("POST /api/team/approve-request", () => {
     await expect(res.json()).resolves.toMatchObject({ error: "Failed to finalize access request approval" });
     expect(operations).toEqual(expect.arrayContaining([
       { table: "team_members", method: "delete", filters: [["id", "member-row-1"]] },
-      { table: "workspace_members", method: "delete", filters: [["user_id", "fresh-auth-user"]] },
+      { table: "workspace_members", method: "delete", filters: [["user_id", "fresh-auth-user"], ["workspace_id", "00000000-0000-0000-0000-000000000001"]] },
       { table: "auth.users", method: "deleteUser", id: "fresh-auth-user" },
     ]));
   });

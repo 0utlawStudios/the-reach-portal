@@ -1,7 +1,12 @@
-import { describe, expect, it } from "vitest";
-import { browserImagePreviewUrl, isHeicLikeImage } from "@/lib/image-preview";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { browserImagePreviewUrl, heicImagePreviewUrl, isHeicLikeImage, warmBrowserImagePreview } from "@/lib/image-preview";
 
 const FILE_ID = "abcdefghijklmnopqrst";
+const originalFetch = globalThis.fetch;
+
+afterEach(() => {
+  globalThis.fetch = originalFetch;
+});
 
 describe("image preview routing", () => {
   it("recognizes HEIC and HEIF by MIME or filename", () => {
@@ -14,12 +19,35 @@ describe("image preview routing", () => {
   });
 
   it("routes Drive HEIC images through the browser-safe preview converter", () => {
-    expect(
-      browserImagePreviewUrl(`/api/drive/stream?id=${FILE_ID}&token=signed`, {
-        mimeType: "image/heic",
-        fileName: "source.heic",
+    const opts = {
+      mimeType: "image/heic",
+      fileName: "source.heic",
+    };
+
+    expect(heicImagePreviewUrl(`/api/drive/stream?id=${FILE_ID}&token=signed`, opts))
+      .toBe(`/api/media/image-preview?id=${FILE_ID}&token=signed`);
+    expect(browserImagePreviewUrl(`/api/drive/stream?id=${FILE_ID}&token=signed`, opts))
+      .toBe(`/api/media/image-preview?id=${FILE_ID}&token=signed`);
+  });
+
+  it("warms browser and server HEIC preview caches after upload", async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 200 }));
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    warmBrowserImagePreview(`/api/drive/stream?id=${FILE_ID}&token=signed`, {
+      mimeType: "image/heic",
+      fileName: "source.heic",
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/media/image-preview?id=${FILE_ID}&token=signed`,
+      expect.objectContaining({
+        method: "GET",
+        credentials: "same-origin",
+        cache: "force-cache",
       }),
-    ).toBe(`/api/media/image-preview?id=${FILE_ID}&token=signed`);
+    );
+    await Promise.resolve();
   });
 
   it("leaves non-HEIC images and local blobs untouched", () => {

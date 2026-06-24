@@ -13,7 +13,7 @@ interface PlaybackUploadTarget {
   bucket: string;
   storageKey: string;
   token: string;
-  publicUrl: string;
+  playbackUrl: string;
   mimeType: string;
   size: number;
 }
@@ -83,7 +83,7 @@ async function getPlaybackUploadTarget(file: File, cardId?: string): Promise<Pla
 
   const data = await res.json() as Partial<PlaybackUploadTarget> & { error?: string };
   if (data.error) throw new Error(data.error);
-  if (!data.bucket || !data.storageKey || !data.token || !data.publicUrl) {
+  if (!data.bucket || !data.storageKey || !data.token || !data.playbackUrl) {
     throw new Error("Playback upload target response was incomplete");
   }
 
@@ -126,7 +126,7 @@ export async function uploadVideoPlaybackCopy(file: File, cardId?: string): Prom
   }
 
   return {
-    playbackUrl: target.publicUrl,
+    playbackUrl: target.playbackUrl,
     playbackStorageKey: target.storageKey,
     mimeType: target.mimeType,
     size: target.size,

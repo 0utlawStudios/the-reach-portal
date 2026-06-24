@@ -54,7 +54,8 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
         updated_at: new Date().toISOString(),
       })
       .eq("id", id)
-      .select("id, post_id, state")
+      .eq("workspace_id", auth.workspaceId)
+      .select("id, post_id, state, workspace_id")
       .maybeSingle();
 
     if (error) {
@@ -66,13 +67,12 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 
     // Audit. Best-effort — don't fail the retry if the audit write fails.
     try {
-      await admin.from("audit_log_v2").insert({
-        actor_user_id: null,
-        actor_role: "n8n",
-        entity_type: "post",
-        entity_id: data.post_id,
-        action: "publish_job_force_retried",
-        metadata: {
+      await admin.rpc("record_audit_event", {
+        p_entity_type: "post",
+        p_action: "publish_job_force_retried",
+        p_entity_id: data.post_id,
+        p_workspace_id: data.workspace_id,
+        p_metadata: {
           user_name: auth.email,
           job_id: id,
           details: `Force-retried by ${auth.email}; state reset to pending, attempts=0`,

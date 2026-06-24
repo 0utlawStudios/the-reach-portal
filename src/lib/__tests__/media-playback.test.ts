@@ -19,7 +19,7 @@ function mockTargetFetch() {
     bucket: "playback",
     storageKey: "media-library/video.mp4",
     token: "signed-token",
-    publicUrl: "https://cdn.example/playback/video.mp4",
+    playbackUrl: "/api/media/playback?key=media-library%2Fvideo.mp4",
     mimeType: "video/mp4",
     size: 10,
   })) as unknown as typeof fetch;
@@ -62,7 +62,7 @@ describe("uploadVideoPlaybackCopy", () => {
   it("resolves when the signed-url upload succeeds", async () => {
     mockUploadToSignedUrl.mockResolvedValue({ data: { path: "ok" }, error: null });
     const result = await uploadVideoPlaybackCopy(makeVideo());
-    expect(result.playbackUrl).toBe("https://cdn.example/playback/video.mp4");
+    expect(result.playbackUrl).toBe("/api/media/playback?key=media-library%2Fvideo.mp4");
     expect(result.playbackStorageKey).toBe("media-library/video.mp4");
   });
 

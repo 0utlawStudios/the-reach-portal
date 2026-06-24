@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { ensureSubfolder, getAccessToken, getFileMetadata, getRootFolderId, verifyDriveStreamToken } from "@/lib/google-drive";
 import { ALLOWED_DRIVE_ROLES, VALID_DRIVE_FOLDERS } from "@/lib/drive-policy";
 import { sanitizeUnknownUploadError, statusForSanitizedDriveError } from "@/lib/drive-errors";
-import { requireBearerTeamRole } from "@/lib/auth/require";
+import { requireBearerTeamRole, requireRole, type WorkspaceRole } from "@/lib/auth/require";
 
 export const maxDuration = 60; // Fluid Compute — stays alive while streaming
 
@@ -103,50 +103,51 @@ async function isInAppManagedDriveFolder(fileId: string): Promise<boolean> {
   }
 }
 
-// SEC-003: Validate the request has a real auth context, or the file is an
-// app-owned Drive file requested by a same-origin media tag. Raw Referer trust
-// is not enough because it can be forged; the referer fallback is constrained
-// to file IDs already referenced by app rows or physically inside app-managed
-// Drive folders.
-async function checkAuth(req: NextRequest, fileId: string): Promise<{ ok: boolean; authed: boolean; signed: boolean; workspaceId?: string }> {
+async function workspaceAuth(req: NextRequest): Promise<{ workspaceId: string } | null> {
+  const bearerToken = req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
+  const auth = bearerToken
+    ? await requireBearerTeamRole(req, ALLOWED_DRIVE_ROLES)
+    : await requireRole(req, ALLOWED_DRIVE_ROLES as readonly WorkspaceRole[]);
+  if (auth instanceof Response) return null;
+  return { workspaceId: auth.workspaceId };
+}
+
+// SEC-003: Validate the request with a signed app URL, a Bearer token, or the
+// server-readable session cookie maintained by AuthProvider. Referer is not an
+// authorization boundary: browsers may omit it, and non-browser callers can
+// forge it.
+async function checkAuth(req: NextRequest, fileId: string): Promise<{
+  ok: boolean;
+  authed: boolean;
+  signed: boolean;
+  workspaceId?: string;
+  requiresWorkspaceAppProperty?: boolean;
+}> {
   const signedToken = req.nextUrl.searchParams.get("token");
   const signedClaims = verifyDriveStreamToken(fileId, signedToken);
   if (signedClaims) {
     return { ok: true, authed: true, signed: true, workspaceId: signedClaims.workspaceId };
   }
 
-  // Media tag fallback: allowed only for file IDs already present in app data
-  // or physically inside one of the app-managed Drive folders.
-  const referer = req.headers.get("referer") || "";
-  let refOk = false;
-  if (referer) {
-    try {
-      refOk = ALLOWED_ORIGINS.has(new URL(referer).origin);
-    } catch {
-      refOk = false;
+  const auth = await workspaceAuth(req);
+  if (auth) {
+    const knownInWorkspace = await isKnownAppDriveFile(fileId, auth.workspaceId);
+    const appManaged = knownInWorkspace ? false : await isInAppManagedDriveFolder(fileId);
+    if (knownInWorkspace) {
+      return { ok: true, authed: true, signed: false, workspaceId: auth.workspaceId };
+    }
+    if (appManaged) {
+      return {
+        ok: true,
+        authed: true,
+        signed: false,
+        workspaceId: auth.workspaceId,
+        requiresWorkspaceAppProperty: true,
+      };
     }
   }
 
-  // Bearer-token check. A valid user token is not enough; the file must be
-  // known in that user's active workspace, or be a freshly-uploaded app-folder
-  // file whose workspace appProperties are verified after metadata loads.
-  const token = req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
-  if (token) {
-    const auth = await requireBearerTeamRole(req, ALLOWED_DRIVE_ROLES);
-    if (!(auth instanceof Response)) {
-      const knownInWorkspace = await isKnownAppDriveFile(fileId, auth.workspaceId);
-      const appManaged = knownInWorkspace ? false : await isInAppManagedDriveFolder(fileId);
-      if (knownInWorkspace || appManaged) {
-        return { ok: true, authed: true, signed: false, workspaceId: auth.workspaceId };
-      }
-    }
-  }
-
-  return {
-    ok: refOk && (await isKnownAppDriveFile(fileId) || await isInAppManagedDriveFolder(fileId)),
-    authed: false,
-    signed: false,
-  };
+  return { ok: false, authed: false, signed: false };
 }
 
 // ─── Stream proxy with Range support ───
@@ -176,7 +177,13 @@ export async function GET(request: NextRequest) {
     // PERF-003: metadata fetch and token mint are independent — run them
     // concurrently instead of sequentially.
     const [meta, token] = await Promise.all([getFileMetadata(fileId), getAccessToken()]);
-    if (auth.workspaceId && meta.appProperties?.workspaceId && meta.appProperties.workspaceId !== auth.workspaceId) {
+    if (
+      auth.workspaceId &&
+      (
+        (auth.requiresWorkspaceAppProperty && meta.appProperties?.workspaceId !== auth.workspaceId) ||
+        (meta.appProperties?.workspaceId && meta.appProperties.workspaceId !== auth.workspaceId)
+      )
+    ) {
       return new Response(JSON.stringify({ error: "File does not belong to this workspace" }), {
         status: 403,
         headers: { "Content-Type": "application/json", ...corsHeaders },
@@ -216,11 +223,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // SEC-003: Cache policy mirrors the auth path used. When the caller
-    // proved themselves with a Bearer token the bytes can be cached for the
-    // standard 1-day immutable window. When they only proved same-origin via
-    // Referer we keep the byte cache out of intermediaries — the Referer
-    // header doesn't ride along on subsequent retrievals.
+    // SEC-003: Cache policy mirrors the auth path used.
     const cacheControl = auth.signed
       ? "public, max-age=86400, immutable"
       : auth.authed

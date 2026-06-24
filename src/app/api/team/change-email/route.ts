@@ -66,6 +66,15 @@ async function findAuthUserByEmail(admin: AdminClient, email: string): Promise<U
   return null;
 }
 
+async function hasOtherWorkspaceMembership(admin: AdminClient, userId: string, workspaceId: string): Promise<boolean> {
+  const { data, error } = await admin
+    .from("workspace_members")
+    .select("workspace_id")
+    .eq("user_id", userId);
+  if (error) throw new Error(`Workspace membership check failed: ${error.message}`);
+  return (data || []).some((row: { workspace_id?: string | null }) => row.workspace_id !== workspaceId);
+}
+
 async function sendInviteEmail(email: string, member: TeamMemberRow, confirmUrl: string) {
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
     return { sent: false, error: "SMTP not configured" };
@@ -136,9 +145,21 @@ async function updateActiveMemberEmail(admin: AdminClient, workspaceId: string, 
   }
 
   const updates = [
-    admin.from("support_threads").update({ created_by_email: newEmail }).eq("created_by", authUser.id),
-    admin.from("posts").update({ created_by: member.name }).eq("created_by", oldEmail),
-    admin.from("media_assets").update({ added_by: member.name }).eq("added_by", oldEmail),
+    admin
+      .from("support_threads")
+      .update({ created_by_email: newEmail })
+      .eq("created_by", authUser.id)
+      .eq("workspace_id", workspaceId),
+    admin
+      .from("posts")
+      .update({ created_by: member.name })
+      .eq("created_by", oldEmail)
+      .eq("workspace_id", workspaceId),
+    admin
+      .from("media_assets")
+      .update({ added_by: member.name })
+      .eq("added_by", oldEmail)
+      .eq("workspace_id", workspaceId),
   ];
   const results = await Promise.all(updates);
   const failed = results.find((result) => result.error);
@@ -190,8 +211,10 @@ async function updatePendingInviteEmail(admin: AdminClient, workspaceId: string,
   }
 
   if (oldAuthUser?.id) {
-    await admin.from("workspace_members").delete().eq("user_id", oldAuthUser.id);
-    await admin.auth.admin.deleteUser(oldAuthUser.id);
+    await admin.from("workspace_members").delete().eq("user_id", oldAuthUser.id).eq("workspace_id", workspaceId);
+    if (!(await hasOtherWorkspaceMembership(admin, oldAuthUser.id, workspaceId))) {
+      await admin.auth.admin.deleteUser(oldAuthUser.id);
+    }
   }
 
   const confirmUrl = `${getSiteUrl()}/auth/confirm?token_hash=${encodeURIComponent(linkData.properties.hashed_token)}&type=invite`;

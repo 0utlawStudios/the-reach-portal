@@ -30,6 +30,19 @@ async function findAuthUserByEmail(admin: ReturnType<typeof getAdminClient>, ema
   return null;
 }
 
+async function hasOtherWorkspaceMembership(
+  admin: ReturnType<typeof getAdminClient>,
+  userId: string,
+  workspaceId: string,
+): Promise<boolean> {
+  const { data, error } = await admin
+    .from("workspace_members")
+    .select("workspace_id")
+    .eq("user_id", userId);
+  if (error) throw new Error(`Workspace membership check failed: ${error.message}`);
+  return (data || []).some((row: { workspace_id?: string | null }) => row.workspace_id !== workspaceId);
+}
+
 interface InviteRequest {
   email: string;
   name: string;
@@ -81,10 +94,14 @@ export async function POST(request: NextRequest) {
       const { error: workspaceCleanupErr } = await admin
         .from("workspace_members")
         .delete()
-        .eq("user_id", existingAuthUser.id);
+        .eq("user_id", existingAuthUser.id)
+        .eq("workspace_id", ctx.workspaceId);
       if (workspaceCleanupErr) {
         console.error("[team/invite] orphan workspace cleanup failed:", workspaceCleanupErr.message);
         return NextResponse.json({ error: "Failed to clean up previous workspace access" }, { status: 500 });
+      }
+      if (await hasOtherWorkspaceMembership(admin, existingAuthUser.id, ctx.workspaceId)) {
+        return NextResponse.json({ error: "That auth account belongs to another workspace" }, { status: 409 });
       }
       const { error: orphanAuthDeleteErr } = await admin.auth.admin.deleteUser(existingAuthUser.id);
       if (orphanAuthDeleteErr) {

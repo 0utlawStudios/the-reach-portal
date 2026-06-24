@@ -11,7 +11,8 @@ import {
 } from "@/lib/google-drive";
 import { ALLOWED_DRIVE_ROLES, normalizeDriveMimeType, VALID_DRIVE_FOLDERS } from "@/lib/drive-policy";
 import { sanitizeUnknownUploadError, statusForSanitizedDriveError } from "@/lib/drive-errors";
-import { requireBearerTeamRole } from "@/lib/auth/require";
+import { requireBearerTeamRole, requireRole, type WorkspaceRole } from "@/lib/auth/require";
+import { withStorageControlTimeout } from "@/lib/storage-upload-timeout";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,6 +28,7 @@ const PREVIEW_CACHE_BUCKET = "media-thumbnails";
 // while larger panoramas fail closed before raw decode.
 const HEIC_FALLBACK_MAX_PIXELS = 50_000_000;
 const DRIVE_MEDIA_TIMEOUT_MS = 45_000;
+const inFlightPreviewBuilds = new Map<string, Promise<Buffer>>();
 
 type HeicDecodedImage = {
   width: number;
@@ -46,13 +48,16 @@ class ImagePreviewHttpError extends Error {
 
 function browserSafeJpegResponse(preview: Buffer, signed: boolean, cacheState: "HIT" | "MISS" | "BYPASS" = "BYPASS") {
   const responseBody = preview.buffer.slice(preview.byteOffset, preview.byteOffset + preview.byteLength) as ArrayBuffer;
+  const cacheControl = signed
+    ? "public, max-age=86400, immutable"
+    : "private, max-age=86400, immutable";
 
   return new Response(responseBody, {
     status: 200,
     headers: {
       "Content-Type": "image/jpeg",
       "Content-Length": String(preview.length),
-      "Cache-Control": signed ? "public, max-age=86400, immutable" : "private, no-store",
+      "Cache-Control": cacheControl,
       "X-Content-Type-Options": "nosniff",
       "X-Preview-Cache": cacheState,
     },
@@ -66,20 +71,35 @@ function previewCacheKey(fileId: string, workspaceId?: string): string {
 
 async function readCachedPreview(admin: SupabaseClient | null, key: string): Promise<Buffer | null> {
   if (!admin) return null;
-  const { data, error } = await admin.storage.from(PREVIEW_CACHE_BUCKET).download(key);
-  if (error || !data) return null;
-  return Buffer.from(await data.arrayBuffer());
+  try {
+    const { data, error } = await withStorageControlTimeout(
+      admin.storage.from(PREVIEW_CACHE_BUCKET).download(key),
+      "HEIC preview cache read",
+    );
+    if (error || !data) return null;
+    return Buffer.from(await data.arrayBuffer());
+  } catch (err) {
+    console.warn("[media/image-preview] preview cache read skipped:", err instanceof Error ? err.message : err);
+    return null;
+  }
 }
 
 async function writeCachedPreview(admin: SupabaseClient | null, key: string, preview: Buffer): Promise<void> {
   if (!admin) return;
-  const { error } = await admin.storage.from(PREVIEW_CACHE_BUCKET).upload(key, preview, {
-    contentType: "image/jpeg",
-    cacheControl: "31536000",
-    upsert: true,
-  });
-  if (error) {
-    console.warn("[media/image-preview] preview cache write failed:", error.message);
+  try {
+    const { error } = await withStorageControlTimeout(
+      admin.storage.from(PREVIEW_CACHE_BUCKET).upload(key, preview, {
+        contentType: "image/jpeg",
+        cacheControl: "31536000",
+        upsert: true,
+      }),
+      "HEIC preview cache write",
+    );
+    if (error) {
+      console.warn("[media/image-preview] preview cache write failed:", error.message);
+    }
+  } catch (err) {
+    console.warn("[media/image-preview] preview cache write skipped:", err instanceof Error ? err.message : err);
   }
 }
 
@@ -151,6 +171,17 @@ async function buildHeicPreview(source: Buffer) {
   return convertHeicWithFallbackDecoder(source);
 }
 
+function buildPreviewOnce(cacheKey: string, build: () => Promise<Buffer>): Promise<Buffer> {
+  const existing = inFlightPreviewBuilds.get(cacheKey);
+  if (existing) return existing;
+
+  const pending = build().finally(() => {
+    inFlightPreviewBuilds.delete(cacheKey);
+  });
+  inFlightPreviewBuilds.set(cacheKey, pending);
+  return pending;
+}
+
 function serviceRoleClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -213,39 +244,41 @@ async function isInAppManagedDriveFolder(fileId: string): Promise<boolean> {
   }
 }
 
-async function checkAuth(req: NextRequest, fileId: string): Promise<{ ok: boolean; signed: boolean; workspaceId?: string }> {
+async function workspaceAuth(req: NextRequest): Promise<{ workspaceId: string } | null> {
+  const bearerToken = req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
+  const auth = bearerToken
+    ? await requireBearerTeamRole(req, ALLOWED_DRIVE_ROLES)
+    : await requireRole(req, ALLOWED_DRIVE_ROLES as readonly WorkspaceRole[]);
+  if (auth instanceof Response) return null;
+  return { workspaceId: auth.workspaceId };
+}
+
+async function checkAuth(req: NextRequest, fileId: string): Promise<{
+  ok: boolean;
+  signed: boolean;
+  workspaceId?: string;
+  requiresWorkspaceAppProperty?: boolean;
+}> {
   const signedToken = req.nextUrl.searchParams.get("token");
   const signedClaims = verifyDriveStreamToken(fileId, signedToken);
   if (signedClaims) return { ok: true, signed: true, workspaceId: signedClaims.workspaceId };
 
-  const token = req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
-  if (token) {
-    const auth = await requireBearerTeamRole(req, ALLOWED_DRIVE_ROLES);
-    if (!(auth instanceof Response)) {
-      const knownInWorkspace = await isKnownAppDriveFile(fileId, auth.workspaceId);
-      const appManaged = knownInWorkspace ? false : await isInAppManagedDriveFolder(fileId);
-      if (knownInWorkspace || appManaged) {
-        return { ok: true, signed: false, workspaceId: auth.workspaceId };
-      }
+  const auth = await workspaceAuth(req);
+  if (auth) {
+    const knownInWorkspace = await isKnownAppDriveFile(fileId, auth.workspaceId);
+    const appManaged = knownInWorkspace ? false : await isInAppManagedDriveFolder(fileId);
+    if (knownInWorkspace) return { ok: true, signed: false, workspaceId: auth.workspaceId };
+    if (appManaged) {
+      return {
+        ok: true,
+        signed: false,
+        workspaceId: auth.workspaceId,
+        requiresWorkspaceAppProperty: true,
+      };
     }
   }
 
-  const referer = req.headers.get("referer") || "";
-  let refOk = false;
-  if (referer) {
-    try {
-      const origin = new URL(referer).origin;
-      const siteOrigin = new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").origin;
-      refOk = origin === siteOrigin || origin === "http://localhost:3000" || origin === "http://localhost:3001";
-    } catch {
-      refOk = false;
-    }
-  }
-
-  return {
-    ok: refOk && (await isKnownAppDriveFile(fileId) || await isInAppManagedDriveFolder(fileId)),
-    signed: false,
-  };
+  return { ok: false, signed: false };
 }
 
 async function fetchDriveMedia(fileId: string, accessToken: string): Promise<Buffer> {
@@ -278,7 +311,13 @@ export async function GET(request: NextRequest) {
 
   try {
     const [meta, token] = await Promise.all([getFileMetadata(fileId), getAccessToken()]);
-    if (auth.workspaceId && meta.appProperties?.workspaceId && meta.appProperties.workspaceId !== auth.workspaceId) {
+    if (
+      auth.workspaceId &&
+      (
+        (auth.requiresWorkspaceAppProperty && meta.appProperties?.workspaceId !== auth.workspaceId) ||
+        (meta.appProperties?.workspaceId && meta.appProperties.workspaceId !== auth.workspaceId)
+      )
+    ) {
       return NextResponse.json({ error: "File does not belong to this workspace" }, { status: 403 });
     }
     const mimeType = normalizeDriveMimeType(meta.mimeType, meta.name);
@@ -295,9 +334,12 @@ export async function GET(request: NextRequest) {
     const cached = await readCachedPreview(admin, cacheKey);
     if (cached) return browserSafeJpegResponse(cached, auth.signed, "HIT");
 
-    const source = await fetchDriveMedia(fileId, token);
-    const preview = await buildHeicPreview(source);
-    await writeCachedPreview(admin, cacheKey, preview);
+    const preview = await buildPreviewOnce(cacheKey, async () => {
+      const source = await fetchDriveMedia(fileId, token);
+      const converted = await buildHeicPreview(source);
+      void writeCachedPreview(admin, cacheKey, converted);
+      return converted;
+    });
     return browserSafeJpegResponse(preview, auth.signed, "MISS");
   } catch (err) {
     if (err instanceof ImagePreviewHttpError) {

@@ -21,9 +21,15 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 export type WorkspaceRole =
   | "superadmin"
   | "admin"
+  | "owner"
   | "approver"
   | "creative_director"
   | "editor"
+  | "social_media_specialist"
+  | "video_editor"
+  | "graphic_designer"
+  | "specialist"
+  | "technician"
   | "viewer";
 
 export type AuthContext = {

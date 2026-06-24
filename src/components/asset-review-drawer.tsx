@@ -31,6 +31,7 @@ import { useToast } from "@/lib/toast-context";
 import { ensureMediaAsset } from "@/lib/media-assets";
 import { isDrivePublishableMediaMime, normalizeDriveMimeType } from "@/lib/drive-policy";
 import { getPublicDriveDownloadUrl } from "@/lib/drive-url-utils";
+import { warmBrowserImagePreview } from "@/lib/image-preview";
 import { driveFileIdFromUrl, isVideoContentType, resolveCardVideoUrl, thumbnailIsDefinitelyImage } from "@/lib/media-resolver";
 import { formatDate, formatDateTime, formatDateShort, formatDateTimeCompact } from "@/lib/utils";
 import { useFocusTrap } from "./use-focus-trap";
@@ -323,6 +324,7 @@ export function AssetReviewDrawer() {
       if (!item?.result) throw item?.error || new Error("Cover upload failed");
       const result = item.result;
       const resultMimeType = result.mimeType || normalizeDriveMimeType(file.type, file.name);
+      warmBrowserImagePreview(result.driveProxyUrl || result.url, { mimeType: resultMimeType, fileName: file.name });
       URL.revokeObjectURL(blobUrl);
       updateCard(selectedCard.id, {
         thumbnailUrl: result.url,
@@ -467,6 +469,7 @@ export function AssetReviewDrawer() {
         }
         const publishUrl = result.publishUrl || getPublicDriveDownloadUrl(result.fileId);
         const driveProxyUrl = result.driveProxyUrl || result.url;
+        warmBrowserImagePreview(driveProxyUrl, { mimeType: resultMimeType, fileName: file.name });
         const newFile = {
           name: file.name,
           url: publishUrl,
@@ -558,6 +561,7 @@ export function AssetReviewDrawer() {
       const isFirstFile = existingFiles.length + offset === 0;
       const fileId = result.fileId || driveFileIdFromUrl(result.driveProxyUrl || result.url) || undefined;
       const publishUrl = result.publishUrl || (fileId ? getPublicDriveDownloadUrl(fileId) : result.url);
+      warmBrowserImagePreview(result.driveProxyUrl || result.url, { mimeType: result.mimeType, fileName: result.name });
       return {
         name: result.name,
         url: publishUrl,

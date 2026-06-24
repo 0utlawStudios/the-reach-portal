@@ -92,7 +92,7 @@ describe("POST /api/team/remove-member", () => {
     const body = await res.json();
     expect(body).toMatchObject({ success: true, authDeleted: true });
     expect(operations).toEqual(expect.arrayContaining([
-      { table: "workspace_members", method: "delete", filters: [["user_id", "user-1"]] },
+      { table: "workspace_members", method: "delete", filters: [["user_id", "user-1"], ["workspace_id", "workspace-1"]] },
       { table: "team_members", method: "delete", filters: [["id", "member-row-1"], ["email", "member@example.com"]] },
       { table: "auth.users", method: "deleteUser", id: "user-1" },
     ]));
@@ -151,7 +151,7 @@ describe("POST /api/team/remove-member", () => {
     const body = await res.json();
     expect(body).toMatchObject({ success: true, authDeleted: false, authCleanupPending: true });
     expect(operations).toEqual(expect.arrayContaining([
-      { table: "workspace_members", method: "delete", filters: [["user_id", "user-1"]] },
+      { table: "workspace_members", method: "delete", filters: [["user_id", "user-1"], ["workspace_id", "workspace-1"]] },
       { table: "team_members", method: "delete", filters: [["id", "member-row-1"], ["email", "member@example.com"]] },
       { table: "auth.users", method: "deleteUser", id: "user-1" },
     ]));

@@ -10,8 +10,8 @@ import { consume } from "@/lib/rate-limit";
 import {
   getSupportAdminClient,
   getTeamRole,
+  resolveActiveSupportWorkspace,
   resolveUserName,
-  resolveWorkspaceId,
   parseAttachmentClaims,
   buildAttachmentsFromClaims,
   notifyAdminOfMessage,
@@ -57,7 +57,8 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
   const thread = threadRow as SupportThreadRow;
 
   // Resolve the sender: thread owner → user; superadmin → admin; else 404.
-  const isOwner = thread.created_by === auth.user.id;
+  const callerWorkspaceId = await resolveActiveSupportWorkspace(admin, auth.user.id, auth.user.email ?? "");
+  const isOwner = thread.created_by === auth.user.id && thread.workspace_id === callerWorkspaceId;
   let senderType: SupportSenderType;
   if (isOwner) {
     senderType = "user";
@@ -65,7 +66,6 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
     const role = await getTeamRole(admin, auth.user.email ?? "", auth.user.id);
     if (role !== "superadmin") return NextResponse.json({ error: "Not found" }, { status: 404 });
     // Multi-tenant guard: a superadmin only reaches threads in their own workspace.
-    const callerWorkspaceId = await resolveWorkspaceId(admin, auth.user.id);
     if (thread.workspace_id !== callerWorkspaceId) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
@@ -147,7 +147,8 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
       unread_for_admin: senderType === "user",
       updated_at: nowIso,
     })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("workspace_id", thread.workspace_id);
 
   // Notifications read the debounce timestamps from the pre-update thread row.
   const freshThread: SupportThreadRow = { ...thread, status: nextStatus };

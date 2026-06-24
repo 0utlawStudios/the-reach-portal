@@ -10,15 +10,17 @@ const GOOGLE_DRIVE_SRC = readFileSync(join(process.cwd(), "src/lib/google-drive.
 
 describe("Drive route security contracts", () => {
   it("does not allow arbitrary Drive streaming on a forged Referer alone", () => {
-    expect(DRIVE_STREAM_SRC).toContain("isKnownAppDriveFile(fileId)");
+    expect(DRIVE_STREAM_SRC).toContain("requireRole(req, ALLOWED_DRIVE_ROLES as readonly WorkspaceRole[])");
+    expect(DRIVE_STREAM_SRC).toContain("isKnownAppDriveFile(fileId, auth.workspaceId)");
     expect(DRIVE_STREAM_SRC).toContain("isInAppManagedDriveFolder(fileId)");
-    expect(DRIVE_STREAM_SRC).toContain("refOk && (await isKnownAppDriveFile(fileId) || await isInAppManagedDriveFolder(fileId))");
-    expect(DRIVE_STREAM_SRC).not.toContain("return { ok: refOk || tokenOk");
+    expect(DRIVE_STREAM_SRC).not.toContain("req.headers.get(\"referer\")");
+    expect(DRIVE_STREAM_SRC).not.toContain("refOk");
     expect(DRIVE_STREAM_SRC).toContain('from("media_assets")');
     expect(DRIVE_STREAM_SRC).toContain('from("posts")');
     expect(DRIVE_STREAM_SRC).toContain('.eq("workspace_id", workspaceId)');
     expect(DRIVE_STREAM_SRC).toContain("signedClaims.workspaceId");
     expect(DRIVE_STREAM_SRC).toContain("File does not belong to this workspace");
+    expect(DRIVE_STREAM_SRC).toContain("requiresWorkspaceAppProperty");
     expect(DRIVE_STREAM_SRC).toContain("VALID_DRIVE_FOLDERS.map");
     expect(DRIVE_STREAM_SRC).toContain("verifyDriveStreamToken(fileId, signedToken)");
     expect(GOOGLE_DRIVE_SRC).toContain("signDriveStreamToken");

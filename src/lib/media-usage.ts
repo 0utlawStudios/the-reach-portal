@@ -66,13 +66,19 @@ function cardMediaAliases(card: ContentCard): Set<string> {
   return aliases;
 }
 
-export function mediaAssetAliases(asset: Pick<MediaAsset, "id" | "url">): Set<string> {
-  const aliases = mediaUrlAliases({ url: asset.url });
+export function mediaAssetAliases(asset: Pick<MediaAsset, "id" | "url" | "publishUrl" | "driveProxyUrl" | "playbackUrl" | "fileId">): Set<string> {
+  const aliases = mediaUrlAliases({
+    url: asset.url,
+    publishUrl: asset.publishUrl,
+    driveProxyUrl: asset.driveProxyUrl,
+    playbackUrl: asset.playbackUrl,
+    fileId: asset.fileId,
+  });
   aliases.add(asset.id);
   return aliases;
 }
 
-export function cardUsesMediaAsset(card: ContentCard, asset: Pick<MediaAsset, "id" | "url">): boolean {
+export function cardUsesMediaAsset(card: ContentCard, asset: Pick<MediaAsset, "id" | "url" | "publishUrl" | "driveProxyUrl" | "playbackUrl" | "fileId">): boolean {
   if (card.mediaIds?.includes(asset.id)) return true;
   const assetAliases = mediaAssetAliases(asset);
   const cardAliases = cardMediaAliases(card);
@@ -82,7 +88,7 @@ export function cardUsesMediaAsset(card: ContentCard, asset: Pick<MediaAsset, "i
   return false;
 }
 
-export function getAutomaticMediaUsage(asset: Pick<MediaAsset, "id" | "url">, cards: readonly ContentCard[]): ContentCard[] {
+export function getAutomaticMediaUsage(asset: Pick<MediaAsset, "id" | "url" | "publishUrl" | "driveProxyUrl" | "playbackUrl" | "fileId">, cards: readonly ContentCard[]): ContentCard[] {
   return cards.filter((card) => cardUsesMediaAsset(card, asset));
 }
 

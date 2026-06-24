@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabaseClient";
 import type { RawFile } from "@/lib/types";
 import { isDrivePublishableMediaMime, normalizeDriveMimeType } from "@/lib/drive-policy";
 import { getPublicDriveDownloadUrl } from "@/lib/drive-url-utils";
+import { warmBrowserImagePreview } from "@/lib/image-preview";
 import { driveFileIdFromUrl } from "@/lib/media-resolver";
 import { videoPreviewFrameUrl } from "@/lib/media-usage";
 import { X, Upload, FolderOpen, Image as ImageIcon, Search, CheckCircle, Clock, Link2, ExternalLink } from "lucide-react";
@@ -42,6 +43,7 @@ interface MediaEntry {
   name: string;
   type: "image" | "video";
   mimeType?: string;
+  size?: number;
   fileId?: string;
   source?: string;
   usedInCards: { id: string; title: string }[];
@@ -51,6 +53,13 @@ interface MediaAssetRow {
   id?: string;
   name?: string;
   url?: string;
+  file_id?: string | null;
+  publish_url?: string | null;
+  drive_proxy_url?: string | null;
+  playback_url?: string | null;
+  playback_storage_key?: string | null;
+  mime_type?: string | null;
+  size_bytes?: number | null;
   file_type?: "image" | "video" | null;
   folder?: string | null;
   used_in?: string[] | null;
@@ -157,7 +166,7 @@ export function MediaPicker({
 
     supabase
       .from("media_assets")
-      .select("id, name, url, file_type, folder, used_in, workspace_id")
+      .select("id, name, url, file_id, publish_url, drive_proxy_url, playback_url, playback_storage_key, mime_type, size_bytes, file_type, folder, used_in, workspace_id")
       .eq("workspace_id", wsId)
       .order("uploaded_at", { ascending: false })
       .then(({ data, error }) => {
@@ -203,7 +212,7 @@ export function MediaPicker({
 
     mediaAssets.forEach((asset) => {
       if (!asset.url) return;
-      const fileId = driveFileIdFromUrl(asset.url) || undefined;
+      const fileId = asset.file_id || driveFileIdFromUrl(asset.drive_proxy_url || asset.url) || undefined;
       const usedInCards = (asset.used_in || [])
         .map((id) => cardsById.get(id))
         .filter(Boolean)
@@ -211,12 +220,15 @@ export function MediaPicker({
       urlMap.set(asset.url, {
         assetId: asset.id,
         url: asset.url,
-        publishUrl: fileId ? getPublicDriveDownloadUrl(fileId) : undefined,
-        driveProxyUrl: fileId ? asset.url : undefined,
+        publishUrl: asset.publish_url || (fileId ? getPublicDriveDownloadUrl(fileId) : undefined),
+        driveProxyUrl: asset.drive_proxy_url || (fileId ? asset.url : undefined),
+        playbackUrl: asset.playback_url || undefined,
+        playbackStorageKey: asset.playback_storage_key || undefined,
         fileId,
         name: asset.name || "Media Library asset",
         type: asset.file_type === "video" ? "video" : "image",
-        mimeType: inferAssetMimeType(asset.file_type === "video" ? "video" : "image", asset.name || asset.url || ""),
+        mimeType: asset.mime_type || inferAssetMimeType(asset.file_type === "video" ? "video" : "image", asset.name || asset.url || ""),
+        size: typeof asset.size_bytes === "number" ? asset.size_bytes : undefined,
         usedInCards,
         source: asset.folder || "Media Library",
       });
@@ -380,6 +392,7 @@ export function MediaPicker({
             mimeType,
             size: result.size || item.file.size,
           });
+          warmBrowserImagePreview(result.driveProxyUrl || result.url, { mimeType, fileName: item.file.name });
         }
         if (selections.length > 0) {
           if (onSelectMany) onSelectMany(selections);

@@ -162,6 +162,33 @@ describe("Drive upload surfaces", () => {
       /phase: "drawer_playback_upload"[\s\S]*?Uploaded \$\{file\.name\}, but fast video playback was skipped\.[\s\S]*?const publishUrl/,
     );
     expect(drawer).not.toContain("Playback optimization failed for ${file.name}");
+
+    const mediaPage = source("src/components/pages/media-page.tsx");
+    expect(mediaPage).toContain("let playbackModule: typeof import(\"@/lib/media-playback\") | null = null");
+    expect(mediaPage).toContain('phase: "media_library_playback_upload"');
+    expect(mediaPage).toContain("Uploaded ${file.name}, but fast video playback was skipped.");
+    expect(mediaPage).toContain("playback_storage_key: asset.playbackStorageKey");
+  });
+
+  it("keeps optimized playback copies behind the app workspace gate, not public storage URLs", () => {
+    const playbackUploadRoute = source("src/app/api/media/playback-upload/route.ts");
+    expect(playbackUploadRoute).toContain("public: false");
+    expect(playbackUploadRoute).not.toContain("getPublicUrl");
+    expect(playbackUploadRoute).toContain('const playbackUrl = `/api/media/playback?key=${encodeURIComponent(storageKey)}`');
+
+    const playbackRoute = source("src/app/api/media/playback/route.ts");
+    expect(playbackRoute).toContain("requireRole(request, ALLOWED_DRIVE_ROLES as readonly WorkspaceRole[])");
+    expect(playbackRoute).toContain("parsed.workspaceId !== auth.workspaceId");
+    expect(playbackRoute).toContain("SUPABASE_SERVICE_ROLE_KEY");
+
+    const privateBucketsMigration = source("supabase/migrations/0051_private_media_derivative_buckets.sql");
+    expect(privateBucketsMigration).toContain("set public = false");
+    expect(privateBucketsMigration).toContain("drop policy if exists \"Public read media-playback\"");
+    expect(privateBucketsMigration).toContain("drop policy if exists \"Public read media-thumbnails\"");
+
+    const mediaPlayback = source("src/lib/media-playback.ts");
+    expect(mediaPlayback).toContain("playbackUrl: string");
+    expect(mediaPlayback).not.toContain("publicUrl");
   });
 
   it("bounds storage and support control-plane requests that gate media work", () => {
@@ -174,9 +201,70 @@ describe("Drive upload surfaces", () => {
       "src/components/pages/settings-page.tsx",
       "src/components/kickback-modal.tsx",
       "src/lib/ai/upload.ts",
+      "src/lib/support/server.ts",
+      "src/app/api/media/image-preview/route.ts",
     ]) {
       const contents = source(file);
       expect(contents, `${file} must import the shared storage control timeout`).toContain("withStorageControlTimeout");
+    }
+
+    const drive = source("src/lib/google-drive.ts");
+    expect(drive).toContain("ACCESS_TOKEN_MINT_TIMEOUT_MS");
+    expect(drive).toContain("cachedAccessToken");
+    expect(drive).toContain("Google Drive token mint timed out");
+
+    const upload = source("src/lib/drive-upload.ts");
+    expect(upload).toContain("UPLOAD_FAILURE_REPORT_TIMEOUT_MS");
+    expect(upload).toContain('fetch("/api/drive/upload-failure"');
+    expect(upload).toContain("signal: controller.signal");
+  });
+
+  it("warms and privately caches HEIC previews so viewing is not repeatedly black while converting", () => {
+    const imagePreview = source("src/app/api/media/image-preview/route.ts");
+    expect(imagePreview).toContain("inFlightPreviewBuilds");
+    expect(imagePreview).toContain('"private, max-age=86400, immutable"');
+
+    const imagePreviewLib = source("src/lib/image-preview.ts");
+    expect(imagePreviewLib).toContain("warmBrowserImagePreview");
+    expect(imagePreviewLib).toContain('cache: "force-cache"');
+
+    const previewImage = source("src/components/preview-image.tsx");
+    expect(previewImage).toContain("IMAGE_PREVIEW_LOAD_TIMEOUT_MS");
+    expect(previewImage).toContain("setFailedSrc(displaySrc)");
+
+    for (const file of [
+      "src/components/pages/media-page.tsx",
+      "src/components/create-post-modal.tsx",
+      "src/components/media-picker.tsx",
+      "src/components/asset-review-drawer.tsx",
+    ]) {
+      expect(source(file), file).toContain("warmBrowserImagePreview");
+    }
+  });
+
+  it("keeps same-origin media tags authenticated with a server-readable session cookie", () => {
+    const authContext = source("src/lib/auth-context.tsx");
+    expect(authContext).toContain('fetch("/api/auth/session-cookie"');
+    expect(authContext).toContain("syncServerSessionCookieBestEffort(session.access_token)");
+    expect(authContext).toContain("syncServerSessionCookieBestEffort(data.session.access_token)");
+    expect(authContext).toContain('fetch("/api/auth/logout", { method: "POST" })');
+
+    const sessionCookieRoute = source("src/app/api/auth/session-cookie/route.ts");
+    expect(sessionCookieRoute).toContain('res.cookies.set("sb-access-token"');
+    expect(sessionCookieRoute).toContain("httpOnly: true");
+    expect(sessionCookieRoute).toContain("admin.auth.getUser(token)");
+  });
+
+  it("does not authorize Drive media or HEIC previews from Referer alone", () => {
+    for (const file of [
+      "src/app/api/drive/stream/route.ts",
+      "src/app/api/media/image-preview/route.ts",
+    ]) {
+      const contents = source(file);
+      expect(contents, file).toContain("requireRole");
+      expect(contents, file).toContain("requiresWorkspaceAppProperty");
+      expect(contents, file).not.toContain('headers.get("referer")');
+      expect(contents, file).not.toContain("refOk");
     }
   });
 });

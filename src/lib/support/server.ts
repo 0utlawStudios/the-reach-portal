@@ -20,6 +20,7 @@ import {
   buildSupportTicketEmailHtml,
   buildSupportReplyEmailHtml,
 } from "@/lib/email-utils";
+import { withStorageControlTimeout } from "@/lib/storage-upload-timeout";
 import { pingTelegram, tgEscape } from "./telegram";
 import {
   attachmentKind,
@@ -262,7 +263,10 @@ export async function createUploadTargets(args: {
         throw new SupportValidationError(`"${sanitizeFileName(f.name)}" is larger than 25 MB.`);
       }
       const storageKey = `${workspaceId}/${userId}/${randomUUID()}.${extForMime(mime)}`;
-      const { data, error } = await admin.storage.from(BUCKET).createSignedUploadUrl(storageKey);
+      const { data, error } = await withStorageControlTimeout(
+        admin.storage.from(BUCKET).createSignedUploadUrl(storageKey),
+        "Support attachment upload target",
+      );
       if (error || !data?.token) {
         throw new Error(`Could not prepare upload: ${error?.message || "unknown"}`);
       }
@@ -312,9 +316,12 @@ export async function buildAttachmentsFromClaims(args: {
       const slash = key.lastIndexOf("/");
       const folder = key.slice(0, slash);
       const fileName = key.slice(slash + 1);
-      const { data: listed, error: listErr } = await admin.storage
-        .from(BUCKET)
-        .list(folder, { limit: 100, search: fileName });
+      const { data: listed, error: listErr } = await withStorageControlTimeout(
+        admin.storage
+          .from(BUCKET)
+          .list(folder, { limit: 100, search: fileName }),
+        "Support attachment verification",
+      );
       if (listErr) throw new Error(`Attachment check failed: ${listErr.message}`);
       const obj = (listed || []).find((o) => o.name === fileName);
       if (!obj) {
@@ -328,9 +335,12 @@ export async function buildAttachmentsFromClaims(args: {
       if (size > SUPPORT_MAX_FILE_BYTES) {
         throw new SupportValidationError("That attachment is larger than 25 MB.");
       }
-      const { data: signed, error: signErr } = await admin.storage
-        .from(BUCKET)
-        .createSignedUrl(key, SIGNED_URL_TTL);
+      const { data: signed, error: signErr } = await withStorageControlTimeout(
+        admin.storage
+          .from(BUCKET)
+          .createSignedUrl(key, SIGNED_URL_TTL),
+        "Support attachment URL signing",
+      );
       if (signErr || !signed?.signedUrl) {
         throw new Error(`Attachment URL failed: ${signErr?.message || "unknown"}`);
       }
@@ -362,10 +372,17 @@ export async function resignAttachments(
     attachments
       .filter((a) => Boolean(a?.storageKey))
       .map(async (a) => {
-        const { data, error } = await admin.storage
-          .from(BUCKET)
-          .createSignedUrl(a.storageKey, SIGNED_URL_TTL);
-        return { ...a, signedUrl: error || !data?.signedUrl ? a.signedUrl : data.signedUrl };
+        try {
+          const { data, error } = await withStorageControlTimeout(
+            admin.storage
+              .from(BUCKET)
+              .createSignedUrl(a.storageKey, SIGNED_URL_TTL),
+            "Support attachment URL refresh",
+          );
+          return { ...a, signedUrl: error || !data?.signedUrl ? a.signedUrl : data.signedUrl };
+        } catch {
+          return { ...a, signedUrl: a.signedUrl };
+        }
       }),
   );
 }

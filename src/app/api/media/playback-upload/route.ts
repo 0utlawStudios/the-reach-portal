@@ -54,7 +54,7 @@ function extensionFor(mimeType: string): string {
 }
 
 const PLAYBACK_BUCKET_OPTIONS = {
-  public: true,
+  public: false,
   fileSizeLimit: MAX_PLAYBACK_VIDEO_FILE_SIZE,
   allowedMimeTypes: [...PLAYBACK_VIDEO_MIME_TYPES],
 };
@@ -69,7 +69,7 @@ async function ensurePlaybackBucket(admin: SupabaseClient): Promise<void> {
     const currentLimit = current.file_size_limit == null ? null : Number(current.file_size_limit);
     const currentMimes = new Set(current.allowed_mime_types || []);
     const hasMimePolicy = PLAYBACK_VIDEO_MIME_TYPES.every((mime) => currentMimes.has(mime));
-    if (current.public && currentLimit === MAX_PLAYBACK_VIDEO_FILE_SIZE && hasMimePolicy) return;
+    if (!current.public && currentLimit === MAX_PLAYBACK_VIDEO_FILE_SIZE && hasMimePolicy) return;
 
     const updated = await admin.storage.updateBucket(BUCKET, PLAYBACK_BUCKET_OPTIONS);
     if (updated.error) {
@@ -130,13 +130,13 @@ export async function POST(request: NextRequest) {
       throw new Error(error?.message || "Failed to create playback upload URL");
     }
 
-    const publicUrl = admin.storage.from(BUCKET).getPublicUrl(storageKey).data.publicUrl;
+    const playbackUrl = `/api/media/playback?key=${encodeURIComponent(storageKey)}`;
 
     return NextResponse.json({
       bucket: BUCKET,
       storageKey,
       token: data.token,
-      publicUrl,
+      playbackUrl,
       mimeType,
       size: fileSize,
     });

@@ -178,6 +178,16 @@ describe("GET /api/media/image-preview", () => {
     expect(storageMocks.upload).not.toHaveBeenCalled();
   });
 
+  it("coalesces concurrent cache misses for the same HEIC preview", async () => {
+    const [first, second] = await Promise.all([GET(makeRequest()), GET(makeRequest())]);
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    expect(sharpMocks.sharp).toHaveBeenCalledTimes(1);
+    expect(storageMocks.upload).toHaveBeenCalledTimes(1);
+  });
+
   it("converts HEIC by filename when Drive reports a misleading image MIME", async () => {
     driveMocks.getFileMetadata.mockResolvedValueOnce({
       id: FILE_ID,

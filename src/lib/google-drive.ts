@@ -9,6 +9,10 @@ const DRIVE_UPLOAD = "https://www.googleapis.com/upload/drive/v3";
 // ─── Singleton auth client ───
 
 let _auth: GoogleAuth | null = null;
+let cachedAccessToken: { token: string; expiresAt: number } | null = null;
+let accessTokenInFlight: Promise<string> | null = null;
+const ACCESS_TOKEN_CACHE_TTL_MS = 50 * 60 * 1000;
+const ACCESS_TOKEN_MINT_TIMEOUT_MS = 10_000;
 
 function getCredentials() {
   const b64 = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
@@ -28,11 +32,27 @@ function getAuth(): GoogleAuth {
 }
 
 export async function getAccessToken(): Promise<string> {
-  const client = await getAuth().getClient();
-  const res = await client.getAccessToken();
-  const token = res?.token;
-  if (!token) throw new Error("Failed to get access token");
-  return token;
+  if (cachedAccessToken && cachedAccessToken.expiresAt > Date.now()) {
+    return cachedAccessToken.token;
+  }
+  if (accessTokenInFlight) return accessTokenInFlight;
+
+  accessTokenInFlight = withTimeout(
+    (async () => {
+      const client = await getAuth().getClient();
+      const res = await client.getAccessToken();
+      const token = res?.token;
+      if (!token) throw new Error("Failed to get access token");
+      cachedAccessToken = { token, expiresAt: Date.now() + ACCESS_TOKEN_CACHE_TTL_MS };
+      return token;
+    })(),
+    ACCESS_TOKEN_MINT_TIMEOUT_MS,
+    new Error("Google Drive token mint timed out"),
+  ).finally(() => {
+    accessTokenInFlight = null;
+  });
+
+  return accessTokenInFlight;
 }
 
 export function getRootFolderId(): string {
@@ -53,6 +73,20 @@ async function driveFetch(url: string, init?: RequestInit): Promise<Response> {
     return await fetch(url, { ...init, headers, signal: controller.signal });
   } finally {
     clearTimeout(timer);
+  }
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, error: Error): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_resolve, reject) => {
+        timer = setTimeout(() => reject(error), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 

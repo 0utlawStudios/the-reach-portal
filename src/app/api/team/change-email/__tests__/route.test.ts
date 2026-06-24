@@ -170,7 +170,19 @@ describe("POST /api/team/change-email", () => {
         table: "support_threads",
         method: "update",
         payload: { created_by_email: "new@example.com" },
-        filters: [["created_by", "user-1"]],
+        filters: [["created_by", "user-1"], ["workspace_id", "workspace-1"]],
+      },
+      {
+        table: "posts",
+        method: "update",
+        payload: { created_by: "Stored Member" },
+        filters: [["created_by", "member@example.com"], ["workspace_id", "workspace-1"]],
+      },
+      {
+        table: "media_assets",
+        method: "update",
+        payload: { added_by: "Stored Member" },
+        filters: [["added_by", "member@example.com"], ["workspace_id", "workspace-1"]],
       },
       {
         table: "rpc",
@@ -241,7 +253,7 @@ describe("POST /api/team/change-email", () => {
         payload: { email: "fresh@example.com", name: "Fresh Invite", role: "creative_director" },
         filters: [["id", "member-row-1"]],
       },
-      { table: "workspace_members", method: "delete", filters: [["user_id", "old-pending-user"]] },
+      { table: "workspace_members", method: "delete", filters: [["user_id", "old-pending-user"], ["workspace_id", "workspace-1"]] },
       { table: "auth.users", method: "deleteUser", id: "old-pending-user" },
     ]));
   });

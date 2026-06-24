@@ -29,6 +29,15 @@ async function findAuthUserByEmail(admin: AdminClient, email: string) {
   }
 }
 
+async function hasOtherWorkspaceMembership(admin: AdminClient, userId: string, workspaceId: string): Promise<boolean> {
+  const { data, error } = await admin
+    .from("workspace_members")
+    .select("workspace_id")
+    .eq("user_id", userId);
+  if (error) throw new Error(`Workspace membership check failed: ${error.message}`);
+  return (data || []).some((row: { workspace_id?: string | null }) => row.workspace_id !== workspaceId);
+}
+
 interface RemoveBody {
   memberId: string;
   memberEmail: string;
@@ -103,7 +112,8 @@ export async function POST(request: NextRequest) {
       const { error: workspaceDeleteErr } = await admin
         .from("workspace_members")
         .delete()
-        .eq("user_id", authUser.id);
+        .eq("user_id", authUser.id)
+        .eq("workspace_id", ctx.workspaceId);
       if (workspaceDeleteErr) {
         throw new Error(`Workspace membership cleanup failed: ${workspaceDeleteErr.message}`);
       }
@@ -124,12 +134,17 @@ export async function POST(request: NextRequest) {
     let authDeleted = false;
     let authCleanupError: string | null = null;
     if (authUser?.id) {
-      const { error: authDeleteErr } = await admin.auth.admin.deleteUser(authUser.id);
-      if (authDeleteErr) {
-        authCleanupError = authDeleteErr.message;
-        console.error("[remove-member] auth user cleanup failed after access revoke:", authDeleteErr.message);
+      const keepAuthUser = await hasOtherWorkspaceMembership(admin, authUser.id, ctx.workspaceId);
+      if (keepAuthUser) {
+        authCleanupError = "auth user kept because they still belong to another workspace";
       } else {
-        authDeleted = true;
+        const { error: authDeleteErr } = await admin.auth.admin.deleteUser(authUser.id);
+        if (authDeleteErr) {
+          authCleanupError = authDeleteErr.message;
+          console.error("[remove-member] auth user cleanup failed after access revoke:", authDeleteErr.message);
+        } else {
+          authDeleted = true;
+        }
       }
     }
 

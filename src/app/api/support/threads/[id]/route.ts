@@ -7,6 +7,7 @@ import { requireBearerUser, requireBearerTeamRole } from "@/lib/auth/require";
 import {
   getSupportAdminClient,
   getTeamRole,
+  resolveActiveSupportWorkspace,
   resignAttachments,
   recordSupportAudit,
   resolveUserName,
@@ -44,14 +45,14 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ id: str
   if (!threadRow) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const thread = threadRow as SupportThreadRow;
-  const isOwner = thread.created_by === auth.user.id;
+  const callerWorkspaceId = await resolveActiveSupportWorkspace(admin, auth.user.id, auth.user.email ?? "");
+  const isOwner = thread.created_by === auth.user.id && thread.workspace_id === callerWorkspaceId;
   if (!isOwner) {
     const role = await getTeamRole(admin, auth.user.email ?? "", auth.user.id);
     // Don't reveal that the thread exists to anyone but its owner / superadmin.
     if (role !== "superadmin") return NextResponse.json({ error: "Not found" }, { status: 404 });
     // Multi-tenant guard: a superadmin only reaches threads in their own workspace.
-    const workspaceId = await resolveWorkspaceId(admin, auth.user.id);
-    if (thread.workspace_id !== workspaceId) {
+    if (thread.workspace_id !== callerWorkspaceId) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
   }

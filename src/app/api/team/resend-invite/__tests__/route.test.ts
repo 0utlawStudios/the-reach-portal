@@ -101,7 +101,7 @@ describe("POST /api/team/resend-invite", () => {
       inviteUrl: "https://thereach.ten80ten.com/auth/confirm?token_hash=hashed-token&type=invite",
     });
     expect(operations).toEqual(expect.arrayContaining([
-      { table: "workspace_members", method: "delete", filters: [["user_id", "old-auth-user"]] },
+      { table: "workspace_members", method: "delete", filters: [["user_id", "old-auth-user"], ["workspace_id", "workspace-1"]] },
       { table: "auth.users", method: "deleteUser", id: "old-auth-user" },
       {
         table: "auth.users",

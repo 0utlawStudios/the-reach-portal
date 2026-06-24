@@ -28,6 +28,19 @@ async function findAuthUserByEmail(admin: ReturnType<typeof getAdminClient>, ema
   return null;
 }
 
+async function hasOtherWorkspaceMembership(
+  admin: ReturnType<typeof getAdminClient>,
+  userId: string,
+  workspaceId: string,
+): Promise<boolean> {
+  const { data, error } = await admin
+    .from("workspace_members")
+    .select("workspace_id")
+    .eq("user_id", userId);
+  if (error) throw new Error(`Workspace membership check failed: ${error.message}`);
+  return (data || []).some((row: { workspace_id?: string | null }) => row.workspace_id !== workspaceId);
+}
+
 interface ApproveBody {
   requestId: string;
   action: "approve" | "reject";
@@ -116,10 +129,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Could not verify previous auth account" }, { status: 500 });
     }
     if (found) {
-      const { error: workspaceCleanupErr } = await admin.from("workspace_members").delete().eq("user_id", found.id);
+      const { error: workspaceCleanupErr } = await admin
+        .from("workspace_members")
+        .delete()
+        .eq("user_id", found.id)
+        .eq("workspace_id", ctx.workspaceId);
       if (workspaceCleanupErr) {
         console.error("[approve-request] workspace cleanup failed:", workspaceCleanupErr.message);
         return NextResponse.json({ error: "Failed to clean up previous workspace access" }, { status: 500 });
+      }
+      if (await hasOtherWorkspaceMembership(admin, found.id, ctx.workspaceId)) {
+        return NextResponse.json({ error: "That auth account belongs to another workspace" }, { status: 409 });
       }
       const { error: authCleanupErr } = await admin.auth.admin.deleteUser(found.id);
       if (authCleanupErr) {
@@ -194,7 +214,7 @@ export async function POST(request: NextRequest) {
       console.error("[approve-request] request status update failed:", requestUpdateErr.message);
       if (!existingMember && memberId) await admin.from("team_members").delete().eq("id", memberId);
       if (authData?.user?.id) {
-        await admin.from("workspace_members").delete().eq("user_id", authData.user.id);
+        await admin.from("workspace_members").delete().eq("user_id", authData.user.id).eq("workspace_id", ctx.workspaceId);
         await admin.auth.admin.deleteUser(authData.user.id);
       }
       return NextResponse.json({ error: "Failed to finalize access request approval" }, { status: 500 });

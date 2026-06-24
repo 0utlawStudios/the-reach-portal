@@ -50,6 +50,7 @@ const DEFAULT_USER: UserProfile = {
   initials: "G",
 };
 const ACCESS_REVALIDATE_MS = 10 * 60 * 1000;
+const SERVER_SESSION_COOKIE_TIMEOUT_MS = 5_000;
 type AuthSession = NonNullable<Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"]>;
 
 /** Build a profile from auth metadata, with proper capitalization */
@@ -115,6 +116,29 @@ async function provisionWorkspace(token: string): Promise<{
   }
 }
 
+async function syncServerSessionCookie(token: string): Promise<void> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), SERVER_SESSION_COOKIE_TIMEOUT_MS);
+  try {
+    const res = await fetch("/api/auth/session-cookie", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      throw new Error(`Session cookie sync failed with HTTP ${res.status}`);
+    }
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function syncServerSessionCookieBestEffort(token: string): Promise<void> {
+  return syncServerSessionCookie(token).catch((err) => {
+    console.warn("[auth] server session cookie sync failed:", err instanceof Error ? err.message : err);
+  });
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [hydrated, setHydrated] = useState(false);
@@ -160,6 +184,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const [enriched, provisioned] = await Promise.all([
         enrichFromTeamMembers(email, fallbackProfile),
         provisionWorkspace(session.access_token),
+        syncServerSessionCookieBestEffort(session.access_token),
       ]);
       setIsAuthenticated(true);
       setAccessToken(session.access_token);
@@ -222,6 +247,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           (provisionedEmailRef.current !== null && email === provisionedEmailRef.current);
         if (isReEmitForSameUser) {
           setAccessToken(session.access_token);
+          void syncServerSessionCookieBestEffort(session.access_token);
           return;
         }
         const meta = session.user.user_metadata || {};
@@ -294,6 +320,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [enriched, provisioned] = await Promise.all([
       enrichFromTeamMembers(userEmail, profile),
       provisionWorkspace(data.session.access_token),
+      syncServerSessionCookieBestEffort(data.session.access_token),
     ]);
     profile = enriched;
     setCurrentUser(profile);
@@ -316,7 +343,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     // scope:"global" revokes the refresh token server-side so the session
     // cannot be reused if cookies/localStorage are recovered after sign-out.
-    await supabase.auth.signOut({ scope: "global" });
+    try {
+      await supabase.auth.signOut({ scope: "global" });
+    } finally {
+      await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
+    }
     setIsAuthenticated(false);
     setCurrentUser(DEFAULT_USER);
     setAccessToken(null);

@@ -3,6 +3,7 @@ import { driveFileIdFromUrl } from "@/lib/media-resolver";
 
 const HEIC_IMAGE_MIME_TYPES = new Set(["image/heic", "image/heic-sequence", "image/heif", "image/heif-sequence"]);
 const HEIC_EXT_RE = /\.(hei[cf])(?:[?#].*)?$/i;
+const HEIC_PREVIEW_WARM_TIMEOUT_MS = 55_000;
 
 export function isHeicLikeImage(mimeType?: unknown, fileNameOrUrl?: unknown): boolean {
   const normalized = normalizeDriveMimeType(mimeType, fileNameOrUrl);
@@ -20,17 +21,48 @@ function driveStreamTokenFromUrl(url: string): string | null {
   }
 }
 
-export function browserImagePreviewUrl(
+export function heicImagePreviewUrl(
   url: string,
   opts: { mimeType?: unknown; fileName?: unknown } = {},
-): string {
-  if (!url || !isHeicLikeImage(opts.mimeType, opts.fileName || url)) return url;
+): string | null {
+  if (!url || !isHeicLikeImage(opts.mimeType, opts.fileName || url)) return null;
 
   const fileId = driveFileIdFromUrl(url);
-  if (!fileId) return url;
+  if (!fileId) return null;
 
   const params = new URLSearchParams({ id: fileId });
   const token = driveStreamTokenFromUrl(url);
   if (token) params.set("token", token);
   return `/api/media/image-preview?${params.toString()}`;
+}
+
+export function browserImagePreviewUrl(
+  url: string,
+  opts: { mimeType?: unknown; fileName?: unknown } = {},
+): string {
+  return heicImagePreviewUrl(url, opts) || url;
+}
+
+export function warmBrowserImagePreview(
+  url: string,
+  opts: { mimeType?: unknown; fileName?: unknown } = {},
+): void {
+  const previewUrl = heicImagePreviewUrl(url, opts);
+  if (!previewUrl || typeof fetch !== "function") return;
+
+  const controller = typeof AbortController === "function" ? new AbortController() : null;
+  const timer = controller
+    ? setTimeout(() => controller.abort(), HEIC_PREVIEW_WARM_TIMEOUT_MS)
+    : undefined;
+
+  void fetch(previewUrl, {
+    method: "GET",
+    credentials: "same-origin",
+    cache: "force-cache",
+    signal: controller?.signal,
+  }).catch(() => {
+    // Cache warming is best-effort. The visible <img> path still handles errors.
+  }).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
 }

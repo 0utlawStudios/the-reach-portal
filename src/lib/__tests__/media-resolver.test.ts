@@ -54,7 +54,7 @@ describe("media resolver", () => {
           url: "https://drive.google.com/uc?export=download&id=raw-video",
           publishUrl: "https://drive.google.com/uc?export=download&id=raw-video",
           driveProxyUrl: "/api/drive/stream?id=raw-video&token=signed",
-          playbackUrl: "https://project.supabase.co/storage/v1/object/public/media-playback/workspace/post/clip.mov",
+          playbackUrl: "/api/media/playback?key=workspace%2Fpost%2Fclip.mov",
           playbackStorageKey: "workspace/post/clip.mov",
           fileId: "raw-video",
           usageType: "master",
@@ -64,7 +64,7 @@ describe("media resolver", () => {
       },
     });
 
-    expect(resolveCardVideoUrl(c)).toBe("https://project.supabase.co/storage/v1/object/public/media-playback/workspace/post/clip.mov");
+    expect(resolveCardVideoUrl(c)).toBe("/api/media/playback?key=workspace%2Fpost%2Fclip.mov");
   });
 
   it("falls back to thumbnailUrl when a legacy video post stored the video as the thumbnail", () => {
@@ -112,7 +112,7 @@ describe("media resolver", () => {
           name: "clip.mov",
           url: "https://drive.google.com/uc?export=download&id=raw-video",
           driveProxyUrl: "/api/drive/stream?id=raw-video&token=signed",
-          playbackUrl: "https://project.supabase.co/storage/v1/object/public/media-playback/workspace/post/clip.mov",
+          playbackUrl: "/api/media/playback?key=workspace%2Fpost%2Fclip.mov",
           fileId: "raw-video",
           usageType: "master",
           mimeType: "video/quicktime",
