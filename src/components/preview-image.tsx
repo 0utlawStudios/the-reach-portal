@@ -36,9 +36,12 @@ export function PreviewImage({
 
   useEffect(() => {
     if (missingOrFailed || typeof displaySrc !== "string" || isLoaded) return;
-    const timer = setTimeout(() => setFailedSrc(displaySrc), IMAGE_PREVIEW_LOAD_TIMEOUT_MS);
+    const timer = setTimeout(() => {
+      setFailedSrc(displaySrc);
+      onError?.({} as SyntheticEvent<HTMLImageElement, Event>);
+    }, IMAGE_PREVIEW_LOAD_TIMEOUT_MS);
     return () => clearTimeout(timer);
-  }, [displaySrc, isLoaded, missingOrFailed]);
+  }, [displaySrc, isLoaded, missingOrFailed, onError]);
 
   if (missingOrFailed) {
     return (

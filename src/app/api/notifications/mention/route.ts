@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
 
     // SEC-012: Derive the author identity from the authenticated user's
     // team_members row. Anything sent in the body is ignored / overridden.
-    const caller = await loadCallerProfile(admin, ctx.email);
+    const caller = await loadCallerProfile(admin, ctx.email, ctx.workspaceId);
     const authorEmail = caller.email;
     const authorName = caller.name;
     const postTitle = post.title || "Post";
@@ -74,6 +74,7 @@ export async function POST(request: NextRequest) {
     const { data: members } = await admin
       .from("team_members")
       .select("name, email")
+      .eq("workspace_id", ctx.workspaceId)
       .in("name", mentionedNames)
       .eq("status", "active");
 

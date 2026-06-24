@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useCallback, useMemo, useEffect, u
 import { loadState, saveState } from "./persistence";
 import { supabase } from "./supabaseClient";
 import { useToast } from "./toast-context";
+import { useAuth } from "./auth-context";
 
 export type UserRole = "superadmin" | "admin" | "approver" | "creative_director" | "social_media_specialist" | "video_editor" | "graphic_designer";
 export type InviteStatus = "active" | "pending";
@@ -59,6 +60,7 @@ type TeamMemberRow = {
   created_at?: string | null;
   updated_at?: string | null;
   avatar_url?: string | null;
+  workspace_id?: string | null;
 };
 
 function isSupabaseConfigured(): boolean {
@@ -82,12 +84,14 @@ function dbToMember(row: TeamMemberRow): TeamMember {
 
 const DEFAULT_MEMBERS: TeamMember[] = [];
 const TEAM_MEMBER_SELECT =
-  "id, name, email, phone, role, secondary_role, status, joined_at, created_at, updated_at, avatar_url";
+  "id, workspace_id, name, email, phone, role, secondary_role, status, joined_at, created_at, updated_at, avatar_url";
 const TEAM_REFRESH_MS = 5 * 60 * 1000;
 const PENDING_REQUEST_REFRESH_MS = 60 * 1000;
+const BASELINE_WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
 export function TeamProvider({ children }: { children: ReactNode }) {
   const { addToast } = useToast();
+  const { provisionResult } = useAuth();
   const [members, setMembers] = useState<TeamMember[]>(DEFAULT_MEMBERS);
   const [pendingRequests, setPendingRequests] = useState<SignupRequest[]>([]);
   const hydrated = useRef(false);
@@ -95,6 +99,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   // (e.g. five member rows arriving back-to-back) collapses into one save.
   const persistTimeoutRef = useRef<number | null>(null);
   const useDb = isSupabaseConfigured();
+  const workspaceId = provisionResult?.workspaceId || BASELINE_WORKSPACE_ID;
 
   const refreshMembers = useCallback(async () => {
     if (!useDb) {
@@ -106,6 +111,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase
         .from("team_members")
         .select(TEAM_MEMBER_SELECT)
+        .eq("workspace_id", workspaceId)
         .order("joined_at");
       if (error) {
         console.error("[team] load failed:", error.message);
@@ -124,7 +130,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       addToast("Could not refresh team members. Try again.", "error");
     }
     hydrated.current = true;
-  }, [useDb, addToast]);
+  }, [useDb, addToast, workspaceId]);
 
   useEffect(() => {
     void Promise.resolve().then(() => refreshMembers());
@@ -136,6 +142,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     supabase
       .from("signup_requests")
       .select("*")
+      .eq("workspace_id", workspaceId)
       .eq("status", "pending")
       .order("created_at", { ascending: false })
       .then(({ data, error }) => {
@@ -145,7 +152,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
         }
         setPendingRequests(data || []);
       });
-  }, [useDb]);
+  }, [useDb, workspaceId]);
 
   useEffect(() => {
     refreshPendingRequests();
@@ -199,22 +206,22 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!useDb) return;
     const channel = supabase
-      .channel("team-access-sync")
+      .channel(`team-access-sync-${workspaceId}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "team_members" },
+        { event: "*", schema: "public", table: "team_members", filter: `workspace_id=eq.${workspaceId}` },
         () => { void refreshMembers(); },
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "signup_requests" },
+        { event: "*", schema: "public", table: "signup_requests", filter: `workspace_id=eq.${workspaceId}` },
         () => { refreshPendingRequests(); },
       )
       .subscribe();
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [useDb, refreshMembers, refreshPendingRequests]);
+  }, [useDb, refreshMembers, refreshPendingRequests, workspaceId]);
 
   // PERF-015: 500ms debounce — saveState fires synchronous JSON.stringify on
   // the whole team list. A realtime sync burst (5+ INSERT/UPDATE events in
@@ -244,7 +251,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       // row and toast the error so the UI never carries a phantom invite.
       supabase
         .from("team_members")
-        .insert({ name, email, role, status: "pending" })
+        .insert({ name, email, role, status: "pending", workspace_id: workspaceId })
         .select(TEAM_MEMBER_SELECT)
         .single()
         .then(({ data, error }) => {
@@ -259,7 +266,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
           }
         });
     }
-  }, [useDb, addToast]);
+  }, [useDb, addToast, workspaceId]);
 
   const removeMember = useCallback((id: string, email: string, requestedBy: string) => {
     // DATA-007: snapshot the member so a failed delete can be rolled back.

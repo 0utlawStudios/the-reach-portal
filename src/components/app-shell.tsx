@@ -27,7 +27,7 @@ function AppLoadingScreen({ label }: { label: string }) {
 }
 
 export function AppShell() {
-  const { isAuthenticated, isLoading, currentUser, provisionStatus, provisionMessage, logout } = useAuth();
+  const { isAuthenticated, isLoading, currentUser, provisionResult, provisionStatus, provisionMessage, logout } = useAuth();
 
   if (isLoading) return <AppLoadingScreen label="Checking session" />;
   if (!isAuthenticated) return <LoginScreen />;
@@ -82,7 +82,7 @@ export function AppShell() {
   }
 
   return (
-    <ThemeProvider email={currentUser.email}>
+    <ThemeProvider email={currentUser.email} workspaceId={provisionResult?.workspaceId}>
       <AuthenticatedAppShell />
     </ThemeProvider>
   );

@@ -63,6 +63,7 @@ export async function POST(request: NextRequest) {
     const { data: member } = await admin
       .from("team_members")
       .select("id, name, role, status")
+      .eq("workspace_id", ctx.workspaceId)
       .eq("email", normalizedEmail)
       .single();
 

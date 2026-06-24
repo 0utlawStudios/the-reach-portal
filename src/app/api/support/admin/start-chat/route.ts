@@ -46,6 +46,7 @@ async function selfHealActiveWorkspaceMember(
   const { data: member, error: memberErr } = await admin
     .from("team_members")
     .select("role, status")
+    .eq("workspace_id", workspaceId)
     .eq("email", email)
     .maybeSingle();
   if (memberErr) throw new Error(`Team member lookup failed: ${memberErr.message}`);
@@ -130,7 +131,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const name = await resolveUserName(admin, email);
+  const name = await resolveUserName(admin, email, workspaceId);
 
   let thread: SupportThreadRow;
   try {

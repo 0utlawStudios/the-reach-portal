@@ -57,11 +57,12 @@ export async function loadWorkspacePost<T extends object>(
   return data as unknown as T;
 }
 
-export async function loadCallerProfile(admin: SupabaseClient, email: string): Promise<{ name: string; email: string }> {
+export async function loadCallerProfile(admin: SupabaseClient, email: string, workspaceId: string): Promise<{ name: string; email: string }> {
   const callerEmail = email.toLowerCase();
   const { data } = await admin
     .from("team_members")
     .select("name, email")
+    .eq("workspace_id", workspaceId)
     .eq("email", callerEmail)
     .eq("status", "active")
     .maybeSingle();
@@ -75,6 +76,7 @@ export async function loadCallerProfile(admin: SupabaseClient, email: string): P
 export async function loadMemberByCreatorKey(
   admin: SupabaseClient,
   creatorKey: unknown,
+  workspaceId: string,
 ): Promise<{ name?: string | null; email?: string | null } | null> {
   const key = String(creatorKey || "").trim();
   if (!key) return null;
@@ -83,6 +85,7 @@ export async function loadMemberByCreatorKey(
   const { data } = await admin
     .from("team_members")
     .select("name, email")
+    .eq("workspace_id", workspaceId)
     .eq(column, value)
     .eq("status", "active")
     .maybeSingle();

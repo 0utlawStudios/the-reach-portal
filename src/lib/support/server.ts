@@ -92,6 +92,7 @@ export async function resolveActiveSupportWorkspace(
   const { data: teamMember } = await admin
     .from("team_members")
     .select("status")
+    .eq("workspace_id", workspaceId)
     .eq("email", lower)
     .maybeSingle();
   if ((teamMember as { status?: string } | null)?.status !== "active") return null;
@@ -103,14 +104,7 @@ export async function resolveActiveSupportWorkspace(
 export async function getTeamRole(admin: SupabaseClient, email: string, userId?: string): Promise<string | null> {
   const lower = (email || "").toLowerCase();
   if (!lower) return null;
-  const { data } = await admin
-    .from("team_members")
-    .select("role, status")
-    .eq("email", lower)
-    .maybeSingle();
-  const team = data as { role?: string | null; status?: string | null } | null;
-  if (team?.status !== "active") return null;
-
+  let workspaceId: string | null = null;
   if (userId) {
     const { data: workspaceMember } = await admin
       .from("workspace_members")
@@ -120,16 +114,28 @@ export async function getTeamRole(admin: SupabaseClient, email: string, userId?:
       .limit(1)
       .maybeSingle();
     if (!workspaceMember) return null;
+    workspaceId = workspaceMember.workspace_id as string;
   }
+
+  const { data } = await admin
+    .from("team_members")
+    .select("role, status")
+    .eq("workspace_id", workspaceId || BASELINE_WORKSPACE_ID)
+    .eq("email", lower)
+    .maybeSingle();
+  const team = data as { role?: string | null; status?: string | null } | null;
+  if (team?.status !== "active") return null;
 
   const role = team?.role || "";
   return role ? role.toLowerCase() : null;
 }
 
 /** Display name for a user, from team_members; falls back to the email local part. */
-export async function resolveUserName(admin: SupabaseClient, email: string): Promise<string> {
+export async function resolveUserName(admin: SupabaseClient, email: string, workspaceId?: string): Promise<string> {
   const lower = (email || "").toLowerCase();
-  const { data } = await admin.from("team_members").select("name").eq("email", lower).maybeSingle();
+  let query = admin.from("team_members").select("name").eq("email", lower);
+  if (workspaceId) query = query.eq("workspace_id", workspaceId);
+  const { data } = await query.maybeSingle();
   const name = data?.name as string | undefined;
   return name || lower.split("@")[0] || "Team member";
 }

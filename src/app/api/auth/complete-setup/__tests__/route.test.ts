@@ -36,6 +36,7 @@ function makeQuery(table: string) {
     state.filters.push([column, value]);
     return builder;
   });
+  builder.limit = vi.fn(() => builder);
   builder.update = vi.fn((payload: unknown) => {
     state.method = "update";
     state.payload = payload;

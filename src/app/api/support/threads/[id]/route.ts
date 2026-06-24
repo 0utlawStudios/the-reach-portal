@@ -111,7 +111,7 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
   if (!threadRow) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const thread = threadRow as SupportThreadRow;
-  const actorName = await resolveUserName(admin, adminAuth.email);
+  const actorName = await resolveUserName(admin, adminAuth.email, workspaceId);
   await recordSupportAudit({
     admin,
     action: "support_status_changed",

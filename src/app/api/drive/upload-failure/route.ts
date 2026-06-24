@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
   if (!errorMessage) return NextResponse.json({ error: "Missing error message" }, { status: 400 });
 
   const admin = getAdminClient();
-  const caller = await loadCallerProfile(admin, ctx.email);
+  const caller = await loadCallerProfile(admin, ctx.email, ctx.workspaceId);
   const cardId = text(body.cardId);
   const safeCardId = isValidUuid(cardId) ? cardId : null;
 

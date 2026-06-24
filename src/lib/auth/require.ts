@@ -187,6 +187,7 @@ export async function requireBearerTeamRole(
     const { data: teamMember, error: teamError } = await admin
       .from("team_members")
       .select("role, status")
+      .eq("workspace_id", workspaceMember.workspace_id)
       .eq("email", email)
       .maybeSingle();
     if (teamError || !teamMember || teamMember.status !== "active") {

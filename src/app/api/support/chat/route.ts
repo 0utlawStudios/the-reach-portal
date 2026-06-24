@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
   const email = (auth.user.email ?? "").toLowerCase();
   const workspaceId = await resolveActiveSupportWorkspace(admin, auth.user.id, email);
   if (!workspaceId) return NextResponse.json({ error: "No active workspace access" }, { status: 403 });
-  const name = await resolveUserName(admin, email);
+  const name = await resolveUserName(admin, email, workspaceId);
 
   let thread: SupportThreadRow;
   try {

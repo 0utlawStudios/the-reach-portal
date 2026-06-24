@@ -1,7 +1,7 @@
 export const VALID_DRIVE_FOLDERS = ["thumbnails", "raw-files", "media-library"] as const;
 export type DriveFolderName = (typeof VALID_DRIVE_FOLDERS)[number];
 
-export const ALLOWED_DRIVE_ROLES: ReadonlyArray<string> = [
+export const ALLOWED_DRIVE_VIEW_ROLES: ReadonlyArray<string> = [
   "superadmin",
   "admin",
   "owner",
@@ -15,6 +15,10 @@ export const ALLOWED_DRIVE_ROLES: ReadonlyArray<string> = [
   "technician",
   "viewer",
 ];
+
+export const ALLOWED_DRIVE_UPLOAD_ROLES: ReadonlyArray<string> = ALLOWED_DRIVE_VIEW_ROLES.filter((role) => role !== "viewer");
+
+export const ALLOWED_DRIVE_ROLES = ALLOWED_DRIVE_VIEW_ROLES;
 
 export const ALLOWED_MEDIA_MIME_TYPES = new Set<string>([
   "image/jpeg",

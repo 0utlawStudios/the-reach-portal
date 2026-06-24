@@ -164,7 +164,7 @@ describe("POST /api/team/change-email", () => {
         table: "team_members",
         method: "update",
         payload: { email: "new@example.com" },
-        filters: [["id", "member-row-1"]],
+        filters: [["id", "member-row-1"], ["workspace_id", "workspace-1"]],
       },
       {
         table: "support_threads",
@@ -251,7 +251,7 @@ describe("POST /api/team/change-email", () => {
         table: "team_members",
         method: "update",
         payload: { email: "fresh@example.com", name: "Fresh Invite", role: "creative_director" },
-        filters: [["id", "member-row-1"]],
+        filters: [["id", "member-row-1"], ["workspace_id", "workspace-1"]],
       },
       { table: "workspace_members", method: "delete", filters: [["user_id", "old-pending-user"], ["workspace_id", "workspace-1"]] },
       { table: "auth.users", method: "deleteUser", id: "old-pending-user" },

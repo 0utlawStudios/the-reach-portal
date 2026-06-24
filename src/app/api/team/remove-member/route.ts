@@ -64,6 +64,7 @@ export async function POST(request: NextRequest) {
     const { data: targetMember, error: targetErr } = await admin
       .from("team_members")
       .select("id, email, role, status")
+      .eq("workspace_id", ctx.workspaceId)
       .eq("id", body.memberId)
       .maybeSingle();
     if (targetErr) {
@@ -93,6 +94,7 @@ export async function POST(request: NextRequest) {
       const { data: activeSuperadmins, error: superadminErr } = await admin
         .from("team_members")
         .select("id")
+        .eq("workspace_id", ctx.workspaceId)
         .eq("role", "superadmin")
         .eq("status", "active");
       if (superadminErr) {
@@ -126,6 +128,7 @@ export async function POST(request: NextRequest) {
       .from("team_members")
       .delete()
       .eq("id", body.memberId)
+      .eq("workspace_id", ctx.workspaceId)
       .eq("email", targetEmail);
     if (teamDeleteErr) {
       throw new Error(`Team profile cleanup failed: ${teamDeleteErr.message}`);

@@ -93,7 +93,7 @@ describe("POST /api/team/remove-member", () => {
     expect(body).toMatchObject({ success: true, authDeleted: true });
     expect(operations).toEqual(expect.arrayContaining([
       { table: "workspace_members", method: "delete", filters: [["user_id", "user-1"], ["workspace_id", "workspace-1"]] },
-      { table: "team_members", method: "delete", filters: [["id", "member-row-1"], ["email", "member@example.com"]] },
+      { table: "team_members", method: "delete", filters: [["id", "member-row-1"], ["workspace_id", "workspace-1"], ["email", "member@example.com"]] },
       { table: "auth.users", method: "deleteUser", id: "user-1" },
     ]));
   });
@@ -137,7 +137,7 @@ describe("POST /api/team/remove-member", () => {
     const body = await res.json();
     expect(body.authDeleted).toBe(false);
     expect(operations).toEqual(expect.arrayContaining([
-      { table: "team_members", method: "delete", filters: [["id", "member-row-2"], ["email", "missing@example.com"]] },
+      { table: "team_members", method: "delete", filters: [["id", "member-row-2"], ["workspace_id", "workspace-1"], ["email", "missing@example.com"]] },
     ]));
     expect(operations.some((op) => op.table === "workspace_members")).toBe(false);
   });
@@ -152,7 +152,7 @@ describe("POST /api/team/remove-member", () => {
     expect(body).toMatchObject({ success: true, authDeleted: false, authCleanupPending: true });
     expect(operations).toEqual(expect.arrayContaining([
       { table: "workspace_members", method: "delete", filters: [["user_id", "user-1"], ["workspace_id", "workspace-1"]] },
-      { table: "team_members", method: "delete", filters: [["id", "member-row-1"], ["email", "member@example.com"]] },
+      { table: "team_members", method: "delete", filters: [["id", "member-row-1"], ["workspace_id", "workspace-1"], ["email", "member@example.com"]] },
       { table: "auth.users", method: "deleteUser", id: "user-1" },
     ]));
   });

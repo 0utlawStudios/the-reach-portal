@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { act, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { CardThumbnailMedia } from "../card-thumbnail-media";
 import type { ContentCard } from "@/lib/types";
 
@@ -13,6 +13,10 @@ function card(overrides: Partial<ContentCard>): Pick<ContentCard, "title" | "con
 }
 
 describe("CardThumbnailMedia", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("renders video cards from the raw video stream instead of treating the thumbnail as an image", () => {
     render(
       <CardThumbnailMedia
@@ -76,5 +80,36 @@ describe("CardThumbnailMedia", () => {
     );
 
     expect(screen.getByAltText("Poster").tagName).toBe("IMG");
+  });
+
+  it("falls back to the video stream when a poster image never loads", async () => {
+    vi.useFakeTimers();
+    render(
+      <CardThumbnailMedia
+        card={card({
+          title: "Slow poster",
+          thumbnailUrl: "/api/drive/stream?id=poster",
+          sourceVault: {
+            thumbnailFileId: "poster",
+            thumbnailMimeType: "image/jpeg",
+            rawFiles: [{
+              name: "slow.mp4",
+              url: "/api/drive/stream?id=raw-video",
+              fileId: "raw-video",
+              usageType: "master",
+              mimeType: "video/mp4",
+              uploadedAt: "2026-06-11T00:00:00.000Z",
+            }],
+          },
+        })}
+        className="thumb"
+      />,
+    );
+
+    expect(screen.getByAltText("Slow poster").tagName).toBe("IMG");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_001);
+    });
+    expect(screen.getByLabelText("Slow poster video preview")).toHaveAttribute("src", "/api/drive/stream?id=raw-video#t=0.1");
   });
 });

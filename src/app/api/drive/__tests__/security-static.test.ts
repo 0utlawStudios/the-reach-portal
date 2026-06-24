@@ -5,6 +5,9 @@ import { join } from "path";
 const DRIVE_STREAM_SRC = readFileSync(join(process.cwd(), "src/app/api/drive/stream/route.ts"), "utf8");
 const DRIVE_FINALIZE_SRC = readFileSync(join(process.cwd(), "src/app/api/drive/finalize/route.ts"), "utf8");
 const DRIVE_PROXY_UPLOAD_SRC = readFileSync(join(process.cwd(), "src/app/api/drive/proxy-upload/route.ts"), "utf8");
+const DRIVE_UPLOAD_SRC = readFileSync(join(process.cwd(), "src/app/api/drive/upload/route.ts"), "utf8");
+const DRIVE_UPLOAD_CHUNK_SRC = readFileSync(join(process.cwd(), "src/app/api/drive/upload-chunk/route.ts"), "utf8");
+const PLAYBACK_UPLOAD_SRC = readFileSync(join(process.cwd(), "src/app/api/media/playback-upload/route.ts"), "utf8");
 const DRIVE_POLICY_SRC = readFileSync(join(process.cwd(), "src/lib/drive-policy.ts"), "utf8");
 const GOOGLE_DRIVE_SRC = readFileSync(join(process.cwd(), "src/lib/google-drive.ts"), "utf8");
 
@@ -61,6 +64,18 @@ describe("Drive route security contracts", () => {
     expect(GOOGLE_DRIVE_SRC).toContain("token: signDriveStreamToken(fileId, workspaceId)");
     expect(GOOGLE_DRIVE_SRC).toContain("workspaceId: string");
     expect(GOOGLE_DRIVE_SRC).toContain("expiresAt <= Date.now()");
+  });
+
+  it("keeps viewer role on media reads but out of every media write route", () => {
+    expect(DRIVE_POLICY_SRC).toContain("ALLOWED_DRIVE_VIEW_ROLES");
+    expect(DRIVE_POLICY_SRC).toContain("ALLOWED_DRIVE_UPLOAD_ROLES");
+    expect(DRIVE_POLICY_SRC).toContain('role !== "viewer"');
+    expect(DRIVE_STREAM_SRC).toContain("ALLOWED_DRIVE_ROLES");
+    for (const contents of [DRIVE_UPLOAD_SRC, DRIVE_PROXY_UPLOAD_SRC, DRIVE_UPLOAD_CHUNK_SRC, DRIVE_FINALIZE_SRC, PLAYBACK_UPLOAD_SRC]) {
+      expect(contents).toContain("ALLOWED_DRIVE_UPLOAD_ROLES");
+      expect(contents).toContain("requireBearerTeamRole(request, ALLOWED_DRIVE_UPLOAD_ROLES)");
+      expect(contents).not.toContain("requireBearerTeamRole(request, ALLOWED_DRIVE_ROLES)");
+    }
   });
 
   it("sanitizes stream route catch responses before returning them to the browser", () => {

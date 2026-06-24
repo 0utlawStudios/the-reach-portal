@@ -69,6 +69,7 @@ export async function POST(request: NextRequest) {
       .from("signup_requests")
       .select("*")
       .eq("id", body.requestId)
+      .eq("workspace_id", ctx.workspaceId)
       .single();
 
     if (fetchErr || !req) {
@@ -83,7 +84,8 @@ export async function POST(request: NextRequest) {
       const { error: rejectErr } = await admin
         .from("signup_requests")
         .update({ status: "rejected", reviewed_by: reviewerEmail, reviewed_at: new Date().toISOString() })
-        .eq("id", body.requestId);
+        .eq("id", body.requestId)
+        .eq("workspace_id", ctx.workspaceId);
       if (rejectErr) {
         console.error("[approve-request] reject update failed:", rejectErr.message);
         return NextResponse.json({ error: "Failed to reject request" }, { status: 500 });
@@ -105,6 +107,7 @@ export async function POST(request: NextRequest) {
     const { data: existingMember, error: existingMemberErr } = await admin
       .from("team_members")
       .select("id, name, role, status")
+      .eq("workspace_id", ctx.workspaceId)
       .eq("email", requestEmail)
       .maybeSingle();
     if (existingMemberErr) {
@@ -188,6 +191,7 @@ export async function POST(request: NextRequest) {
       const { data: member, error: memberErr } = await admin
         .from("team_members")
         .insert({
+          workspace_id: ctx.workspaceId,
           name: req.name,
           email: requestEmail,
           phone: req.phone || null,
@@ -209,10 +213,11 @@ export async function POST(request: NextRequest) {
     const { error: requestUpdateErr } = await admin
       .from("signup_requests")
       .update({ status: "approved", reviewed_by: reviewerEmail, reviewed_at: new Date().toISOString() })
-      .eq("id", body.requestId);
+      .eq("id", body.requestId)
+      .eq("workspace_id", ctx.workspaceId);
     if (requestUpdateErr) {
       console.error("[approve-request] request status update failed:", requestUpdateErr.message);
-      if (!existingMember && memberId) await admin.from("team_members").delete().eq("id", memberId);
+      if (!existingMember && memberId) await admin.from("team_members").delete().eq("id", memberId).eq("workspace_id", ctx.workspaceId);
       if (authData?.user?.id) {
         await admin.from("workspace_members").delete().eq("user_id", authData.user.id).eq("workspace_id", ctx.workspaceId);
         await admin.auth.admin.deleteUser(authData.user.id);

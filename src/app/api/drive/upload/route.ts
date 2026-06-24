@@ -7,7 +7,7 @@ import {
 import { consume, getClientIp } from "@/lib/rate-limit";
 import { requireBearerTeamRole } from "@/lib/auth/require";
 import {
-  ALLOWED_DRIVE_ROLES,
+  ALLOWED_DRIVE_UPLOAD_ROLES,
   DriveFolderName,
   isAllowedDriveUploadForFolder,
   MAX_DRIVE_MEDIA_FILE_SIZE,
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
   let mimeType = "application/octet-stream";
   let fileSize: number | null = null;
   try {
-    const auth = await requireBearerTeamRole(request, ALLOWED_DRIVE_ROLES);
+    const auth = await requireBearerTeamRole(request, ALLOWED_DRIVE_UPLOAD_ROLES);
     if (auth instanceof NextResponse) return auth;
     authContext = auth;
     const { user } = auth;

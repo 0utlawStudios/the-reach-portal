@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
 
     // SEC-012: Override `approvedBy` with the server-resolved team_members
     // name for the authenticated caller.
-    const caller = await loadCallerProfile(admin, ctx.email);
+    const caller = await loadCallerProfile(admin, ctx.email, ctx.workspaceId);
     const approvedBy = caller.name || "Approver";
 
     // Fetch full post data for rich email
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
     const postTitle = post.title || "Post";
 
     // Look up creator email by name (same pattern as revision route)
-    const creator = await loadMemberByCreatorKey(admin, post.created_by || body.createdBy);
+    const creator = await loadMemberByCreatorKey(admin, post.created_by || body.createdBy, ctx.workspaceId);
 
     if (!creator?.email) {
       return NextResponse.json({ sent: 0, reason: "Creator not found in team_members" });

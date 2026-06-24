@@ -66,13 +66,14 @@ function buildProfile(email: string, meta: Record<string, unknown>): UserProfile
 }
 
 /** Enrich profile with team_members data (real name, role, avatar) */
-async function enrichFromTeamMembers(email: string, profile: UserProfile): Promise<UserProfile> {
+async function enrichFromTeamMembers(email: string, profile: UserProfile, workspaceId?: string): Promise<UserProfile> {
   try {
-    const { data } = await supabase
+    let query = supabase
       .from("team_members")
       .select("name, role, avatar_url, status")
-      .eq("email", email)
-      .single();
+      .eq("email", email);
+    if (workspaceId) query = query.eq("workspace_id", workspaceId);
+    const { data } = await query.maybeSingle();
     if (data) {
       // NOTE: previously this block auto-flipped status:"pending"→"active". That
       // defeats the admin approval flow — anyone who acquires an auth session
@@ -181,11 +182,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const fallbackProfile = currentUserRef.current.email.toLowerCase() === email.toLowerCase()
         ? currentUserRef.current
         : buildProfile(email, meta);
-      const [enriched, provisioned] = await Promise.all([
-        enrichFromTeamMembers(email, fallbackProfile),
+      const [provisioned] = await Promise.all([
         provisionWorkspace(session.access_token),
         syncServerSessionCookieBestEffort(session.access_token),
       ]);
+      const enriched = provisioned.result
+        ? await enrichFromTeamMembers(email, fallbackProfile, provisioned.result.workspaceId)
+        : fallbackProfile;
       setIsAuthenticated(true);
       setAccessToken(session.access_token);
       setCurrentUser((prev) =>
@@ -317,11 +320,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const userEmail = data.user?.email || email;
     const meta = data.user?.user_metadata || {};
     let profile = buildProfile(userEmail, meta);
-    const [enriched, provisioned] = await Promise.all([
-      enrichFromTeamMembers(userEmail, profile),
+    const [provisioned] = await Promise.all([
       provisionWorkspace(data.session.access_token),
       syncServerSessionCookieBestEffort(data.session.access_token),
     ]);
+    const enriched = provisioned.result
+      ? await enrichFromTeamMembers(userEmail, profile, provisioned.result.workspaceId)
+      : profile;
     profile = enriched;
     setCurrentUser(profile);
     setIsAuthenticated(true);

@@ -106,7 +106,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 
   const senderName = isOwner
     ? thread.created_by_name
-    : await resolveUserName(admin, auth.user.email ?? "");
+    : await resolveUserName(admin, auth.user.email ?? "", thread.workspace_id);
   const messageId = randomUUID();
 
   const { data: messageRow, error: msgErr } = await admin

@@ -55,6 +55,7 @@ export async function POST(request: NextRequest) {
     const { data: existingMember, error: existingErr } = await admin
       .from("team_members")
       .select("id, status")
+      .eq("workspace_id", BASELINE_WORKSPACE_ID)
       .eq("email", email)
       .maybeSingle();
     if (existingErr) {
@@ -124,6 +125,7 @@ export async function POST(request: NextRequest) {
         const { data: admins, error: adminsErr } = await admin
           .from("team_members")
           .select("email")
+          .eq("workspace_id", BASELINE_WORKSPACE_ID)
           .in("role", ["superadmin", "admin"]);
         if (adminsErr) throw new Error(`Admin lookup failed: ${adminsErr.message}`);
 

@@ -125,7 +125,7 @@ describe("POST /api/team/update-member", () => {
         table: "team_members",
         method: "update",
         payload: { name: "Updated Name", phone: "+1 555", role: "creative_director" },
-        filters: [["id", "member-row-1"]],
+        filters: [["id", "member-row-1"], ["workspace_id", "workspace-1"]],
       },
       {
         table: "workspace_members",
@@ -166,12 +166,12 @@ describe("POST /api/team/update-member", () => {
 
     expect(res.status).toBe(500);
     expect(operations).toEqual(expect.arrayContaining([
-      { table: "team_members", method: "update", payload: { role: "admin" }, filters: [["id", "member-row-1"]] },
+      { table: "team_members", method: "update", payload: { role: "admin" }, filters: [["id", "member-row-1"], ["workspace_id", "workspace-1"]] },
       {
         table: "team_members",
         method: "update",
         payload: { name: "Member Name", phone: null, role: "approver", avatar_url: null },
-        filters: [["id", "member-row-1"]],
+        filters: [["id", "member-row-1"], ["workspace_id", "workspace-1"]],
       },
     ]));
   });
@@ -196,7 +196,7 @@ describe("POST /api/team/update-member", () => {
         table: "team_members",
         method: "update",
         payload: { name: "Pending Name", role: "video_editor" },
-        filters: [["id", "member-row-1"]],
+        filters: [["id", "member-row-1"], ["workspace_id", "workspace-1"]],
       },
       {
         table: "auth.users",

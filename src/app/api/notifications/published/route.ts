@@ -210,6 +210,7 @@ export async function POST(request: NextRequest) {
       const { data: members, error: membersError } = await admin
         .from("team_members")
         .select("email, role, status")
+        .eq("workspace_id", postRow.workspace_id)
         .in("role", NOTIFY_ROLES)
         .eq("status", "active");
 

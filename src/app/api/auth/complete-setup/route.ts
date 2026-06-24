@@ -83,10 +83,22 @@ export async function POST(request: NextRequest) {
     const email = (user.email || "").toLowerCase();
     if (!email) return NextResponse.json({ error: "No email on user" }, { status: 403 });
 
-    const { data: member, error: memberReadErr } = await admin
+    const { data: existingWorkspaceAccess } = await admin
+      .from("workspace_members")
+      .select("workspace_id, status")
+      .eq("user_id", user.id)
+      .limit(1)
+      .maybeSingle();
+
+    let memberQuery = admin
       .from("team_members")
-      .select("id, role, status, avatar_url")
-      .eq("email", email)
+      .select("id, workspace_id, role, status, avatar_url")
+      .eq("email", email);
+    if (existingWorkspaceAccess?.workspace_id) {
+      memberQuery = memberQuery.eq("workspace_id", existingWorkspaceAccess.workspace_id);
+    }
+    const { data: member, error: memberReadErr } = await memberQuery
+      .limit(1)
       .maybeSingle();
 
     if (memberReadErr) {
@@ -98,6 +110,7 @@ export async function POST(request: NextRequest) {
     if (!["pending", "active"].includes(String(member.status))) {
       return NextResponse.json({ error: "Invitation is not active" }, { status: 403 });
     }
+    const workspaceId = (member.workspace_id as string | null) || existingWorkspaceAccess?.workspace_id || BASELINE_WORKSPACE_ID;
     const avatarUrl = cleanOwnedProfileAvatarUrl(body.avatarUrl, user.id);
     const submittedAvatar = typeof body.avatarUrl === "string" && body.avatarUrl.trim().length > 0;
     const existingAvatarUrl = String(member.avatar_url || "").trim();
@@ -122,7 +135,8 @@ export async function POST(request: NextRequest) {
     const { error: memberUpdateErr } = await admin
       .from("team_members")
       .update(memberUpdates)
-      .eq("id", member.id);
+      .eq("id", member.id)
+      .eq("workspace_id", workspaceId);
 
     if (memberUpdateErr) {
       console.error("[auth/complete-setup] member update failed:", memberUpdateErr.message);
@@ -133,7 +147,7 @@ export async function POST(request: NextRequest) {
       .from("workspace_members")
       .upsert(
         {
-          workspace_id: BASELINE_WORKSPACE_ID,
+          workspace_id: workspaceId,
           user_id: user.id,
           role: member.role,
           status: "active",
@@ -143,7 +157,7 @@ export async function POST(request: NextRequest) {
 
     if (workspaceErr) {
       console.error("[auth/complete-setup] workspace activation failed:", workspaceErr.message);
-      await admin.from("team_members").update({ status: member.status }).eq("id", member.id);
+      await admin.from("team_members").update({ status: member.status }).eq("id", member.id).eq("workspace_id", workspaceId);
       return NextResponse.json({ error: "Could not activate workspace access" }, { status: 500 });
     }
 
@@ -161,7 +175,7 @@ export async function POST(request: NextRequest) {
         p_entity_type: "team",
         p_action: "member_activated",
         p_entity_id: null,
-        p_workspace_id: BASELINE_WORKSPACE_ID,
+        p_workspace_id: workspaceId,
         p_metadata: {
           user_name: email,
           details: `${name} completed invite setup`,
@@ -174,7 +188,7 @@ export async function POST(request: NextRequest) {
     console.log(`[auth/complete-setup] Activated email_hash=${hashEmail(email)} as ${member.role}`);
     return NextResponse.json({
       success: true,
-      workspaceId: BASELINE_WORKSPACE_ID,
+      workspaceId,
       member: {
         name,
         email,

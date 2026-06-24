@@ -10,6 +10,7 @@ import {
 import { consume, getClientIp } from "@/lib/rate-limit";
 
 export const maxDuration = 10;
+const BASELINE_WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -76,6 +77,7 @@ export async function POST(request: NextRequest) {
       const { data: member, error: memberErr } = await admin
         .from("team_members")
         .select("name, role, status")
+        .eq("workspace_id", BASELINE_WORKSPACE_ID)
         .eq("email", cleanEmail)
         .maybeSingle();
 

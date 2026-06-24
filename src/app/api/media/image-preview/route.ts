@@ -23,6 +23,8 @@ const HEIC_IMAGE_MIME_TYPES = new Set(["image/heic", "image/heic-sequence", "ima
 const MAX_PREVIEW_SOURCE_BYTES = 50 * 1024 * 1024;
 const PREVIEW_MAX_EDGE = 1600;
 const PREVIEW_CACHE_BUCKET = "media-thumbnails";
+const PREVIEW_CACHE_READ_TIMEOUT_MS = 2_000;
+const PREVIEW_CACHE_WRITE_TIMEOUT_MS = 5_000;
 // heic-decode allocates raw RGBA in JS/WASM before Sharp can resize it. Cap the
 // fallback below Sharp's native limit so common 48MP iPhone HEICs still preview
 // while larger panoramas fail closed before raw decode.
@@ -75,6 +77,7 @@ async function readCachedPreview(admin: SupabaseClient | null, key: string): Pro
     const { data, error } = await withStorageControlTimeout(
       admin.storage.from(PREVIEW_CACHE_BUCKET).download(key),
       "HEIC preview cache read",
+      PREVIEW_CACHE_READ_TIMEOUT_MS,
     );
     if (error || !data) return null;
     return Buffer.from(await data.arrayBuffer());
@@ -94,6 +97,7 @@ async function writeCachedPreview(admin: SupabaseClient | null, key: string, pre
         upsert: true,
       }),
       "HEIC preview cache write",
+      PREVIEW_CACHE_WRITE_TIMEOUT_MS,
     );
     if (error) {
       console.warn("[media/image-preview] preview cache write failed:", error.message);
@@ -337,7 +341,7 @@ export async function GET(request: NextRequest) {
     const preview = await buildPreviewOnce(cacheKey, async () => {
       const source = await fetchDriveMedia(fileId, token);
       const converted = await buildHeicPreview(source);
-      void writeCachedPreview(admin, cacheKey, converted);
+      await writeCachedPreview(admin, cacheKey, converted);
       return converted;
     });
     return browserSafeJpegResponse(preview, auth.signed, "MISS");

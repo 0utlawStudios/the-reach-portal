@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { requireBearerTeamRole } from "@/lib/auth/require";
-import { ALLOWED_DRIVE_ROLES, normalizeDriveMimeType } from "@/lib/drive-policy";
+import { ALLOWED_DRIVE_UPLOAD_ROLES, normalizeDriveMimeType } from "@/lib/drive-policy";
 import { MAX_PLAYBACK_VIDEO_FILE_SIZE, PLAYBACK_VIDEO_MIME_TYPES } from "@/lib/media-playback-policy";
 import { consume, getClientIp } from "@/lib/rate-limit";
 import { appRateLimitError } from "@/lib/drive-errors";
@@ -87,7 +87,7 @@ async function ensurePlaybackBucket(admin: SupabaseClient): Promise<void> {
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireBearerTeamRole(request, ALLOWED_DRIVE_ROLES);
+    const auth = await requireBearerTeamRole(request, ALLOWED_DRIVE_UPLOAD_ROLES);
     if (auth instanceof NextResponse) return auth;
 
     const rlKey = `user:${auth.user.id}|ip:${getClientIp(request)}`;

@@ -163,13 +163,18 @@ describe("POST /api/team/approve-request", () => {
       {
         table: "team_members",
         method: "insert",
-        payload: expect.objectContaining({ email: "hanes@ten80ten.com", status: "pending", role: "admin" }),
+        payload: expect.objectContaining({
+          workspace_id: "00000000-0000-0000-0000-000000000001",
+          email: "hanes@ten80ten.com",
+          status: "pending",
+          role: "admin",
+        }),
       },
       {
         table: "signup_requests",
         method: "update",
         payload: expect.objectContaining({ status: "approved", reviewed_by: "admin@example.com" }),
-        filters: [["id", "request-1"]],
+        filters: [["id", "request-1"], ["workspace_id", "00000000-0000-0000-0000-000000000001"]],
       },
     ]));
   });
@@ -232,7 +237,7 @@ describe("POST /api/team/approve-request", () => {
         table: "signup_requests",
         method: "update",
         payload: expect.objectContaining({ status: "approved", reviewed_by: "admin@example.com" }),
-        filters: [["id", "request-1"]],
+        filters: [["id", "request-1"], ["workspace_id", "00000000-0000-0000-0000-000000000001"]],
       },
     ]));
   });
@@ -245,7 +250,7 @@ describe("POST /api/team/approve-request", () => {
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toMatchObject({ error: "Failed to finalize access request approval" });
     expect(operations).toEqual(expect.arrayContaining([
-      { table: "team_members", method: "delete", filters: [["id", "member-row-1"]] },
+      { table: "team_members", method: "delete", filters: [["id", "member-row-1"], ["workspace_id", "00000000-0000-0000-0000-000000000001"]] },
       { table: "workspace_members", method: "delete", filters: [["user_id", "fresh-auth-user"], ["workspace_id", "00000000-0000-0000-0000-000000000001"]] },
       { table: "auth.users", method: "deleteUser", id: "fresh-auth-user" },
     ]));

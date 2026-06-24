@@ -31,6 +31,7 @@ const INVITE_ROLES = new Set([
 type AdminClient = ReturnType<typeof getAdminClient>;
 type TeamMemberRow = {
   id: string;
+  workspace_id?: string;
   name: string;
   email: string;
   role: string;
@@ -138,7 +139,8 @@ async function updateActiveMemberEmail(admin: AdminClient, workspaceId: string, 
   const { error: memberErr } = await admin
     .from("team_members")
     .update({ email: newEmail })
-    .eq("id", member.id);
+    .eq("id", member.id)
+    .eq("workspace_id", workspaceId);
   if (memberErr) {
     await rollbackAuth();
     return NextResponse.json({ error: "Team profile update failed; Auth email was rolled back." }, { status: 500 });
@@ -164,7 +166,7 @@ async function updateActiveMemberEmail(admin: AdminClient, workspaceId: string, 
   const results = await Promise.all(updates);
   const failed = results.find((result) => result.error);
   if (failed?.error) {
-    await admin.from("team_members").update({ email: oldEmail }).eq("id", member.id);
+    await admin.from("team_members").update({ email: oldEmail }).eq("id", member.id).eq("workspace_id", workspaceId);
     await rollbackAuth();
     return NextResponse.json({ error: "App identity reconciliation failed; Auth email was rolled back." }, { status: 500 });
   }
@@ -204,7 +206,8 @@ async function updatePendingInviteEmail(admin: AdminClient, workspaceId: string,
   const { error: memberErr } = await admin
     .from("team_members")
     .update({ email: newEmail, name: member.name, role: member.role })
-    .eq("id", member.id);
+    .eq("id", member.id)
+    .eq("workspace_id", workspaceId);
   if (memberErr) {
     if (authData?.user?.id) await admin.auth.admin.deleteUser(authData.user.id);
     return NextResponse.json({ error: "Team invite email update failed" }, { status: 500 });
@@ -253,7 +256,8 @@ export async function POST(request: NextRequest) {
     const admin = getAdminClient();
     const { data: member, error: memberReadErr } = await admin
       .from("team_members")
-      .select("id, name, email, role, status")
+      .select("id, workspace_id, name, email, role, status")
+      .eq("workspace_id", ctx.workspaceId)
       .eq("id", memberId)
       .maybeSingle();
     if (memberReadErr) {
@@ -275,6 +279,7 @@ export async function POST(request: NextRequest) {
     const { data: duplicateMember } = await admin
       .from("team_members")
       .select("id")
+      .eq("workspace_id", ctx.workspaceId)
       .eq("email", newEmail)
       .maybeSingle();
     if (duplicateMember && (duplicateMember as { id: string }).id !== target.id) {

@@ -18,6 +18,7 @@ const VALID_ROLES = new Set([
 type AdminClient = ReturnType<typeof getAdminClient>;
 type TeamMemberRow = {
   id: string;
+  workspace_id?: string;
   name: string;
   email: string;
   phone?: string | null;
@@ -151,7 +152,8 @@ export async function POST(request: NextRequest) {
     const admin = getAdminClient();
     const { data: member, error: readErr } = await admin
       .from("team_members")
-      .select("id, name, email, phone, role, status, avatar_url")
+      .select("id, workspace_id, name, email, phone, role, status, avatar_url")
+      .eq("workspace_id", ctx.workspaceId)
       .eq("id", memberId)
       .maybeSingle();
     if (readErr) return NextResponse.json({ error: "Could not read team member" }, { status: 500 });
@@ -178,7 +180,8 @@ export async function POST(request: NextRequest) {
     const { error: updateErr } = await admin
       .from("team_members")
       .update(dbUpdates)
-      .eq("id", target.id);
+      .eq("id", target.id)
+      .eq("workspace_id", ctx.workspaceId);
     if (updateErr) {
       return NextResponse.json({ error: "Team profile update failed" }, { status: 500 });
     }
@@ -190,7 +193,7 @@ export async function POST(request: NextRequest) {
         .eq("workspace_id", ctx.workspaceId)
         .eq("user_id", authUser.id);
       if (workspaceErr) {
-        await admin.from("team_members").update(rollbackTeam).eq("id", target.id);
+        await admin.from("team_members").update(rollbackTeam).eq("id", target.id).eq("workspace_id", ctx.workspaceId);
         return NextResponse.json({ error: "Workspace role update failed; team profile was rolled back." }, { status: 500 });
       }
     }
@@ -207,7 +210,7 @@ export async function POST(request: NextRequest) {
         user_metadata: nextMetadata,
       });
       if (authErr) {
-        await admin.from("team_members").update(rollbackTeam).eq("id", target.id);
+        await admin.from("team_members").update(rollbackTeam).eq("id", target.id).eq("workspace_id", ctx.workspaceId);
         if (roleChanged && target.status === "active") {
           await admin.from("workspace_members").update({ role: target.role }).eq("workspace_id", ctx.workspaceId).eq("user_id", authUser.id);
         }

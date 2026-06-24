@@ -95,7 +95,8 @@ describe("Supabase IO hardening", () => {
     expect(AUTH_CONTEXT_SRC).toContain("applyAccessState(session)");
     expect(AUTH_CONTEXT_SRC).toContain("provisionWorkspace(session.access_token)");
     expect(TEAM_CONTEXT_SRC).toContain("const TEAM_REFRESH_MS = 5 * 60 * 1000");
-    expect(TEAM_CONTEXT_SRC).toContain('channel("team-access-sync")');
+    expect(TEAM_CONTEXT_SRC).toContain("channel(`team-access-sync-${workspaceId}`)");
+    expect(TEAM_CONTEXT_SRC).toContain("filter: `workspace_id=eq.${workspaceId}`");
     expect(TEAM_CONTEXT_SRC).toContain('table: "team_members"');
     expect(TEAM_CONTEXT_SRC).toContain('table: "signup_requests"');
     expect(TEAM_ACCESS_REALTIME_MIGRATION_SRC).toContain("ALTER PUBLICATION supabase_realtime ADD TABLE public.team_members");

@@ -41,6 +41,7 @@ export async function withStorageUploadTimeout<T>(
 export async function withStorageControlTimeout<T>(
   operation: PromiseLike<T>,
   label = "Storage request",
+  timeoutMs = STORAGE_CONTROL_PLANE_TIMEOUT_MS,
 ): Promise<T> {
-  return withTimeout(operation, STORAGE_CONTROL_PLANE_TIMEOUT_MS, label);
+  return withTimeout(operation, timeoutMs, label);
 }

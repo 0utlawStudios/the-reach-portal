@@ -52,14 +52,14 @@ export async function POST(request: NextRequest) {
     const postTitle = post.title || "Post";
 
     // SEC-012: Trust the authenticated caller's identity, not the body.
-    const caller = await loadCallerProfile(admin, ctx.email);
+    const caller = await loadCallerProfile(admin, ctx.email, ctx.workspaceId);
     const requestedBy = caller.name || "Reviewer";
     const requesterEmail = caller.email;
 
     const recipients: string[] = [];
 
     // Find the Creator's email
-    const creator = await loadMemberByCreatorKey(admin, post.created_by || body.createdBy);
+    const creator = await loadMemberByCreatorKey(admin, post.created_by || body.createdBy, ctx.workspaceId);
     if (creator?.email && creator.email !== requesterEmail) {
       recipients.push(creator.email);
     }
@@ -68,6 +68,7 @@ export async function POST(request: NextRequest) {
     const { data: directors } = await admin
       .from("team_members")
       .select("email, role")
+      .eq("workspace_id", ctx.workspaceId)
       .in("role", ["creative_director", "approver"])
       .eq("status", "active");
 

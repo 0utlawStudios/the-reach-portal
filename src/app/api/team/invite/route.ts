@@ -81,6 +81,7 @@ export async function POST(request: NextRequest) {
     const { data: existing } = await admin
       .from("team_members")
       .select("id")
+      .eq("workspace_id", ctx.workspaceId)
       .eq("email", email)
       .maybeSingle();
 
@@ -146,6 +147,7 @@ export async function POST(request: NextRequest) {
     const { data: member, error: memberError } = await admin
       .from("team_members")
       .insert({
+        workspace_id: ctx.workspaceId,
         name: body.name,
         email,
         role: body.role,

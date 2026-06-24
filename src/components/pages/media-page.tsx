@@ -86,6 +86,10 @@ function uploadPathForSize(file: File): "proxy" | "resumable" {
   return file.size >= 4 * 1024 * 1024 ? "resumable" : "proxy";
 }
 
+function mediaDisplayUrl(asset: Pick<MediaAsset, "url" | "driveProxyUrl" | "playbackUrl">): string {
+  return asset.playbackUrl || asset.driveProxyUrl || asset.url;
+}
+
 export function MediaPage() {
   const { cards, workspaceId } = usePipeline();
   const { currentUser } = useAuth();
@@ -597,10 +601,10 @@ export function MediaPage() {
                     <div key={asset.id} className={`group relative rounded-xl overflow-hidden cursor-pointer transition-all duration-200 ${selected ? "ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-[#0a0a0a]" : "border border-gray-200/70 dark:border-white/[0.06] hover:border-gray-300 hover:shadow-md"} bg-white dark:bg-[#151518] shadow-sm`}>
                       <div onClick={() => setLightboxAsset(asset)} className="relative aspect-square overflow-hidden bg-gray-50 dark:bg-white/[0.03]">
                         {asset.type === "image" ? (
-                          <PreviewImage src={asset.url} alt={asset.name} fileName={asset.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                          <PreviewImage src={mediaDisplayUrl(asset)} alt={asset.name} mimeType={asset.mimeType} fileName={asset.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                         ) : (
                           <video
-                            src={videoPreviewFrameUrl(asset.url)}
+                            src={videoPreviewFrameUrl(mediaDisplayUrl(asset))}
                             muted
                             playsInline
                             preload="metadata"
@@ -667,10 +671,10 @@ export function MediaPage() {
                           </button>
                           <div className="w-8 h-8 rounded-lg overflow-hidden bg-gray-100 dark:bg-white/[0.04] shrink-0">
                             {asset.type === "image" ? (
-                              <PreviewImage src={asset.url} alt="" fileName={asset.name} className="w-full h-full object-cover" />
+                              <PreviewImage src={mediaDisplayUrl(asset)} alt="" mimeType={asset.mimeType} fileName={asset.name} className="w-full h-full object-cover" />
                             ) : (
                               <video
-                                src={videoPreviewFrameUrl(asset.url)}
+                                src={videoPreviewFrameUrl(mediaDisplayUrl(asset))}
                                 muted
                                 playsInline
                                 preload="metadata"
@@ -750,9 +754,9 @@ export function MediaPage() {
               </div>
               <div className="flex-1 overflow-hidden bg-gray-50 dark:bg-black flex items-center justify-center p-4 relative group/lb" onTouchStart={onSwipeStart} onTouchEnd={onSwipeEnd}>
                 {lightboxAsset.type === "image" ? (
-                  <PreviewImage src={lightboxAsset.url} alt={lightboxAsset.name} fileName={lightboxAsset.name} className="w-full h-[60vh] max-w-full max-h-[60vh] object-contain rounded-lg select-none" draggable={false} />
+                  <PreviewImage src={mediaDisplayUrl(lightboxAsset)} alt={lightboxAsset.name} mimeType={lightboxAsset.mimeType} fileName={lightboxAsset.name} className="w-full h-[60vh] max-w-full max-h-[60vh] object-contain rounded-lg select-none" draggable={false} />
                 ) : (
-                  <video src={lightboxAsset.url} controls playsInline preload="metadata" className="max-w-full max-h-[60vh] object-contain rounded-lg bg-black" />
+                  <video src={mediaDisplayUrl(lightboxAsset)} controls playsInline preload="metadata" className="max-w-full max-h-[60vh] object-contain rounded-lg bg-black" />
                 )}
                 {hasPrev && (
                   <button onClick={() => setLightboxAsset(filteredMedia[lightboxIndex - 1])} className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/60 transition-all cursor-pointer shadow-lg opacity-70 md:opacity-0 md:group-hover/lb:opacity-100">

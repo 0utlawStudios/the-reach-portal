@@ -17,7 +17,7 @@ function isSupabaseConfigured(): boolean {
   return !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 }
 
-export function ThemeProvider({ children, email }: { children: ReactNode; email?: string }) {
+export function ThemeProvider({ children, email, workspaceId }: { children: ReactNode; email?: string; workspaceId?: string }) {
   const [theme, setTheme] = useState<Theme>(() => {
     // Default to Reach light mode unless this app has an explicit saved preference.
     if (typeof window !== "undefined") {
@@ -36,6 +36,7 @@ export function ThemeProvider({ children, email }: { children: ReactNode; email?
       .from("team_members")
       .select("theme_preference")
       .eq("email", email)
+      .eq("workspace_id", workspaceId)
       .single()
       .then(({ data }) => {
         if (!cancelled && data?.theme_preference) {
@@ -48,7 +49,7 @@ export function ThemeProvider({ children, email }: { children: ReactNode; email?
       });
 
     return () => { cancelled = true; };
-  }, [email]);
+  }, [email, workspaceId]);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
@@ -65,12 +66,13 @@ export function ThemeProvider({ children, email }: { children: ReactNode; email?
           .from("team_members")
           .update({ theme_preference: next })
           .eq("email", email)
+          .eq("workspace_id", workspaceId)
           .then(() => {});
       }
 
       return next;
     });
-  }, [email]);
+  }, [email, workspaceId]);
 
   const value = useMemo(() => ({ theme, toggleTheme }), [theme, toggleTheme]);
 

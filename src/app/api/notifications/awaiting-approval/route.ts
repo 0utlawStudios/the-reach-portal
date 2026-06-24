@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
     const admin = getAdminClient();
 
     // SEC-012: Resolve `movedBy` from the authenticated caller.
-    const caller = await loadCallerProfile(admin, ctx.email);
+    const caller = await loadCallerProfile(admin, ctx.email, ctx.workspaceId);
     const movedBy = caller.name || "Team member";
 
     // Fetch full post data for rich email
@@ -110,6 +110,7 @@ export async function POST(request: NextRequest) {
     const { data: admins } = await admin
       .from("team_members")
       .select("email")
+      .eq("workspace_id", ctx.workspaceId)
       .in("role", ["superadmin", "admin", "owner", "creative_director", "approver"])
       .eq("status", "active");
 

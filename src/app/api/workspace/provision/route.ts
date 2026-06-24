@@ -53,10 +53,16 @@ export async function GET(request: NextRequest) {
     // SEC-010: lowercase the email and match with `.eq`. `.ilike` treated
     // wildcard chars in a crafted email as SQL patterns.
     const lookupEmail = (user.email ?? "").toLowerCase();
-    const { data: tm } = await admin
+    let teamQuery = admin
       .from("team_members")
-      .select("role, status")
-      .eq("email", lookupEmail)
+      .select("workspace_id, role, status")
+      .eq("email", lookupEmail);
+    if (existing?.workspace_id) {
+      teamQuery = teamQuery.eq("workspace_id", existing.workspace_id);
+    }
+    const { data: tm } = await teamQuery
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     // SEC-006: REJECT users without a team_members row instead of silently
@@ -83,6 +89,7 @@ export async function GET(request: NextRequest) {
         { status: 403 },
       );
     }
+    const workspaceId = (tm.workspace_id as string | null) || existing?.workspace_id || BASELINE_WORKSPACE_ID;
 
     // SEC-018 / DATA-010: dual-tab race fix. Two simultaneous /provision
     // calls would both observe no active membership and both try to INSERT,
@@ -92,7 +99,7 @@ export async function GET(request: NextRequest) {
       .from("workspace_members")
       .upsert(
         {
-          workspace_id: BASELINE_WORKSPACE_ID,
+          workspace_id: workspaceId,
           user_id: user.id,
           role,
           status: "active",
@@ -105,7 +112,7 @@ export async function GET(request: NextRequest) {
     }
 
     console.log(`[workspace/provision] Provisioned email_hash=${hashEmail(user.email)} as ${role} (active)`);
-    return NextResponse.json({ workspaceId: BASELINE_WORKSPACE_ID, provisioned: true });
+    return NextResponse.json({ workspaceId, provisioned: true });
   } catch (err: unknown) {
     // SEC-011: log the full error server-side, return a generic message.
     console.error("[workspace/provision]", err);
