@@ -219,6 +219,20 @@ describe("Drive upload surfaces", () => {
     expect(upload).toContain("signal: controller.signal");
   });
 
+  it("keeps revision attachments private instead of writing them to public avatars/kickback", () => {
+    const kickback = source("src/components/kickback-modal.tsx");
+    expect(kickback).toContain('PRIVATE_ATTACHMENT_BUCKET = "support-attachments"');
+    expect(kickback).toContain('fetch("/api/support/uploads"');
+    expect(kickback).toContain("uploadToSignedUrl");
+    expect(kickback).toContain("/api/support/attachment?");
+    expect(kickback).not.toContain('storage.from("avatars").upload');
+    expect(kickback).not.toContain("getPublicUrl");
+
+    const migration = source("supabase/migrations/0054_private_kickback_attachments.sql");
+    expect(migration).toContain("= 'profiles'");
+    expect(migration).not.toContain("IN ('profiles', 'kickback')");
+  });
+
   it("warms and privately caches HEIC previews so viewing is not repeatedly black while converting", () => {
     const imagePreview = source("src/app/api/media/image-preview/route.ts");
     expect(imagePreview).toContain("inFlightPreviewBuilds");

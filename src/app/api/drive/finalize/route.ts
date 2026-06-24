@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ensureSubfolder, getRootFolderId, setPublicPermission, getStreamUrl, getFileMetadata, getDriveDownloadUrl } from "@/lib/google-drive";
+import { ensureSubfolder, getRootFolderId, getStreamUrl, getFileMetadata, getPublishStreamUrl } from "@/lib/google-drive";
 import { requireBearerTeamRole } from "@/lib/auth/require";
 import { consume, getClientIp } from "@/lib/rate-limit";
 import {
@@ -92,16 +92,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Set public permission so the file is servable
-    await setPublicPermission(fileId);
-
     const isImage = mimeType.startsWith("image/");
     const isVideo = mimeType.startsWith("video/");
 
     // Always use our stream proxy as primary URL — it's authenticated server-side
-    // and works immediately (lh3 URLs break during Google permission propagation)
+    // and works immediately without making the Drive file public.
     const proxyUrl = getStreamUrl(fileId, authContext.workspaceId);
-    const publishUrl = getDriveDownloadUrl(fileId);
+    const publishUrl = getPublishStreamUrl(fileId, authContext.workspaceId);
 
     return NextResponse.json({
       fileId,

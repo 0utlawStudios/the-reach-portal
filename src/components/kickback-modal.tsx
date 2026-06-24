@@ -12,6 +12,53 @@ import { MentionTextarea } from "./mention-textarea";
 import { useFocusTrap } from "./use-focus-trap";
 
 const useSupabase = !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+const PRIVATE_ATTACHMENT_BUCKET = "support-attachments";
+
+async function revisionAttachmentUrl(file: File): Promise<string> {
+  const { data: { session } } = await withStorageControlTimeout(
+    supabase.auth.getSession(),
+    "Revision attachment session check",
+  );
+  if (!session?.access_token) {
+    throw new Error("Please sign in again before attaching a revision file.");
+  }
+
+  const uploadTargetRes = await withStorageControlTimeout(
+    fetch("/api/support/uploads", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ files: [{ name: file.name, mime: file.type, size: file.size }] }),
+    }),
+    "Revision attachment upload target",
+  );
+  const payload = await uploadTargetRes.json().catch(() => ({})) as {
+    error?: unknown;
+    uploads?: Array<{ storageKey?: string; token?: string; name?: string }>;
+  };
+  if (!uploadTargetRes.ok) {
+    throw new Error(typeof payload.error === "string" ? payload.error : "Could not prepare attachment upload.");
+  }
+  const target = payload.uploads?.[0];
+  if (!target?.storageKey || !target.token) {
+    throw new Error("Could not prepare attachment upload.");
+  }
+
+  const { error } = await withStorageUploadTimeout(
+    supabase.storage.from(PRIVATE_ATTACHMENT_BUCKET).uploadToSignedUrl(target.storageKey, target.token, file),
+    file.size,
+    "Revision attachment upload",
+  );
+  if (error) {
+    throw new Error(`Could not upload attachment: ${error.message}`);
+  }
+
+  const params = new URLSearchParams({ key: target.storageKey });
+  if (target.name) params.set("name", target.name);
+  return `/api/support/attachment?${params.toString()}`;
+}
 
 export function KickbackModal() {
   const { pendingKickback, submitKickback, cancelKickback } = usePipeline();
@@ -59,25 +106,7 @@ export function KickbackModal() {
       let attachmentUrl: string | undefined;
 
       if (file && useSupabase) {
-        const { data: { user } } = await withStorageControlTimeout(
-          supabase.auth.getUser(),
-          "Revision attachment session check",
-        );
-        if (!user?.id) {
-          addToast("Please sign in again before attaching a revision file.", "error");
-          return;
-        }
-        const ext = file.name.split(".").pop();
-        const path = `kickback/${user.id}/${pendingKickback.cardId}-${Date.now()}.${ext}`;
-        const { error } = await withStorageUploadTimeout(
-          supabase.storage.from("avatars").upload(path, file, { upsert: true }),
-          file.size,
-          "Revision attachment upload",
-        );
-        if (!error) {
-          const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
-          attachmentUrl = urlData.publicUrl;
-        }
+        attachmentUrl = await revisionAttachmentUrl(file);
       } else if (file) {
         attachmentUrl = filePreview || undefined;
       }

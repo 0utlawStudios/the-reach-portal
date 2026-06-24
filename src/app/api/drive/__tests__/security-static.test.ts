@@ -29,17 +29,17 @@ describe("Drive route security contracts", () => {
     expect(GOOGLE_DRIVE_SRC).toContain("signDriveStreamToken");
   });
 
-  it("validates Drive parent folders before publicizing a finalized file", () => {
+  it("validates Drive parent folders before returning signed URLs for a finalized file", () => {
     const metadataIdx = DRIVE_FINALIZE_SRC.indexOf("const meta = await getFileMetadata(fileId)");
     const parentCheckIdx = DRIVE_FINALIZE_SRC.indexOf("belongsToAppFolder");
-    const permissionIdx = DRIVE_FINALIZE_SRC.indexOf("await setPublicPermission(fileId)");
+    const publishUrlIdx = DRIVE_FINALIZE_SRC.indexOf("const publishUrl = getPublishStreamUrl(fileId, authContext.workspaceId)");
     const folderValidationIdx = DRIVE_FINALIZE_SRC.indexOf("VALID_DRIVE_FOLDERS.includes(folder)");
     const singleFolderIdx = DRIVE_FINALIZE_SRC.indexOf("const allowedParentId = await ensureSubfolder(folder, rootId)");
     expect(metadataIdx).toBeGreaterThan(-1);
     expect(folderValidationIdx).toBeGreaterThan(-1);
     expect(folderValidationIdx).toBeLessThan(metadataIdx);
     expect(parentCheckIdx).toBeGreaterThan(metadataIdx);
-    expect(permissionIdx).toBeGreaterThan(parentCheckIdx);
+    expect(publishUrlIdx).toBeGreaterThan(parentCheckIdx);
     expect(singleFolderIdx).toBeGreaterThan(metadataIdx);
     expect(DRIVE_FINALIZE_SRC).not.toContain("VALID_DRIVE_FOLDERS.map");
     expect(DRIVE_FINALIZE_SRC).toContain("isAllowedDriveMediaMime(mimeType)");
@@ -47,6 +47,16 @@ describe("Drive route security contracts", () => {
     expect(GOOGLE_DRIVE_SRC).toContain("fields=id,name,mimeType,size,parents,appProperties");
     expect(DRIVE_FINALIZE_SRC).toContain("meta.appProperties?.workspaceId");
     expect(DRIVE_FINALIZE_SRC).toContain("getStreamUrl(fileId, authContext.workspaceId)");
+  });
+
+  it("keeps new Drive uploads private and returns signed app stream URLs for publishing", () => {
+    expect(DRIVE_FINALIZE_SRC).not.toContain("setPublicPermission");
+    expect(DRIVE_PROXY_UPLOAD_SRC).not.toContain("setPublicPermission");
+    expect(DRIVE_FINALIZE_SRC).not.toContain("getDriveDownloadUrl");
+    expect(DRIVE_PROXY_UPLOAD_SRC).not.toContain("getDriveDownloadUrl");
+    expect(DRIVE_FINALIZE_SRC).toContain("getPublishStreamUrl(fileId, authContext.workspaceId)");
+    expect(DRIVE_PROXY_UPLOAD_SRC).toContain("getPublishStreamUrl(fileId, authContext.workspaceId)");
+    expect(GOOGLE_DRIVE_SRC).toContain("DRIVE_PUBLISH_STREAM_TOKEN_TTL_MS");
   });
 
   it("rejects proxy uploads above the small-file threshold before buffering", () => {
@@ -61,7 +71,7 @@ describe("Drive route security contracts", () => {
   it("returns signed app stream URLs from both Drive upload paths", () => {
     expect(DRIVE_PROXY_UPLOAD_SRC).toContain("getStreamUrl(fileId, authContext.workspaceId)");
     expect(DRIVE_FINALIZE_SRC).toContain("getStreamUrl(fileId, authContext.workspaceId)");
-    expect(GOOGLE_DRIVE_SRC).toContain("token: signDriveStreamToken(fileId, workspaceId)");
+    expect(GOOGLE_DRIVE_SRC).toContain("token: signDriveStreamToken(fileId, workspaceId, expiresAt)");
     expect(GOOGLE_DRIVE_SRC).toContain("workspaceId: string");
     expect(GOOGLE_DRIVE_SRC).toContain("expiresAt <= Date.now()");
   });

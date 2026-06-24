@@ -15,10 +15,9 @@ const rateLimitMocks = vi.hoisted(() => ({
 const driveMocks = vi.hoisted(() => ({
   getRootFolderId: vi.fn(),
   ensureSubfolder: vi.fn(),
-  setPublicPermission: vi.fn(),
   getAccessToken: vi.fn(),
   getStreamUrl: vi.fn(),
-  getDriveDownloadUrl: vi.fn(),
+  getPublishStreamUrl: vi.fn(),
 }));
 
 const alertMocks = vi.hoisted(() => ({
@@ -37,10 +36,9 @@ vi.mock("@/lib/rate-limit", () => ({
 vi.mock("@/lib/google-drive", () => ({
   getRootFolderId: driveMocks.getRootFolderId,
   ensureSubfolder: driveMocks.ensureSubfolder,
-  setPublicPermission: driveMocks.setPublicPermission,
   getAccessToken: driveMocks.getAccessToken,
   getStreamUrl: driveMocks.getStreamUrl,
-  getDriveDownloadUrl: driveMocks.getDriveDownloadUrl,
+  getPublishStreamUrl: driveMocks.getPublishStreamUrl,
 }));
 
 vi.mock("@/lib/upload-alerts", () => ({
@@ -91,10 +89,9 @@ beforeEach(() => {
   });
   driveMocks.getRootFolderId.mockReturnValue("root-folder");
   driveMocks.ensureSubfolder.mockResolvedValue("sub-folder");
-  driveMocks.setPublicPermission.mockResolvedValue(undefined);
   driveMocks.getAccessToken.mockResolvedValue("drive-token");
   driveMocks.getStreamUrl.mockReturnValue("/api/drive/stream?id=file-1");
-  driveMocks.getDriveDownloadUrl.mockReturnValue("https://drive.google.com/uc?export=download&id=file-1");
+  driveMocks.getPublishStreamUrl.mockReturnValue("/api/drive/stream?id=file-1&token=publish");
   alertMocks.notifyUploadFailure.mockResolvedValue({ emailSent: false, telegramSent: false });
   global.fetch = vi.fn(() => Promise.resolve(new Response(JSON.stringify({
     id: "file-1",
@@ -168,6 +165,7 @@ describe("POST /api/drive/proxy-upload", () => {
 
     expect(res.status).toBe(200);
     expect(driveMocks.getStreamUrl).toHaveBeenCalledWith("file-1", "00000000-0000-0000-0000-000000000001");
+    expect(driveMocks.getPublishStreamUrl).toHaveBeenCalledWith("file-1", "00000000-0000-0000-0000-000000000001");
     const uploadCall = vi.mocked(global.fetch).mock.calls[0];
     const body = uploadCall?.[1]?.body;
     expect(Buffer.isBuffer(body)).toBe(true);

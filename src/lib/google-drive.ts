@@ -227,6 +227,7 @@ function streamSigningSecret(): string {
 
 const DRIVE_STREAM_TOKEN_VERSION = "v1";
 const DRIVE_STREAM_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+const DRIVE_PUBLISH_STREAM_TOKEN_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 
 function signDriveStreamPayload(fileId: string, workspaceId: string, expiresAt: number): string {
   return createHmac("sha256", streamSigningSecret())
@@ -263,11 +264,19 @@ export function verifyDriveStreamToken(
   }
 }
 
-export function getStreamUrl(fileId: string, workspaceId: string): string {
+export function getStreamUrl(
+  fileId: string,
+  workspaceId: string,
+  expiresAt = Date.now() + DRIVE_STREAM_TOKEN_TTL_MS,
+): string {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
   const base = siteUrl ? siteUrl.replace(/\/+$/, "") : "";
-  const params = new URLSearchParams({ id: fileId, token: signDriveStreamToken(fileId, workspaceId) });
+  const params = new URLSearchParams({ id: fileId, token: signDriveStreamToken(fileId, workspaceId, expiresAt) });
   return `${base}/api/drive/stream?${params.toString()}`;
+}
+
+export function getPublishStreamUrl(fileId: string, workspaceId: string): string {
+  return getStreamUrl(fileId, workspaceId, Date.now() + DRIVE_PUBLISH_STREAM_TOKEN_TTL_MS);
 }
 
 // ─── File metadata ───

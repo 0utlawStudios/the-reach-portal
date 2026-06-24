@@ -2,10 +2,9 @@ import { NextRequest } from "next/server";
 import {
   getRootFolderId,
   ensureSubfolder,
-  setPublicPermission,
   getAccessToken,
   getStreamUrl,
-  getDriveDownloadUrl,
+  getPublishStreamUrl,
 } from "@/lib/google-drive";
 import { consume, getClientIp } from "@/lib/rate-limit";
 import { requireBearerTeamRole } from "@/lib/auth/require";
@@ -176,16 +175,8 @@ export async function POST(request: NextRequest) {
       return jsonResponse({ error: "Upload succeeded but Google did not return a file ID" }, 500);
     }
 
-    // Set public permission
-    try {
-      await setPublicPermission(fileId);
-    } catch (permErr) {
-      console.error("[proxy-upload] Permission error (file still uploaded):", permErr);
-      // Don't fail — file is uploaded, just not public yet
-    }
-
     const driveProxyUrl = getStreamUrl(fileId, authContext.workspaceId);
-    const publishUrl = getDriveDownloadUrl(fileId);
+    const publishUrl = getPublishStreamUrl(fileId, authContext.workspaceId);
 
     return jsonResponse({
       fileId,

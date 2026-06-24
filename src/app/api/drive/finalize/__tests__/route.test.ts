@@ -12,9 +12,8 @@ const rateLimitMocks = vi.hoisted(() => ({
 const driveMocks = vi.hoisted(() => ({
   ensureSubfolder: vi.fn(),
   getRootFolderId: vi.fn(),
-  setPublicPermission: vi.fn(),
   getStreamUrl: vi.fn(),
-  getDriveDownloadUrl: vi.fn(),
+  getPublishStreamUrl: vi.fn(),
   getFileMetadata: vi.fn(),
 }));
 
@@ -34,9 +33,8 @@ vi.mock("@/lib/rate-limit", () => ({
 vi.mock("@/lib/google-drive", () => ({
   ensureSubfolder: driveMocks.ensureSubfolder,
   getRootFolderId: driveMocks.getRootFolderId,
-  setPublicPermission: driveMocks.setPublicPermission,
   getStreamUrl: driveMocks.getStreamUrl,
-  getDriveDownloadUrl: driveMocks.getDriveDownloadUrl,
+  getPublishStreamUrl: driveMocks.getPublishStreamUrl,
   getFileMetadata: driveMocks.getFileMetadata,
 }));
 
@@ -68,9 +66,8 @@ beforeEach(() => {
   rateLimitMocks.consume.mockResolvedValue({ allowed: true, remaining: 59, resetAt: new Date() });
   driveMocks.getRootFolderId.mockReturnValue("root-folder");
   driveMocks.ensureSubfolder.mockResolvedValue("raw-folder");
-  driveMocks.setPublicPermission.mockResolvedValue(undefined);
   driveMocks.getStreamUrl.mockReturnValue("/api/drive/stream?id=abcdefghijklmnopqrst");
-  driveMocks.getDriveDownloadUrl.mockReturnValue("https://drive.google.com/uc?export=download&id=abcdefghijklmnopqrst");
+  driveMocks.getPublishStreamUrl.mockReturnValue("/api/drive/stream?id=abcdefghijklmnopqrst&token=publish");
   driveMocks.getFileMetadata.mockResolvedValue({
     id: FILE_ID,
     name: "clip.mp4",
@@ -82,7 +79,7 @@ beforeEach(() => {
 });
 
 describe("POST /api/drive/finalize", () => {
-  it("resolves only the requested managed folder before publicizing", async () => {
+  it("resolves only the requested managed folder before returning signed stream URLs", async () => {
     const res = await POST(makeRequest({ fileId: FILE_ID, folder: "raw-files" }));
     const data = await res.json();
 
@@ -91,15 +88,15 @@ describe("POST /api/drive/finalize", () => {
       fileId: FILE_ID,
       url: "/api/drive/stream?id=abcdefghijklmnopqrst",
       driveProxyUrl: "/api/drive/stream?id=abcdefghijklmnopqrst",
-      publishUrl: "https://drive.google.com/uc?export=download&id=abcdefghijklmnopqrst",
+      publishUrl: "/api/drive/stream?id=abcdefghijklmnopqrst&token=publish",
     });
     expect(driveMocks.ensureSubfolder).toHaveBeenCalledTimes(1);
     expect(driveMocks.ensureSubfolder).toHaveBeenCalledWith("raw-files", "root-folder");
-    expect(driveMocks.setPublicPermission).toHaveBeenCalledWith(FILE_ID);
     expect(driveMocks.getStreamUrl).toHaveBeenCalledWith(FILE_ID, "00000000-0000-0000-0000-000000000001");
+    expect(driveMocks.getPublishStreamUrl).toHaveBeenCalledWith(FILE_ID, "00000000-0000-0000-0000-000000000001");
   });
 
-  it("rejects a file whose parent is not the requested folder before permission changes", async () => {
+  it("rejects a file whose parent is not the requested folder before URL signing", async () => {
     driveMocks.getFileMetadata.mockResolvedValueOnce({
       id: FILE_ID,
       name: "clip.mp4",
@@ -112,10 +109,10 @@ describe("POST /api/drive/finalize", () => {
 
     expect(res.status).toBe(403);
     expect(driveMocks.ensureSubfolder).toHaveBeenCalledTimes(1);
-    expect(driveMocks.setPublicPermission).not.toHaveBeenCalled();
+    expect(driveMocks.getPublishStreamUrl).not.toHaveBeenCalled();
   });
 
-  it("rejects a managed-folder file tagged to another workspace before permission changes", async () => {
+  it("rejects a managed-folder file tagged to another workspace before URL signing", async () => {
     driveMocks.getFileMetadata.mockResolvedValueOnce({
       id: FILE_ID,
       name: "clip.mp4",
@@ -130,8 +127,8 @@ describe("POST /api/drive/finalize", () => {
 
     expect(res.status).toBe(403);
     expect(data.error).toMatch(/workspace/i);
-    expect(driveMocks.setPublicPermission).not.toHaveBeenCalled();
     expect(driveMocks.getStreamUrl).not.toHaveBeenCalled();
+    expect(driveMocks.getPublishStreamUrl).not.toHaveBeenCalled();
   });
 
   it("rejects an invalid folder before Drive metadata or permission calls", async () => {
@@ -140,7 +137,7 @@ describe("POST /api/drive/finalize", () => {
     expect(res.status).toBe(400);
     expect(driveMocks.getFileMetadata).not.toHaveBeenCalled();
     expect(driveMocks.ensureSubfolder).not.toHaveBeenCalled();
-    expect(driveMocks.setPublicPermission).not.toHaveBeenCalled();
+    expect(driveMocks.getPublishStreamUrl).not.toHaveBeenCalled();
   });
 
   it("rejects a malformed fileId before Drive metadata or permission calls", async () => {
@@ -149,6 +146,6 @@ describe("POST /api/drive/finalize", () => {
     expect(res.status).toBe(400);
     expect(driveMocks.getFileMetadata).not.toHaveBeenCalled();
     expect(driveMocks.ensureSubfolder).not.toHaveBeenCalled();
-    expect(driveMocks.setPublicPermission).not.toHaveBeenCalled();
+    expect(driveMocks.getPublishStreamUrl).not.toHaveBeenCalled();
   });
 });
