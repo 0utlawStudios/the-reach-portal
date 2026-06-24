@@ -51,6 +51,7 @@ export interface UploadFailureReport {
   phase?: string;
   route?: string;
   uploadPath?: "proxy" | "resumable" | "unknown";
+  workspaceId?: string;
   cardId?: string;
   postTitle?: string;
   folder?: string;
@@ -269,6 +270,7 @@ async function uploadViaProxy(
   file: File,
   folder: string,
   cardId: string | undefined,
+  workspaceId: string | undefined,
   onProgress: ProgressCallback | undefined
 ): Promise<DriveUploadResult> {
   return withRetry(async () => {
@@ -316,6 +318,7 @@ async function uploadViaProxy(
 
       xhr.open("POST", "/api/drive/proxy-upload", true);
       if (accessToken) xhr.setRequestHeader("Authorization", `Bearer ${accessToken}`);
+      if (workspaceId) xhr.setRequestHeader("X-Workspace-Id", workspaceId);
 
       xhr.upload.onprogress = (e) => {
         watchdog.kick();
@@ -384,21 +387,23 @@ async function uploadViaProxy(
 
 // ─── Resumable path (≥ 4 MB) ──────────────────────────────────────────────
 
-async function getAuthHeaders(): Promise<HeadersInit> {
+async function getAuthHeaders(workspaceId?: string): Promise<HeadersInit> {
   const accessToken = await getAccessTokenFromCurrentSession();
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (accessToken) {
     headers.Authorization = `Bearer ${accessToken}`;
   }
+  if (workspaceId) headers["X-Workspace-Id"] = workspaceId;
   return headers;
 }
 
 async function getUploadSession(
   file: File,
   folder: string,
-  cardId: string | undefined
+  cardId: string | undefined,
+  workspaceId: string | undefined,
 ): Promise<string> {
-  const headers = await getAuthHeaders();
+  const headers = await getAuthHeaders(workspaceId);
   const res = await fetchWithTimeout("/api/drive/upload", {
     method: "POST",
     headers,
@@ -425,6 +430,7 @@ async function uploadResumableChunk(
   uploadUri: string,
   folder: string,
   accessToken: string | undefined,
+  workspaceId: string | undefined,
   start: number,
   end: number,
   onProgress: ProgressCallback | undefined
@@ -456,6 +462,7 @@ async function uploadResumableChunk(
     xhr.setRequestHeader("X-File-Name", file.name);
     xhr.setRequestHeader("X-Drive-Folder", folder);
     if (accessToken) xhr.setRequestHeader("Authorization", `Bearer ${accessToken}`);
+    if (workspaceId) xhr.setRequestHeader("X-Workspace-Id", workspaceId);
 
     xhr.upload.onprogress = (e) => {
       watchdog.kick();
@@ -525,6 +532,7 @@ async function putResumableChunkWithRetry(
   uploadUri: string,
   folder: string,
   accessToken: string | undefined,
+  workspaceId: string | undefined,
   start: number,
   end: number,
   onProgress: ProgressCallback | undefined
@@ -532,7 +540,7 @@ async function putResumableChunkWithRetry(
   let lastError: Error | null = null;
   for (let attempt = 0; attempt <= CHUNK_RETRY_DELAYS.length; attempt++) {
     try {
-      return await uploadResumableChunk(file, uploadUri, folder, accessToken, start, end, onProgress);
+      return await uploadResumableChunk(file, uploadUri, folder, accessToken, workspaceId, start, end, onProgress);
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
       if (!isResumableChunkRetryableInPlace(lastError) || attempt >= CHUNK_RETRY_DELAYS.length) {
@@ -550,12 +558,13 @@ async function putToGoogle(
   file: File,
   uploadUri: string,
   folder: string,
+  workspaceId: string | undefined,
   onProgress: ProgressCallback | undefined
 ): Promise<string> {
   const accessToken = await getAccessTokenFromCurrentSession();
   for (let start = 0; start < file.size; start += DRIVE_RESUMABLE_CHUNK_SIZE) {
     const end = Math.min(start + DRIVE_RESUMABLE_CHUNK_SIZE, file.size) - 1;
-    const result = await putResumableChunkWithRetry(file, uploadUri, folder, accessToken, start, end, onProgress);
+    const result = await putResumableChunkWithRetry(file, uploadUri, folder, accessToken, workspaceId, start, end, onProgress);
     if (result.done) {
       if (!result.fileId) throw new Error("Storage did not return a file ID after upload");
       return result.fileId;
@@ -564,8 +573,8 @@ async function putToGoogle(
   throw new Error("Storage did not return a file ID after upload");
 }
 
-async function finalizeUpload(fileId: string, folder: string): Promise<DriveUploadResult> {
-  const headers = await getAuthHeaders();
+async function finalizeUpload(fileId: string, folder: string, workspaceId?: string): Promise<DriveUploadResult> {
+  const headers = await getAuthHeaders(workspaceId);
   const res = await fetchWithTimeout("/api/drive/finalize", {
     method: "POST",
     headers,
@@ -590,6 +599,7 @@ async function finalizeUpload(fileId: string, folder: string): Promise<DriveUplo
 async function uploadViaResumable(
   file: File,
   folder: string,
+  workspaceId: string | undefined,
   cardId: string | undefined,
   onProgress: ProgressCallback | undefined
 ): Promise<DriveUploadResult> {
@@ -601,12 +611,12 @@ async function uploadViaResumable(
   // at all, so any dropped connection failed the whole upload outright.
   const fileId = await withRetry(
     async () => {
-      const uploadUri = await getUploadSession(file, folder, cardId);
+      const uploadUri = await getUploadSession(file, folder, cardId, workspaceId);
       onProgress?.(5);
       // The uploadUri is pre-authenticated, but browsers cannot PUT to it
       // directly because Google omits CORS headers. Send bounded same-origin
       // chunks and let the server forward them to the session URL.
-      return putToGoogle(file, uploadUri, folder, onProgress);
+      return putToGoogle(file, uploadUri, folder, workspaceId, onProgress);
     },
     "Direct upload",
     PUT_RETRY_DELAYS,
@@ -615,7 +625,7 @@ async function uploadViaResumable(
 
   // Step 3: set permissions and get serving URL
   const result = await withRetry(
-    () => finalizeUpload(fileId, folder),
+    () => finalizeUpload(fileId, folder, workspaceId),
     "Finalize"
   );
   onProgress?.(100);
@@ -629,7 +639,8 @@ export async function uploadToDrive(
   file: File,
   folder: "thumbnails" | "raw-files" | "media-library",
   cardId?: string,
-  onProgress?: ProgressCallback
+  onProgress?: ProgressCallback,
+  workspaceId?: string,
 ): Promise<DriveUploadResult> {
   if (file.size === 0) throw new Error("Cannot upload empty file");
   if (file.size > MAX_DRIVE_MEDIA_FILE_SIZE) throw new Error(`File exceeds ${MAX_DRIVE_MEDIA_FILE_SIZE / (1024 * 1024)}MB limit.`);
@@ -638,9 +649,9 @@ export async function uploadToDrive(
   onProgress?.(1);
 
   if (file.size >= RESUMABLE_THRESHOLD) {
-    return uploadViaResumable(file, folder, cardId, onProgress);
+    return uploadViaResumable(file, folder, workspaceId, cardId, onProgress);
   }
-  return uploadViaProxy(file, folder, cardId, onProgress);
+  return uploadViaProxy(file, folder, cardId, workspaceId, onProgress);
 }
 
 export async function reportUploadFailure(report: UploadFailureReport): Promise<void> {
@@ -655,6 +666,7 @@ export async function reportUploadFailure(report: UploadFailureReport): Promise<
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${accessToken}`,
+          ...(report.workspaceId ? { "X-Workspace-Id": report.workspaceId } : {}),
         },
         body: JSON.stringify(report),
         signal: controller.signal,
@@ -692,6 +704,7 @@ export async function uploadManyToDrive(
   folder: "thumbnails" | "raw-files" | "media-library",
   opts: {
     cardId?: string;
+    workspaceId?: string;
     concurrency?: number;
     /** @deprecated Per-file failures never abort the rest of the batch. */
     stopOnError?: boolean;
@@ -699,7 +712,7 @@ export async function uploadManyToDrive(
     onSettled?: (item: BatchItemResult) => void;
   } = {},
 ): Promise<BatchItemResult[]> {
-  const { cardId, concurrency = 3, onProgress, onSettled } = opts;
+  const { cardId, workspaceId, concurrency = 3, onProgress, onSettled } = opts;
   const total = files.length;
   if (total === 0) return [];
 
@@ -725,7 +738,7 @@ export async function uploadManyToDrive(
         const result = await uploadToDrive(file, folder, cardId, (p) => {
           filePercent[i] = p;
           emitProgress();
-        });
+        }, workspaceId);
         filePercent[i] = 100;
         emitProgress();
         const item: BatchItemResult = { index: i, file, result };

@@ -239,7 +239,8 @@ describe("Drive upload surfaces", () => {
     expect(imagePreview).toContain('"private, max-age=86400, immutable"');
     expect(imagePreview).toContain("PREVIEW_SIZES");
     expect(imagePreview).toContain("previewSizeFromRequest");
-    expect(imagePreview).toContain("void writeCachedPreview");
+    expect(imagePreview).toContain("schedulePreviewCacheWrite");
+    expect(imagePreview).toContain("after(() => writeCachedPreview");
 
     const imagePreviewLib = source("src/lib/image-preview.ts");
     expect(imagePreviewLib).toContain("warmBrowserImagePreview");
@@ -248,9 +249,11 @@ describe("Drive upload surfaces", () => {
 
     const previewImage = source("src/components/preview-image.tsx");
     expect(previewImage).toContain("IMAGE_PREVIEW_LOAD_TIMEOUT_MS");
-    expect(previewImage).toContain("setFailedSrc(displaySrc)");
+    expect(previewImage).toContain("fallbackSrc");
+    expect(previewImage).toContain("wantsFullPreview");
     expect(previewImage).toContain('className.includes("object-contain")');
-    expect(previewImage).toContain('size: previewSize');
+    expect(previewImage).toContain('size: "thumb"');
+    expect(previewImage).toContain('size: "full"');
 
     for (const file of [
       "src/components/pages/media-page.tsx",

@@ -11,6 +11,7 @@ import { consume, getClientIp } from "@/lib/rate-limit";
 
 export const maxDuration = 10;
 const BASELINE_WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
+const WORKSPACE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -39,6 +40,40 @@ async function sendSetupEmail(email: string, name: string, role: string, confirm
   });
 }
 
+type ForgotPasswordBody = {
+  email?: unknown;
+  workspaceId?: unknown;
+  workspaceSlug?: unknown;
+  workspace?: unknown;
+};
+
+async function resolveWorkspaceId(
+  admin: ReturnType<typeof getAdminClient>,
+  request: NextRequest,
+  body: ForgotPasswordBody,
+): Promise<string> {
+  const explicitId = (typeof body.workspaceId === "string" ? body.workspaceId : request.headers.get("x-workspace-id") || "").trim();
+  const slugOrAlias = (
+    typeof body.workspaceSlug === "string" ? body.workspaceSlug
+      : typeof body.workspace === "string" ? body.workspace
+        : request.headers.get("x-workspace-slug") || ""
+  ).trim();
+  const workspaceId = explicitId || (WORKSPACE_ID_RE.test(slugOrAlias) ? slugOrAlias : "");
+  const workspaceSlug = workspaceId ? "" : slugOrAlias;
+  if (!workspaceId && !workspaceSlug) return BASELINE_WORKSPACE_ID;
+  if (workspaceId && !WORKSPACE_ID_RE.test(workspaceId)) throw new Error("Invalid workspace");
+
+  const query = admin
+    .from("workspaces")
+    .select("id")
+    .limit(1);
+  const { data, error } = workspaceId
+    ? await query.eq("id", workspaceId).maybeSingle<{ id: string }>()
+    : await query.eq("slug", workspaceSlug).maybeSingle<{ id: string }>();
+  if (error || !data?.id) throw new Error("Workspace not found");
+  return data.id;
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Rate limit: 5 requests per minute per IP. Fails open on infrastructure
@@ -52,7 +87,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true });
     }
 
-    const { email } = await request.json();
+    const body = await request.json() as ForgotPasswordBody;
+    const email = typeof body.email === "string" ? body.email : "";
 
     // ALWAYS return success to prevent email enumeration
     const successResponse = NextResponse.json({ success: true });
@@ -63,6 +99,7 @@ export async function POST(request: NextRequest) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) return successResponse;
 
     const admin = getAdminClient();
+    const workspaceId = await resolveWorkspaceId(admin, request, body);
 
     // Generate recovery link (no email sent by Supabase)
     const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
@@ -77,7 +114,7 @@ export async function POST(request: NextRequest) {
       const { data: member, error: memberErr } = await admin
         .from("team_members")
         .select("name, role, status")
-        .eq("workspace_id", BASELINE_WORKSPACE_ID)
+        .eq("workspace_id", workspaceId)
         .eq("email", cleanEmail)
         .maybeSingle();
 

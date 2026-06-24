@@ -247,6 +247,7 @@ export function MediaPage() {
       const { reportUploadFailure, uploadManyToDrive } = driveModule;
       // Upload all files concurrently (3-wide pool) instead of one-at-a-time.
       const items = await uploadManyToDrive(fileList, "media-library", {
+        workspaceId,
         concurrency: 3,
         onProgress: setUploadProgress,
       });
@@ -259,6 +260,7 @@ export function MediaPage() {
           route: "/api/drive/upload-failure",
           uploadPath: uploadPathForSize(first.file),
           folder: "media-library",
+          workspaceId,
           fileName: first.file.name,
           mimeType: normalizeDriveMimeType(first.file.type, first.file.name),
           fileSize: first.file.size,
@@ -291,7 +293,7 @@ export function MediaPage() {
         if (mimeType.startsWith("video/") && playbackModule?.canUploadPlaybackCopy(file, mimeType)) {
           try {
             setUploadingFileName(`Optimizing playback for ${file.name}`);
-            const playback = await playbackModule.uploadVideoPlaybackCopy(file, "media-library");
+            const playback = await playbackModule.uploadVideoPlaybackCopy(file, "media-library", workspaceId);
             playbackUrl = playback.playbackUrl;
             playbackStorageKey = playback.playbackStorageKey;
           } catch (playbackErr) {
@@ -300,6 +302,7 @@ export function MediaPage() {
               route: "/api/media/playback-upload",
               uploadPath: "unknown",
               folder: "media-library",
+              workspaceId,
               fileName: file.name,
               mimeType,
               fileSize: file.size,
@@ -370,6 +373,7 @@ export function MediaPage() {
           route: "/api/drive/upload-failure",
           uploadPath: first ? uploadPathForSize(first) : "unknown",
           folder: "media-library",
+          workspaceId,
           fileName: first?.name,
           mimeType: first ? normalizeDriveMimeType(first.type, first.name) : undefined,
           fileSize: first?.size,

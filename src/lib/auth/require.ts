@@ -42,8 +42,26 @@ function unauthorized(message = "Unauthorized"): NextResponse {
   return NextResponse.json({ error: message }, { status: 401 });
 }
 
+function badRequest(message = "Bad request"): NextResponse {
+  return NextResponse.json({ error: message }, { status: 400 });
+}
+
 function forbidden(message = "Forbidden"): NextResponse {
   return NextResponse.json({ error: message }, { status: 403 });
+}
+
+function conflict(message = "Conflict"): NextResponse {
+  return NextResponse.json({ error: message }, { status: 409 });
+}
+
+const WORKSPACE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function requestedWorkspaceId(req: NextRequest): string | null | NextResponse {
+  const value = req.headers.get("x-workspace-id") || req.headers.get("x-reach-workspace-id");
+  if (!value) return null;
+  const workspaceId = value.trim();
+  if (!WORKSPACE_ID_RE.test(workspaceId)) return badRequest("Invalid workspace context");
+  return workspaceId;
 }
 
 /**
@@ -83,18 +101,42 @@ export async function requireRole(
   const { user } = result;
 
   try {
+    const workspaceContext = requestedWorkspaceId(req);
+    if (workspaceContext instanceof NextResponse) return workspaceContext;
     const supabase = createServerSupabaseClient(req);
-    const { data, error } = await supabase
+    const query = supabase
       .from("workspace_members")
       .select("workspace_id, role")
       .eq("user_id", user.id)
-      .eq("status", "active")
-      .limit(1)
-      .maybeSingle();
+      .eq("status", "active");
 
-    if (error || !data) {
+    if (workspaceContext) {
+      const { data, error } = await query.eq("workspace_id", workspaceContext).maybeSingle();
+      if (error || !data) {
+        return forbidden("No active workspace membership");
+      }
+
+      const role = data.role as WorkspaceRole;
+      if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(role)) {
+        return forbidden(`Role '${role}' not allowed`);
+      }
+
+      return {
+        user,
+        workspaceId: data.workspace_id as string,
+        role,
+      };
+    }
+
+    const { data: memberships, error } = await query.limit(2);
+    if (error || !memberships || memberships.length === 0) {
       return forbidden("No active workspace membership");
     }
+    if (memberships.length > 1) {
+      return conflict("Workspace context required");
+    }
+
+    const data = memberships[0];
 
     const role = data.role as WorkspaceRole;
     if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(role)) {
@@ -167,18 +209,35 @@ export async function requireBearerTeamRole(
   if (!url || !serviceKey) return forbidden("Auth not configured");
 
   try {
+    const workspaceContext = requestedWorkspaceId(req);
+    if (workspaceContext instanceof NextResponse) return workspaceContext;
     const admin = createClient(url, serviceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
-    const { data: workspaceMember, error: workspaceError } = await admin
+    const workspaceQuery = admin
       .from("workspace_members")
       .select("workspace_id, role, status")
       .eq("user_id", user.id)
-      .eq("status", "active")
-      .limit(1)
-      .maybeSingle();
+      .eq("status", "active");
 
-    if (workspaceError || !workspaceMember) {
+    let workspaceMember: { workspace_id?: string; role?: string; status?: string } | null = null;
+    if (workspaceContext) {
+      const { data, error: workspaceError } = await workspaceQuery.eq("workspace_id", workspaceContext).maybeSingle();
+      if (workspaceError || !data) {
+        return forbidden("No active workspace membership");
+      }
+      workspaceMember = data as { workspace_id?: string; role?: string; status?: string };
+    } else {
+      const { data, error: workspaceError } = await workspaceQuery.limit(2);
+      if (workspaceError || !data || data.length === 0) {
+        return forbidden("No active workspace membership");
+      }
+      if (data.length > 1) {
+        return conflict("Workspace context required");
+      }
+      workspaceMember = data[0] as { workspace_id?: string; role?: string; status?: string };
+    }
+    if (!workspaceMember) {
       return forbidden("No active workspace membership");
     }
 

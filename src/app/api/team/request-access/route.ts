@@ -6,6 +6,7 @@ import { consume, getClientIp } from "@/lib/rate-limit";
 export const maxDuration = 10;
 
 const BASELINE_WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
+const WORKSPACE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const GENERIC_RECEIVED_RESPONSE = {
   success: true,
   status: "received",
@@ -25,6 +26,35 @@ interface RequestBody {
   phone?: string | null;
   company?: string | null;
   reason?: string | null;
+  workspaceId?: string | null;
+  workspaceSlug?: string | null;
+  workspace?: string | null;
+}
+
+async function resolveWorkspaceId(
+  admin: ReturnType<typeof getAdminClient>,
+  request: NextRequest,
+  body: RequestBody,
+): Promise<string> {
+  const explicitId = (body.workspaceId || request.headers.get("x-workspace-id") || "").trim();
+  const slugOrAlias = (body.workspaceSlug || body.workspace || request.headers.get("x-workspace-slug") || "").trim();
+  const workspaceId = explicitId || (WORKSPACE_ID_RE.test(slugOrAlias) ? slugOrAlias : "");
+  const workspaceSlug = workspaceId ? "" : slugOrAlias;
+  if (!workspaceId && !workspaceSlug) return BASELINE_WORKSPACE_ID;
+  if (workspaceId && !WORKSPACE_ID_RE.test(workspaceId)) {
+    throw new Error("Invalid workspace");
+  }
+
+  const query = admin
+    .from("workspaces")
+    .select("id")
+    .limit(1);
+  const { data, error } = workspaceId
+    ? await query.eq("id", workspaceId).maybeSingle<{ id: string }>()
+    : await query.eq("slug", workspaceSlug).maybeSingle<{ id: string }>();
+  if (error) throw new Error("Could not verify workspace");
+  if (!data?.id) throw new Error("Workspace not found");
+  return data.id;
 }
 
 export async function POST(request: NextRequest) {
@@ -51,11 +81,12 @@ export async function POST(request: NextRequest) {
     }
 
     const admin = getAdminClient();
+    const workspaceId = await resolveWorkspaceId(admin, request, body);
 
     const { data: existingMember, error: existingErr } = await admin
       .from("team_members")
       .select("id, status")
-      .eq("workspace_id", BASELINE_WORKSPACE_ID)
+      .eq("workspace_id", workspaceId)
       .eq("email", email)
       .maybeSingle();
     if (existingErr) {
@@ -72,7 +103,7 @@ export async function POST(request: NextRequest) {
       .from("signup_requests")
       .select("id")
       .eq("email", email)
-      .eq("workspace_id", BASELINE_WORKSPACE_ID)
+      .eq("workspace_id", workspaceId)
       .eq("status", "pending")
       .maybeSingle();
     if (pendingErr) {
@@ -85,7 +116,7 @@ export async function POST(request: NextRequest) {
     }
 
     const requestRow = {
-      workspace_id: BASELINE_WORKSPACE_ID,
+      workspace_id: workspaceId,
       name: body.name.trim(),
       email,
       phone: body.phone || null,
@@ -125,7 +156,7 @@ export async function POST(request: NextRequest) {
         const { data: admins, error: adminsErr } = await admin
           .from("team_members")
           .select("email")
-          .eq("workspace_id", BASELINE_WORKSPACE_ID)
+          .eq("workspace_id", workspaceId)
           .in("role", ["superadmin", "admin"]);
         if (adminsErr) throw new Error(`Admin lookup failed: ${adminsErr.message}`);
 
@@ -157,7 +188,7 @@ export async function POST(request: NextRequest) {
         p_entity_type: "team",
         p_action: "access_request_submitted",
         p_entity_id: inserted.id,
-        p_workspace_id: BASELINE_WORKSPACE_ID,
+        p_workspace_id: workspaceId,
         p_metadata: {
           user_name: email,
           details: emailSent

@@ -91,7 +91,12 @@ import { POST } from "../route";
 
 function makeRequest(body: Record<string, unknown>) {
   return {
-    headers: { get: () => "127.0.0.1" },
+    headers: {
+      get: (name: string) => {
+        if (name.toLowerCase() === "x-forwarded-for") return "127.0.0.1";
+        return null;
+      },
+    },
     json: () => Promise.resolve(body),
   } as unknown as Parameters<typeof POST>[0];
 }
@@ -108,6 +113,9 @@ beforeEach(() => {
     team_members: {
       maybeSingle: { data: null, error: null },
       list: { data: [{ email: "admin@example.com" }], error: null },
+    },
+    workspaces: {
+      maybeSingle: { data: { id: "00000000-0000-0000-0000-000000000001" }, error: null },
     },
     signup_requests: {
       maybeSingle: { data: null, error: null },

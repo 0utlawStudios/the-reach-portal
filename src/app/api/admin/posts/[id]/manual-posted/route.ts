@@ -48,6 +48,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
     const { data: flag, error: flagError } = await admin
       .from("feature_flags")
       .select("enabled")
+      .eq("workspace_id", auth.workspaceId)
       .eq("name", MANUAL_POSTED_FLAG_NAME)
       .maybeSingle<{ enabled: boolean | null }>();
     if (flagError) {

@@ -5,6 +5,17 @@ import { useState } from "react";
 import Link from "next/link";
 import { User, Mail, Phone, Building2, MessageSquare, CheckCircle, AlertCircle, ArrowLeft } from "lucide-react";
 
+function workspaceContextFromUrl(): { workspaceId?: string; workspaceSlug?: string } {
+  if (typeof window === "undefined") return {};
+  const params = new URLSearchParams(window.location.search);
+  const workspaceId = params.get("workspaceId")?.trim() || "";
+  const workspaceSlug = (params.get("workspaceSlug") || params.get("workspace"))?.trim() || "";
+  return {
+    ...(workspaceId ? { workspaceId } : {}),
+    ...(workspaceSlug ? { workspaceSlug } : {}),
+  };
+}
+
 export default function RequestAccessPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -35,6 +46,7 @@ export default function RequestAccessPage() {
           phone: phone.trim().replace(/[^0-9+\s]/g, "") || null,
           company: company.trim() || null,
           reason: reason.trim() || null,
+          ...workspaceContextFromUrl(),
         }),
       });
       if (!res.ok) {

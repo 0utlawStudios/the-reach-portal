@@ -372,7 +372,6 @@ const PipelineContext = createContext<PipelineContextType | null>(null);
 export function PipelineProvider({ children }: { children: ReactNode }) {
   const { currentUser, accessToken, provisionResult } = useAuth();
   const { addToast } = useToast();
-  const manualPostedMovesEnabled = useManualPostedMovesEnabled();
   const [cards, setCards] = useState<ContentCard[]>(PLACEHOLDER_CARDS);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCard, setSelectedCard] = useState<ContentCard | null>(null);
@@ -408,6 +407,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
   };
 
   const activeWorkspaceId = workspaceId || BASELINE_WORKSPACE_ID;
+  const manualPostedMovesEnabled = useManualPostedMovesEnabled(activeWorkspaceId);
 
   useEffect(() => {
     accessTokenRef.current = accessToken;
@@ -658,6 +658,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
               headers: {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${token}`,
+                "X-Workspace-Id": workspaceIdRef.current || BASELINE_WORKSPACE_ID,
               },
               body: JSON.stringify({ postedAt }),
             });

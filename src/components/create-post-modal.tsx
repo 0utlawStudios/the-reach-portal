@@ -208,6 +208,7 @@ export function CreatePostModal({ open, onClose }: Props) {
         setUploadingFileName(pending.length === 1 ? pending[0].file.name : `Uploading ${pending.length} files`);
         setUploadProgress(0);
         const items = await uploadManyToDrive(pending.map((p) => p.file), "raw-files", {
+          workspaceId,
           concurrency: 3,
           onProgress: setUploadProgress,
         });
@@ -224,6 +225,7 @@ export function CreatePostModal({ open, onClose }: Props) {
             phase: "create_post_batch_upload",
             route: "/api/drive/upload-failure",
             uploadPath: uploadPathForSize(failure.file),
+            workspaceId,
             postTitle: title.trim(),
             folder: "raw-files",
             fileName: failure.file.name,
@@ -258,7 +260,7 @@ export function CreatePostModal({ open, onClose }: Props) {
             try {
               setUploadingFileName(`Optimizing playback for ${f.name}`);
               setUploadProgress(0);
-              const playback = await playbackModule.uploadVideoPlaybackCopy(sourceFile);
+              const playback = await playbackModule.uploadVideoPlaybackCopy(sourceFile, undefined, workspaceId);
               withPlayback[i] = {
                 ...f,
                 playbackUrl: playback.playbackUrl,
@@ -270,6 +272,7 @@ export function CreatePostModal({ open, onClose }: Props) {
                 phase: "create_post_playback_upload",
                 route: "/api/media/playback-upload",
                 uploadPath: uploadPathForSize(sourceFile),
+                workspaceId,
                 postTitle: title.trim(),
                 folder: "raw-files",
                 fileName: sourceFile.name,
@@ -321,6 +324,7 @@ export function CreatePostModal({ open, onClose }: Props) {
                     const { createVideoPosterFile } = await import("@/lib/video-poster");
                     const posterFile = await createVideoPosterFile(sourceFile);
                     const [posterItem] = await uploadManyToDrive([posterFile], "thumbnails", {
+                      workspaceId,
                       concurrency: 1,
                       onProgress: setUploadProgress,
                     });
@@ -668,7 +672,7 @@ export function CreatePostModal({ open, onClose }: Props) {
                         let driveModule: typeof import("@/lib/drive-upload") | null = null;
                         try {
                           driveModule = await import("@/lib/drive-upload");
-                          const [item] = await driveModule.uploadManyToDrive([file], "raw-files", { concurrency: 1 });
+                          const [item] = await driveModule.uploadManyToDrive([file], "raw-files", { workspaceId, concurrency: 1 });
                           if (!item?.result) throw item?.error || new Error("License upload failed");
                           const result = item.result;
                           setLicenseFileId(result.fileId);
@@ -681,6 +685,7 @@ export function CreatePostModal({ open, onClose }: Props) {
                               phase: "create_post_license_upload",
                               route: "/api/drive/upload-failure",
                               uploadPath: uploadPathForSize(file),
+                              workspaceId,
                               postTitle: title.trim(),
                               folder: "raw-files",
                               fileName: file.name,

@@ -115,6 +115,7 @@ function EditProfileModal({
   canDelete,
   canManageTeam,
   canEditProfile,
+  workspaceId,
 }: {
   member: TeamMember;
   onClose: () => void;
@@ -122,6 +123,7 @@ function EditProfileModal({
   canDelete?: boolean;
   canManageTeam: boolean;
   canEditProfile: boolean;
+  workspaceId: string;
 }) {
   const { updateMember, refreshMembers } = useTeam();
   const { addToast } = useToast();
@@ -155,7 +157,7 @@ function EditProfileModal({
       const res = await fetch("/api/auth/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: normalizedEmail }),
+        body: JSON.stringify({ email: normalizedEmail, workspaceId }),
       });
       if (!res.ok) {
         addToast("Recovery email could not be requested.", "error");
@@ -481,7 +483,7 @@ export function SettingsPage() {
   const { navigate } = useNavigation();
   const { addToast } = useToast();
   const { workspaceId } = usePipeline();
-  const manualPostedMovesSetting = useManualPostedMovesSetting();
+  const manualPostedMovesSetting = useManualPostedMovesSetting(workspaceId);
   const [manualPostedSaving, setManualPostedSaving] = useState(false);
   const [workspaceTz, setWorkspaceTz] = useState("America/Chicago");
   const currentMember = members.find((m) => m.email === currentUser.email);
@@ -545,7 +547,7 @@ export function SettingsPage() {
       const res = await fetch("/api/auth/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: cleanEmail }),
+        body: JSON.stringify({ email: cleanEmail, workspaceId }),
       });
       if (!res.ok) {
         addToast("Recovery email could not be requested.", "error");
@@ -557,7 +559,7 @@ export function SettingsPage() {
       addToast("Network error. Recovery link not sent.", "error");
       return false;
     }
-  }, [addToast]);
+  }, [addToast, workspaceId]);
 
   const handleOwnPasswordRecovery = useCallback(async () => {
     if (sendingOwnRecovery) return;
@@ -783,7 +785,7 @@ export function SettingsPage() {
                   onChange={async (enabled) => {
                     setManualPostedSaving(true);
                     try {
-                      await setManualPostedMovesEnabled(enabled);
+                      await setManualPostedMovesEnabled(enabled, workspaceId);
                       addToast(enabled ? "Manual Posted moves enabled" : "Manual Posted moves disabled", "success");
                     } catch (err) {
                       const message = err instanceof Error ? err.message : "Could not update Manual Posted moves";
@@ -1072,6 +1074,7 @@ export function SettingsPage() {
           onClose={() => setEditingMember(null)}
           canManageTeam={isAdmin}
           canEditProfile={isAdmin}
+          workspaceId={workspaceId}
           canDelete={
             editingMember.role !== "superadmin" &&
             (currentUser.email !== editingMember.email) &&

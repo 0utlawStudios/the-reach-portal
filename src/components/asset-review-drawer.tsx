@@ -318,6 +318,7 @@ export function AssetReviewDrawer() {
       driveModule = await import("@/lib/drive-upload");
       const [item] = await driveModule.uploadManyToDrive([file], "thumbnails", {
         cardId: selectedCard.id,
+        workspaceId,
         concurrency: 1,
         onProgress: setUploadProgress,
       });
@@ -365,6 +366,7 @@ export function AssetReviewDrawer() {
           route: "/api/drive/upload-failure",
           uploadPath: uploadPathForSize(file),
           cardId: selectedCard.id,
+          workspaceId,
           postTitle: selectedCard.title,
           folder: "thumbnails",
           fileName: file.name,
@@ -406,6 +408,7 @@ export function AssetReviewDrawer() {
       const { uploadManyToDrive, reportUploadFailure } = driveModule;
       const items = await uploadManyToDrive(selectedFiles, "raw-files", {
         cardId: selectedCard.id,
+        workspaceId,
         concurrency: 3,
         onProgress: setUploadProgress,
       });
@@ -427,6 +430,7 @@ export function AssetReviewDrawer() {
             route: "/api/drive/upload-failure",
             uploadPath: uploadPathForSize(file),
             cardId: selectedCard.id,
+            workspaceId,
             postTitle: selectedCard.title,
             folder: "raw-files",
             fileName: file.name,
@@ -450,7 +454,7 @@ export function AssetReviewDrawer() {
           if (playbackModule.canUploadPlaybackCopy(file, resultMimeType)) {
             try {
               setUploadingFileName(`Optimizing playback for ${file.name}`);
-              const playback = await playbackModule.uploadVideoPlaybackCopy(file, selectedCard.id);
+              const playback = await playbackModule.uploadVideoPlaybackCopy(file, selectedCard.id, workspaceId);
               playbackUrl = playback.playbackUrl;
               playbackStorageKey = playback.playbackStorageKey;
             } catch (err) {
@@ -460,6 +464,7 @@ export function AssetReviewDrawer() {
                 route: "/api/media/playback-upload",
                 uploadPath: uploadPathForSize(file),
                 cardId: selectedCard.id,
+                workspaceId,
                 postTitle: selectedCard.title,
                 folder: "raw-files",
                 fileName: file.name,
@@ -527,6 +532,7 @@ export function AssetReviewDrawer() {
           route: "/api/drive/upload-failure",
           uploadPath: first ? uploadPathForSize(first) : "unknown",
           cardId: selectedCard.id,
+          workspaceId,
           postTitle: selectedCard.title,
           folder: "raw-files",
           fileName: first?.name,
@@ -1016,7 +1022,7 @@ export function AssetReviewDrawer() {
                             let driveModule: typeof import("@/lib/drive-upload") | null = null;
                             try {
                               driveModule = await import("@/lib/drive-upload");
-                              const [item] = await driveModule.uploadManyToDrive([file], "raw-files", { cardId: selectedCard.id, concurrency: 1 });
+                              const [item] = await driveModule.uploadManyToDrive([file], "raw-files", { cardId: selectedCard.id, workspaceId, concurrency: 1 });
                               if (!item?.result) throw item?.error || new Error("License upload failed");
                               const result = item.result;
                               updateCard(selectedCard.id, { licenseFileId: result.fileId });
@@ -1031,6 +1037,7 @@ export function AssetReviewDrawer() {
                                   route: "/api/drive/upload-failure",
                                   uploadPath: uploadPathForSize(file),
                                   cardId: selectedCard.id,
+                                  workspaceId,
                                   postTitle: selectedCard.title,
                                   folder: "raw-files",
                                   fileName: file.name,

@@ -18,34 +18,48 @@ export function PreviewImage({
   mimeType,
   fileName,
   className,
+  loading,
+  onLoad,
   onError,
   ...props
 }: PreviewImageProps) {
-  const previewSize =
-    typeof className === "string" && className.includes("object-contain")
-      ? "full"
-      : "thumb";
-  const displaySrc = useMemo(() => {
-    return typeof src === "string" ? browserImagePreviewUrl(src, { mimeType, fileName, size: previewSize }) : src;
-  }, [src, mimeType, fileName, previewSize]);
-  const [failedSrc, setFailedSrc] = useState<string | undefined>(undefined);
+  const wantsFullPreview = typeof className === "string" && className.includes("object-contain");
+  const { primarySrc, fallbackSrc } = useMemo(() => {
+    if (typeof src !== "string") return { primarySrc: src, fallbackSrc: undefined };
+    const thumb = browserImagePreviewUrl(src, { mimeType, fileName, size: "thumb" });
+    const full = wantsFullPreview
+      ? browserImagePreviewUrl(src, { mimeType, fileName, size: "full" })
+      : thumb;
+    return {
+      primarySrc: full,
+      fallbackSrc: wantsFullPreview && thumb !== full ? thumb : undefined,
+    };
+  }, [src, mimeType, fileName, wantsFullPreview]);
+  const [failedSrcs, setFailedSrcs] = useState<Record<string, true>>({});
   const [loadedSrc, setLoadedSrc] = useState<string | undefined>(undefined);
+  const [loadedFallbackSrc, setLoadedFallbackSrc] = useState<string | undefined>(undefined);
 
   const fitClass =
     typeof className === "string" && className.includes("object-contain")
       ? "object-contain"
       : "object-cover";
-  const isLoaded = typeof displaySrc !== "string" || loadedSrc === displaySrc;
-  const missingOrFailed = !displaySrc || failedSrc === displaySrc;
+  const primaryFailed = typeof primarySrc === "string" && Boolean(failedSrcs[primarySrc]);
+  const fallbackFailed = typeof fallbackSrc === "string" && Boolean(failedSrcs[fallbackSrc]);
+  const isLoaded = typeof primarySrc !== "string" || loadedSrc === primarySrc;
+  const fallbackLoaded = typeof fallbackSrc === "string" && loadedFallbackSrc === fallbackSrc;
+  const canShowFallback = Boolean(fallbackSrc && fallbackLoaded && !fallbackFailed);
+  const missingOrFailed = !primarySrc || (primaryFailed && !canShowFallback);
+  const showSpinner = !isLoaded && !canShowFallback;
+  const effectiveLoading = loading || (wantsFullPreview ? "eager" : undefined);
 
   useEffect(() => {
-    if (missingOrFailed || typeof displaySrc !== "string" || isLoaded) return;
+    if (missingOrFailed || typeof primarySrc !== "string" || isLoaded || canShowFallback) return;
     const timer = setTimeout(() => {
-      setFailedSrc(displaySrc);
+      setFailedSrcs((prev) => ({ ...prev, [primarySrc]: true }));
       onError?.({} as SyntheticEvent<HTMLImageElement, Event>);
     }, IMAGE_PREVIEW_LOAD_TIMEOUT_MS);
     return () => clearTimeout(timer);
-  }, [displaySrc, isLoaded, missingOrFailed, onError]);
+  }, [primarySrc, isLoaded, missingOrFailed, canShowFallback, onError]);
 
   if (missingOrFailed) {
     return (
@@ -57,19 +71,43 @@ export function PreviewImage({
 
   return (
     <div className={`${className || ""} relative overflow-hidden bg-[#6C655A]/10 dark:bg-white/[0.03]`}>
-      {!isLoaded && (
+      {showSpinner && (
         <div className="absolute inset-0 flex items-center justify-center bg-slate-100/95 text-[#975428] dark:bg-[#151518]/95 dark:text-white/75" aria-hidden="true">
           <div className="h-7 w-7 rounded-full border-2 border-current/25 border-t-current animate-spin" />
         </div>
       )}
+      {typeof fallbackSrc === "string" && (
+        <RawImage
+          {...props}
+          alt=""
+          aria-hidden="true"
+          src={fallbackSrc}
+          loading={effectiveLoading}
+          className={`absolute inset-0 h-full w-full ${fitClass} transition-opacity duration-150 ${canShowFallback && !isLoaded ? "opacity-100" : "opacity-0"}`}
+          onLoad={(event: SyntheticEvent<HTMLImageElement, Event>) => {
+            setLoadedFallbackSrc(fallbackSrc);
+            onLoad?.(event);
+          }}
+          onError={(event: SyntheticEvent<HTMLImageElement, Event>) => {
+            onError?.(event);
+            setFailedSrcs((prev) => ({ ...prev, [fallbackSrc]: true }));
+          }}
+        />
+      )}
       <RawImage
         {...props}
-        src={displaySrc}
+        src={primarySrc}
+        loading={effectiveLoading}
         className={`absolute inset-0 h-full w-full ${fitClass} transition-opacity duration-150 ${isLoaded ? "opacity-100" : "opacity-0"}`}
-        onLoad={() => setLoadedSrc(typeof displaySrc === "string" ? displaySrc : undefined)}
+        onLoad={(event: SyntheticEvent<HTMLImageElement, Event>) => {
+          setLoadedSrc(typeof primarySrc === "string" ? primarySrc : undefined);
+          onLoad?.(event);
+        }}
         onError={(event: SyntheticEvent<HTMLImageElement, Event>) => {
           onError?.(event);
-          setFailedSrc(typeof displaySrc === "string" ? displaySrc : undefined);
+          if (typeof primarySrc === "string") {
+            setFailedSrcs((prev) => ({ ...prev, [primarySrc]: true }));
+          }
         }}
       />
     </div>

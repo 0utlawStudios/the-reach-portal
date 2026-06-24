@@ -1,6 +1,6 @@
 import sharp from "sharp";
 import decodeHeic from "heic-decode";
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
   ensureSubfolder,
@@ -124,6 +124,18 @@ async function writeCachedPreview(admin: SupabaseClient | null, key: string, pre
     }
   } catch (err) {
     console.warn("[media/image-preview] preview cache write skipped:", err instanceof Error ? err.message : err);
+  }
+}
+
+function schedulePreviewCacheWrite(admin: SupabaseClient | null, key: string, preview: Buffer) {
+  if (!admin) return;
+  try {
+    after(() => writeCachedPreview(admin, key, preview));
+  } catch {
+    // Vitest and some self-hosted contexts do not provide Next's request scope.
+    // Production Vercel/Next uses `after`; this fallback keeps preview delivery
+    // working where only a normal Node event loop is available.
+    void writeCachedPreview(admin, key, preview);
   }
 }
 
@@ -369,7 +381,7 @@ export async function GET(request: NextRequest) {
     const preview = await buildPreviewOnce(cacheKey, async () => {
       const source = await fetchDriveMedia(fileId, token);
       const converted = await buildHeicPreview(source, previewSize);
-      void writeCachedPreview(admin, cacheKey, converted);
+      schedulePreviewCacheWrite(admin, cacheKey, converted);
       return converted;
     });
     return browserSafeJpegResponse(preview, auth.signed, previewSize, "MISS");

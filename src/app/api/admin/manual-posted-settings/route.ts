@@ -19,10 +19,11 @@ type FlagRow = {
   enabled: boolean | null;
 };
 
-async function readEnabled(admin: ReturnType<typeof createServiceRoleClient>): Promise<boolean> {
+async function readEnabled(admin: ReturnType<typeof createServiceRoleClient>, workspaceId: string): Promise<boolean> {
   const { data, error } = await admin
     .from("feature_flags")
     .select("enabled")
+    .eq("workspace_id", workspaceId)
     .eq("name", MANUAL_POSTED_FLAG_NAME)
     .maybeSingle<FlagRow>();
   if (error) {
@@ -36,7 +37,7 @@ export async function GET(request: NextRequest) {
   const auth = await requireBearerTeamRole(request, MANUAL_POSTED_READ_ROLES);
   if (auth instanceof NextResponse) return auth;
 
-  const enabled = await readEnabled(createServiceRoleClient());
+  const enabled = await readEnabled(createServiceRoleClient(), auth.workspaceId);
   return NextResponse.json(
     { enabled, canToggle: isManualPostedToggleRole(auth.role) },
     { headers: { "Cache-Control": "no-store" } },
@@ -65,6 +66,7 @@ export async function PATCH(request: NextRequest) {
     .from("feature_flags")
     .upsert({
       name: MANUAL_POSTED_FLAG_NAME,
+      workspace_id: auth.workspaceId,
       enabled: body.enabled,
       metadata: {
         updated_by: auth.email,
@@ -72,7 +74,7 @@ export async function PATCH(request: NextRequest) {
         updated_from: "the-reach-settings",
       },
       updated_at: new Date().toISOString(),
-    }, { onConflict: "name" });
+    }, { onConflict: "workspace_id,name" });
 
   if (error) {
     console.error("[manual-posted-settings] flag update failed:", error.message);

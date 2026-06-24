@@ -47,10 +47,11 @@ export function playbackUploadBudgetMs(fileSize: number): number {
   return PLAYBACK_UPLOAD_BASE_MS + transferMs;
 }
 
-async function getPlaybackUploadTarget(file: File, cardId?: string): Promise<PlaybackUploadTarget> {
+async function getPlaybackUploadTarget(file: File, cardId?: string, workspaceId?: string): Promise<PlaybackUploadTarget> {
   const accessToken = await getAccessTokenFromCurrentSession();
   const headers: HeadersInit = { "Content-Type": "application/json" };
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+  if (workspaceId) headers["X-Workspace-Id"] = workspaceId;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PLAYBACK_TARGET_TIMEOUT_MS);
@@ -90,7 +91,7 @@ async function getPlaybackUploadTarget(file: File, cardId?: string): Promise<Pla
   return data as PlaybackUploadTarget;
 }
 
-export async function uploadVideoPlaybackCopy(file: File, cardId?: string): Promise<PlaybackUploadResult> {
+export async function uploadVideoPlaybackCopy(file: File, cardId?: string, workspaceId?: string): Promise<PlaybackUploadResult> {
   const mimeType = normalizeDriveMimeType(file.type, file.name);
   if (!PLAYBACK_VIDEO_MIME_TYPES.includes(mimeType as typeof PLAYBACK_VIDEO_MIME_TYPES[number])) {
     throw new Error("Playback copy is only supported for supported video files");
@@ -99,7 +100,7 @@ export async function uploadVideoPlaybackCopy(file: File, cardId?: string): Prom
     throw new Error(`Playback copy exceeds ${MAX_PLAYBACK_VIDEO_FILE_SIZE / (1024 * 1024)}MB limit`);
   }
 
-  const target = await getPlaybackUploadTarget(file, cardId);
+  const target = await getPlaybackUploadTarget(file, cardId, workspaceId);
 
   // Fail closed instead of hanging: uploadToSignedUrl cannot be aborted in this
   // storage-js version, so race it against a size-scaled budget. The orphaned

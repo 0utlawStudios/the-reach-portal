@@ -67,7 +67,7 @@ beforeEach(() => {
 });
 
 describe("/api/admin/manual-posted-settings", () => {
-  it("lets active users read the global setting and reports whether they can toggle", async () => {
+  it("lets active users read the workspace setting and reports whether they can toggle", async () => {
     adminMocks.flagEnabled = true;
     authMocks.requireBearerTeamRole.mockResolvedValueOnce({
       user: { id: "approver-1" },
@@ -91,8 +91,9 @@ describe("/api/admin/manual-posted-settings", () => {
     expect(body).toEqual({ enabled: true, canToggle: true });
     expect(adminMocks.upsert).toHaveBeenCalledWith(expect.objectContaining({
       name: "manual_posted_moves",
+      workspace_id: "00000000-0000-0000-0000-000000000001",
       enabled: true,
-    }), { onConflict: "name" });
+    }), { onConflict: "workspace_id,name" });
     expect(adminMocks.rpc).toHaveBeenCalledWith("record_audit_event", expect.objectContaining({
       p_entity_type: "setting",
       p_action: "settings_changed",

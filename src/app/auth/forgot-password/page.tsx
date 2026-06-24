@@ -10,6 +10,17 @@ const ease = [0.25, 0.4, 0.25, 1] as const;
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.07, delayChildren: 0.1 } } };
 const fadeUp = { hidden: { opacity: 0, y: 18 }, show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: ease as unknown as [number, number, number, number] } } };
 
+function workspaceContextFromUrl(): { workspaceId?: string; workspaceSlug?: string } {
+  if (typeof window === "undefined") return {};
+  const params = new URLSearchParams(window.location.search);
+  const workspaceId = params.get("workspaceId")?.trim() || "";
+  const workspaceSlug = (params.get("workspaceSlug") || params.get("workspace"))?.trim() || "";
+  return {
+    ...(workspaceId ? { workspaceId } : {}),
+    ...(workspaceSlug ? { workspaceSlug } : {}),
+  };
+}
+
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
@@ -28,7 +39,7 @@ export default function ForgotPasswordPage() {
       const res = await fetch("/api/auth/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+        body: JSON.stringify({ email: email.trim().toLowerCase(), ...workspaceContextFromUrl() }),
       });
       const data = await res.json();
       if (data.success) {

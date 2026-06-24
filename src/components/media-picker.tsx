@@ -320,7 +320,7 @@ export function MediaPicker({
       try {
         driveModule = await import("@/lib/drive-upload");
         const { uploadManyToDrive, reportUploadFailure } = driveModule;
-        const items = await uploadManyToDrive(fileList, folder, { cardId, concurrency: 3, onProgress: setUploadProgress });
+        const items = await uploadManyToDrive(fileList, folder, { cardId, workspaceId, concurrency: 3, onProgress: setUploadProgress });
         const failures = items.filter((item) => item.error || !item.result);
         for (const failure of failures) {
           const errorMessage = uploadErrorMessage(failure.error);
@@ -329,6 +329,7 @@ export function MediaPicker({
             route: "/api/drive/upload-failure",
             uploadPath: uploadPathForSize(failure.file),
             cardId,
+            workspaceId,
             folder,
             fileName: failure.file.name,
             mimeType: normalizeDriveMimeType(failure.file.type, failure.file.name),
@@ -360,7 +361,7 @@ export function MediaPicker({
           if (mimeType.startsWith("video/") && playbackModule) {
             if (playbackModule.canUploadPlaybackCopy(item.file, mimeType)) {
               try {
-                const playback = await playbackModule.uploadVideoPlaybackCopy(item.file, cardId);
+                const playback = await playbackModule.uploadVideoPlaybackCopy(item.file, cardId, workspaceId);
                 playbackUrl = playback.playbackUrl;
                 playbackStorageKey = playback.playbackStorageKey;
               } catch (err) {
@@ -370,6 +371,7 @@ export function MediaPicker({
                   route: "/api/media/playback-upload",
                   uploadPath: uploadPathForSize(item.file),
                   cardId,
+                  workspaceId,
                   folder,
                   fileName: item.file.name,
                   mimeType,
@@ -413,6 +415,7 @@ export function MediaPicker({
             route: "/api/drive/upload-failure",
             uploadPath: first ? uploadPathForSize(first) : "unknown",
             cardId,
+            workspaceId,
             folder,
             fileName: first?.name,
             mimeType: first ? normalizeDriveMimeType(first.type, first.name) : undefined,

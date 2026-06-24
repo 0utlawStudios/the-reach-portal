@@ -79,7 +79,7 @@ function emitDragTelemetry(eventName: "start" | "end", detail: DragTelemetryDeta
 }
 
 export function KanbanBoard() {
-  const { cards, moveCard, requestKickback, selectCard, isLoading } = usePipeline();
+  const { cards, moveCard, requestKickback, selectCard, isLoading, workspaceId } = usePipeline();
   const { currentUser } = useAuth();
   const { members } = useTeam();
   const { addToast } = useToast();
@@ -137,7 +137,7 @@ export function KanbanBoard() {
     () => isPipelineApproverRole(currentMember?.role || currentUser.role),
     [currentMember, currentUser.role]
   );
-  const manualPostedMovesEnabled = useManualPostedMovesEnabled();
+  const manualPostedMovesEnabled = useManualPostedMovesEnabled(workspaceId);
 
   // CST week window (Sun-Sat)
   const thisWeekStart = useMemo(() => {
