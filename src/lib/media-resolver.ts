@@ -18,6 +18,29 @@ export function firstVideoRawFile(card: Pick<ContentCard, "sourceVault">): RawFi
   return card.sourceVault?.rawFiles?.find((file) => file.mimeType?.startsWith("video/")) || null;
 }
 
+function matchingThumbnailRawFile(card: Pick<ContentCard, "thumbnailUrl" | "sourceVault">): RawFile | null {
+  const files = card.sourceVault?.rawFiles || [];
+  if (files.length === 0) return null;
+
+  const thumbFileId = driveFileIdFromUrl(card.thumbnailUrl);
+  return files.find((file) => {
+    return Boolean(
+      (thumbFileId && file.fileId === thumbFileId)
+        || file.driveProxyUrl === card.thumbnailUrl
+        || file.publishUrl === card.thumbnailUrl
+        || file.url === card.thumbnailUrl,
+    );
+  }) || files.find((file) => file.usageType === "master") || null;
+}
+
+export function resolveCardThumbnailMimeType(card: Pick<ContentCard, "thumbnailUrl" | "sourceVault">): string | undefined {
+  return card.sourceVault?.thumbnailMimeType || matchingThumbnailRawFile(card)?.mimeType;
+}
+
+export function resolveCardThumbnailFileName(card: Pick<ContentCard, "thumbnailUrl" | "sourceVault">): string | undefined {
+  return matchingThumbnailRawFile(card)?.name;
+}
+
 export function resolveCardVideoUrl(card: Pick<ContentCard, "contentType" | "thumbnailUrl" | "mediaIds" | "sourceVault">): string | null {
   if (!isVideoContentType(card.contentType)) return null;
 
@@ -34,7 +57,7 @@ export function resolveCardVideoUrl(card: Pick<ContentCard, "contentType" | "thu
 }
 
 export function thumbnailIsDefinitelyImage(card: Pick<ContentCard, "thumbnailUrl" | "sourceVault">): boolean {
-  const mimeType = card.sourceVault?.thumbnailMimeType;
+  const mimeType = resolveCardThumbnailMimeType(card);
   if (mimeType?.startsWith("image/")) return true;
   if (card.thumbnailUrl.startsWith("data:image/")) return true;
   if (card.thumbnailUrl.startsWith("blob:")) return true;

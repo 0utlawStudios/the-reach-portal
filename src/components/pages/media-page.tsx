@@ -1,6 +1,6 @@
 "use client";
 
-import { RawImage } from "@/components/raw-image";
+import { PreviewImage } from "@/components/preview-image";
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { ContentCard, MediaAsset } from "@/lib/types";
 import { usePipeline } from "@/lib/pipeline-context";
@@ -259,11 +259,12 @@ export function MediaPage() {
           continue;
         }
         const result = it.result;
+        const mimeType = result.mimeType || normalizeDriveMimeType(file.type, file.name);
         const asset: MediaAsset = {
           id: `m-${Date.now()}-${Math.random().toString(36).slice(2)}`,
           name: file.name,
           url: result.url,
-          type: file.type.startsWith("video") ? "video" : "image",
+          type: mimeType.startsWith("video") ? "video" : "image",
           folder: "Media Library",
           uploadedAt: new Date().toISOString(),
           addedBy: currentUser.name,
@@ -458,7 +459,7 @@ export function MediaPage() {
             </button>
           ))}
         </div>
-        <input ref={fileInputRef} type="file" multiple accept="image/*,video/*" onChange={handleUpload} className="hidden" />
+        <input ref={fileInputRef} type="file" multiple accept="image/*,video/*,.heic,.heif" onChange={handleUpload} className="hidden" />
         <button disabled={uploading} onClick={() => fileInputRef.current?.click()} className="reach-action-button hidden md:flex mt-2 w-full items-center justify-center gap-2 h-9 rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white text-[11px] font-medium cursor-pointer shadow-sm transition-all duration-200 disabled:opacity-40">
           <Upload className="w-3.5 h-3.5" />{uploading ? "Uploading..." : "Upload Files"}
         </button>
@@ -535,7 +536,7 @@ export function MediaPage() {
                     <div key={asset.id} className={`group relative rounded-xl overflow-hidden cursor-pointer transition-all duration-200 ${selected ? "ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-[#0a0a0a]" : "border border-gray-200/70 dark:border-white/[0.06] hover:border-gray-300 hover:shadow-md"} bg-white dark:bg-[#151518] shadow-sm`}>
                       <div onClick={() => setLightboxAsset(asset)} className="relative aspect-square overflow-hidden bg-gray-50 dark:bg-white/[0.03]">
                         {asset.type === "image" ? (
-                          <RawImage src={asset.url} alt={asset.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                          <PreviewImage src={asset.url} alt={asset.name} fileName={asset.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                         ) : (
                           <video
                             src={videoPreviewFrameUrl(asset.url)}
@@ -605,7 +606,7 @@ export function MediaPage() {
                           </button>
                           <div className="w-8 h-8 rounded-lg overflow-hidden bg-gray-100 dark:bg-white/[0.04] shrink-0">
                             {asset.type === "image" ? (
-                              <RawImage src={asset.url} alt="" className="w-full h-full object-cover" />
+                              <PreviewImage src={asset.url} alt="" fileName={asset.name} className="w-full h-full object-cover" />
                             ) : (
                               <video
                                 src={videoPreviewFrameUrl(asset.url)}
@@ -688,7 +689,7 @@ export function MediaPage() {
               </div>
               <div className="flex-1 overflow-hidden bg-gray-50 dark:bg-black flex items-center justify-center p-4 relative group/lb" onTouchStart={onSwipeStart} onTouchEnd={onSwipeEnd}>
                 {lightboxAsset.type === "image" ? (
-                  <RawImage src={lightboxAsset.url} alt={lightboxAsset.name} className="max-w-full max-h-[60vh] object-contain rounded-lg select-none" draggable={false} />
+                  <PreviewImage src={lightboxAsset.url} alt={lightboxAsset.name} fileName={lightboxAsset.name} className="max-w-full max-h-[60vh] object-contain rounded-lg select-none" draggable={false} />
                 ) : (
                   <video src={lightboxAsset.url} controls playsInline preload="metadata" className="max-w-full max-h-[60vh] object-contain rounded-lg bg-black" />
                 )}

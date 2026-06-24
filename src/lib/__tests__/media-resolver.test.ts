@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { driveFileIdFromUrl, resolveCardVideoUrl, thumbnailIsDefinitelyImage } from "../media-resolver";
+import {
+  driveFileIdFromUrl,
+  resolveCardThumbnailFileName,
+  resolveCardThumbnailMimeType,
+  resolveCardVideoUrl,
+  thumbnailIsDefinitelyImage,
+} from "../media-resolver";
 import type { ContentCard } from "../types";
 
 function card(overrides: Partial<ContentCard>): ContentCard {
@@ -73,6 +79,28 @@ describe("media resolver", () => {
       sourceVault: { thumbnailMimeType: "image/jpeg" },
     });
 
+    expect(thumbnailIsDefinitelyImage(c)).toBe(true);
+  });
+
+  it("recovers thumbnail MIME and filename from matching raw files for old HEIC posts", () => {
+    const c = card({
+      contentType: "image",
+      thumbnailUrl: "/api/drive/stream?id=heic-file&token=signed",
+      sourceVault: {
+        rawFiles: [{
+          name: "IMG_1234.HEIC",
+          url: "https://drive.google.com/uc?export=download&id=heic-file",
+          driveProxyUrl: "/api/drive/stream?id=heic-file&token=signed",
+          fileId: "heic-file",
+          usageType: "master",
+          mimeType: "image/heic",
+          uploadedAt: "2026-06-11T00:00:00.000Z",
+        }],
+      },
+    });
+
+    expect(resolveCardThumbnailMimeType(c)).toBe("image/heic");
+    expect(resolveCardThumbnailFileName(c)).toBe("IMG_1234.HEIC");
     expect(thumbnailIsDefinitelyImage(c)).toBe(true);
   });
 

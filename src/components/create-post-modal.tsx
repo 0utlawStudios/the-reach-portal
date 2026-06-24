@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { RawImage } from "@/components/raw-image";
+import { PreviewImage } from "@/components/preview-image";
 import { useState, useRef, useEffect } from "react";
 import { usePipeline } from "@/lib/pipeline-context";
 import { Platform, ContentType, ALL_PLATFORMS, DEFAULT_CHECKLIST } from "@/lib/types";
@@ -145,13 +145,15 @@ export function CreatePostModal({ open, onClose }: Props) {
     }
     const newFiles: UploadedFile[] = acceptedFiles.map((file) => {
       const id = Date.now().toString() + Math.random().toString(36).slice(2);
+      const mimeType = normalizeDriveMimeType(file.type, file.name);
       rawFilesRef.current.set(id, file);
       return {
         id,
         name: file.name,
         size: file.size < 1024 * 1024 ? `${(file.size / 1024).toFixed(0)} KB` : `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
-        type: file.type.startsWith("video") ? "video" : "image",
+        type: mimeType.startsWith("video") ? "video" : "image",
         preview: URL.createObjectURL(file),
+        mimeType,
       };
     });
     setFiles((prev) => [...prev, ...newFiles]);
@@ -487,14 +489,14 @@ export function CreatePostModal({ open, onClose }: Props) {
                     <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Content for Publishing</label>
                     <span className="text-[8px] text-emerald-500 font-medium bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-500/20">Pulled by n8n</span>
                   </div>
-                  <input ref={fileInputRef} type="file" multiple accept="image/*,video/*" onChange={handleFileSelect} className="hidden" />
+                  <input ref={fileInputRef} type="file" multiple accept="image/*,video/*,.heic,.heif" onChange={handleFileSelect} className="hidden" />
 
                   {files.length > 0 && (
                     <div className="grid grid-cols-3 gap-2 mb-2">
                       {files.map((file) => (
                         <div key={file.id} className="relative group rounded-lg overflow-hidden border border-gray-200 dark:border-white/[0.08] bg-gray-50 dark:bg-white/[0.03]">
                           {file.type === "image" ? (
-                            <RawImage src={file.preview} alt={file.name} className="w-full aspect-square object-cover" />
+                            <PreviewImage src={file.preview} alt={file.name} mimeType={file.mimeType} fileName={file.name} className="w-full aspect-square object-cover" />
                           ) : (
                             <div className="w-full aspect-square flex flex-col items-center justify-center bg-gray-100 dark:bg-white/[0.04]">
                               <FileVideo className="w-6 h-6 text-gray-400 dark:text-gray-500" />

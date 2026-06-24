@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { RawImage } from "@/components/raw-image";
 import { CardThumbnailMedia } from "@/components/card-thumbnail-media";
+import { PreviewImage } from "@/components/preview-image";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { usePipeline } from "@/lib/pipeline-context";
 import { PIPELINE_COLUMNS, PipelineStage, ALL_PLATFORMS, Platform } from "@/lib/types";
@@ -745,7 +746,7 @@ export function AssetReviewDrawer() {
                 <option value="reel" className="text-gray-900">Reel</option>
                 <option value="carousel" className="text-gray-900">Carousel</option>
               </select>
-              <input ref={assetInputRef} type="file" accept="image/*,video/*" onChange={handleAssetReplace} className="hidden" />
+              <input ref={assetInputRef} type="file" accept="image/*,video/*,.heic,.heif" onChange={handleAssetReplace} className="hidden" />
               <div className="absolute bottom-3 right-3 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                 <button onClick={() => setShowMediaPicker("thumbnail")} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-black/60 backdrop-blur-sm text-white text-[10px] font-medium hover:bg-black/80 cursor-pointer">
                   <ImageIcon className="w-3 h-3" />Library
@@ -866,13 +867,13 @@ export function AssetReviewDrawer() {
                   <span className="text-[8px] text-emerald-500 dark:text-emerald-400 font-medium bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-500/20">Auto-posted by n8n</span>
                 </div>
                 {(selectedCard.sourceVault?.rawFiles || []).map((file, i) => {
-                  const isImage = /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(file.name);
+                  const isImage = file.mimeType?.startsWith("image/") || /\.(heic|heif|jpg|jpeg|png|gif|webp|svg)$/i.test(file.name);
                   const isVideo = /\.(mp4|mov|avi|webm|mkv)$/i.test(file.name);
                   const displayUrl = file.playbackUrl || file.driveProxyUrl || file.url;
                   return (
                     <div key={i} className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-white dark:bg-white/[0.02] border border-gray-100 dark:border-white/[0.05] hover:border-orange-200 dark:hover:border-orange-500/20 transition-colors group">
                       {isImage ? (
-                        <RawImage src={displayUrl} alt={file.name} className="w-8 h-8 rounded object-cover shrink-0" />
+                        <PreviewImage src={displayUrl} alt={file.name} mimeType={file.mimeType} fileName={file.name} className="w-8 h-8 rounded object-cover shrink-0" />
                       ) : isVideo ? (
                         <div className="w-8 h-8 rounded bg-violet-50 dark:bg-violet-500/10 flex items-center justify-center shrink-0"><FileVideo className="w-3.5 h-3.5 text-violet-500" /></div>
                       ) : (
@@ -904,7 +905,7 @@ export function AssetReviewDrawer() {
             )}
 
             {/* Dropzone */}
-            <input ref={rawFileInputRef} type="file" multiple accept="image/*,video/*,.pdf,.txt,.doc,.docx,.csv,.xls,.xlsx,.ppt,.pptx,.zip,.psd,.ai,.prproj,.aep,.sketch,.fig" onChange={handleRawFileUpload} className="hidden" />
+            <input ref={rawFileInputRef} type="file" multiple accept="image/*,video/*,.heic,.heif,.pdf,.txt,.doc,.docx,.csv,.xls,.xlsx,.ppt,.pptx,.zip,.psd,.ai,.prproj,.aep,.sketch,.fig" onChange={handleRawFileUpload} className="hidden" />
             <div className="flex gap-2">
               <button disabled={uploading} onClick={() => rawFileInputRef.current?.click()} className={`flex-1 border border-dashed rounded-xl py-3 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
                 !(selectedCard.sourceVault?.rawFiles?.length)
@@ -1152,7 +1153,7 @@ export function AssetReviewDrawer() {
                 <div className="space-y-3">
                   <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em] flex items-center gap-1.5"><Paperclip className="w-3 h-3 text-violet-500" />Raw Project Files</label>
 
-                  <input ref={rawFileInputRef} type="file" multiple accept="image/*,video/*,.pdf,.txt,.doc,.docx,.csv,.xls,.xlsx,.ppt,.pptx,.zip,.psd,.ai,.prproj,.aep,.sketch,.fig" onChange={handleRawFileUpload} className="hidden" />
+                  <input ref={rawFileInputRef} type="file" multiple accept="image/*,video/*,.heic,.heif,.pdf,.txt,.doc,.docx,.csv,.xls,.xlsx,.ppt,.pptx,.zip,.psd,.ai,.prproj,.aep,.sketch,.fig" onChange={handleRawFileUpload} className="hidden" />
                   <button onClick={() => rawFileInputRef.current?.click()} className="w-full border-2 border-dashed border-gray-200 dark:border-white/[0.08] rounded-xl py-5 flex flex-col items-center gap-1.5 text-gray-400 hover:text-gray-500 hover:border-gray-300 dark:hover:border-white/[0.15] transition-colors cursor-pointer">
                     <Upload className="w-5 h-5" />
                     <span className="text-[11px]">Upload .prproj, .zip, .psd, or any project file</span>

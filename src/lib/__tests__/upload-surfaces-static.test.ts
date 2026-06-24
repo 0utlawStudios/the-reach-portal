@@ -36,11 +36,11 @@ describe("Drive upload surfaces", () => {
     expect(drawer).toContain("onSelectMany={applyMediaPickerSelections}");
 
     const createPost = source("src/components/create-post-modal.tsx");
-    expect(createPost).toContain('ref={fileInputRef} type="file" multiple accept="image/*,video/*"');
+    expect(createPost).toContain('ref={fileInputRef} type="file" multiple accept="image/*,video/*,.heic,.heif"');
     expect(createPost).toContain("onSelectMany={addMediaPickerSelections}");
 
     const mediaPage = source("src/components/pages/media-page.tsx");
-    expect(mediaPage).toContain('ref={fileInputRef} type="file" multiple accept="image/*,video/*"');
+    expect(mediaPage).toContain('ref={fileInputRef} type="file" multiple accept="image/*,video/*,.heic,.heif"');
     expect(mediaPage).toContain('uploadManyToDrive(fileList, "media-library"');
   });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { RawImage } from "@/components/raw-image";
+import { PreviewImage } from "@/components/preview-image";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { usePipeline } from "@/lib/pipeline-context";
 import { useToast } from "@/lib/toast-context";
@@ -25,6 +25,11 @@ function uploadPathForSize(file: File): "proxy" | "resumable" {
   return file.size >= 4 * 1024 * 1024 ? "resumable" : "proxy";
 }
 
+function inferAssetMimeType(type: "image" | "video", nameOrUrl: string): string | undefined {
+  const inferred = normalizeDriveMimeType(type === "video" ? "video/mp4" : "", nameOrUrl);
+  return inferred === "application/octet-stream" ? undefined : inferred;
+}
+
 type PickerTab = "upload" | "library";
 
 interface MediaEntry {
@@ -36,6 +41,7 @@ interface MediaEntry {
   playbackStorageKey?: string;
   name: string;
   type: "image" | "video";
+  mimeType?: string;
   fileId?: string;
   source?: string;
   usedInCards: { id: string; title: string }[];
@@ -82,6 +88,7 @@ function enrichFromRawFile(entry: MediaEntry, file: RawFile) {
   entry.playbackUrl = file.playbackUrl || entry.playbackUrl;
   entry.playbackStorageKey = file.playbackStorageKey || entry.playbackStorageKey;
   entry.fileId = fileId || entry.fileId;
+  entry.mimeType = file.mimeType || entry.mimeType;
   entry.type = file.mimeType?.startsWith("video") ? "video" : entry.type;
 }
 
@@ -97,7 +104,7 @@ function selectionFromAsset(asset: MediaEntry): MediaPickerSelection {
     fileId,
     mediaAssetId: asset.assetId,
     name: asset.name,
-    mimeType: asset.type === "video" ? "video/mp4" : "image/jpeg",
+    mimeType: asset.mimeType || inferAssetMimeType(asset.type, asset.name),
   };
 }
 
@@ -209,6 +216,7 @@ export function MediaPicker({
         fileId,
         name: asset.name || "Media Library asset",
         type: asset.file_type === "video" ? "video" : "image",
+        mimeType: inferAssetMimeType(asset.file_type === "video" ? "video" : "image", asset.name || asset.url || ""),
         usedInCards,
         source: asset.folder || "Media Library",
       });
@@ -223,7 +231,13 @@ export function MediaPicker({
             existing.usedInCards.push({ id: c.id, title: c.title });
           }
         } else {
-          urlMap.set(c.thumbnailUrl, { url: c.thumbnailUrl, name: c.title || "Thumbnail", type: "image", usedInCards: [{ id: c.id, title: c.title }] });
+          urlMap.set(c.thumbnailUrl, {
+            url: c.thumbnailUrl,
+            name: c.title || "Thumbnail",
+            type: "image",
+            mimeType: c.sourceVault?.thumbnailMimeType,
+            usedInCards: [{ id: c.id, title: c.title }],
+          });
         }
       }
 
@@ -246,6 +260,7 @@ export function MediaPicker({
             playbackStorageKey: f.playbackStorageKey,
             name: f.name,
             type: f.mimeType?.startsWith("video") ? "video" : "image",
+            mimeType: f.mimeType,
             fileId: f.fileId,
             usedInCards: [{ id: c.id, title: c.title }],
           });
@@ -277,7 +292,7 @@ export function MediaPicker({
     const input = document.createElement("input");
     input.type = "file";
     input.multiple = allowMultipleUpload;
-    input.accept = "image/*,video/*";
+    input.accept = "image/*,video/*,.heic,.heif";
     input.onchange = async (ev) => {
       const selected = Array.from((ev.target as HTMLInputElement).files || []);
       if (selected.length === 0) return;
@@ -501,7 +516,7 @@ export function MediaPicker({
                         <button key={i} onClick={() => setSelectedAsset(asset)}
                           className={`group relative aspect-square rounded-xl overflow-hidden border-2 transition-all cursor-pointer bg-gray-50 dark:bg-white/[0.03] ${isSelected ? "border-orange-500 ring-2 ring-orange-200 dark:ring-orange-500/20" : "border-transparent hover:border-orange-400"}`}>
                           {asset.type === "image" ? (
-                            <RawImage src={mediaDisplayUrl(asset)} alt={asset.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
+                            <PreviewImage src={mediaDisplayUrl(asset)} alt={asset.name} mimeType={asset.mimeType} fileName={asset.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
                           ) : (
                             <video
                               src={videoPreviewFrameUrl(mediaDisplayUrl(asset))}
@@ -540,7 +555,7 @@ export function MediaPicker({
                   {/* Preview */}
                   <div className="rounded-xl overflow-hidden bg-white dark:bg-white/[0.03] border border-gray-200/60 dark:border-white/[0.06] shadow-sm">
                     {selectedAsset.type === "image" ? (
-                      <RawImage src={mediaDisplayUrl(selectedAsset)} alt={selectedAsset.name} className="w-full aspect-video object-cover" />
+                      <PreviewImage src={mediaDisplayUrl(selectedAsset)} alt={selectedAsset.name} mimeType={selectedAsset.mimeType} fileName={selectedAsset.name} className="w-full aspect-video object-cover" />
                     ) : (
                       <video
                         src={mediaDisplayUrl(selectedAsset)}

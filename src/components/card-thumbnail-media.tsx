@@ -2,9 +2,15 @@
 
 import { useMemo, useState } from "react";
 import { ImageOff } from "lucide-react";
-import { RawImage } from "@/components/raw-image";
+import { PreviewImage } from "@/components/preview-image";
 import type { ContentCard } from "@/lib/types";
-import { isVideoContentType, resolveCardVideoUrl, thumbnailIsDefinitelyImage } from "@/lib/media-resolver";
+import {
+  isVideoContentType,
+  resolveCardThumbnailFileName,
+  resolveCardThumbnailMimeType,
+  resolveCardVideoUrl,
+  thumbnailIsDefinitelyImage,
+} from "@/lib/media-resolver";
 import { videoPreviewFrameUrl } from "@/lib/media-usage";
 
 type CardThumbnailMediaProps = {
@@ -21,6 +27,8 @@ export function CardThumbnailMedia({
   draggable = false,
 }: CardThumbnailMediaProps) {
   const videoUrl = useMemo(() => resolveCardVideoUrl(card), [card]);
+  const thumbnailMimeType = useMemo(() => resolveCardThumbnailMimeType(card), [card]);
+  const thumbnailFileName = useMemo(() => resolveCardThumbnailFileName(card), [card]);
   const mediaKey = `${card.thumbnailUrl || ""}|${videoUrl || ""}`;
   const [failedMediaKey, setFailedMediaKey] = useState<string | null>(null);
   const isVideoCard = isVideoContentType(card.contentType);
@@ -44,9 +52,11 @@ export function CardThumbnailMedia({
 
   if (card.thumbnailUrl && !imageFailed) {
     return (
-      <RawImage
+      <PreviewImage
         src={card.thumbnailUrl}
         alt={card.title}
+        mimeType={thumbnailMimeType}
+        fileName={thumbnailFileName}
         className={className}
         draggable={draggable}
         onError={() => setFailedMediaKey(mediaKey)}
