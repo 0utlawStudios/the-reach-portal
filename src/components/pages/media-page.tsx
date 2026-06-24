@@ -509,7 +509,7 @@ export function MediaPage() {
   useEffect(() => {
     if (!lightboxAsset || lightboxAsset.type !== "image") return;
     const currentUrl = mediaDisplayUrl(lightboxAsset);
-    warmBrowserImagePreview(currentUrl, { mimeType: lightboxAsset.mimeType, fileName: lightboxAsset.name, size: "full" });
+    warmBrowserImagePreview(currentUrl, { mimeType: lightboxAsset.mimeType, fileName: lightboxAsset.name, size: "thumb" });
 
     for (const neighbor of [filteredMedia[lightboxIndex - 1], filteredMedia[lightboxIndex + 1]]) {
       if (!neighbor || neighbor.type !== "image") continue;

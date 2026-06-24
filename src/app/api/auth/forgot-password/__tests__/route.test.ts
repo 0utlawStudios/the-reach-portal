@@ -119,6 +119,7 @@ describe("POST /api/auth/forgot-password", () => {
   });
 
   it("preserves workspace context on recovery links when the request provides it", async () => {
+    teamMember = { name: "Aldridge Dagos", role: "superadmin", status: "active" };
     linkResults = [{ data: { properties: { hashed_token: "hash+with/slash=" } }, error: null }];
 
     const res = await POST(makeRequest({
@@ -136,6 +137,21 @@ describe("POST /api/auth/forgot-password", () => {
         payload: { type: "recovery", email: "aldridge@ten80ten.com" },
       },
     ]);
+  });
+
+  it("does not send a tenant-scoped recovery link when the email is not active in that workspace", async () => {
+    linkResults = [{ data: { properties: { hashed_token: "hash+with/slash=" } }, error: null }];
+
+    const res = await POST(makeRequest({
+      email: "outside@example.com",
+      workspaceId: "00000000-0000-0000-0000-000000000001",
+    }));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true });
+    expect(recoveryUrl).toBeNull();
+    expect(sentMessages).toEqual([]);
+    expect(operations).toEqual([]);
   });
 
   it("sends a setup invite for an active team member without an Auth user", async () => {

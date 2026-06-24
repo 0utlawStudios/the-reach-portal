@@ -37,6 +37,7 @@ import { driveFileIdFromUrl, isVideoContentType, resolveCardVideoUrl, thumbnailI
 import { formatDate, formatDateTime, formatDateShort, formatDateTimeCompact } from "@/lib/utils";
 import { useFocusTrap } from "./use-focus-trap";
 import { canDeletePostRole, isPipelineApproverRole } from "@/lib/roles";
+import { hasPublishingMedia } from "@/lib/publishing-media";
 
 const MediaPicker = dynamic(() => import("./media-picker").then((mod) => mod.MediaPicker));
 
@@ -98,6 +99,7 @@ export function AssetReviewDrawer() {
     if (!selectedCard || !selectedCard.thumbnailUrl) return undefined;
     return thumbnailIsDefinitelyImage(selectedCard) ? selectedCard.thumbnailUrl : undefined;
   }, [selectedCard]);
+  const selectedCardHasPublishingMedia = useMemo(() => hasPublishingMedia(selectedCard), [selectedCard]);
 
   // Source Vault state
   const [designLink, setDesignLink] = useState("");
@@ -996,19 +998,19 @@ export function AssetReviewDrawer() {
             <input ref={rawFileInputRef} type="file" multiple accept="image/*,video/*,.heic,.heif,.pdf,.txt,.doc,.docx,.csv,.xls,.xlsx,.ppt,.pptx,.zip,.psd,.ai,.prproj,.aep,.sketch,.fig" onChange={handleRawFileUpload} className="hidden" />
             <div className="flex gap-2">
               <button disabled={uploading} onClick={() => rawFileInputRef.current?.click()} className={`flex-1 border border-dashed rounded-xl py-3 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
-                !(selectedCard.sourceVault?.rawFiles?.length)
+                !selectedCardHasPublishingMedia
                   ? "border-red-300 dark:border-red-500/20 text-red-400 dark:text-red-400/70 hover:border-red-400 hover:bg-red-50/30 dark:hover:bg-red-500/[0.02]"
                   : "border-gray-200 dark:border-white/[0.08] text-gray-400 dark:text-gray-500 hover:text-orange-500 hover:border-orange-300 dark:hover:border-orange-500/30 hover:bg-orange-50/30 dark:hover:bg-orange-500/[0.02]"
               }`}>
                 <Upload className="w-3.5 h-3.5" />
-                <span className="text-[11px]">{(selectedCard.sourceVault?.rawFiles?.length) ? "Upload" : "Upload *"}</span>
+                <span className="text-[11px]">{selectedCardHasPublishingMedia ? "Upload" : "Upload *"}</span>
               </button>
               <button onClick={() => setShowMediaPicker("content")} className="flex-1 border border-dashed border-gray-200 dark:border-white/[0.08] rounded-xl py-3 flex items-center justify-center gap-2 text-gray-400 dark:text-gray-500 hover:text-orange-500 hover:border-orange-300 dark:hover:border-orange-500/30 hover:bg-orange-50/30 dark:hover:bg-orange-500/[0.02] transition-all cursor-pointer">
                 <FolderOpen className="w-3.5 h-3.5" />
                 <span className="text-[11px]">Browse Library</span>
               </button>
             </div>
-            {!(selectedCard.sourceVault?.rawFiles?.length) && (
+            {!selectedCardHasPublishingMedia && (
               <p className="text-[9px] text-red-400/80 flex items-center gap-1"><AlertCircle className="w-2.5 h-2.5" />At least 1 file required — this is what gets posted to social platforms</p>
             )}
           </div>
@@ -1371,7 +1373,7 @@ export function AssetReviewDrawer() {
                   if (!selectedCard.scheduledDate) missing.push("scheduled date");
                   if (!selectedCard.scheduledTime) missing.push("scheduled time");
                   if (!selectedCard.thumbnailUrl) missing.push("thumbnail");
-                  if (!selectedCard.sourceVault?.rawFiles?.length) missing.push("content for publishing");
+                  if (!selectedCardHasPublishingMedia) missing.push("content for publishing");
                   if (!selectedCard.caption?.trim()) missing.push("caption");
                   if (!selectedCard.assetSource?.trim()) missing.push("asset source");
                   const unchk = checklist.filter((c) => !c.checked).length;
@@ -1397,7 +1399,7 @@ export function AssetReviewDrawer() {
                 if (!selectedCard.scheduledDate) missing.push("scheduled date");
                 if (!selectedCard.scheduledTime) missing.push("scheduled time");
                 if (!selectedCard.thumbnailUrl) missing.push("thumbnail");
-                if (!selectedCard.sourceVault?.rawFiles?.length) missing.push("content for publishing");
+                if (!selectedCardHasPublishingMedia) missing.push("content for publishing");
                 if (!selectedCard.caption?.trim()) missing.push("caption");
                 if (!selectedCard.assetSource?.trim()) missing.push("asset source");
                 const unchk = checklist.filter((c) => !c.checked).length;
@@ -1429,7 +1431,7 @@ export function AssetReviewDrawer() {
                       if (!selectedCard.scheduledDate) missing.push("scheduled date");
                       if (!selectedCard.scheduledTime) missing.push("scheduled time");
                       if (!selectedCard.thumbnailUrl) missing.push("thumbnail");
-                      if (!selectedCard.sourceVault?.rawFiles?.length) missing.push("content for publishing");
+                      if (!selectedCardHasPublishingMedia) missing.push("content for publishing");
                       if (!selectedCard.caption?.trim()) missing.push("caption");
                       if (!selectedCard.assetSource?.trim()) missing.push("asset source");
                       const unchecked = checklist.filter((c) => !c.checked).length;

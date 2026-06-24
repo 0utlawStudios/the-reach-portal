@@ -23,6 +23,7 @@ import { ValidationErrorModal } from "./validation-error-modal";
 import { useNavigation } from "@/lib/navigation-context";
 import { useManualPostedMovesEnabled } from "@/lib/manual-posted-settings";
 import { isArchivedPostedCard, isCurrentPostedCard, resolvePostedArchiveDate } from "@/lib/post-archive";
+import { hasPublishingMedia } from "@/lib/publishing-media";
 
 // ─── Context-aware comparators per column ───
 // PERF-012: comparators only — no array clone here. The single-pass useMemo
@@ -300,7 +301,7 @@ export function KanbanBoard() {
       if (!sourceCard.scheduledDate) missing.push("scheduled date");
       if (!sourceCard.scheduledTime) missing.push("scheduled time");
       if (!sourceCard.thumbnailUrl) missing.push("thumbnail");
-      if (!sourceCard.sourceVault?.rawFiles?.length) missing.push("content for publishing");
+      if (!hasPublishingMedia(sourceCard)) missing.push("content for publishing");
       if (!sourceCard.caption?.trim()) missing.push("caption");
       if (!sourceCard.assetSource?.trim()) missing.push("asset source");
       const unchecked = (sourceCard.checklist || []).filter((c) => !c.checked).length;

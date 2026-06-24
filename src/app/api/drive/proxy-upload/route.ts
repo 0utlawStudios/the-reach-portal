@@ -16,7 +16,7 @@ import {
   normalizeDriveMimeType,
   VALID_DRIVE_FOLDERS,
 } from "@/lib/drive-policy";
-import { notifyUploadFailure } from "@/lib/upload-alerts";
+import { scheduleUploadFailureAlert } from "../upload-alert-scheduler";
 import {
   appRateLimitError,
   sanitizeGoogleDriveError,
@@ -144,15 +144,16 @@ export async function POST(request: NextRequest) {
       const rawErr = await uploadRes.text();
       const sanitized = sanitizeGoogleDriveError(uploadRes.status, rawErr);
       console.error("[proxy-upload] Google Drive error:", uploadRes.status, rawErr);
-      await notifyUploadFailure({
+      const auth = authContext;
+      scheduleUploadFailureAlert("proxy-upload", {
         source: "server",
         phase: "proxy_drive_upload",
         route: "/api/drive/proxy-upload",
         uploadPath: "proxy",
-        workspaceId: authContext.workspaceId,
-        userId: authContext.user.id,
-        userEmail: authContext.email,
-        userRole: authContext.role,
+        workspaceId: auth.workspaceId,
+        userId: auth.user.id,
+        userEmail: auth.email,
+        userRole: auth.role,
         folder,
         fileName,
         mimeType,
@@ -192,15 +193,16 @@ export async function POST(request: NextRequest) {
     const sanitized = sanitizeUnknownUploadError(err);
     console.error("[proxy-upload] Error:", message);
     if (authContext) {
-      await notifyUploadFailure({
+      const auth = authContext;
+      scheduleUploadFailureAlert("proxy-upload", {
         source: "server",
         phase: "proxy_upload_route",
         route: "/api/drive/proxy-upload",
         uploadPath: "proxy",
-        workspaceId: authContext.workspaceId,
-        userId: authContext.user.id,
-        userEmail: authContext.email,
-        userRole: authContext.role,
+        workspaceId: auth.workspaceId,
+        userId: auth.user.id,
+        userEmail: auth.email,
+        userRole: auth.role,
         folder,
         fileName,
         mimeType,

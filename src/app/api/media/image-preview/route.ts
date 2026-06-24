@@ -38,6 +38,7 @@ const PREVIEW_CONVERSION_TIMEOUT_MS = {
 const HEIC_FALLBACK_MAX_PIXELS = 50_000_000;
 const DRIVE_MEDIA_TIMEOUT_MS = 45_000;
 const DRIVE_THUMBNAIL_TIMEOUT_MS = 2_500;
+const PREVIEW_FAST_THUMBNAIL_LOOKUP_TIMEOUT_MS = 2_750;
 const MAX_DRIVE_THUMBNAIL_BYTES = 5 * 1024 * 1024;
 const inFlightPreviewBuilds = new Map<string, Promise<Buffer>>();
 
@@ -190,6 +191,20 @@ async function withPreviewTimeout<T>(promise: Promise<T>, timeoutMs: number, lab
       promise,
       new Promise<T>((_resolve, reject) => {
         timer = setTimeout(() => reject(new ImagePreviewHttpError(`${label} timed out`, 504)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+async function withNullTimeout<T>(promise: Promise<T | null>, timeoutMs: number): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), timeoutMs);
       }),
     ]);
   } finally {
@@ -552,13 +567,16 @@ export async function GET(request: NextRequest) {
     const cacheWorkspaceId = auth.workspaceId || meta.appProperties?.workspaceId;
     const cacheKey = previewCacheKey(fileId, cacheWorkspaceId, previewSize);
     if (previewSize === "thumb") {
-      const fastThumbnail = await firstAvailablePreview([
-        readCachedPreview(admin, cacheKey).then((preview) => preview ? { preview, cacheState: "HIT" } : null),
-        buildThumbnailFromCachedPreview(admin, fileId, cacheWorkspaceId)
-          .then((preview) => preview ? { preview, cacheState: "HIT", writeCacheKey: cacheKey } : null),
-        fetchDriveThumbnail(meta.thumbnailLink, token)
-          .then((preview) => preview ? { preview, cacheState: "MISS", writeCacheKey: cacheKey } : null),
-      ]);
+      const fastThumbnail = await withNullTimeout(
+        firstAvailablePreview([
+          readCachedPreview(admin, cacheKey).then((preview) => preview ? { preview, cacheState: "HIT" } : null),
+          buildThumbnailFromCachedPreview(admin, fileId, cacheWorkspaceId)
+            .then((preview) => preview ? { preview, cacheState: "HIT", writeCacheKey: cacheKey } : null),
+          fetchDriveThumbnail(meta.thumbnailLink, token)
+            .then((preview) => preview ? { preview, cacheState: "MISS", writeCacheKey: cacheKey } : null),
+        ]),
+        PREVIEW_FAST_THUMBNAIL_LOOKUP_TIMEOUT_MS,
+      );
       if (fastThumbnail) {
         if (fastThumbnail.writeCacheKey) schedulePreviewCacheWrite(admin, fastThumbnail.writeCacheKey, fastThumbnail.preview);
         return browserSafeJpegResponse(fastThumbnail.preview, auth.signed, previewSize, fastThumbnail.cacheState);
@@ -573,13 +591,6 @@ export async function GET(request: NextRequest) {
     }
 
     const preview = await buildPreviewOnce(cacheKey, async () => {
-      if (previewSize === "thumb") {
-        const thumbnail = await fetchDriveThumbnail(meta.thumbnailLink, token);
-        if (thumbnail) {
-          schedulePreviewCacheWrite(admin, cacheKey, thumbnail);
-          return thumbnail;
-        }
-      }
       const source = await fetchDriveMedia(fileId, token);
       const converted = await buildHeicPreview(source, previewSize);
       schedulePreviewCacheWrite(admin, cacheKey, converted);

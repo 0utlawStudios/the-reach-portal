@@ -10,7 +10,7 @@ import {
   VALID_DRIVE_FOLDERS,
   type DriveFolderName,
 } from "@/lib/drive-policy";
-import { notifyUploadFailure } from "@/lib/upload-alerts";
+import { scheduleUploadFailureAlert } from "../upload-alert-scheduler";
 import {
   appRateLimitError,
   sanitizeGoogleDriveError,
@@ -144,15 +144,16 @@ export async function POST(request: NextRequest) {
       const rawErr = await uploadRes.text();
       const sanitized = sanitizeGoogleDriveError(uploadRes.status, rawErr);
       console.error("[drive/upload-chunk] Google Drive error:", uploadRes.status, rawErr);
-      await notifyUploadFailure({
+      const auth = authContext;
+      scheduleUploadFailureAlert("drive/upload-chunk", {
         source: "server",
         phase: "resumable_chunk_upload",
         route: "/api/drive/upload-chunk",
         uploadPath: "resumable",
-        workspaceId: authContext.workspaceId,
-        userId: authContext.user.id,
-        userEmail: authContext.email,
-        userRole: authContext.role,
+        workspaceId: auth.workspaceId,
+        userId: auth.user.id,
+        userEmail: auth.email,
+        userRole: auth.role,
         folder,
         fileName,
         mimeType,
@@ -183,15 +184,16 @@ export async function POST(request: NextRequest) {
     const sanitized = sanitizeUnknownUploadError(err);
     console.error("[drive/upload-chunk]", message);
     if (authContext) {
-      await notifyUploadFailure({
+      const auth = authContext;
+      scheduleUploadFailureAlert("drive/upload-chunk", {
         source: "server",
         phase: "resumable_chunk_route",
         route: "/api/drive/upload-chunk",
         uploadPath: "resumable",
-        workspaceId: authContext.workspaceId,
-        userId: authContext.user.id,
-        userEmail: authContext.email,
-        userRole: authContext.role,
+        workspaceId: auth.workspaceId,
+        userId: auth.user.id,
+        userEmail: auth.email,
+        userRole: auth.role,
         folder,
         fileName,
         mimeType,

@@ -343,7 +343,7 @@ export function MediaPicker({
     warmBrowserImagePreview(mediaDisplayUrl(selectedAsset), {
       mimeType: selectedAsset.mimeType,
       fileName: selectedAsset.name,
-      size: "full",
+      size: "thumb",
     });
   }, [open, selectedAsset]);
 

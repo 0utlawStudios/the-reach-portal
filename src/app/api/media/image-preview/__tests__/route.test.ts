@@ -256,6 +256,41 @@ describe("GET /api/media/image-preview", () => {
     expect(heicDecodeMocks.decode.all).not.toHaveBeenCalled();
   });
 
+  it("does not retry Drive thumbnail lookup before cold thumbnail conversion", async () => {
+    driveMocks.getFileMetadata.mockResolvedValueOnce({
+      id: FILE_ID,
+      name: "source.heic",
+      mimeType: "image/heic",
+      size: 2 * 1024 * 1024,
+      parents: ["raw-files-folder"],
+      appProperties: { workspaceId: "00000000-0000-0000-0000-000000000001" },
+      thumbnailLink: "https://drive.example/unusable-thumbnail",
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "https://drive.example/unusable-thumbnail") {
+        return new Response(new Uint8Array([1, 2, 3]), {
+          status: 200,
+          headers: { "content-type": "text/plain" },
+        });
+      }
+      return new Response(new Uint8Array([4, 5, 6]), { status: 200 });
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const res = await GET(makeRequest(`/api/media/image-preview?id=${FILE_ID}&token=signed&size=thumb`));
+
+    expect(res.status).toBe(200);
+    expect(fetchMock.mock.calls.filter(([url]) => String(url) === "https://drive.example/unusable-thumbnail")).toHaveLength(1);
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes(`/files/${FILE_ID}?alt=media`))).toHaveLength(1);
+    expect(sharpMocks.pipeline.resize).toHaveBeenCalledWith(expect.objectContaining({
+      width: 520,
+      height: 520,
+      fit: "inside",
+      withoutEnlargement: true,
+    }));
+  });
+
   it("serves a cached HEIC JPEG preview without fetching or decoding the Drive source", async () => {
     storageMocks.download.mockResolvedValueOnce({
       data: {

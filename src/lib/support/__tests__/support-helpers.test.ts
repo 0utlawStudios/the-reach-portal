@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { rowToThread, rowToMessage } from "@/lib/support/types";
 import type { SupportThreadRow, SupportMessageRow } from "@/lib/support/types";
 import { tgEscape } from "@/lib/support/telegram";
-import { getTeamRole, parseAttachmentClaims } from "@/lib/support/server";
+import { getTeamRole, parseAttachmentClaims, resignAttachments } from "@/lib/support/server";
 
 type MockQueryResult = { data: unknown; error?: unknown };
 type MockQuery = {
@@ -25,6 +25,23 @@ function makeAdmin(resultsByTable: Record<string, MockQueryResult>): SupabaseCli
       return query;
     },
   } as unknown as SupabaseClient;
+}
+
+function makeStorageAdmin(): { admin: SupabaseClient; signedKeys: string[] } {
+  const signedKeys: string[] = [];
+  return {
+    signedKeys,
+    admin: {
+      storage: {
+        from: () => ({
+          createSignedUrl: async (key: string) => {
+            signedKeys.push(key);
+            return { data: { signedUrl: `https://signed/${key}` }, error: null };
+          },
+        }),
+      },
+    } as unknown as SupabaseClient,
+  };
 }
 
 describe("rowToThread", () => {
@@ -125,6 +142,29 @@ describe("parseAttachmentClaims", () => {
   it("never returns more than the file cap plus one", () => {
     const many = Array.from({ length: 30 }, (_, i) => ({ storageKey: `k${i}`, name: `n${i}` }));
     expect(parseAttachmentClaims(many).length).toBe(6);
+  });
+});
+
+describe("resignAttachments", () => {
+  it("refreshes signed URLs for attachments in the expected workspace", async () => {
+    const { admin, signedKeys } = makeStorageAdmin();
+    const attachments = await resignAttachments(admin, [
+      { storageKey: "w1/u1/a.png", signedUrl: "old", mime: "image/png", name: "a.png", size: 10, kind: "image" },
+    ], "w1");
+
+    expect(attachments).toHaveLength(1);
+    expect(attachments[0].signedUrl).toBe("https://signed/w1/u1/a.png");
+    expect(signedKeys).toEqual(["w1/u1/a.png"]);
+  });
+
+  it("drops stored attachments that do not belong to the expected workspace", async () => {
+    const { admin, signedKeys } = makeStorageAdmin();
+    const attachments = await resignAttachments(admin, [
+      { storageKey: "w2/u1/a.png", signedUrl: "https://old/w2", mime: "image/png", name: "a.png", size: 10, kind: "image" },
+    ], "w1");
+
+    expect(attachments).toEqual([]);
+    expect(signedKeys).toEqual([]);
   });
 });
 

@@ -69,7 +69,7 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ id: str
 
   const messages: SupportMessage[] = await Promise.all(
     ((msgRows as SupportMessageRow[]) || []).map(async (r) => {
-      const fresh = await resignAttachments(admin, r.attachments);
+      const fresh = await resignAttachments(admin, r.attachments, r.workspace_id);
       return rowToMessage({ ...r, attachments: fresh });
     }),
   );

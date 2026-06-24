@@ -399,13 +399,26 @@ export async function buildAttachmentsFromClaims(args: {
 export async function resignAttachments(
   admin: SupabaseClient,
   attachments: SupportAttachment[] | null | undefined,
+  workspaceId?: string,
 ): Promise<SupportAttachment[]> {
   if (!attachments || attachments.length === 0) return [];
+  const workspacePrefix = workspaceId ? `${workspaceId}/` : null;
   // Re-sign every attachment in parallel.
-  return Promise.all(
+  const refreshed = await Promise.all(
     attachments
       .filter((a) => Boolean(a?.storageKey))
       .map(async (a) => {
+        if (
+          workspacePrefix &&
+          (
+            !a.storageKey.startsWith(workspacePrefix) ||
+            a.storageKey.includes("..") ||
+            a.storageKey.split("/").length < 3
+          )
+        ) {
+          console.error("[support] skipped attachment with invalid workspace prefix");
+          return null;
+        }
         try {
           const { data, error } = await withStorageControlTimeout(
             admin.storage
@@ -419,6 +432,7 @@ export async function resignAttachments(
         }
       }),
   );
+  return refreshed.filter((a): a is SupportAttachment => Boolean(a));
 }
 
 // ─── audit ───

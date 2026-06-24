@@ -12,7 +12,7 @@ type PreviewImageProps = ImgHTMLAttributes<HTMLImageElement> & {
 };
 
 const IMAGE_PREVIEW_LOAD_TIMEOUT_MS = 60_000;
-const FALLBACK_PREVIEW_LOAD_TIMEOUT_MS = 2_500;
+const FALLBACK_PREVIEW_LOAD_TIMEOUT_MS = 9_000;
 
 export function PreviewImage({
   src,
@@ -84,8 +84,8 @@ export function PreviewImage({
   return (
     <div className={`${className || ""} relative overflow-hidden bg-[#6C655A]/10 dark:bg-white/[0.03]`}>
       {showSpinner && (
-        <div className="absolute inset-0 flex items-center justify-center bg-slate-100/95 text-[#975428] dark:bg-[#151518]/95 dark:text-white/75" aria-hidden="true">
-          <div className="h-7 w-7 rounded-full border-2 border-current/25 border-t-current animate-spin" />
+        <div className="absolute inset-0 flex items-center justify-center bg-[#f4f1ec]/95 text-[#975428] dark:bg-[#111214]/95 dark:text-white/80" aria-hidden="true">
+          <div className="h-8 w-8 rounded-full border-2 border-current/25 border-t-current animate-spin" />
         </div>
       )}
       {typeof fallbackSrc === "string" && (

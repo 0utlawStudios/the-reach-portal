@@ -230,6 +230,28 @@ describe("Drive upload surfaces", () => {
     expect(playbackRoute).toContain("Supabase playback media stream");
   });
 
+  it("keeps server upload failure alerts off the upload response path", () => {
+    const scheduler = source("src/app/api/drive/upload-alert-scheduler.ts");
+    expect(scheduler).toContain("after(run)");
+    expect(scheduler).toContain("void run()");
+    expect(scheduler).toContain("notifyUploadFailure(alert)");
+
+    for (const file of [
+      "src/app/api/drive/upload/route.ts",
+      "src/app/api/drive/proxy-upload/route.ts",
+      "src/app/api/drive/upload-chunk/route.ts",
+      "src/app/api/drive/finalize/route.ts",
+    ]) {
+      const contents = source(file);
+      expect(contents, `${file} should schedule alert delivery after the route response`).toContain("scheduleUploadFailureAlert");
+      expect(contents, `${file} must not wait on email/Telegram alert delivery before replying`).not.toContain("await notifyUploadFailure");
+      expect(contents, `${file} must not import the blocking alert sender directly`).not.toContain("@/lib/upload-alerts");
+    }
+
+    const clientAlertRoute = source("src/app/api/drive/upload-failure/route.ts");
+    expect(clientAlertRoute).toContain("await notifyUploadFailure");
+  });
+
   it("keeps revision attachments private instead of writing them to public avatars/kickback", () => {
     const kickback = source("src/components/kickback-modal.tsx");
     expect(kickback).toContain('PRIVATE_ATTACHMENT_BUCKET = "support-attachments"');
@@ -253,8 +275,10 @@ describe("Drive upload surfaces", () => {
     expect(imagePreview).toContain("schedulePreviewCacheWrite");
     expect(imagePreview).toContain("after(() => writeCachedPreview");
     expect(imagePreview).toContain("MAX_DRIVE_THUMBNAIL_BYTES");
+    expect(imagePreview).toContain("PREVIEW_FAST_THUMBNAIL_LOOKUP_TIMEOUT_MS");
     expect(imagePreview).toContain("Drive thumbnail normalization");
     expect(imagePreview).toContain("firstAvailablePreview");
+    expect(imagePreview).toContain("withNullTimeout");
 
     const imagePreviewLib = source("src/lib/image-preview.ts");
     expect(imagePreviewLib).toContain("warmBrowserImagePreview");
@@ -272,6 +296,9 @@ describe("Drive upload surfaces", () => {
     expect(previewImage).toContain("FALLBACK_PREVIEW_LOAD_TIMEOUT_MS");
     expect(previewImage).toContain("timedOutFallbackSrcs");
     expect(previewImage).toContain("!fallbackSrc || fallbackLoaded || fallbackFailed || fallbackTimedOut");
+
+    const mediaPage = source("src/components/pages/media-page.tsx");
+    expect(mediaPage).toContain('warmBrowserImagePreview(currentUrl, { mimeType: lightboxAsset.mimeType, fileName: lightboxAsset.name, size: "thumb" })');
 
     for (const file of [
       "src/components/pages/media-page.tsx",

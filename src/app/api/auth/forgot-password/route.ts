@@ -46,6 +46,12 @@ type ForgotPasswordBody = {
   workspace?: unknown;
 };
 
+type TeamMemberAccess = {
+  name: string | null;
+  role: string | null;
+  status: string | null;
+};
+
 async function resolveWorkspaceId(
   admin: ReturnType<typeof getAdminClient>,
   request: NextRequest,
@@ -97,6 +103,24 @@ async function resolveOptionalWorkspaceId(
   }
 }
 
+async function lookupWorkspaceMember(
+  admin: ReturnType<typeof getAdminClient>,
+  workspaceId: string,
+  email: string,
+): Promise<TeamMemberAccess | null> {
+  const { data, error } = await admin
+    .from("team_members")
+    .select("name, role, status")
+    .eq("workspace_id", workspaceId)
+    .eq("email", email)
+    .maybeSingle<TeamMemberAccess>();
+  if (error) {
+    console.error("[forgot-password] member lookup failed:", error.message);
+    return null;
+  }
+  return data || null;
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Rate limit: 5 requests per minute per IP. Fails open on infrastructure
@@ -122,6 +146,21 @@ export async function POST(request: NextRequest) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) return successResponse;
 
     const admin = getAdminClient();
+    const workspaceContextProvided = hasWorkspaceContext(request, body);
+    let requestedWorkspaceId: string | null = null;
+    let requestedWorkspaceMember: TeamMemberAccess | null = null;
+    if (workspaceContextProvided) {
+      try {
+        requestedWorkspaceId = await resolveWorkspaceId(admin, request, body);
+      } catch (err) {
+        console.error("[forgot-password] workspace context invalid:", err instanceof Error ? err.message : err);
+        return successResponse;
+      }
+      requestedWorkspaceMember = await lookupWorkspaceMember(admin, requestedWorkspaceId, cleanEmail);
+      if (!requestedWorkspaceMember) {
+        return successResponse;
+      }
+    }
 
     // Generate recovery link (no email sent by Supabase)
     const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
@@ -130,21 +169,11 @@ export async function POST(request: NextRequest) {
     });
 
     if (linkErr || !linkData?.properties?.hashed_token) {
-      const workspaceId = await resolveWorkspaceId(admin, request, body);
+      const workspaceId = requestedWorkspaceId || await resolveWorkspaceId(admin, request, body);
       // New cloned deployments can have active team_members rows before their
       // matching Supabase Auth users exist. In that case, treat forgot password
       // as a self-service setup-link request for known team members only.
-      const { data: member, error: memberErr } = await admin
-        .from("team_members")
-        .select("name, role, status")
-        .eq("workspace_id", workspaceId)
-        .eq("email", cleanEmail)
-        .maybeSingle();
-
-      if (memberErr) {
-        console.error("[forgot-password] member lookup failed:", memberErr.message);
-        return successResponse;
-      }
+      const member = requestedWorkspaceMember || await lookupWorkspaceMember(admin, workspaceId, cleanEmail);
 
       const status = String(member?.status || "");
       const name = typeof member?.name === "string" && member.name.trim() ? member.name.trim() : cleanEmail.split("@")[0];
@@ -193,10 +222,14 @@ export async function POST(request: NextRequest) {
       return successResponse;
     }
 
+    if (workspaceContextProvided && String(requestedWorkspaceMember?.status || "") !== "active") {
+      return successResponse;
+    }
+
     // Build our own confirmation URL
     const siteUrl = getSiteUrl();
     const tokenHash = linkData.properties.hashed_token;
-    const recoveryWorkspaceId = await resolveOptionalWorkspaceId(admin, request, body);
+    const recoveryWorkspaceId = requestedWorkspaceId || await resolveOptionalWorkspaceId(admin, request, body);
     const confirmParams = new URLSearchParams({
       token_hash: tokenHash,
       type: "recovery",

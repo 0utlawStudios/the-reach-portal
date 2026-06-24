@@ -14,7 +14,7 @@ import {
   normalizeDriveMimeType,
   VALID_DRIVE_FOLDERS,
 } from "@/lib/drive-policy";
-import { notifyUploadFailure } from "@/lib/upload-alerts";
+import { scheduleUploadFailureAlert } from "../upload-alert-scheduler";
 import {
   appRateLimitError,
   sanitizeUnknownUploadError,
@@ -131,15 +131,16 @@ export async function POST(request: NextRequest) {
     const sanitized = sanitizeUnknownUploadError(err);
     console.error("[drive/upload]", message);
     if (authContext) {
-      await notifyUploadFailure({
+      const auth = authContext;
+      scheduleUploadFailureAlert("drive/upload", {
         source: "server",
         phase: "resumable_session",
         route: "/api/drive/upload",
         uploadPath: "resumable",
-        workspaceId: authContext.workspaceId,
-        userId: authContext.user.id,
-        userEmail: authContext.email,
-        userRole: authContext.role,
+        workspaceId: auth.workspaceId,
+        userId: auth.user.id,
+        userEmail: auth.email,
+        userRole: auth.role,
         folder,
         fileName,
         mimeType,
