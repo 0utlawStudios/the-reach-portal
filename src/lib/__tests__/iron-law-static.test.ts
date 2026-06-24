@@ -30,11 +30,16 @@ const MANUAL_POSTED_SETTINGS_ROUTE_SRC = readFileSync(
   join(process.cwd(), "src/app/api/admin/manual-posted-settings/route.ts"),
   "utf8",
 );
+const BACKFILL_MEDIA_ROUTE_SRC = readFileSync(
+  join(process.cwd(), "src/app/api/admin/backfill-media/route.ts"),
+  "utf8",
+);
 const MANUAL_POSTED_SETTINGS_SRC = readFileSync(join(process.cwd(), "src/lib/manual-posted-settings.ts"), "utf8");
 const SETTINGS_PAGE_SRC = readFileSync(join(process.cwd(), "src/components/pages/settings-page.tsx"), "utf8");
 const REVISION_MODAL_SRC = readFileSync(join(process.cwd(), "src/components/revision-modal.tsx"), "utf8");
 const KICKBACK_MODAL_SRC = readFileSync(join(process.cwd(), "src/components/kickback-modal.tsx"), "utf8");
 const AUDIT_SRC = readFileSync(join(process.cwd(), "src/lib/audit.ts"), "utf8");
+const AI_WORKER_SRC = readFileSync(join(process.cwd(), "src/lib/ai/worker.ts"), "utf8");
 const DEEP_CHECK_SRC = readFileSync(join(process.cwd(), "src/app/api/health/deep-check/route.ts"), "utf8");
 const POST_SAFETY_MIGRATION_SRC = readFileSync(join(process.cwd(), "supabase/migrations/0015_post_safety.sql"), "utf8");
 const POST_STAGE_GUARD_MIGRATION_SRC = readFileSync(
@@ -404,6 +409,21 @@ describe("iron-law guards in pipeline-context.tsx", () => {
       expect(src).toContain("loadWorkspacePost");
       expect(src).toContain("p_workspace_id: ctx.workspaceId");
     }
+  });
+
+  it("AI worker audit events carry the job workspace id", () => {
+    expect(AI_WORKER_SRC).toContain("p_workspace_id: workspaceId");
+    expect(AI_WORKER_SRC.match(/await recordAudit\(sb, job\.workspace_id/g) || []).toHaveLength(4);
+  });
+
+  it("admin media backfill is scoped to the caller's workspace", () => {
+    expect(BACKFILL_MEDIA_ROUTE_SRC).toContain("requireBearerTeamRole(request, ADMIN_ROLES)");
+    expect(BACKFILL_MEDIA_ROUTE_SRC).toContain("const workspaceId = auth.workspaceId");
+    expect(BACKFILL_MEDIA_ROUTE_SRC).toMatch(/\.from\("posts"\)[\s\S]{0,220}\.eq\("workspace_id", workspaceId\)/);
+    expect(BACKFILL_MEDIA_ROUTE_SRC).toMatch(/\.from\("media_assets"\)[\s\S]{0,220}\.eq\("workspace_id", workspaceId\)/);
+    expect(BACKFILL_MEDIA_ROUTE_SRC).toMatch(
+      /\.update\(\{ used_in: newUsedIn \}\)[\s\S]{0,160}\.eq\("workspace_id", workspaceId\)/,
+    );
   });
 });
 

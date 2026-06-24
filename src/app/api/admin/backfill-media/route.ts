@@ -1,54 +1,40 @@
-import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
+import { requireBearerTeamRole } from "@/lib/auth/require";
+import { createServiceRoleClient } from "@/lib/supabase/server";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const ADMIN_ROLES = new Set(["superadmin", "admin", "owner"]);
+const ADMIN_ROLES = ["superadmin", "admin", "owner"] as const;
+
+export const runtime = "nodejs";
+export const maxDuration = 60;
 
 function isValidUuid(v: string): boolean {
   return UUID_REGEX.test(v);
 }
 
 export async function POST(request: NextRequest) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const auth = await requireBearerTeamRole(request, ADMIN_ROLES);
+  if (auth instanceof NextResponse) return auth;
 
-  if (!supabaseUrl || !serviceKey) {
-    return NextResponse.json({ error: "Missing Supabase credentials" }, { status: 500 });
-  }
+  const admin = createServiceRoleClient();
+  const workspaceId = auth.workspaceId;
 
-  const admin = createClient(supabaseUrl, serviceKey);
-
-  // ─── Auth: Bearer token + admin role required ───
-  const token = request.headers.get("Authorization")?.replace("Bearer ", "");
-  if (!token) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  const { data: { user }, error: authErr } = await admin.auth.getUser(token);
-  if (authErr || !user?.email) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  // SEC-010: lowercase + `.eq` for the identity lookup. `.ilike` would
-  // interpret wildcard chars in a crafted email as SQL patterns.
-  const { data: tm } = await admin
-    .from("team_members")
-    .select("role")
-    .eq("email", user.email.toLowerCase())
-    .maybeSingle();
-  if (!tm || !ADMIN_ROLES.has(tm.role)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
-  // Fetch all posts
+  // Fetch only this workspace's posts.
   const { data: posts, error: postsErr } = await admin
     .from("posts")
-    .select("id, title, thumbnail_url, source_vault, content_type, created_by, workspace_id");
+    .select("id, title, thumbnail_url, source_vault, content_type, created_by, workspace_id")
+    .eq("workspace_id", workspaceId);
 
   if (postsErr) {
     return NextResponse.json({ error: postsErr.message }, { status: 500 });
   }
 
-  // Fetch all existing media_assets URLs to skip duplicates
-  const { data: existingAssets } = await admin.from("media_assets").select("id, url, used_in");
+  // Fetch existing media assets only inside this workspace. The same Drive URL
+  // can appear in another workspace without affecting this backfill.
+  const { data: existingAssets } = await admin
+    .from("media_assets")
+    .select("id, url, used_in")
+    .eq("workspace_id", workspaceId);
   const existingByUrl = new Map<string, { id: string; used_in: string[] }>(
     (existingAssets || []).map((a: { id: string; url: string; used_in: string[] }) => [
       a.url,
@@ -61,7 +47,7 @@ export async function POST(request: NextRequest) {
   let updated = 0;
 
   for (const post of posts || []) {
-    const wsId = post.workspace_id || "00000000-0000-0000-0000-000000000001";
+    const wsId = post.workspace_id || workspaceId;
     const isVideo = post.content_type === "video" || post.content_type === "reel";
 
     // Collect all image/video URLs for this post
@@ -98,7 +84,8 @@ export async function POST(request: NextRequest) {
           await admin
             .from("media_assets")
             .update({ used_in: newUsedIn })
-            .eq("id", existing.id);
+            .eq("id", existing.id)
+            .eq("workspace_id", workspaceId);
           existingByUrl.set(entry.url, { id: existing.id, used_in: newUsedIn });
           updated++;
         }

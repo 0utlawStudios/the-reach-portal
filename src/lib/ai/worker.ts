@@ -264,12 +264,19 @@ async function failJob(sb: SupabaseClient, jobId: string, errMessage: string) {
   }
 }
 
-async function recordAudit(sb: SupabaseClient, action: string, postId: string | null, meta: Record<string, unknown>) {
+async function recordAudit(
+  sb: SupabaseClient,
+  workspaceId: string,
+  action: string,
+  postId: string | null,
+  meta: Record<string, unknown>,
+) {
   try {
     await sb.rpc("record_audit_event", {
       p_entity_type: "post",
       p_action: action,
       p_entity_id: postId,
+      p_workspace_id: workspaceId,
       p_metadata: meta,
     });
   } catch (err) {
@@ -442,7 +449,7 @@ export async function runGenerateJob(jobId: string): Promise<void> {
       },
     }).eq("id", jobId);
 
-    await recordAudit(sb, "ai_post_generated", inserted.id, {
+    await recordAudit(sb, job.workspace_id, "ai_post_generated", inserted.id, {
       job_id: jobId,
       plan_row_id: plan.id,
       model: textModel(),
@@ -460,7 +467,7 @@ export async function runGenerateJob(jobId: string): Promise<void> {
     const capHit = err instanceof DailyCapExceeded || err instanceof PerRowCapExceeded;
     const detailed = capHit ? msg : msg;
     await failJob(sb, jobId, detailed);
-    await recordAudit(sb, "ai_post_generate_failed", null, { job_id: jobId, error: detailed, cap_hit: capHit });
+    await recordAudit(sb, job.workspace_id, "ai_post_generate_failed", null, { job_id: jobId, error: detailed, cap_hit: capHit });
   }
 }
 
@@ -598,7 +605,7 @@ export async function runReviseJob(jobId: string): Promise<void> {
       result: { revision_of: sourcePost.id, quality_score: textResult.caption.quality_score },
     }).eq("id", jobId);
 
-    await recordAudit(sb, "ai_post_revised", sourcePost.id, {
+    await recordAudit(sb, job.workspace_id, "ai_post_revised", sourcePost.id, {
       job_id: jobId,
       model: textModel(),
       image_model: imageModel(),
@@ -615,7 +622,7 @@ export async function runReviseJob(jobId: string): Promise<void> {
     const msg = err instanceof Error ? err.message : String(err);
     const capHit = err instanceof DailyCapExceeded || err instanceof PerRowCapExceeded;
     await failJob(sb, jobId, msg);
-    await recordAudit(sb, "ai_post_revise_failed", job.post_id || null, { job_id: jobId, error: msg, cap_hit: capHit });
+    await recordAudit(sb, job.workspace_id, "ai_post_revise_failed", job.post_id || null, { job_id: jobId, error: msg, cap_hit: capHit });
   }
 }
 
