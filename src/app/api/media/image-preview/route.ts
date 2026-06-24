@@ -37,7 +37,8 @@ const PREVIEW_CONVERSION_TIMEOUT_MS = {
 // while larger panoramas fail closed before raw decode.
 const HEIC_FALLBACK_MAX_PIXELS = 50_000_000;
 const DRIVE_MEDIA_TIMEOUT_MS = 45_000;
-const DRIVE_THUMBNAIL_TIMEOUT_MS = 1_500;
+const DRIVE_THUMBNAIL_TIMEOUT_MS = 2_500;
+const MAX_DRIVE_THUMBNAIL_BYTES = 5 * 1024 * 1024;
 const inFlightPreviewBuilds = new Map<string, Promise<Buffer>>();
 
 type PreviewSize = keyof typeof PREVIEW_SIZES;
@@ -276,8 +277,15 @@ async function fetchDriveThumbnail(thumbnailLink: string | undefined, accessToke
     });
     if (!res.ok) return null;
     const contentType = (res.headers.get("content-type") || "").toLowerCase();
-    if (!contentType.includes("image/jpeg") && !contentType.includes("image/jpg")) return null;
-    return Buffer.from(await res.arrayBuffer());
+    if (!contentType.startsWith("image/") || contentType.includes("svg") || contentType.includes("heic") || contentType.includes("heif")) return null;
+    const thumbnail = Buffer.from(await res.arrayBuffer());
+    if (thumbnail.length <= 0 || thumbnail.length > MAX_DRIVE_THUMBNAIL_BYTES) return null;
+    if (contentType.includes("image/jpeg") || contentType.includes("image/jpg")) return thumbnail;
+    return await withPreviewTimeout(
+      resizeBrowserSafeJpeg(thumbnail, "thumb"),
+      PREVIEW_CONVERSION_TIMEOUT_MS.thumb,
+      "Drive thumbnail normalization",
+    );
   } catch {
     return null;
   } finally {

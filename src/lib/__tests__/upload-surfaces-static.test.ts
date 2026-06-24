@@ -242,6 +242,8 @@ describe("Drive upload surfaces", () => {
     expect(imagePreview).toContain("previewSizeFromRequest");
     expect(imagePreview).toContain("schedulePreviewCacheWrite");
     expect(imagePreview).toContain("after(() => writeCachedPreview");
+    expect(imagePreview).toContain("MAX_DRIVE_THUMBNAIL_BYTES");
+    expect(imagePreview).toContain("Drive thumbnail normalization");
 
     const imagePreviewLib = source("src/lib/image-preview.ts");
     expect(imagePreviewLib).toContain("warmBrowserImagePreview");

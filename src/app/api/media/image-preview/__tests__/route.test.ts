@@ -214,6 +214,48 @@ describe("GET /api/media/image-preview", () => {
     expect(heicDecodeMocks.decode.all).not.toHaveBeenCalled();
   });
 
+  it("normalizes Drive's browser-safe thumbnail formats instead of decoding the original HEIC for first paint", async () => {
+    driveMocks.getFileMetadata.mockResolvedValueOnce({
+      id: FILE_ID,
+      name: "source.heic",
+      mimeType: "image/heic",
+      size: 2 * 1024 * 1024,
+      parents: ["raw-files-folder"],
+      appProperties: { workspaceId: "00000000-0000-0000-0000-000000000001" },
+      thumbnailLink: "https://drive.example/thumbnail-webp",
+    });
+    globalThis.fetch = vi.fn(async () => new Response(new Uint8Array([0x52, 0x49, 0x46, 0x46]), {
+      status: 200,
+      headers: { "content-type": "image/webp" },
+    })) as unknown as typeof fetch;
+
+    const res = await GET(makeRequest(`/api/media/image-preview?id=${FILE_ID}&token=signed&size=thumb`));
+    const body = new Uint8Array(await res.arrayBuffer());
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/jpeg");
+    expect(res.headers.get("x-preview-size")).toBe("thumb");
+    expect(Array.from(body)).toEqual([0xff, 0xd8, 0xff]);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "https://drive.example/thumbnail-webp",
+      expect.objectContaining({
+        headers: { Authorization: "Bearer drive-token" },
+      }),
+    );
+    expect(sharpMocks.sharp).toHaveBeenCalledWith(
+      expect.any(Buffer),
+      expect.objectContaining({ limitInputPixels: 50_000_000 }),
+    );
+    expect(sharpMocks.pipeline.resize).toHaveBeenCalledWith(expect.objectContaining({
+      width: 520,
+      height: 520,
+      fit: "inside",
+      withoutEnlargement: true,
+    }));
+    expect(heicDecodeMocks.decode.all).not.toHaveBeenCalled();
+  });
+
   it("serves a cached HEIC JPEG preview without fetching or decoding the Drive source", async () => {
     storageMocks.download.mockResolvedValueOnce({
       data: {
