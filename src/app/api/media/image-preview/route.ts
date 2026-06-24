@@ -1,4 +1,5 @@
 import sharp from "sharp";
+import decodeHeic from "heic-decode";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import {
@@ -19,7 +20,109 @@ const DRIVE_FILE_ID_RE = /^[a-zA-Z0-9_-]{20,80}$/;
 const HEIC_IMAGE_MIME_TYPES = new Set(["image/heic", "image/heif"]);
 const MAX_PREVIEW_SOURCE_BYTES = 50 * 1024 * 1024;
 const PREVIEW_MAX_EDGE = 1600;
+// heic-decode allocates raw RGBA in JS/WASM before Sharp can resize it. Cap the
+// fallback below Sharp's native limit so common 48MP iPhone HEICs still preview
+// while larger panoramas fail closed before raw decode.
+const HEIC_FALLBACK_MAX_PIXELS = 50_000_000;
 const DRIVE_MEDIA_TIMEOUT_MS = 45_000;
+
+type HeicDecodedImage = {
+  width: number;
+  height: number;
+  data: Uint8ClampedArray | Uint8Array;
+};
+
+class ImagePreviewHttpError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ImagePreviewHttpError";
+    this.status = status;
+  }
+}
+
+function browserSafeJpegResponse(preview: Buffer, signed: boolean) {
+  const responseBody = preview.buffer.slice(preview.byteOffset, preview.byteOffset + preview.byteLength) as ArrayBuffer;
+
+  return new Response(responseBody, {
+    status: 200,
+    headers: {
+      "Content-Type": "image/jpeg",
+      "Content-Length": String(preview.length),
+      "Cache-Control": signed ? "public, max-age=86400, immutable" : "private, no-store",
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
+}
+
+function resizeBrowserSafeJpeg(source: Buffer) {
+  return sharp(source, { limitInputPixels: HEIC_FALLBACK_MAX_PIXELS })
+    .rotate()
+    .resize({
+      width: PREVIEW_MAX_EDGE,
+      height: PREVIEW_MAX_EDGE,
+      fit: "inside",
+      withoutEnlargement: true,
+    })
+    .jpeg({ quality: 86, mozjpeg: true })
+    .toBuffer();
+}
+
+function assertFallbackPixelSafe(width: number, height: number) {
+  const pixels = width * height;
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0 || pixels > HEIC_FALLBACK_MAX_PIXELS) {
+    throw new ImagePreviewHttpError("Image is too large for preview conversion", 413);
+  }
+}
+
+function resizeRawBrowserSafeJpeg(image: HeicDecodedImage) {
+  assertFallbackPixelSafe(image.width, image.height);
+  return sharp(image.data, {
+    raw: {
+      width: image.width,
+      height: image.height,
+      channels: 4,
+    },
+    limitInputPixels: HEIC_FALLBACK_MAX_PIXELS,
+  })
+    .resize({
+      width: PREVIEW_MAX_EDGE,
+      height: PREVIEW_MAX_EDGE,
+      fit: "inside",
+      withoutEnlargement: true,
+    })
+    .jpeg({ quality: 86, mozjpeg: true })
+    .toBuffer();
+}
+
+async function convertHeicWithFallbackDecoder(source: Buffer) {
+  const images = await decodeHeic.all({ buffer: source });
+  try {
+    const image = images[0];
+    if (!image) throw new Error("HEIF image not found");
+    assertFallbackPixelSafe(image.width, image.height);
+    return resizeRawBrowserSafeJpeg(await image.decode());
+  } finally {
+    try {
+      images.dispose();
+    } catch {
+      // Best-effort cleanup only; preserve the conversion error if one exists.
+    }
+  }
+}
+
+async function buildHeicPreview(source: Buffer) {
+  if (sharp.format.heif?.input.buffer) {
+    try {
+      return await resizeBrowserSafeJpeg(source);
+    } catch {
+      // Some runtimes expose HEIF metadata support but cannot decode iPhone HEVC HEIC payloads.
+    }
+  }
+
+  return convertHeicWithFallbackDecoder(source);
+}
 
 function serviceRoleClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -149,33 +252,14 @@ export async function GET(request: NextRequest) {
     if (!Number.isFinite(meta.size) || meta.size <= 0 || meta.size > MAX_PREVIEW_SOURCE_BYTES) {
       return NextResponse.json({ error: "Image is too large for preview conversion" }, { status: 413 });
     }
-    if (!sharp.format.heif?.input.buffer) {
-      return NextResponse.json({ error: "HEIC preview conversion is unavailable in this runtime" }, { status: 415 });
-    }
 
     const source = await fetchDriveMedia(fileId, token);
-    const preview = await sharp(source, { limitInputPixels: 100_000_000 })
-      .rotate()
-      .resize({
-        width: PREVIEW_MAX_EDGE,
-        height: PREVIEW_MAX_EDGE,
-        fit: "inside",
-        withoutEnlargement: true,
-      })
-      .jpeg({ quality: 86, mozjpeg: true })
-      .toBuffer();
-    const responseBody = preview.buffer.slice(preview.byteOffset, preview.byteOffset + preview.byteLength) as ArrayBuffer;
-
-    return new Response(responseBody, {
-      status: 200,
-      headers: {
-        "Content-Type": "image/jpeg",
-        "Content-Length": String(preview.length),
-        "Cache-Control": auth.signed ? "public, max-age=86400, immutable" : "private, no-store",
-        "X-Content-Type-Options": "nosniff",
-      },
-    });
+    const preview = await buildHeicPreview(source);
+    return browserSafeJpegResponse(preview, auth.signed);
   } catch (err) {
+    if (err instanceof ImagePreviewHttpError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
     const sanitized = sanitizeUnknownUploadError(err);
     console.error("[media/image-preview]", err instanceof Error ? err.message : err);
     return NextResponse.json(sanitized, { status: statusForSanitizedDriveError(sanitized) });

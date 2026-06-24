@@ -35,6 +35,14 @@ interface MixedUploadRun {
   failDirectNames: Set<string>;
 }
 
+interface StallingChunkRun {
+  chunkRanges: string[];
+  chunkUploadUris: string[];
+  sessionRequests: string[];
+  finalizeRequests: string[];
+  stalledOnce: boolean;
+}
+
 function installProxyUploadXhrMock(run: MockUploadRun) {
   class MockXHR {
     upload: { onprogress: XhrHandler } = { onprogress: null };
@@ -181,8 +189,98 @@ function installMixedUploadMocks(run: MixedUploadRun, onSend?: (timeout: number)
   }) as unknown as typeof fetch;
 }
 
+function installStallingChunkUploadMocks(run: StallingChunkRun) {
+  class MockXHR {
+    upload: { onprogress: XhrHandler } = { onprogress: null };
+    onload: XhrHandler = null;
+    onerror: XhrHandler = null;
+    ontimeout: XhrHandler = null;
+    onabort: XhrHandler = null;
+    status = 0;
+    responseText = "";
+    timeout = 0;
+    private method = "";
+    private url = "";
+    private headers: Record<string, string> = {};
+
+    open(method: string, url: string) {
+      this.method = method;
+      this.url = url;
+    }
+    setRequestHeader(name: string, value: string) {
+      this.headers[name.toLowerCase()] = value;
+    }
+    abort() {
+      this.onabort?.();
+    }
+    send(body: Blob) {
+      if (this.method !== "POST" || this.url !== "/api/drive/upload-chunk") {
+        throw new Error(`Unexpected XHR ${this.method} ${this.url}`);
+      }
+
+      const range = this.headers["content-range"] || "";
+      run.chunkRanges.push(range);
+      run.chunkUploadUris.push(this.headers["x-upload-uri"] || "");
+
+      if (!run.stalledOnce && range.startsWith("bytes 0-")) {
+        run.stalledOnce = true;
+        return;
+      }
+
+      setTimeout(() => {
+        const uploadTotal = body.size || 10;
+        this.upload.onprogress?.({ lengthComputable: true, loaded: uploadTotal, total: uploadTotal });
+        const match = range.match(/^bytes \d+-(\d+)\/(\d+)$/);
+        const isFinalChunk = !match || Number(match[1]) + 1 >= Number(match[2]);
+        this.status = 200;
+        this.responseText = JSON.stringify(isFinalChunk ? {
+          done: true,
+          fileId: `drive-${this.headers["x-file-name"]}`,
+        } : {
+          done: false,
+        });
+        this.onload?.();
+      }, 1);
+    }
+  }
+
+  globalThis.XMLHttpRequest = MockXHR as unknown as typeof XMLHttpRequest;
+  globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url === "/api/drive/upload") {
+      const body = JSON.parse(String(init?.body || "{}")) as { fileName?: string };
+      const fileName = body.fileName || "upload.bin";
+      run.sessionRequests.push(fileName);
+      return Response.json({ uploadUri: `https://upload.example/session-${run.sessionRequests.length}` });
+    }
+    if (url === "/api/drive/finalize") {
+      const body = JSON.parse(String(init?.body || "{}")) as { fileId?: string; folder?: string };
+      const fileId = body.fileId || "missing";
+      run.finalizeRequests.push(`${fileId}:${body.folder || ""}`);
+      return Response.json({
+        fileId,
+        url: `/api/drive/stream?id=${fileId}`,
+        mimeType: "video/mp4",
+        size: 4 * 1024 * 1024,
+      });
+    }
+    throw new Error(`Unexpected fetch ${url}`);
+  }) as unknown as typeof fetch;
+}
+
 function makeImage(name: string) {
   return new File(["0123456789"], name, { type: "image/jpeg" });
+}
+
+async function flushPromises(times = 20) {
+  for (let i = 0; i < times; i++) await Promise.resolve();
+}
+
+async function waitForChunkSends(run: StallingChunkRun, count: number) {
+  for (let i = 0; i < 20 && run.chunkRanges.length < count; i++) {
+    await flushPromises();
+    await vi.advanceTimersByTimeAsync(0);
+  }
 }
 
 beforeEach(() => {
@@ -479,5 +577,47 @@ describe("uploadManyToDrive", () => {
     // The bug set this to 120000 on every transfer XHR. A moving upload must
     // never be killed by a fixed ceiling — the watchdog + response timer govern.
     expect(transferTimeouts.every((timeout) => timeout === 0)).toBe(true);
+  });
+
+  it("retries a stalled resumable chunk in place without restarting the upload session", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const run: StallingChunkRun = {
+      chunkRanges: [],
+      chunkUploadUris: [],
+      sessionRequests: [],
+      finalizeRequests: [],
+      stalledOnce: false,
+    };
+    installStallingChunkUploadMocks(run);
+    const largeVideo = new Uint8Array(4 * 1024 * 1024);
+
+    const pending = uploadManyToDrive([
+      new File([largeVideo], "stalled.mp4", { type: "video/mp4" }),
+    ], "raw-files");
+
+    await waitForChunkSends(run, 1);
+    expect(run.chunkRanges).toEqual(["bytes 0-2097151/4194304"]);
+
+    await vi.advanceTimersByTimeAsync(30_000);
+    await flushPromises();
+    await vi.advanceTimersByTimeAsync(1);
+    await flushPromises();
+    await vi.advanceTimersByTimeAsync(1);
+    await flushPromises();
+    await vi.advanceTimersByTimeAsync(1);
+
+    const results = await pending;
+
+    expect(results).toHaveLength(1);
+    expect(results[0].error).toBeUndefined();
+    expect(results[0].result?.fileId).toBe("drive-stalled.mp4");
+    expect(run.sessionRequests).toEqual(["stalled.mp4"]);
+    expect(run.chunkRanges.slice(0, 2)).toEqual([
+      "bytes 0-2097151/4194304",
+      "bytes 0-2097151/4194304",
+    ]);
+    expect(new Set(run.chunkUploadUris.slice(0, 2)).size).toBe(1);
+    expect(run.finalizeRequests).toEqual(["drive-stalled.mp4:raw-files"]);
   });
 });

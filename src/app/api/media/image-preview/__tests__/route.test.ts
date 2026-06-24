@@ -32,6 +32,12 @@ const sharpMocks = vi.hoisted(() => {
   return { sharp, pipeline };
 });
 
+const heicDecodeMocks = vi.hoisted(() => {
+  const decode = vi.fn() as ReturnType<typeof vi.fn> & { all: ReturnType<typeof vi.fn> };
+  decode.all = vi.fn();
+  return { decode };
+});
+
 vi.mock("@/lib/google-drive", () => ({
   ensureSubfolder: driveMocks.ensureSubfolder,
   getAccessToken: driveMocks.getAccessToken,
@@ -44,6 +50,10 @@ vi.mock("sharp", () => ({
   default: sharpMocks.sharp,
 }));
 
+vi.mock("heic-decode", () => ({
+  default: heicDecodeMocks.decode,
+}));
+
 import { GET } from "../route";
 
 const FILE_ID = "abcdefghijklmnopqrst";
@@ -53,8 +63,26 @@ function makeRequest(path = `/api/media/image-preview?id=${FILE_ID}&token=signed
   return new NextRequest(`http://localhost:3000${path}`);
 }
 
+function installHeicDecodeImages(width = 4, height = 3) {
+  const byteLength = width * height * 4;
+  const dataLength = Number.isFinite(byteLength) && byteLength > 0 && byteLength <= 4096 ? byteLength : 16;
+  const image = {
+    width,
+    height,
+    decode: vi.fn(async () => ({
+      width,
+      height,
+      data: new Uint8ClampedArray(dataLength).fill(128),
+    })),
+  };
+  const images = Object.assign([image], { dispose: vi.fn() });
+  heicDecodeMocks.decode.all.mockResolvedValue(images);
+  return { image, images, dispose: images.dispose };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
+  sharpMocks.sharp.format = { heif: { input: { buffer: true } } };
   driveMocks.verifyDriveStreamToken.mockReturnValue(true);
   driveMocks.getFileMetadata.mockResolvedValue({
     id: FILE_ID,
@@ -65,6 +93,7 @@ beforeEach(() => {
   });
   driveMocks.getAccessToken.mockResolvedValue("drive-token");
   sharpMocks.pipeline.toBuffer.mockResolvedValue(Buffer.from([0xff, 0xd8, 0xff]));
+  installHeicDecodeImages();
   globalThis.fetch = vi.fn(async () => new Response(new Uint8Array([1, 2, 3]), { status: 200 })) as unknown as typeof fetch;
 });
 
@@ -91,6 +120,85 @@ describe("GET /api/media/image-preview", () => {
       fit: "inside",
       withoutEnlargement: true,
     }));
+    expect(heicDecodeMocks.decode.all).not.toHaveBeenCalled();
+  });
+
+  it("falls back to heic-decode when Sharp rejects iPhone HEVC HEIC input", async () => {
+    const heic = installHeicDecodeImages(4, 3);
+    sharpMocks.pipeline.toBuffer
+      .mockRejectedValueOnce(new Error("Support for this compression format has not been built in"))
+      .mockResolvedValueOnce(Buffer.from([0xff, 0xd8, 0x42]));
+
+    const res = await GET(makeRequest());
+    const body = new Uint8Array(await res.arrayBuffer());
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/jpeg");
+    expect(Array.from(body)).toEqual([0xff, 0xd8, 0x42]);
+    expect(heicDecodeMocks.decode.all).toHaveBeenCalledWith(expect.objectContaining({
+      buffer: expect.any(Buffer),
+    }));
+    const decodeInput = heicDecodeMocks.decode.all.mock.calls[0]?.[0]?.buffer;
+    expect(Buffer.isBuffer(decodeInput)).toBe(true);
+    expect(Array.from(decodeInput as Buffer)).toEqual([1, 2, 3]);
+    expect(heic.image.decode).toHaveBeenCalledTimes(1);
+    expect(heic.dispose).toHaveBeenCalledTimes(1);
+    expect(sharpMocks.sharp).toHaveBeenCalledTimes(2);
+    expect(sharpMocks.sharp.mock.calls[1]?.[1]).toEqual(expect.objectContaining({
+      raw: { width: 4, height: 3, channels: 4 },
+      limitInputPixels: 50_000_000,
+    }));
+  });
+
+  it("falls back to heic-decode when Sharp HEIF buffer input support is absent", async () => {
+    const heic = installHeicDecodeImages(4, 3);
+    sharpMocks.sharp.format = { heif: { input: { buffer: false } } };
+
+    const res = await GET(makeRequest());
+    const body = new Uint8Array(await res.arrayBuffer());
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/jpeg");
+    expect(Array.from(body)).toEqual([0xff, 0xd8, 0xff]);
+    expect(heicDecodeMocks.decode.all).toHaveBeenCalledWith(expect.objectContaining({
+      buffer: expect.any(Buffer),
+    }));
+    expect(heic.image.decode).toHaveBeenCalledTimes(1);
+    expect(heic.dispose).toHaveBeenCalledTimes(1);
+    expect(sharpMocks.sharp).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects over-pixel fallback HEIC images before decoding raw pixels", async () => {
+    const heic = installHeicDecodeImages(10_001, 10_000);
+    sharpMocks.sharp.format = { heif: { input: { buffer: false } } };
+
+    const res = await GET(makeRequest());
+    const body = await res.json();
+
+    expect(res.status).toBe(413);
+    expect(body.error).toBe("Image is too large for preview conversion");
+    expect(heicDecodeMocks.decode.all).toHaveBeenCalledTimes(1);
+    expect(heic.image.decode).not.toHaveBeenCalled();
+    expect(heic.dispose).toHaveBeenCalledTimes(1);
+    expect(sharpMocks.sharp).not.toHaveBeenCalled();
+  });
+
+  it("disposes fallback HEIC decoder resources when raw conversion fails", async () => {
+    const heic = installHeicDecodeImages(4, 3);
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    sharpMocks.sharp.format = { heif: { input: { buffer: false } } };
+    sharpMocks.pipeline.toBuffer.mockRejectedValueOnce(new Error("raw conversion failed"));
+
+    try {
+      const res = await GET(makeRequest());
+
+      expect(res.status).toBe(500);
+      expect(heicDecodeMocks.decode.all).toHaveBeenCalledTimes(1);
+      expect(heic.image.decode).toHaveBeenCalledTimes(1);
+      expect(heic.dispose).toHaveBeenCalledTimes(1);
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 
   it("rejects non-HEIC images instead of proxying arbitrary Drive files", async () => {

@@ -213,8 +213,8 @@ function makeStallWatchdog(xhr: XMLHttpRequest, onStall: () => void) {
   const kick = () => {
     clear();
     timer = setTimeout(() => {
-      try { xhr.abort(); } catch { /* already settled */ }
       onStall();
+      try { xhr.abort(); } catch { /* already settled */ }
     }, STALL_TIMEOUT_MS);
   };
   return { kick, clear };
