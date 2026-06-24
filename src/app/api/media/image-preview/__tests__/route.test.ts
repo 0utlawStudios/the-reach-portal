@@ -38,6 +38,12 @@ const heicDecodeMocks = vi.hoisted(() => {
   return { decode };
 });
 
+const storageMocks = vi.hoisted(() => ({
+  download: vi.fn(),
+  upload: vi.fn(),
+  from: vi.fn(),
+}));
+
 vi.mock("@/lib/google-drive", () => ({
   ensureSubfolder: driveMocks.ensureSubfolder,
   getAccessToken: driveMocks.getAccessToken,
@@ -54,10 +60,18 @@ vi.mock("heic-decode", () => ({
   default: heicDecodeMocks.decode,
 }));
 
+vi.mock("@supabase/supabase-js", () => ({
+  createClient: vi.fn(() => ({
+    storage: { from: storageMocks.from },
+  })),
+}));
+
 import { GET } from "../route";
 
 const FILE_ID = "abcdefghijklmnopqrst";
 const originalFetch = globalThis.fetch;
+const originalSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const originalServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 function makeRequest(path = `/api/media/image-preview?id=${FILE_ID}&token=signed`) {
   return new NextRequest(`http://localhost:3000${path}`);
@@ -82,6 +96,8 @@ function installHeicDecodeImages(width = 4, height = 3) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  process.env.NEXT_PUBLIC_SUPABASE_URL = "https://supabase.example";
+  process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role";
   sharpMocks.sharp.format = { heif: { input: { buffer: true } } };
   driveMocks.verifyDriveStreamToken.mockReturnValue({
     workspaceId: "00000000-0000-0000-0000-000000000001",
@@ -97,11 +113,21 @@ beforeEach(() => {
   driveMocks.getAccessToken.mockResolvedValue("drive-token");
   sharpMocks.pipeline.toBuffer.mockResolvedValue(Buffer.from([0xff, 0xd8, 0xff]));
   installHeicDecodeImages();
+  storageMocks.from.mockReturnValue({
+    download: storageMocks.download,
+    upload: storageMocks.upload,
+  });
+  storageMocks.download.mockResolvedValue({ data: null, error: { message: "not found" } });
+  storageMocks.upload.mockResolvedValue({ data: { path: "cached.jpg" }, error: null });
   globalThis.fetch = vi.fn(async () => new Response(new Uint8Array([1, 2, 3]), { status: 200 })) as unknown as typeof fetch;
 });
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  if (originalSupabaseUrl === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+  else process.env.NEXT_PUBLIC_SUPABASE_URL = originalSupabaseUrl;
+  if (originalServiceKey === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+  else process.env.SUPABASE_SERVICE_ROLE_KEY = originalServiceKey;
 });
 
 describe("GET /api/media/image-preview", () => {
@@ -112,6 +138,7 @@ describe("GET /api/media/image-preview", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("image/jpeg");
     expect(res.headers.get("cache-control")).toBe("public, max-age=86400, immutable");
+    expect(res.headers.get("x-preview-cache")).toBe("MISS");
     expect(Array.from(body)).toEqual([0xff, 0xd8, 0xff]);
     expect(globalThis.fetch).toHaveBeenCalledWith(
       expect.stringContaining(`/files/${FILE_ID}?alt=media`),
@@ -124,6 +151,31 @@ describe("GET /api/media/image-preview", () => {
       withoutEnlargement: true,
     }));
     expect(heicDecodeMocks.decode.all).not.toHaveBeenCalled();
+    expect(storageMocks.upload).toHaveBeenCalledWith(
+      `00000000-0000-0000-0000-000000000001/heic-previews/${FILE_ID}.jpg`,
+      expect.any(Buffer),
+      expect.objectContaining({ contentType: "image/jpeg", upsert: true }),
+    );
+  });
+
+  it("serves a cached HEIC JPEG preview without fetching or decoding the Drive source", async () => {
+    storageMocks.download.mockResolvedValueOnce({
+      data: {
+        arrayBuffer: async () => new Uint8Array([0xff, 0xd8, 0x99]).buffer,
+      },
+      error: null,
+    });
+
+    const res = await GET(makeRequest());
+    const body = new Uint8Array(await res.arrayBuffer());
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/jpeg");
+    expect(res.headers.get("x-preview-cache")).toBe("HIT");
+    expect(Array.from(body)).toEqual([0xff, 0xd8, 0x99]);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(sharpMocks.sharp).not.toHaveBeenCalled();
+    expect(storageMocks.upload).not.toHaveBeenCalled();
   });
 
   it("converts HEIC by filename when Drive reports a misleading image MIME", async () => {

@@ -1,7 +1,7 @@
 import sharp from "sharp";
 import decodeHeic from "heic-decode";
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
   ensureSubfolder,
   getAccessToken,
@@ -21,6 +21,7 @@ const DRIVE_FILE_ID_RE = /^[a-zA-Z0-9_-]{20,80}$/;
 const HEIC_IMAGE_MIME_TYPES = new Set(["image/heic", "image/heic-sequence", "image/heif", "image/heif-sequence"]);
 const MAX_PREVIEW_SOURCE_BYTES = 50 * 1024 * 1024;
 const PREVIEW_MAX_EDGE = 1600;
+const PREVIEW_CACHE_BUCKET = "media-thumbnails";
 // heic-decode allocates raw RGBA in JS/WASM before Sharp can resize it. Cap the
 // fallback below Sharp's native limit so common 48MP iPhone HEICs still preview
 // while larger panoramas fail closed before raw decode.
@@ -43,7 +44,7 @@ class ImagePreviewHttpError extends Error {
   }
 }
 
-function browserSafeJpegResponse(preview: Buffer, signed: boolean) {
+function browserSafeJpegResponse(preview: Buffer, signed: boolean, cacheState: "HIT" | "MISS" | "BYPASS" = "BYPASS") {
   const responseBody = preview.buffer.slice(preview.byteOffset, preview.byteOffset + preview.byteLength) as ArrayBuffer;
 
   return new Response(responseBody, {
@@ -53,8 +54,33 @@ function browserSafeJpegResponse(preview: Buffer, signed: boolean) {
       "Content-Length": String(preview.length),
       "Cache-Control": signed ? "public, max-age=86400, immutable" : "private, no-store",
       "X-Content-Type-Options": "nosniff",
+      "X-Preview-Cache": cacheState,
     },
   });
+}
+
+function previewCacheKey(fileId: string, workspaceId?: string): string {
+  const namespace = (workspaceId || "legacy").replace(/[^a-zA-Z0-9_-]/g, "_");
+  return `${namespace}/heic-previews/${fileId}.jpg`;
+}
+
+async function readCachedPreview(admin: SupabaseClient | null, key: string): Promise<Buffer | null> {
+  if (!admin) return null;
+  const { data, error } = await admin.storage.from(PREVIEW_CACHE_BUCKET).download(key);
+  if (error || !data) return null;
+  return Buffer.from(await data.arrayBuffer());
+}
+
+async function writeCachedPreview(admin: SupabaseClient | null, key: string, preview: Buffer): Promise<void> {
+  if (!admin) return;
+  const { error } = await admin.storage.from(PREVIEW_CACHE_BUCKET).upload(key, preview, {
+    contentType: "image/jpeg",
+    cacheControl: "31536000",
+    upsert: true,
+  });
+  if (error) {
+    console.warn("[media/image-preview] preview cache write failed:", error.message);
+  }
 }
 
 function resizeBrowserSafeJpeg(source: Buffer) {
@@ -264,9 +290,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Image is too large for preview conversion" }, { status: 413 });
     }
 
+    const admin = serviceRoleClient();
+    const cacheKey = previewCacheKey(fileId, auth.workspaceId || meta.appProperties?.workspaceId);
+    const cached = await readCachedPreview(admin, cacheKey);
+    if (cached) return browserSafeJpegResponse(cached, auth.signed, "HIT");
+
     const source = await fetchDriveMedia(fileId, token);
     const preview = await buildHeicPreview(source);
-    return browserSafeJpegResponse(preview, auth.signed);
+    await writeCachedPreview(admin, cacheKey, preview);
+    return browserSafeJpegResponse(preview, auth.signed, "MISS");
   } catch (err) {
     if (err instanceof ImagePreviewHttpError) {
       return NextResponse.json({ error: err.message }, { status: err.status });

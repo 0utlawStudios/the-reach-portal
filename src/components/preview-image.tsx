@@ -23,6 +23,7 @@ export function PreviewImage({
     return typeof src === "string" ? browserImagePreviewUrl(src, { mimeType, fileName }) : src;
   }, [src, mimeType, fileName]);
   const [failedSrc, setFailedSrc] = useState<string | undefined>(undefined);
+  const [loadedSrc, setLoadedSrc] = useState<string | undefined>(undefined);
 
   if (!displaySrc || failedSrc === displaySrc) {
     return (
@@ -32,15 +33,29 @@ export function PreviewImage({
     );
   }
 
+  const fitClass =
+    typeof className === "string" && className.includes("object-contain")
+      ? "object-contain"
+      : "object-cover";
+  const isLoaded = typeof displaySrc !== "string" || loadedSrc === displaySrc;
+
   return (
-    <RawImage
-      {...props}
-      src={displaySrc}
-      className={className}
-      onError={(event: SyntheticEvent<HTMLImageElement, Event>) => {
-        onError?.(event);
-        setFailedSrc(typeof displaySrc === "string" ? displaySrc : undefined);
-      }}
-    />
+    <div className={`${className || ""} relative overflow-hidden bg-[#6C655A]/10 dark:bg-white/[0.03]`}>
+      {!isLoaded && (
+        <div className="absolute inset-0 flex items-center justify-center bg-[#111113]/70 text-white/70" aria-hidden="true">
+          <div className="h-7 w-7 rounded-full border-2 border-white/30 border-t-white/80 animate-spin" />
+        </div>
+      )}
+      <RawImage
+        {...props}
+        src={displaySrc}
+        className={`absolute inset-0 h-full w-full ${fitClass} transition-opacity duration-150 ${isLoaded ? "opacity-100" : "opacity-0"}`}
+        onLoad={() => setLoadedSrc(typeof displaySrc === "string" ? displaySrc : undefined)}
+        onError={(event: SyntheticEvent<HTMLImageElement, Event>) => {
+          onError?.(event);
+          setFailedSrc(typeof displaySrc === "string" ? displaySrc : undefined);
+        }}
+      />
+    </div>
   );
 }
