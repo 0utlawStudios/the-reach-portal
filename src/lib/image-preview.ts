@@ -45,6 +45,26 @@ export function browserImagePreviewUrl(
   return heicImagePreviewUrl(url, opts) || url;
 }
 
+async function warmPreviewUrl(previewUrl: string): Promise<void> {
+  const controller = typeof AbortController === "function" ? new AbortController() : null;
+  const timer = controller
+    ? setTimeout(() => controller.abort(), HEIC_PREVIEW_WARM_TIMEOUT_MS)
+    : undefined;
+
+  try {
+    await fetch(previewUrl, {
+      method: "GET",
+      credentials: "same-origin",
+      cache: "force-cache",
+      signal: controller?.signal,
+    });
+  } catch {
+    // Cache warming is best-effort. The visible <img> path still handles errors.
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 export function warmBrowserImagePreview(
   url: string,
   opts: { mimeType?: unknown; fileName?: unknown; size?: BrowserImagePreviewSize } = {},
@@ -52,19 +72,14 @@ export function warmBrowserImagePreview(
   const previewUrl = heicImagePreviewUrl(url, opts);
   if (!previewUrl || typeof fetch !== "function") return;
 
-  const controller = typeof AbortController === "function" ? new AbortController() : null;
-  const timer = controller
-    ? setTimeout(() => controller.abort(), HEIC_PREVIEW_WARM_TIMEOUT_MS)
-    : undefined;
+  if (opts.size) {
+    void warmPreviewUrl(previewUrl);
+    return;
+  }
 
-  void fetch(previewUrl, {
-    method: "GET",
-    credentials: "same-origin",
-    cache: "force-cache",
-    signal: controller?.signal,
-  }).catch(() => {
-    // Cache warming is best-effort. The visible <img> path still handles errors.
-  }).finally(() => {
-    if (timer) clearTimeout(timer);
-  });
+  const thumbUrl = heicImagePreviewUrl(url, { ...opts, size: "thumb" });
+  void (async () => {
+    if (thumbUrl) await warmPreviewUrl(thumbUrl);
+    await warmPreviewUrl(previewUrl);
+  })();
 }

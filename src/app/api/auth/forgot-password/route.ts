@@ -10,7 +10,6 @@ import {
 import { consume, getClientIp } from "@/lib/rate-limit";
 
 export const maxDuration = 10;
-const BASELINE_WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 const WORKSPACE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function getAdminClient() {
@@ -60,7 +59,7 @@ async function resolveWorkspaceId(
   ).trim();
   const workspaceId = explicitId || (WORKSPACE_ID_RE.test(slugOrAlias) ? slugOrAlias : "");
   const workspaceSlug = workspaceId ? "" : slugOrAlias;
-  if (!workspaceId && !workspaceSlug) return BASELINE_WORKSPACE_ID;
+  if (!workspaceId && !workspaceSlug) throw new Error("Workspace context required");
   if (workspaceId && !WORKSPACE_ID_RE.test(workspaceId)) throw new Error("Invalid workspace");
 
   const query = admin
@@ -99,7 +98,6 @@ export async function POST(request: NextRequest) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) return successResponse;
 
     const admin = getAdminClient();
-    const workspaceId = await resolveWorkspaceId(admin, request, body);
 
     // Generate recovery link (no email sent by Supabase)
     const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
@@ -108,6 +106,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (linkErr || !linkData?.properties?.hashed_token) {
+      const workspaceId = await resolveWorkspaceId(admin, request, body);
       // New cloned deployments can have active team_members rows before their
       // matching Supabase Auth users exist. In that case, treat forgot password
       // as a self-service setup-link request for known team members only.
@@ -161,7 +160,7 @@ export async function POST(request: NextRequest) {
 
       const siteUrl = getSiteUrl();
       const tokenHash = inviteData.properties.hashed_token;
-      const confirmUrl = `${siteUrl}/auth/confirm?token_hash=${encodeURIComponent(tokenHash)}&type=invite`;
+      const confirmUrl = `${siteUrl}/auth/confirm?token_hash=${encodeURIComponent(tokenHash)}&type=invite&workspaceId=${encodeURIComponent(workspaceId)}`;
       try {
         await sendSetupEmail(cleanEmail, name, role, confirmUrl);
       } catch (emailErr: unknown) {

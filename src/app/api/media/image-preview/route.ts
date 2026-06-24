@@ -158,6 +158,24 @@ function resizeBrowserSafeJpeg(source: Buffer, size: PreviewSize) {
     .toBuffer();
 }
 
+async function buildThumbnailFromCachedPreview(admin: SupabaseClient | null, fileId: string, workspaceId?: string): Promise<Buffer | null> {
+  const cachedFull =
+    await readCachedPreview(admin, previewCacheKey(fileId, workspaceId, "full")) ||
+    await readCachedPreview(admin, legacyPreviewCacheKey(fileId, workspaceId));
+  if (!cachedFull) return null;
+
+  try {
+    return await withPreviewTimeout(
+      resizeBrowserSafeJpeg(cachedFull, "thumb"),
+      PREVIEW_CONVERSION_TIMEOUT_MS.thumb,
+      "HEIC thumbnail cache resize",
+    );
+  } catch (err) {
+    console.warn("[media/image-preview] cached full preview could not be resized:", err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
 async function withPreviewTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -484,12 +502,21 @@ export async function GET(request: NextRequest) {
 
     const admin = serviceRoleClient();
     const previewSize = previewSizeFromRequest(request);
-    const cacheKey = previewCacheKey(fileId, auth.workspaceId || meta.appProperties?.workspaceId, previewSize);
+    const cacheWorkspaceId = auth.workspaceId || meta.appProperties?.workspaceId;
+    const cacheKey = previewCacheKey(fileId, cacheWorkspaceId, previewSize);
     const cached = await readCachedPreview(admin, cacheKey);
     if (cached) return browserSafeJpegResponse(cached, auth.signed, previewSize, "HIT");
 
+    if (previewSize === "thumb") {
+      const derivedThumbnail = await buildThumbnailFromCachedPreview(admin, fileId, cacheWorkspaceId);
+      if (derivedThumbnail) {
+        schedulePreviewCacheWrite(admin, cacheKey, derivedThumbnail);
+        return browserSafeJpegResponse(derivedThumbnail, auth.signed, previewSize, "HIT");
+      }
+    }
+
     if (previewSize === "full") {
-      const legacyCached = await readCachedPreview(admin, legacyPreviewCacheKey(fileId, auth.workspaceId || meta.appProperties?.workspaceId));
+      const legacyCached = await readCachedPreview(admin, legacyPreviewCacheKey(fileId, cacheWorkspaceId));
       if (legacyCached) return browserSafeJpegResponse(legacyCached, auth.signed, previewSize, "HIT");
     }
 

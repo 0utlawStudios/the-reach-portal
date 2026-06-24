@@ -16,8 +16,10 @@ let setupUrl: string | null;
 function makeQuery(table: string) {
   const builder: Record<string, unknown> = {};
   builder.select = vi.fn(() => builder);
+  builder.limit = vi.fn(() => builder);
   builder.eq = vi.fn(() => builder);
   builder.maybeSingle = vi.fn(() => {
+    if (table === "workspaces") return Promise.resolve({ data: { id: "00000000-0000-0000-0000-000000000001" }, error: null });
     if (table === "team_members") return Promise.resolve({ data: teamMember, error: null });
     return Promise.resolve({ data: null, error: null });
   });
@@ -123,11 +125,14 @@ describe("POST /api/auth/forgot-password", () => {
       { data: { properties: { hashed_token: "invite+hash/slash=" } }, error: null },
     ];
 
-    const res = await POST(makeRequest({ email: "aldridge@ten80ten.com" }));
+    const res = await POST(makeRequest({
+      email: "aldridge@ten80ten.com",
+      workspaceId: "00000000-0000-0000-0000-000000000001",
+    }));
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ success: true });
-    expect(setupUrl).toBe("https://thereach.ten80ten.com/auth/confirm?token_hash=invite%2Bhash%2Fslash%3D&type=invite");
+    expect(setupUrl).toBe("https://thereach.ten80ten.com/auth/confirm?token_hash=invite%2Bhash%2Fslash%3D&type=invite&workspaceId=00000000-0000-0000-0000-000000000001");
     expect(sentMessages).toHaveLength(1);
     expect(sentMessages[0]).toMatchObject({
       to: "aldridge@ten80ten.com",
@@ -166,11 +171,14 @@ describe("POST /api/auth/forgot-password", () => {
       { data: { properties: { hashed_token: "retry-hash" } }, error: null },
     ];
 
-    const res = await POST(makeRequest({ email: "aldridge@ten80ten.com" }));
+    const res = await POST(makeRequest({
+      email: "aldridge@ten80ten.com",
+      workspaceId: "00000000-0000-0000-0000-000000000001",
+    }));
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ success: true });
-    expect(setupUrl).toBe("https://thereach.ten80ten.com/auth/confirm?token_hash=retry-hash&type=invite");
+    expect(setupUrl).toBe("https://thereach.ten80ten.com/auth/confirm?token_hash=retry-hash&type=invite&workspaceId=00000000-0000-0000-0000-000000000001");
     expect(sentMessages).toHaveLength(1);
     expect(operations).toEqual([
       {
@@ -204,6 +212,24 @@ describe("POST /api/auth/forgot-password", () => {
       {
         method: "generateLink",
         payload: { type: "recovery", email: "unknown@example.com" },
+      },
+    ]);
+  });
+
+  it("does not send setup fallback links without workspace context", async () => {
+    teamMember = { name: "Aldridge Dagos", role: "superadmin", status: "active" };
+    linkResults = [{ data: null, error: { message: "User not found" } }];
+
+    const res = await POST(makeRequest({ email: "aldridge@ten80ten.com" }));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true });
+    expect(setupUrl).toBeNull();
+    expect(sentMessages).toEqual([]);
+    expect(operations).toEqual([
+      {
+        method: "generateLink",
+        payload: { type: "recovery", email: "aldridge@ten80ten.com" },
       },
     ]);
   });

@@ -39,6 +39,7 @@ function makeQuery(table: string) {
   };
   const builder: Record<string, unknown> = {};
   builder.select = vi.fn(() => builder);
+  builder.limit = vi.fn(() => builder);
   builder.insert = vi.fn((payload: Record<string, unknown>) => {
     state.method = "insert";
     state.payload = payload;
@@ -90,6 +91,9 @@ vi.mock("@supabase/supabase-js", () => ({
 import { POST } from "../route";
 
 function makeRequest(body: Record<string, unknown>) {
+  const payload = body.workspaceId || body.workspaceSlug || body.workspace
+    ? body
+    : { ...body, workspaceId: "00000000-0000-0000-0000-000000000001" };
   return {
     headers: {
       get: (name: string) => {
@@ -97,7 +101,7 @@ function makeRequest(body: Record<string, unknown>) {
         return null;
       },
     },
-    json: () => Promise.resolve(body),
+    json: () => Promise.resolve(payload),
   } as unknown as Parameters<typeof POST>[0];
 }
 
@@ -137,7 +141,7 @@ describe("POST /api/team/request-access", () => {
     expect(AUTH_AUDIT_AVATAR_MIGRATION_SRC).toContain("WHERE status = 'pending'");
   });
 
-  it("saves a new request with the baseline workspace before notifying admins", async () => {
+  it("saves a new request with explicit workspace context before notifying admins", async () => {
     const res = await POST(makeRequest({
       name: "Hanes Abasola",
       email: " Hanes@Ten80Ten.com ",
@@ -167,6 +171,20 @@ describe("POST /api/team/request-access", () => {
       to: "admin@example.com",
       subject: "New Access Request: Hanes Abasola",
     }));
+  });
+
+  it("requires workspace context instead of silently using the baseline tenant", async () => {
+    const res = await POST({
+      headers: {
+        get: (name: string) => (name.toLowerCase() === "x-forwarded-for" ? "127.0.0.1" : null),
+      },
+      json: () => Promise.resolve({ name: "No Tenant", email: "no-tenant@example.com" }),
+    } as unknown as Parameters<typeof POST>[0]);
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toContain("Workspace context required");
+    expect(operations.some((op) => op.table === "signup_requests" && op.method === "insert")).toBe(false);
   });
 
   it("does not show success when the signup request insert fails", async () => {

@@ -37,6 +37,7 @@ export function PreviewImage({
     };
   }, [src, mimeType, fileName, wantsFullPreview]);
   const [failedSrcs, setFailedSrcs] = useState<Record<string, true>>({});
+  const [timedOutFallbackSrcs, setTimedOutFallbackSrcs] = useState<Record<string, true>>({});
   const [loadedSrc, setLoadedSrc] = useState<string | undefined>(undefined);
   const [loadedFallbackSrc, setLoadedFallbackSrc] = useState<string | undefined>(undefined);
 
@@ -46,21 +47,22 @@ export function PreviewImage({
       : "object-cover";
   const primaryFailed = typeof primarySrc === "string" && Boolean(failedSrcs[primarySrc]);
   const fallbackFailed = typeof fallbackSrc === "string" && Boolean(failedSrcs[fallbackSrc]);
+  const fallbackTimedOut = typeof fallbackSrc === "string" && Boolean(timedOutFallbackSrcs[fallbackSrc]);
   const isLoaded = typeof primarySrc !== "string" || loadedSrc === primarySrc;
   const fallbackLoaded = typeof fallbackSrc === "string" && loadedFallbackSrc === fallbackSrc;
   const canShowFallback = Boolean(fallbackSrc && fallbackLoaded && !fallbackFailed);
-  const shouldLoadPrimary = !fallbackSrc || wantsFullPreview || fallbackLoaded || fallbackFailed;
+  const shouldLoadPrimary = !fallbackSrc || fallbackLoaded || fallbackFailed || fallbackTimedOut;
   const missingOrFailed = !primarySrc || (primaryFailed && !canShowFallback);
   const showSpinner = !isLoaded && !canShowFallback;
   const effectiveLoading = loading || (wantsFullPreview ? "eager" : undefined);
 
   useEffect(() => {
-    if (typeof fallbackSrc !== "string" || fallbackLoaded || fallbackFailed) return;
+    if (typeof fallbackSrc !== "string" || fallbackLoaded || fallbackFailed || fallbackTimedOut) return;
     const timer = setTimeout(() => {
-      setFailedSrcs((prev) => ({ ...prev, [fallbackSrc]: true }));
+      setTimedOutFallbackSrcs((prev) => ({ ...prev, [fallbackSrc]: true }));
     }, FALLBACK_PREVIEW_LOAD_TIMEOUT_MS);
     return () => clearTimeout(timer);
-  }, [fallbackSrc, fallbackLoaded, fallbackFailed]);
+  }, [fallbackSrc, fallbackLoaded, fallbackFailed, fallbackTimedOut]);
 
   useEffect(() => {
     if (missingOrFailed || typeof primarySrc !== "string" || isLoaded || canShowFallback || !shouldLoadPrimary) return;
@@ -97,8 +99,7 @@ export function PreviewImage({
           onLoad={() => {
             setLoadedFallbackSrc(fallbackSrc);
           }}
-          onError={(event: SyntheticEvent<HTMLImageElement, Event>) => {
-            onError?.(event);
+          onError={() => {
             setFailedSrcs((prev) => ({ ...prev, [fallbackSrc]: true }));
           }}
         />

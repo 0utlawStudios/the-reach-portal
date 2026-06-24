@@ -5,7 +5,6 @@ import { consume, getClientIp } from "@/lib/rate-limit";
 
 export const maxDuration = 10;
 
-const BASELINE_WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 const WORKSPACE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const GENERIC_RECEIVED_RESPONSE = {
   success: true,
@@ -40,7 +39,9 @@ async function resolveWorkspaceId(
   const slugOrAlias = (body.workspaceSlug || body.workspace || request.headers.get("x-workspace-slug") || "").trim();
   const workspaceId = explicitId || (WORKSPACE_ID_RE.test(slugOrAlias) ? slugOrAlias : "");
   const workspaceSlug = workspaceId ? "" : slugOrAlias;
-  if (!workspaceId && !workspaceSlug) return BASELINE_WORKSPACE_ID;
+  if (!workspaceId && !workspaceSlug) {
+    throw new Error("Workspace context required");
+  }
   if (workspaceId && !WORKSPACE_ID_RE.test(workspaceId)) {
     throw new Error("Invalid workspace");
   }
@@ -202,6 +203,7 @@ export async function POST(request: NextRequest) {
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[request-access]", message);
-    return NextResponse.json({ error: message.slice(0, 200) }, { status: 500 });
+    const status = /workspace/i.test(message) ? 400 : 500;
+    return NextResponse.json({ error: message.slice(0, 200) }, { status });
   }
 }

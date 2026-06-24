@@ -42,6 +42,16 @@ describe("image preview routing", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
+      `/api/media/image-preview?id=${FILE_ID}&token=signed&size=thumb`,
+      expect.objectContaining({
+        method: "GET",
+        credentials: "same-origin",
+        cache: "force-cache",
+      }),
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(fetchMock).toHaveBeenCalledWith(
       `/api/media/image-preview?id=${FILE_ID}&token=signed`,
       expect.objectContaining({
         method: "GET",
@@ -49,6 +59,28 @@ describe("image preview routing", () => {
         cache: "force-cache",
       }),
     );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("warms only the requested HEIC preview size when size is explicit", async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 200 }));
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    warmBrowserImagePreview(`/api/drive/stream?id=${FILE_ID}&token=signed`, {
+      mimeType: "image/heic",
+      fileName: "source.heic",
+      size: "thumb",
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/media/image-preview?id=${FILE_ID}&token=signed&size=thumb`,
+      expect.objectContaining({
+        method: "GET",
+        credentials: "same-origin",
+        cache: "force-cache",
+      }),
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     await Promise.resolve();
   });
 

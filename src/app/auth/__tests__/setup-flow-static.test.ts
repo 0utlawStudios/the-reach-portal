@@ -9,6 +9,8 @@ const TEAM_INVITE_ROUTE_SRC = readFileSync(join(process.cwd(), "src/app/api/team
 const TEAM_RESEND_INVITE_ROUTE_SRC = readFileSync(join(process.cwd(), "src/app/api/team/resend-invite/route.ts"), "utf8");
 const TEAM_APPROVE_REQUEST_ROUTE_SRC = readFileSync(join(process.cwd(), "src/app/api/team/approve-request/route.ts"), "utf8");
 const TEAM_CHANGE_EMAIL_ROUTE_SRC = readFileSync(join(process.cwd(), "src/app/api/team/change-email/route.ts"), "utf8");
+const REQUEST_ACCESS_ROUTE_SRC = readFileSync(join(process.cwd(), "src/app/api/team/request-access/route.ts"), "utf8");
+const FORGOT_PASSWORD_ROUTE_SRC = readFileSync(join(process.cwd(), "src/app/api/auth/forgot-password/route.ts"), "utf8");
 const APP_SHELL_SRC = readFileSync(join(process.cwd(), "src/components/app-shell.tsx"), "utf8");
 const AUTHENTICATED_APP_SHELL_SRC = readFileSync(join(process.cwd(), "src/components/authenticated-app-shell.tsx"), "utf8");
 const GLOBALS_SRC = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
@@ -50,6 +52,14 @@ describe("invite setup flow hardening", () => {
     for (const src of [TEAM_INVITE_ROUTE_SRC, TEAM_RESEND_INVITE_ROUTE_SRC, TEAM_APPROVE_REQUEST_ROUTE_SRC, TEAM_CHANGE_EMAIL_ROUTE_SRC]) {
       expect(src).toContain("workspaceId=${encodeURIComponent");
     }
+  });
+
+  it("does not silently default public tenant-specific flows to the baseline workspace", () => {
+    expect(REQUEST_ACCESS_ROUTE_SRC).toContain('throw new Error("Workspace context required")');
+    expect(REQUEST_ACCESS_ROUTE_SRC).not.toContain("return BASELINE_WORKSPACE_ID");
+    expect(FORGOT_PASSWORD_ROUTE_SRC).toContain('throw new Error("Workspace context required")');
+    expect(FORGOT_PASSWORD_ROUTE_SRC).toContain("type=invite&workspaceId=");
+    expect(FORGOT_PASSWORD_ROUTE_SRC).not.toContain("return BASELINE_WORKSPACE_ID");
   });
 
   it("keeps the user session after setup so workspace provisioning can refresh immediately", () => {

@@ -257,7 +257,8 @@ describe("Drive upload surfaces", () => {
     expect(previewImage).toContain('size: "full"');
     expect(previewImage).toContain("shouldLoadPrimary");
     expect(previewImage).toContain("FALLBACK_PREVIEW_LOAD_TIMEOUT_MS");
-    expect(previewImage).toContain("!fallbackSrc || wantsFullPreview || fallbackLoaded || fallbackFailed");
+    expect(previewImage).toContain("timedOutFallbackSrcs");
+    expect(previewImage).toContain("!fallbackSrc || fallbackLoaded || fallbackFailed || fallbackTimedOut");
 
     for (const file of [
       "src/components/pages/media-page.tsx",
