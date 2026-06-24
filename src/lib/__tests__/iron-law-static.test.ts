@@ -351,8 +351,16 @@ describe("iron-law guards in pipeline-context.tsx", () => {
     expect(PIPELINE_SRC).toContain("const [workspaceId, setWorkspaceId] = useState<string | null>(null)");
     expect(PIPELINE_SRC).toContain("if (!useSupabase || !workspaceId) return");
     expect(PIPELINE_SRC).toContain("const wsId = workspaceId");
-    expect(PIPELINE_SRC).not.toContain("if (!useSupabase || !workspaceIdRef.current) return");
-    expect(PIPELINE_SRC).not.toContain("const wsId = workspaceIdRef.current");
+    const realtimeBlock = PIPELINE_SRC.match(/\/\/ ─── Realtime subscription ───[\s\S]*?\/\/ ─── Persist localStorage backup/);
+    expect(realtimeBlock).not.toBeNull();
+    expect(realtimeBlock![0]).not.toContain("if (!useSupabase || !workspaceIdRef.current) return");
+    expect(realtimeBlock![0]).not.toContain("const wsId = workspaceIdRef.current");
+  });
+
+  it("scopes post loads and client post updates to the active workspace", () => {
+    expect(PIPELINE_SRC).toContain("const wsId = workspaceIdRef.current || BASELINE_WORKSPACE_ID");
+    expect(PIPELINE_SRC.match(/\.from\("posts"\)\s*[\s\S]{0,120}\.select\([\s\S]{0,120}\.eq\("workspace_id", wsId\)/g) || []).toHaveLength(2);
+    expect(PIPELINE_SRC.match(/\.eq\("workspace_id", workspaceIdRef\.current \|\| BASELINE_WORKSPACE_ID\)/g) || []).toHaveLength(4);
   });
 
   it("treats realtime UPDATE payloads as canonical instead of suppressing peer or publisher updates", () => {

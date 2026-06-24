@@ -460,10 +460,13 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
             setWorkspaceId(BASELINE_WORKSPACE_ID);
           }
 
+          const wsId = workspaceIdRef.current || BASELINE_WORKSPACE_ID;
+
           // Try full select (with publish_jobs join); fall back if tables missing
           let result = await supabase
             .from("posts")
             .select(postsSelect.current)
+            .eq("workspace_id", wsId)
             .order("created_at", { ascending: false }) as { error: unknown; data: PostRow[] | null };
           if (result.error && postsSelect.current !== POSTS_SELECT_BASIC) {
             postsSelect.current = POSTS_SELECT_BASIC;
@@ -471,6 +474,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
             result = await supabase
               .from("posts")
               .select(POSTS_SELECT_BASIC)
+              .eq("workspace_id", wsId)
               .order("created_at", { ascending: false }) as { error: unknown; data: PostRow[] | null };
           }
           // Iron-law §1b: an empty array is a valid empty board. resolveLoadedCards
@@ -699,6 +703,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
             .from("posts")
             .update({ stage: newStage })
             .eq("id", cardId)
+            .eq("workspace_id", workspaceIdRef.current || BASELINE_WORKSPACE_ID)
             .select("id, stage")
             .maybeSingle();
           if (error) throw error;
@@ -793,7 +798,11 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
       markMutation(cardId);
       const card = previousCard;
       const notes = card?.notes ? card.notes + "\n\n" + noteLine : noteLine;
-      supabase.from("posts").update({ stage: "awaiting_approval", notes }).eq("id", cardId).then(({ error }) => {
+      supabase.from("posts")
+        .update({ stage: "awaiting_approval", notes })
+        .eq("id", cardId)
+        .eq("workspace_id", workspaceIdRef.current || BASELINE_WORKSPACE_ID)
+        .then(({ error }) => {
         if (error) {
           const message = formatPipelineError(error);
           console.error("[pipeline] reapproval sync failed:", message);
@@ -817,7 +826,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
           movedBy: author,
           fromStage: "revision_needed",
         }).catch((e) => console.error("[pipeline] awaiting-approval notify failed:", e));
-      });
+        });
     } else {
       // Local-only path (no Supabase configured or temp id): still record audit locally.
       logAudit(cardId, author, "revision_submitted", `Fix submitted: ${note}`);
@@ -897,7 +906,11 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     if (useSupabase && isValidUuid(cardId)) {
       markMutation(cardId);
       const notes = card?.notes ? card.notes + "\n\n" + noteLine : noteLine;
-      supabase.from("posts").update({ stage: "revision_needed", notes }).eq("id", cardId).then(({ error }) => {
+      supabase.from("posts")
+        .update({ stage: "revision_needed", notes })
+        .eq("id", cardId)
+        .eq("workspace_id", workspaceIdRef.current || BASELINE_WORKSPACE_ID)
+        .then(({ error }) => {
         if (error) {
           const message = formatPipelineError(error);
           console.error("[pipeline] kickback sync failed:", message);
@@ -915,7 +928,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
         // This closes the DATA-002 phantom-email path.
         fireNotifications();
         addToast("Revision requested. Notifications are being sent.", "warning");
-      });
+        });
     } else {
       // Local-only path: no DB to confirm, so fire audit + notifications now.
       fireNotifications();
@@ -940,7 +953,11 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     setSelectedCard((prev) => (prev?.id === cardId ? { ...prev, ...updates } : prev));
     if (useSupabase && isValidUuid(cardId)) {
       markMutation(cardId);
-      supabase.from("posts").update(cardToDb(updates)).eq("id", cardId).then(({ error }) => {
+      supabase.from("posts")
+        .update(cardToDb(updates))
+        .eq("id", cardId)
+        .eq("workspace_id", workspaceIdRef.current || BASELINE_WORKSPACE_ID)
+        .then(({ error }) => {
         if (error) {
           console.error("[pipeline] updateCard sync failed:", error.message);
           if (previousCard) {
@@ -956,7 +973,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
           // @mention email) on a confirmed persist can safely fire now.
           onResult?.(true);
         }
-      });
+        });
     } else {
       // No DB write happened (local-only mode or a temp-id card mid-create).
       // Report not-persisted so callers do not fire persistence-gated effects.
