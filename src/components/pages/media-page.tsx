@@ -110,6 +110,8 @@ export function MediaPage() {
   const { currentUser } = useAuth();
   const { addToast } = useToast();
   const [media, setMedia] = useState<MediaAsset[]>([]);
+  const [mediaLoadError, setMediaLoadError] = useState<string | null>(null);
+  const [mediaReloadNonce, setMediaReloadNonce] = useState(0);
   const [activeFolder, setActiveFolder] = useState<string>("all");
   const [activeType, setActiveType] = useState<"all" | "image" | "video">("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -138,12 +140,14 @@ export function MediaPage() {
       .then(({ data, error }) => {
         if (error) {
           console.error("[media] media_assets load failed:", error.message);
-          setMedia([]);
+          setMediaLoadError(error.message);
+          addToast("Media Library couldn't refresh. Showing the last loaded files.", "error");
           return;
         }
+        setMediaLoadError(null);
         setMedia((data || []).map(dbToAsset));
       });
-  }, [useDb, workspaceId]);
+  }, [addToast, mediaReloadNonce, useDb, workspaceId]);
 
   // Realtime subscription — keeps media library in sync with DB inserts/updates/deletes
   useEffect(() => {
@@ -628,6 +632,19 @@ export function MediaPage() {
             <div className="w-full h-1.5 rounded-full bg-gray-100 dark:bg-white/[0.06] overflow-hidden">
               <div className="h-full rounded-full bg-gradient-to-r from-orange-500 to-amber-500 transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
             </div>
+          </div>
+        )}
+
+        {mediaLoadError && (
+          <div className="mx-4 mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+            <span className="min-w-0 flex-1">Media Library could not refresh. Last loaded files are still shown.</span>
+            <button
+              type="button"
+              onClick={() => setMediaReloadNonce((value) => value + 1)}
+              className="rounded-md border border-amber-300/70 px-2 py-1 font-medium text-amber-950 transition-colors hover:bg-amber-100 dark:border-amber-400/30 dark:text-amber-100 dark:hover:bg-amber-400/10"
+            >
+              Retry
+            </button>
           </div>
         )}
 

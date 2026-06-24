@@ -51,7 +51,7 @@ export function PreviewImage({
   const isLoaded = typeof primarySrc !== "string" || loadedSrc === primarySrc;
   const fallbackLoaded = typeof fallbackSrc === "string" && loadedFallbackSrc === fallbackSrc;
   const canShowFallback = Boolean(fallbackSrc && fallbackLoaded && !fallbackFailed);
-  const shouldLoadPrimary = !fallbackSrc || wantsFullPreview || fallbackLoaded || fallbackFailed || fallbackTimedOut;
+  const shouldLoadPrimary = !fallbackSrc || fallbackLoaded || fallbackFailed || fallbackTimedOut;
   const missingOrFailed = !primarySrc || (primaryFailed && !canShowFallback);
   const showSpinner = !isLoaded && !canShowFallback;
   const effectiveLoading = loading || (wantsFullPreview ? "eager" : undefined);

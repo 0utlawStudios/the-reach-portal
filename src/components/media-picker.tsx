@@ -153,6 +153,8 @@ export function MediaPicker({
   const { currentUser } = useAuth();
   const { addToast } = useToast();
   const [mediaAssets, setMediaAssets] = useState<MediaAssetRow[]>([]);
+  const [mediaLoadError, setMediaLoadError] = useState<string | null>(null);
+  const [mediaReloadNonce, setMediaReloadNonce] = useState(0);
   const [tab, setTab] = useState<PickerTab>(defaultTab);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -193,9 +195,11 @@ export function MediaPicker({
         if (cancelled) return;
         if (error) {
           console.error("[media-picker] media_assets load failed:", error.message);
-          setMediaAssets([]);
+          setMediaLoadError(error.message);
+          addToast("Media Library couldn't refresh. Showing the last loaded files.", "error");
           return;
         }
+        setMediaLoadError(null);
         setMediaAssets((data || []) as MediaAssetRow[]);
       });
 
@@ -223,7 +227,7 @@ export function MediaPicker({
       cancelled = true;
       supabase.removeChannel(channel);
     };
-  }, [open, workspaceId]);
+  }, [addToast, mediaReloadNonce, open, workspaceId]);
 
   // Build media index: accumulate ALL card references per URL
   const allMedia = useMemo(() => {
@@ -388,6 +392,7 @@ export function MediaPicker({
         }
         const successes = items.filter((item) => item.result);
         const selections: MediaPickerSelection[] = [];
+        let mediaAssetSyncFailures = 0;
         // Load the playback-optimization module ONCE up front. If its code-split
         // chunk fails to load, videos still upload (they just skip playback
         // optimization) instead of the failure throwing mid-loop and dropping
@@ -440,22 +445,45 @@ export function MediaPicker({
             size: result.size || item.file.size,
           });
           if (isDrivePublishableMediaMime(mimeType, item.file.name)) {
-            ensureMediaAsset({
-              name: item.file.name,
-              url: playbackUrl || result.driveProxyUrl || result.url,
-              fileId: result.fileId,
-              publishUrl: result.publishUrl || getPublicDriveDownloadUrl(result.fileId),
-              driveProxyUrl: result.driveProxyUrl || result.url,
-              playbackUrl,
-              playbackStorageKey,
-              mimeType,
-              size: result.size || item.file.size,
-              fileType: mimeType.startsWith("video/") ? "video" : "image",
-              folder: "Content Engine Uploads",
-              addedBy: currentUser.name,
-              workspaceId,
-              usedIn: cardId,
-            }).catch((err) => console.error("[media-picker] media_assets sync failed:", err));
+            try {
+              await ensureMediaAsset({
+                name: item.file.name,
+                url: playbackUrl || result.driveProxyUrl || result.url,
+                fileId: result.fileId,
+                publishUrl: result.publishUrl || getPublicDriveDownloadUrl(result.fileId),
+                driveProxyUrl: result.driveProxyUrl || result.url,
+                playbackUrl,
+                playbackStorageKey,
+                mimeType,
+                size: result.size || item.file.size,
+                fileType: mimeType.startsWith("video/") ? "video" : "image",
+                folder: "Content Engine Uploads",
+                addedBy: currentUser.name,
+                workspaceId,
+                usedIn: cardId,
+              });
+            } catch (err) {
+              mediaAssetSyncFailures += 1;
+              const errorMessage = uploadErrorMessage(err);
+              console.error("[media-picker] media_assets sync failed:", err);
+              try {
+                await reportUploadFailure({
+                  phase: "media_picker_media_asset_sync",
+                  route: "/api/drive/upload-failure",
+                  uploadPath: uploadPathForSize(item.file),
+                  cardId,
+                  workspaceId,
+                  folder,
+                  fileName: item.file.name,
+                  mimeType,
+                  fileSize: item.file.size,
+                  errorMessage,
+                  errorDetail: err instanceof Error ? err.stack : undefined,
+                });
+              } catch (reportErr) {
+                console.error("[media-picker] media_assets sync telemetry failed:", reportErr);
+              }
+            }
           }
           warmBrowserImagePreview(result.driveProxyUrl || result.url, { mimeType, fileName: item.file.name });
         }
@@ -464,6 +492,14 @@ export function MediaPicker({
           else selections.forEach(onSelect);
         }
         if (selections.length > 0) {
+          if (mediaAssetSyncFailures > 0) {
+            addToast(
+              mediaAssetSyncFailures === 1
+                ? "Uploaded, but saving one file to Media Library failed. The post attachment still worked."
+                : `Uploaded, but saving ${mediaAssetSyncFailures} files to Media Library failed. The post attachments still worked.`,
+              "warning",
+            );
+          }
           addToast(selections.length === 1 ? `${selections[0].name} uploaded` : `${selections.length} files uploaded`, "success");
           onClose();
         }
@@ -584,6 +620,19 @@ export function MediaPicker({
                   </button>
                   <span className="text-[10px] text-gray-400 tabular-nums shrink-0">{filteredMedia.length}</span>
                 </div>
+
+                {mediaLoadError && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+                    <span className="min-w-0 flex-1">Media Library could not refresh. Last loaded files are still shown.</span>
+                    <button
+                      type="button"
+                      onClick={() => setMediaReloadNonce((value) => value + 1)}
+                      className="rounded-md border border-amber-300/70 px-2 py-1 font-medium text-amber-950 transition-colors hover:bg-amber-100 dark:border-amber-400/30 dark:text-amber-100 dark:hover:bg-amber-400/10"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                )}
 
                 {filteredMedia.length > 0 ? (
                   <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">

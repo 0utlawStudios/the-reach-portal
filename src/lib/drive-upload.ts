@@ -65,6 +65,11 @@ export interface UploadFailureReport {
   errorDetail?: string;
 }
 
+type ResumableUploadSession = {
+  uploadUri: string;
+  uploadToken: string;
+};
+
 // Interactive-friendly backoff. The old [2000, 8000, 32000] meant a single
 // transient hiccup cost up to 42s of dead waiting (and the proxy path re-sent
 // the whole file each time). Worst case is now ~11s.
@@ -402,7 +407,7 @@ async function getUploadSession(
   folder: string,
   cardId: string | undefined,
   workspaceId: string | undefined,
-): Promise<string> {
+): Promise<ResumableUploadSession> {
   const headers = await getAuthHeaders(workspaceId);
   const res = await fetchWithTimeout("/api/drive/upload", {
     method: "POST",
@@ -420,14 +425,15 @@ async function getUploadSession(
     throw await errorFromResponse(res);
   }
 
-  const data = await res.json();
-  if (!data.uploadUri) throw new Error("No uploadUri returned from session endpoint");
-  return data.uploadUri;
+	  const data = await res.json();
+	  if (!data.uploadUri) throw new Error("No uploadUri returned from session endpoint");
+	  if (!data.uploadToken) throw new Error("No upload token returned from session endpoint");
+	  return { uploadUri: data.uploadUri, uploadToken: data.uploadToken };
 }
 
 async function uploadResumableChunk(
   file: File,
-  uploadUri: string,
+  session: ResumableUploadSession,
   folder: string,
   accessToken: string | undefined,
   workspaceId: string | undefined,
@@ -458,7 +464,8 @@ async function uploadResumableChunk(
     xhr.open("POST", "/api/drive/upload-chunk", true);
     xhr.setRequestHeader("Content-Type", mimeType);
     xhr.setRequestHeader("Content-Range", `bytes ${start}-${end}/${total}`);
-    xhr.setRequestHeader("X-Upload-Uri", uploadUri);
+	    xhr.setRequestHeader("X-Upload-Uri", session.uploadUri);
+	    xhr.setRequestHeader("X-Upload-Token", session.uploadToken);
     xhr.setRequestHeader("X-File-Name", file.name);
     xhr.setRequestHeader("X-Drive-Folder", folder);
     if (accessToken) xhr.setRequestHeader("Authorization", `Bearer ${accessToken}`);
@@ -529,7 +536,7 @@ function isResumableChunkRetryableInPlace(error: Error): boolean {
 
 async function putResumableChunkWithRetry(
   file: File,
-  uploadUri: string,
+  session: ResumableUploadSession,
   folder: string,
   accessToken: string | undefined,
   workspaceId: string | undefined,
@@ -540,7 +547,7 @@ async function putResumableChunkWithRetry(
   let lastError: Error | null = null;
   for (let attempt = 0; attempt <= CHUNK_RETRY_DELAYS.length; attempt++) {
     try {
-      return await uploadResumableChunk(file, uploadUri, folder, accessToken, workspaceId, start, end, onProgress);
+	      return await uploadResumableChunk(file, session, folder, accessToken, workspaceId, start, end, onProgress);
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
       if (!isResumableChunkRetryableInPlace(lastError) || attempt >= CHUNK_RETRY_DELAYS.length) {
@@ -556,7 +563,7 @@ async function putResumableChunkWithRetry(
 
 async function putToGoogle(
   file: File,
-  uploadUri: string,
+  session: ResumableUploadSession,
   folder: string,
   workspaceId: string | undefined,
   onProgress: ProgressCallback | undefined
@@ -564,7 +571,7 @@ async function putToGoogle(
   const accessToken = await getAccessTokenFromCurrentSession();
   for (let start = 0; start < file.size; start += DRIVE_RESUMABLE_CHUNK_SIZE) {
     const end = Math.min(start + DRIVE_RESUMABLE_CHUNK_SIZE, file.size) - 1;
-    const result = await putResumableChunkWithRetry(file, uploadUri, folder, accessToken, workspaceId, start, end, onProgress);
+	    const result = await putResumableChunkWithRetry(file, session, folder, accessToken, workspaceId, start, end, onProgress);
     if (result.done) {
       if (!result.fileId) throw new Error("Storage did not return a file ID after upload");
       return result.fileId;
@@ -611,12 +618,12 @@ async function uploadViaResumable(
   // at all, so any dropped connection failed the whole upload outright.
   const fileId = await withRetry(
     async () => {
-      const uploadUri = await getUploadSession(file, folder, cardId, workspaceId);
+	      const session = await getUploadSession(file, folder, cardId, workspaceId);
       onProgress?.(5);
       // The uploadUri is pre-authenticated, but browsers cannot PUT to it
       // directly because Google omits CORS headers. Send bounded same-origin
       // chunks and let the server forward them to the session URL.
-      return putToGoogle(file, uploadUri, folder, workspaceId, onProgress);
+	      return putToGoogle(file, session, folder, workspaceId, onProgress);
     },
     "Direct upload",
     PUT_RETRY_DELAYS,

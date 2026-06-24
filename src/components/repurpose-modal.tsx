@@ -53,63 +53,85 @@ export function RepurposeModal({ card, onClose }: Props) {
     setPlatforms((prev) => prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!title.trim() || platforms.length === 0 || !scheduledDate || !scheduledTime || submitting) return;
     setSubmitting(true);
-    createCard({
-      title: mode === "repost" ? `[Repost] ${card.title}` : `[Repurposed] ${title.trim()}`,
-      stage: "ideas",
-      platforms,
-      contentType,
-      thumbnailUrl: card.thumbnailUrl,
-      caption: caption.trim() || undefined,
-      hook: hook.trim() || undefined,
-      scheduledDate,
-      scheduledTime,
-      sourceVault: card.sourceVault
-        ? {
-            designLink: card.sourceVault.designLink,
-            driveFolder: card.sourceVault.driveFolder,
-            rawFiles: card.sourceVault.rawFiles?.map((file) => ({ ...file })),
-          }
-        : undefined,
-      assetSource: card.assetSource,
-      licenseFileId: card.licenseFileId,
-    });
-    // Sync thumbnail and rawFiles to Media Library (dedup-safe)
-    if (card.thumbnailUrl) {
-      ensureMediaAsset({
-        name: card.title || "Repurposed asset",
-        url: card.thumbnailUrl,
-        fileType: card.contentType === "video" || card.contentType === "reel" ? "video" : "image",
-        folder: "Content Engine Uploads",
-        addedBy: currentUser.name,
-        workspaceId,
-      }).catch((err) => console.error("[repurpose] media_assets sync failed:", err));
-    }
-    if (card.sourceVault?.rawFiles) {
-      for (const rf of card.sourceVault.rawFiles) {
-        if (!isDrivePublishableMediaMime(rf.mimeType, rf.name)) continue;
-        ensureMediaAsset({
-          name: rf.name,
-          url: rf.playbackUrl || rf.driveProxyUrl || rf.url,
-          fileId: rf.fileId,
-          publishUrl: rf.publishUrl,
-          driveProxyUrl: rf.driveProxyUrl,
-          playbackUrl: rf.playbackUrl,
-          playbackStorageKey: rf.playbackStorageKey,
-          mimeType: rf.mimeType,
-          size: rf.size,
-          fileType: rf.mimeType?.startsWith("video") ? "video" : "image",
+    try {
+      const createdCard = await createCard({
+        title: mode === "repost" ? `[Repost] ${card.title}` : `[Repurposed] ${title.trim()}`,
+        stage: "ideas",
+        platforms,
+        contentType,
+        thumbnailUrl: card.thumbnailUrl,
+        caption: caption.trim() || undefined,
+        hook: hook.trim() || undefined,
+        scheduledDate,
+        scheduledTime,
+        sourceVault: card.sourceVault
+          ? {
+              designLink: card.sourceVault.designLink,
+              driveFolder: card.sourceVault.driveFolder,
+              rawFiles: card.sourceVault.rawFiles?.map((file) => ({ ...file })),
+            }
+          : undefined,
+        assetSource: card.assetSource,
+        licenseFileId: card.licenseFileId,
+      });
+      if (!createdCard) return;
+
+      const mediaSyncs: Promise<void>[] = [];
+      if (card.thumbnailUrl) {
+        mediaSyncs.push(ensureMediaAsset({
+          name: card.title || "Repurposed asset",
+          url: card.thumbnailUrl,
+          fileId: card.sourceVault?.thumbnailFileId,
+          driveProxyUrl: card.thumbnailUrl,
+          mimeType: card.sourceVault?.thumbnailMimeType,
+          fileType: card.contentType === "video" || card.contentType === "reel" ? "video" : "image",
           folder: "Content Engine Uploads",
           addedBy: currentUser.name,
           workspaceId,
-        }).catch((err) => console.error("[repurpose] media_assets sync failed:", err));
+          usedIn: createdCard.id,
+        }));
       }
+      if (card.sourceVault?.rawFiles) {
+        for (const rf of card.sourceVault.rawFiles) {
+          if (!isDrivePublishableMediaMime(rf.mimeType, rf.name)) continue;
+          mediaSyncs.push(ensureMediaAsset({
+            name: rf.name,
+            url: rf.playbackUrl || rf.driveProxyUrl || rf.url,
+            fileId: rf.fileId,
+            publishUrl: rf.publishUrl,
+            driveProxyUrl: rf.driveProxyUrl,
+            playbackUrl: rf.playbackUrl,
+            playbackStorageKey: rf.playbackStorageKey,
+            mimeType: rf.mimeType,
+            size: rf.size,
+            fileType: rf.mimeType?.startsWith("video") ? "video" : "image",
+            folder: "Content Engine Uploads",
+            addedBy: currentUser.name,
+            workspaceId,
+            usedIn: createdCard.id,
+          }));
+        }
+      }
+
+      const syncResults = await Promise.allSettled(mediaSyncs);
+      const failedSyncs = syncResults.filter((result) => result.status === "rejected");
+      for (const failure of failedSyncs) {
+        console.error("[repurpose] media_assets sync failed:", failure);
+      }
+      if (failedSyncs.length > 0) {
+        addToast("Repurposed post saved, but Media Library linking needs a retry.", "warning");
+      }
+      addToast("Content repurposed and added to Ideas.", "success");
+      onClose();
+    } catch (err) {
+      console.error("[repurpose] create failed:", err);
+      addToast("Repurpose failed. The new post was not created.", "error");
+    } finally {
+      setSubmitting(false);
     }
-    addToast(`Content repurposed and added to Ideas.`, "success");
-    setSubmitting(false);
-    onClose();
   };
 
   // Step 1: Choose repurpose type
@@ -268,7 +290,7 @@ export function RepurposeModal({ card, onClose }: Props) {
                 className="reach-secondary-action flex-1 h-10 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-[12px] shadow-sm disabled:opacity-40"
               >
                 <CheckCircle className="w-3.5 h-3.5 mr-1.5" />
-                {mode === "repost" ? "Schedule Repost" : "Send to The Reach"}
+                {submitting ? "Saving..." : mode === "repost" ? "Schedule Repost" : "Send to The Reach"}
               </Button>
             </div>
           </div>

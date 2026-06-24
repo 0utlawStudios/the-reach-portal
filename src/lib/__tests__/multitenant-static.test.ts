@@ -85,6 +85,27 @@ describe("multitenant static contracts", () => {
     expect(migration).toContain("ON public.brand_playbook(workspace_id)");
   });
 
+  it("fails AI jobs closed when linked plan or post rows do not match the job workspace", () => {
+    const aiWorker = source("src/lib/ai/worker.ts");
+    expect(aiWorker).toContain("loadGenerateContext(sb, job.plan_row_id, job.workspace_id)");
+    expect(aiWorker).toMatch(
+      /from\("content_plan_rows"\)[\s\S]{0,160}\.eq\("id", planRowId\)[\s\S]{0,80}\.eq\("workspace_id", workspaceId\)/,
+    );
+    expect(aiWorker).toMatch(
+      /from\("content_plan_rows"\)[\s\S]{0,180}\.eq\("id", job\.plan_row_id\)[\s\S]{0,80}\.eq\("workspace_id", job\.workspace_id\)/,
+    );
+    expect(aiWorker).toMatch(
+      /from\("posts"\)[\s\S]{0,180}\.eq\("id", sourcePost\.id\)[\s\S]{0,80}\.eq\("workspace_id", job\.workspace_id\)/,
+    );
+    expect(aiWorker).toMatch(
+      /from\("ai_generation_jobs"\)[\s\S]{0,260}\.eq\("id", jobId\)[\s\S]{0,80}\.eq\("workspace_id", job\.workspace_id\)/,
+    );
+    expect(aiWorker).toContain("async function failJob(sb: SupabaseClient, job: Pick<AiJobRow, \"id\" | \"workspace_id\">");
+    expect(aiWorker).toMatch(
+      /from\("content_plan_rows"\)[\s\S]{0,180}\.eq\("id", data\.plan_row_id\)[\s\S]{0,80}\.eq\("workspace_id", job\.workspace_id\)/,
+    );
+  });
+
   it("scopes publish queue, audit logs, and presence to the active workspace", () => {
     const migration = source("supabase/migrations/0055_media_tenant_hardening.sql");
     expect(migration).toContain("DROP VIEW IF EXISTS public.v_publish_queue");

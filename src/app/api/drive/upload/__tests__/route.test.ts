@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMocks = vi.hoisted(() => ({
   requireBearerTeamRole: vi.fn(),
@@ -32,6 +32,8 @@ vi.mock("@/lib/google-drive", () => ({
 
 import { POST } from "../route";
 
+const originalServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
 function makeRequest(body: Record<string, unknown>) {
   return {
     headers: { get: () => "Bearer test-token" },
@@ -41,6 +43,7 @@ function makeRequest(body: Record<string, unknown>) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  process.env.SUPABASE_SERVICE_ROLE_KEY = "test-upload-session-secret";
   authMocks.requireBearerTeamRole.mockResolvedValue({
     user: { id: "user-1" },
     email: "creator@example.com",
@@ -52,6 +55,11 @@ beforeEach(() => {
   driveMocks.getRootFolderId.mockReturnValue("root-folder");
   driveMocks.ensureSubfolder.mockResolvedValue("sub-folder");
   driveMocks.createResumableUploadSession.mockResolvedValue({ uploadUri: "https://upload.example/session" });
+});
+
+afterEach(() => {
+  if (originalServiceKey === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+  else process.env.SUPABASE_SERVICE_ROLE_KEY = originalServiceKey;
 });
 
 describe("POST /api/drive/upload", () => {
@@ -133,9 +141,10 @@ describe("POST /api/drive/upload", () => {
     }));
 
     expect(res.status).toBe(200);
-    const data = await res.json();
-    expect(data.uploadUri).toBe("https://upload.example/session");
-    expect(driveMocks.createResumableUploadSession).toHaveBeenCalledWith(
+	    const data = await res.json();
+	    expect(data.uploadUri).toBe("https://upload.example/session");
+	    expect(data.uploadToken).toMatch(/^v1\.\d+\./);
+	    expect(driveMocks.createResumableUploadSession).toHaveBeenCalledWith(
       expect.stringMatching(/Reach_Hero\.PNG$/),
       "image/png",
       "sub-folder",

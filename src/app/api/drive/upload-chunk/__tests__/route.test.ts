@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DRIVE_RESUMABLE_CHUNK_SIZE } from "@/lib/drive-policy";
+import { signDriveUploadSession } from "@/lib/drive-upload-session";
 
 const authMocks = vi.hoisted(() => ({
   requireBearerTeamRole: vi.fn(),
@@ -31,7 +32,23 @@ vi.mock("@/lib/upload-alerts", () => ({
 import { POST } from "../route";
 
 const originalFetch = global.fetch;
+const originalServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const uploadUri = "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&upload_id=test-upload";
+const workspaceId = "00000000-0000-0000-0000-000000000001";
+const userId = "user-1";
+
+function uploadToken(overrides: Partial<Parameters<typeof signDriveUploadSession>[0]> = {}) {
+  return signDriveUploadSession({
+    uploadUri,
+    workspaceId,
+    userId,
+    folder: "media-library",
+    fileName: "hero.png",
+    mimeType: "image/png",
+    fileSize: 4,
+    ...overrides,
+  });
+}
 
 function makeRequest({
   body = new Uint8Array([1, 2, 3, 4]),
@@ -59,11 +76,12 @@ function makeRequest({
 beforeEach(() => {
   vi.clearAllMocks();
   authMocks.requireBearerTeamRole.mockResolvedValue({
-    user: { id: "user-1" },
+    user: { id: userId },
     email: "creator@example.com",
     role: "editor",
-    workspaceId: "00000000-0000-0000-0000-000000000001",
+    workspaceId,
   });
+  process.env.SUPABASE_SERVICE_ROLE_KEY = "test-upload-session-secret";
   rateLimitMocks.getClientIp.mockReturnValue("1.2.3.4");
   rateLimitMocks.consume.mockResolvedValue({ allowed: true, remaining: 240, resetAt: new Date() });
   alertMocks.notifyUploadFailure.mockResolvedValue({ emailSent: false, telegramSent: false });
@@ -76,6 +94,8 @@ beforeEach(() => {
 
 afterEach(() => {
   global.fetch = originalFetch;
+  if (originalServiceKey === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+  else process.env.SUPABASE_SERVICE_ROLE_KEY = originalServiceKey;
 });
 
 describe("POST /api/drive/upload-chunk", () => {
@@ -97,13 +117,32 @@ describe("POST /api/drive/upload-chunk", () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
+  it("rejects chunks with a missing upload session token", async () => {
+    const res = await POST(makeRequest());
+
+    expect(res.status).toBe(403);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("rejects chunks when the upload session token belongs to another workspace", async () => {
+    const res = await POST(makeRequest({
+      headers: { "x-upload-token": uploadToken({ workspaceId: "11111111-1111-4111-8111-111111111111" }) },
+    }));
+
+    expect(res.status).toBe(403);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
   it("rejects chunks over the safe per-request size", async () => {
     const body = new Uint8Array(DRIVE_RESUMABLE_CHUNK_SIZE + 1);
 
-    const res = await POST(makeRequest({
-      body,
-      headers: { "content-range": `bytes 0-${body.byteLength - 1}/${body.byteLength}` },
-    }));
+	    const res = await POST(makeRequest({
+	      body,
+	      headers: {
+	        "content-range": `bytes 0-${body.byteLength - 1}/${body.byteLength}`,
+	        "x-upload-token": uploadToken({ fileSize: body.byteLength }),
+	      },
+	    }));
 
     expect(res.status).toBe(413);
     expect(global.fetch).not.toHaveBeenCalled();
@@ -115,10 +154,13 @@ describe("POST /api/drive/upload-chunk", () => {
       headers: { Range: "bytes=0-3" },
     }))) as typeof fetch;
 
-    const res = await POST(makeRequest({
-      body: new Uint8Array([1, 2, 3, 4]),
-      headers: { "content-range": "bytes 0-3/8" },
-    }));
+	    const res = await POST(makeRequest({
+	      body: new Uint8Array([1, 2, 3, 4]),
+	      headers: {
+	        "content-range": "bytes 0-3/8",
+	        "x-upload-token": uploadToken({ fileSize: 8 }),
+	      },
+	    }));
     const data = await res.json();
 
     expect(res.status).toBe(200);
@@ -134,7 +176,9 @@ describe("POST /api/drive/upload-chunk", () => {
   });
 
   it("returns the final Drive file id when Google completes the resumable upload", async () => {
-    const res = await POST(makeRequest());
+	    const res = await POST(makeRequest({
+	      headers: { "x-upload-token": uploadToken() },
+	    }));
     const data = await res.json();
 
     expect(res.status).toBe(200);
@@ -155,7 +199,9 @@ describe("POST /api/drive/upload-chunk", () => {
       },
     }), { status: 403 }))) as typeof fetch;
 
-    const res = await POST(makeRequest());
+	    const res = await POST(makeRequest({
+	      headers: { "x-upload-token": uploadToken() },
+	    }));
     const data = await res.json();
 
     expect(res.status).toBe(429);

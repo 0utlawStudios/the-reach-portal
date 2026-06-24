@@ -20,6 +20,7 @@ import {
   sanitizeUnknownUploadError,
   statusForSanitizedDriveError,
 } from "@/lib/drive-errors";
+import { signDriveUploadSession } from "@/lib/drive-upload-session";
 
 export const maxDuration = 60;
 
@@ -113,6 +114,15 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       uploadUri,
+      uploadToken: signDriveUploadSession({
+        uploadUri,
+        workspaceId: authContext.workspaceId,
+        userId: user.id,
+        folder,
+        fileName,
+        mimeType,
+        fileSize,
+      }),
       isImage,
       driveFileName,
     });

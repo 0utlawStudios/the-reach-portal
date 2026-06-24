@@ -49,6 +49,12 @@ type HeicDecodedImage = {
   data: Uint8ClampedArray | Uint8Array;
 };
 
+type PreviewCandidate = {
+  preview: Buffer;
+  cacheState: "HIT" | "MISS";
+  writeCacheKey?: string;
+};
+
 class ImagePreviewHttpError extends Error {
   status: number;
 
@@ -189,6 +195,38 @@ async function withPreviewTimeout<T>(promise: Promise<T>, timeoutMs: number, lab
   } finally {
     if (timer) clearTimeout(timer);
   }
+}
+
+async function firstAvailablePreview(candidates: Promise<PreviewCandidate | null>[]): Promise<PreviewCandidate | null> {
+  if (candidates.length === 0) return null;
+  return new Promise((resolve) => {
+    let pending = candidates.length;
+    let settled = false;
+
+    const finishEmpty = () => {
+      pending -= 1;
+      if (!settled && pending === 0) {
+        settled = true;
+        resolve(null);
+      }
+    };
+
+    for (const candidate of candidates) {
+      candidate
+        .then((result) => {
+          if (settled) return;
+          if (result) {
+            settled = true;
+            resolve(result);
+            return;
+          }
+          finishEmpty();
+        })
+        .catch(() => {
+          if (!settled) finishEmpty();
+        });
+    }
+  });
 }
 
 function assertFallbackPixelSafe(width: number, height: number) {
@@ -513,20 +551,25 @@ export async function GET(request: NextRequest) {
     const previewSize = previewSizeFromRequest(request);
     const cacheWorkspaceId = auth.workspaceId || meta.appProperties?.workspaceId;
     const cacheKey = previewCacheKey(fileId, cacheWorkspaceId, previewSize);
-    const cached = await readCachedPreview(admin, cacheKey);
-    if (cached) return browserSafeJpegResponse(cached, auth.signed, previewSize, "HIT");
-
     if (previewSize === "thumb") {
-      const derivedThumbnail = await buildThumbnailFromCachedPreview(admin, fileId, cacheWorkspaceId);
-      if (derivedThumbnail) {
-        schedulePreviewCacheWrite(admin, cacheKey, derivedThumbnail);
-        return browserSafeJpegResponse(derivedThumbnail, auth.signed, previewSize, "HIT");
+      const fastThumbnail = await firstAvailablePreview([
+        readCachedPreview(admin, cacheKey).then((preview) => preview ? { preview, cacheState: "HIT" } : null),
+        buildThumbnailFromCachedPreview(admin, fileId, cacheWorkspaceId)
+          .then((preview) => preview ? { preview, cacheState: "HIT", writeCacheKey: cacheKey } : null),
+        fetchDriveThumbnail(meta.thumbnailLink, token)
+          .then((preview) => preview ? { preview, cacheState: "MISS", writeCacheKey: cacheKey } : null),
+      ]);
+      if (fastThumbnail) {
+        if (fastThumbnail.writeCacheKey) schedulePreviewCacheWrite(admin, fastThumbnail.writeCacheKey, fastThumbnail.preview);
+        return browserSafeJpegResponse(fastThumbnail.preview, auth.signed, previewSize, fastThumbnail.cacheState);
       }
-    }
-
-    if (previewSize === "full") {
-      const legacyCached = await readCachedPreview(admin, legacyPreviewCacheKey(fileId, cacheWorkspaceId));
-      if (legacyCached) return browserSafeJpegResponse(legacyCached, auth.signed, previewSize, "HIT");
+    } else {
+      const cachedFull = await firstAvailablePreview([
+        readCachedPreview(admin, cacheKey).then((preview) => preview ? { preview, cacheState: "HIT" } : null),
+        readCachedPreview(admin, legacyPreviewCacheKey(fileId, cacheWorkspaceId))
+          .then((preview) => preview ? { preview, cacheState: "HIT" } : null),
+      ]);
+      if (cachedFull) return browserSafeJpegResponse(cachedFull.preview, auth.signed, previewSize, cachedFull.cacheState);
     }
 
     const preview = await buildPreviewOnce(cacheKey, async () => {

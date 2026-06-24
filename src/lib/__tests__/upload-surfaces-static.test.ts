@@ -244,6 +244,7 @@ describe("Drive upload surfaces", () => {
     expect(imagePreview).toContain("after(() => writeCachedPreview");
     expect(imagePreview).toContain("MAX_DRIVE_THUMBNAIL_BYTES");
     expect(imagePreview).toContain("Drive thumbnail normalization");
+    expect(imagePreview).toContain("firstAvailablePreview");
 
     const imagePreviewLib = source("src/lib/image-preview.ts");
     expect(imagePreviewLib).toContain("warmBrowserImagePreview");
@@ -260,7 +261,7 @@ describe("Drive upload surfaces", () => {
     expect(previewImage).toContain("shouldLoadPrimary");
     expect(previewImage).toContain("FALLBACK_PREVIEW_LOAD_TIMEOUT_MS");
     expect(previewImage).toContain("timedOutFallbackSrcs");
-    expect(previewImage).toContain("!fallbackSrc || wantsFullPreview || fallbackLoaded || fallbackFailed || fallbackTimedOut");
+    expect(previewImage).toContain("!fallbackSrc || fallbackLoaded || fallbackFailed || fallbackTimedOut");
 
     for (const file of [
       "src/components/pages/media-page.tsx",
@@ -358,6 +359,54 @@ describe("Drive upload surfaces", () => {
     expect(createPost).toContain("const createdCard = await createCard");
     expect(createPost).toContain("if (!createdCard) return;");
     expect(createPost).toContain("usedIn: createdCard.id");
+  });
+
+  it("preserves Media Library rows when a refresh fails", () => {
+    const mediaPage = source("src/components/pages/media-page.tsx");
+    expect(mediaPage).toContain("mediaLoadError");
+    expect(mediaPage).toContain("setMediaReloadNonce");
+    expect(mediaPage).toContain("Showing the last loaded files");
+    expect(mediaPage).not.toContain("setMedia([])");
+
+    const mediaPicker = source("src/components/media-picker.tsx");
+    expect(mediaPicker).toContain("mediaLoadError");
+    expect(mediaPicker).toContain("setMediaReloadNonce");
+    expect(mediaPicker).toContain("Showing the last loaded files");
+    expect(mediaPicker).not.toContain("setMediaAssets([])");
+  });
+
+  it("confirms repurpose saves before success and surfaces media mirror failures", () => {
+    const repurpose = source("src/components/repurpose-modal.tsx");
+    expect(repurpose).toContain("const createdCard = await createCard");
+    expect(repurpose).toContain("if (!createdCard) return;");
+    expect(repurpose).toContain("Promise.allSettled(mediaSyncs)");
+    expect(repurpose).toContain("usedIn: createdCard.id");
+    expect(repurpose).toContain("Media Library linking needs a retry");
+
+    const mediaPicker = source("src/components/media-picker.tsx");
+    expect(mediaPicker).toContain("await ensureMediaAsset");
+    expect(mediaPicker).toContain("media_picker_media_asset_sync");
+    expect(mediaPicker).toContain("The post attachment still worked");
+  });
+
+  it("binds resumable Drive chunk uploads to the minted workspace session", () => {
+    const session = source("src/lib/drive-upload-session.ts");
+    expect(session).toContain("signDriveUploadSession");
+    expect(session).toContain("verifyDriveUploadSessionToken");
+    expect(session).toContain("workspaceId");
+    expect(session).toContain("userId");
+
+    const upload = source("src/app/api/drive/upload/route.ts");
+    expect(upload).toContain("uploadToken: signDriveUploadSession");
+
+    const chunk = source("src/app/api/drive/upload-chunk/route.ts");
+    expect(chunk).toContain('request.headers.get("x-upload-token")');
+    expect(chunk).toContain("verifyDriveUploadSessionToken");
+    expect(chunk).toContain("Upload session does not belong to this workspace");
+
+    const client = source("src/lib/drive-upload.ts");
+    expect(client).toContain("uploadToken");
+    expect(client).toContain('xhr.setRequestHeader("X-Upload-Token", session.uploadToken)');
   });
 
   it("renders support attachments through the authenticated proxy, not stored signed URLs", () => {

@@ -68,11 +68,12 @@ interface LoadCtxResult {
   recent: Array<{ hook: string | null; caption: string | null; title: string | null }>;
 }
 
-async function loadGenerateContext(sb: SupabaseClient, planRowId: string): Promise<LoadCtxResult> {
+async function loadGenerateContext(sb: SupabaseClient, planRowId: string, workspaceId: string): Promise<LoadCtxResult> {
   const { data: plan, error: planErr } = await sb
     .from("content_plan_rows")
     .select("*")
     .eq("id", planRowId)
+    .eq("workspace_id", workspaceId)
     .single();
   if (planErr || !plan) throw new Error(`Plan row not found: ${planErr?.message || "missing"}`);
 
@@ -110,12 +111,13 @@ async function loadReviseContext(sb: SupabaseClient, postId: string, workspaceId
   // as the topic, which drifted away from the operator's original instructions.
   let originalTopic: string | null = null;
   let originalNotes: string | null = null;
-  if (post.plan_row_id) {
-    const { data: planRow } = await sb
-      .from("content_plan_rows")
-      .select("topic, notes")
-      .eq("id", post.plan_row_id)
-      .maybeSingle();
+	  if (post.plan_row_id) {
+	    const { data: planRow } = await sb
+	      .from("content_plan_rows")
+	      .select("topic, notes")
+	      .eq("id", post.plan_row_id)
+	      .eq("workspace_id", workspaceId)
+	      .maybeSingle();
     if (planRow) {
       originalTopic = (planRow.topic as string | null) ?? null;
       originalNotes = (planRow.notes as string | null) ?? null;
@@ -258,12 +260,22 @@ async function claimJob(sb: SupabaseClient, jobId: string): Promise<AiJobRow | n
   return data as AiJobRow;
 }
 
-async function failJob(sb: SupabaseClient, jobId: string, errMessage: string) {
-  await sb.from("ai_generation_jobs").update({ status: "failed", error: errMessage.slice(0, 2000), completed_at: new Date().toISOString() }).eq("id", jobId);
+async function failJob(sb: SupabaseClient, job: Pick<AiJobRow, "id" | "workspace_id">, errMessage: string) {
+  await sb.from("ai_generation_jobs")
+    .update({ status: "failed", error: errMessage.slice(0, 2000), completed_at: new Date().toISOString() })
+    .eq("id", job.id)
+    .eq("workspace_id", job.workspace_id);
   // Find the plan row attached so we can mark it failed too.
-  const { data } = await sb.from("ai_generation_jobs").select("plan_row_id").eq("id", jobId).single();
+  const { data } = await sb.from("ai_generation_jobs")
+    .select("plan_row_id")
+    .eq("id", job.id)
+    .eq("workspace_id", job.workspace_id)
+    .single();
   if (data?.plan_row_id) {
-    await sb.from("content_plan_rows").update({ status: "failed", last_error: errMessage.slice(0, 2000) }).eq("id", data.plan_row_id);
+    await sb.from("content_plan_rows")
+      .update({ status: "failed", last_error: errMessage.slice(0, 2000) })
+      .eq("id", data.plan_row_id)
+      .eq("workspace_id", job.workspace_id);
   }
 }
 
@@ -305,6 +317,7 @@ export async function runGenerateJob(jobId: string): Promise<void> {
       .from("content_plan_rows")
       .select("generated_post_id, status")
       .eq("id", job.plan_row_id)
+      .eq("workspace_id", job.workspace_id)
       .maybeSingle();
     if (planCheck?.generated_post_id) {
       await sb.from("ai_generation_jobs")
@@ -314,11 +327,12 @@ export async function runGenerateJob(jobId: string): Promise<void> {
           error: "duplicate_job: plan row already has a generated post",
           result: { duplicate_of: planCheck.generated_post_id },
         })
-        .eq("id", jobId);
+        .eq("id", jobId)
+        .eq("workspace_id", job.workspace_id);
       return;
     }
 
-    const { plan, brand, recent } = await loadGenerateContext(sb, job.plan_row_id);
+    const { plan, brand, recent } = await loadGenerateContext(sb, job.plan_row_id, job.workspace_id);
     const resolved = resolveAspect({
       mediaType: (plan.media_type || "image") as never,
       format: (plan.format || "single") as never,
@@ -418,7 +432,8 @@ export async function runGenerateJob(jobId: string): Promise<void> {
           asset_urls: reSigned.map((a) => aiAssetPublishUrl(a.storageKey)),
           thumbnail_url: reSigned[0] ? aiAssetProxyUrl(reSigned[0].storageKey) : null,
         })
-        .eq("id", inserted.id);
+        .eq("id", inserted.id)
+        .eq("workspace_id", job.workspace_id);
     } catch (err) {
       console.error("[ai-worker] asset rename failed (non-fatal)", err);
     }
@@ -435,7 +450,8 @@ export async function runGenerateJob(jobId: string): Promise<void> {
       generated_post_id: inserted.id,
       last_error: null,
       cost_usd: costUsd,
-    }).eq("id", plan.id);
+    }).eq("id", plan.id)
+      .eq("workspace_id", job.workspace_id);
 
     await sb.from("ai_generation_jobs").update({
       status: "completed",
@@ -450,7 +466,8 @@ export async function runGenerateJob(jobId: string): Promise<void> {
         quality_score: textResult.caption.quality_score,
         precharge_estimate: estimate,
       },
-    }).eq("id", jobId);
+    }).eq("id", jobId)
+      .eq("workspace_id", job.workspace_id);
 
     await recordAudit(sb, job.workspace_id, "ai_post_generated", inserted.id, {
       job_id: jobId,
@@ -469,7 +486,7 @@ export async function runGenerateJob(jobId: string): Promise<void> {
     const msg = err instanceof Error ? err.message : String(err);
     const capHit = err instanceof DailyCapExceeded || err instanceof PerRowCapExceeded;
     const detailed = capHit ? msg : msg;
-    await failJob(sb, jobId, detailed);
+	    await failJob(sb, job, detailed);
     await recordAudit(sb, job.workspace_id, "ai_post_generate_failed", null, { job_id: jobId, error: detailed, cap_hit: capHit });
   }
 }
@@ -558,6 +575,7 @@ export async function runReviseJob(jobId: string): Promise<void> {
       .from("posts")
       .select("stage")
       .eq("id", sourcePost.id)
+      .eq("workspace_id", job.workspace_id)
       .maybeSingle();
     if (latest?.stage && latest.stage !== "revision_needed") {
       await sb.from("ai_generation_jobs")
@@ -566,7 +584,8 @@ export async function runReviseJob(jobId: string): Promise<void> {
           completed_at: new Date().toISOString(),
           error: `aborted: post left revision_needed (now ${latest.stage}) before revise completed`,
         })
-        .eq("id", jobId);
+        .eq("id", jobId)
+        .eq("workspace_id", job.workspace_id);
       return;
     }
 
@@ -595,7 +614,8 @@ export async function runReviseJob(jobId: string): Promise<void> {
       await sb
         .from("content_plan_rows")
         .update({ status: "generated", last_error: null })
-        .eq("id", sourcePost.plan_row_id);
+        .eq("id", sourcePost.plan_row_id)
+        .eq("workspace_id", job.workspace_id);
     }
     await sb.from("ai_generation_jobs").update({
       status: "completed",
@@ -606,7 +626,8 @@ export async function runReviseJob(jobId: string): Promise<void> {
       images_generated: usage.images,
       cost_usd: costUsd,
       result: { revision_of: sourcePost.id, quality_score: textResult.caption.quality_score },
-    }).eq("id", jobId);
+    }).eq("id", jobId)
+      .eq("workspace_id", job.workspace_id);
 
     await recordAudit(sb, job.workspace_id, "ai_post_revised", sourcePost.id, {
       job_id: jobId,
@@ -630,12 +651,13 @@ export async function runReviseJob(jobId: string): Promise<void> {
           completed_at: new Date().toISOString(),
           error: msg,
         })
-        .eq("id", jobId);
+        .eq("id", jobId)
+        .eq("workspace_id", job.workspace_id);
       await recordAudit(sb, job.workspace_id, "ai_post_revise_cancelled", job.post_id || null, { job_id: jobId, error: msg });
       return;
-    }
-    const capHit = err instanceof DailyCapExceeded || err instanceof PerRowCapExceeded;
-    await failJob(sb, jobId, msg);
+	    }
+	    const capHit = err instanceof DailyCapExceeded || err instanceof PerRowCapExceeded;
+	    await failJob(sb, job, msg);
     await recordAudit(sb, job.workspace_id, "ai_post_revise_failed", job.post_id || null, { job_id: jobId, error: msg, cap_hit: capHit });
   }
 }

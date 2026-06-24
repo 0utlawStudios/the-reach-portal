@@ -17,6 +17,7 @@ import {
   sanitizeUnknownUploadError,
   statusForSanitizedDriveError,
 } from "@/lib/drive-errors";
+import { verifyDriveUploadSessionToken } from "@/lib/drive-upload-session";
 
 export const maxDuration = 60;
 
@@ -75,6 +76,7 @@ export async function POST(request: NextRequest) {
     }
 
     const uploadUri = validUploadUri(request.headers.get("x-upload-uri"));
+    const uploadToken = request.headers.get("x-upload-token");
     fileName = request.headers.get("x-file-name") || "upload";
     const folderHeader = request.headers.get("x-drive-folder");
     folder = VALID_DRIVE_FOLDERS.includes(folderHeader as DriveFolderName)
@@ -92,8 +94,18 @@ export async function POST(request: NextRequest) {
     if (contentRange.total > MAX_DRIVE_MEDIA_FILE_SIZE) {
       return jsonResponse({ error: `File exceeds ${MAX_DRIVE_MEDIA_FILE_SIZE / (1024 * 1024)}MB limit.` }, 413);
     }
-
     fileSize = contentRange.total;
+    if (!verifyDriveUploadSessionToken(uploadToken, {
+      uploadUri,
+      workspaceId: authContext.workspaceId,
+      userId: user.id,
+      folder,
+      fileName,
+      mimeType,
+      fileSize,
+    })) {
+      return jsonResponse({ error: "Upload session does not belong to this workspace" }, 403);
+    }
     const chunk = Buffer.from(await request.arrayBuffer());
     const expectedLength = contentRange.end - contentRange.start + 1;
     if (chunk.length !== expectedLength) {

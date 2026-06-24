@@ -172,7 +172,10 @@ function installMixedUploadMocks(run: MixedUploadRun, onSend?: (timeout: number)
       const body = JSON.parse(String(init?.body || "{}")) as { fileName?: string };
       const fileName = body.fileName || "upload.bin";
       run.sessionRequests.push(fileName);
-      return Response.json({ uploadUri: `https://upload.example/${encodeURIComponent(fileName)}` });
+	      return Response.json({
+	        uploadUri: `https://upload.example/${encodeURIComponent(fileName)}`,
+	        uploadToken: `token-${fileName}`,
+	      });
     }
     if (url === "/api/drive/finalize") {
       const body = JSON.parse(String(init?.body || "{}")) as { fileId?: string; folder?: string };
@@ -220,7 +223,7 @@ function installStallingChunkUploadMocks(run: StallingChunkRun) {
 
       const range = this.headers["content-range"] || "";
       run.chunkRanges.push(range);
-      run.chunkUploadUris.push(this.headers["x-upload-uri"] || "");
+	      run.chunkUploadUris.push(`${this.headers["x-upload-uri"] || ""}|${this.headers["x-upload-token"] || ""}`);
 
       if (!run.stalledOnce && range.startsWith("bytes 0-")) {
         run.stalledOnce = true;
@@ -251,7 +254,10 @@ function installStallingChunkUploadMocks(run: StallingChunkRun) {
       const body = JSON.parse(String(init?.body || "{}")) as { fileName?: string };
       const fileName = body.fileName || "upload.bin";
       run.sessionRequests.push(fileName);
-      return Response.json({ uploadUri: `https://upload.example/session-${run.sessionRequests.length}` });
+	      return Response.json({
+	        uploadUri: `https://upload.example/session-${run.sessionRequests.length}`,
+	        uploadToken: `token-${run.sessionRequests.length}`,
+	      });
     }
     if (url === "/api/drive/finalize") {
       const body = JSON.parse(String(init?.body || "{}")) as { fileId?: string; folder?: string };
