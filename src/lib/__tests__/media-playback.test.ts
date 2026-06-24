@@ -75,4 +75,18 @@ describe("uploadVideoPlaybackCopy", () => {
     await vi.advanceTimersByTimeAsync(playbackUploadBudgetMs(10) + 10);
     await assertion;
   });
+
+  it("fails closed instead of hanging when playback target minting never settles", async () => {
+    vi.useFakeTimers();
+    globalThis.fetch = vi.fn((_input, init) => new Promise((_resolve, reject) => {
+      const signal = (init as RequestInit | undefined)?.signal;
+      signal?.addEventListener("abort", () => reject(new Error("aborted")));
+    })) as unknown as typeof fetch;
+
+    const pending = uploadVideoPlaybackCopy(makeVideo("target-stalled.mp4", 10));
+    const assertion = expect(pending).rejects.toThrow(/target timed out/i);
+    await vi.advanceTimersByTimeAsync(15_010);
+    await assertion;
+    expect(mockUploadToSignedUrl).not.toHaveBeenCalled();
+  });
 });

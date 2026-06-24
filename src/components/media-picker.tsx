@@ -365,8 +365,7 @@ export function MediaPicker({
                   errorMessage,
                   errorDetail: err instanceof Error ? err.stack : undefined,
                 });
-                addToast(`Playback optimization failed for ${item.file.name}`, "error");
-                continue;
+                addToast(`Uploaded ${item.file.name}, but fast video playback was skipped.`, "warning");
               }
             }
           }

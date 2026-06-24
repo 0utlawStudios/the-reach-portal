@@ -5,7 +5,7 @@ import { useState, useRef, useEffect } from "react";
 import { usePipeline } from "@/lib/pipeline-context";
 import { useToast } from "@/lib/toast-context";
 import { supabase } from "@/lib/supabaseClient";
-import { withStorageUploadTimeout } from "@/lib/storage-upload-timeout";
+import { withStorageControlTimeout, withStorageUploadTimeout } from "@/lib/storage-upload-timeout";
 import { Button } from "@/components/ui/button";
 import { X, AlertTriangle, Send, Paperclip, Image as ImageIcon, Trash2 } from "lucide-react";
 import { MentionTextarea } from "./mention-textarea";
@@ -59,7 +59,10 @@ export function KickbackModal() {
       let attachmentUrl: string | undefined;
 
       if (file && useSupabase) {
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { user } } = await withStorageControlTimeout(
+          supabase.auth.getUser(),
+          "Revision attachment session check",
+        );
         if (!user?.id) {
           addToast("Please sign in again before attaching a revision file.", "error");
           return;

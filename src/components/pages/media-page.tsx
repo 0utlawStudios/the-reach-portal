@@ -689,7 +689,7 @@ export function MediaPage() {
               </div>
               <div className="flex-1 overflow-hidden bg-gray-50 dark:bg-black flex items-center justify-center p-4 relative group/lb" onTouchStart={onSwipeStart} onTouchEnd={onSwipeEnd}>
                 {lightboxAsset.type === "image" ? (
-                  <PreviewImage src={lightboxAsset.url} alt={lightboxAsset.name} fileName={lightboxAsset.name} className="max-w-full max-h-[60vh] object-contain rounded-lg select-none" draggable={false} />
+                  <PreviewImage src={lightboxAsset.url} alt={lightboxAsset.name} fileName={lightboxAsset.name} className="w-full h-[60vh] max-w-full max-h-[60vh] object-contain rounded-lg select-none" draggable={false} />
                 ) : (
                   <video src={lightboxAsset.url} controls playsInline preload="metadata" className="max-w-full max-h-[60vh] object-contain rounded-lg bg-black" />
                 )}

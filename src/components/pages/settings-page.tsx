@@ -14,7 +14,7 @@ import { PresenceDot } from "@/components/presence-dot";
 import { PresenceLabel } from "@/components/presence-label";
 import { usePipeline } from "@/lib/pipeline-context";
 import { setManualPostedMovesEnabled, useManualPostedMovesSetting } from "@/lib/manual-posted-settings";
-import { withStorageUploadTimeout } from "@/lib/storage-upload-timeout";
+import { withStorageControlTimeout, withStorageUploadTimeout } from "@/lib/storage-upload-timeout";
 import { ThemeSelector } from "@/components/theme-selector";
 import { fetchAllAuditLogs, AuditEntry } from "@/lib/audit";
 import { History, ArrowUpRight, Search, FileText as FileTextIcon, Shield as ShieldIcon, AtSign, ArrowUpDown, Filter, ChevronRight, CheckCircle, Activity, Clock as ClockIcon } from "lucide-react";
@@ -186,7 +186,10 @@ function EditProfileModal({
 
     try {
       if (useDb) {
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { user } } = await withStorageControlTimeout(
+          supabase.auth.getUser(),
+          "Profile photo session check",
+        );
         if (!user?.id) {
           addToast("Upload failed. Please sign in again.", "error");
           return;

@@ -405,6 +405,12 @@ export function AssetReviewDrawer() {
       const existingFiles = selectedCard.sourceVault?.rawFiles || [];
       const rawFiles = [...existingFiles];
       const failures = items.filter((item) => item.error || !item.result);
+      let playbackModule: typeof import("@/lib/media-playback") | null = null;
+      try {
+        playbackModule = await import("@/lib/media-playback");
+      } catch {
+        playbackModule = null;
+      }
       for (const item of items) {
         const file = item.file;
         if (item.error || !item.result) {
@@ -433,8 +439,7 @@ export function AssetReviewDrawer() {
         const isFirstFile = rawFiles.length === 0;
         let playbackUrl: string | undefined;
         let playbackStorageKey: string | undefined;
-        if (resultMimeType.startsWith("video/")) {
-          const playbackModule = await import("@/lib/media-playback");
+        if (resultMimeType.startsWith("video/") && playbackModule) {
           if (playbackModule.canUploadPlaybackCopy(file, resultMimeType)) {
             try {
               setUploadingFileName(`Optimizing playback for ${file.name}`);
@@ -456,8 +461,7 @@ export function AssetReviewDrawer() {
                 errorMessage,
                 errorDetail: err instanceof Error ? err.stack : undefined,
               });
-              addToast(`Playback optimization failed for ${file.name}. Try the upload again.`, "error");
-              continue;
+              addToast(`Uploaded ${file.name}, but fast video playback was skipped.`, "warning");
             }
           }
         }
@@ -1369,7 +1373,7 @@ export function AssetReviewDrawer() {
           className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 sm:p-8"
         >
           <div className="relative max-w-4xl w-full max-h-[90dvh]">
-            <CardThumbnailMedia card={selectedCard} className="max-w-full max-h-[85dvh] object-contain mx-auto" />
+            <CardThumbnailMedia card={selectedCard} className="w-full h-[85dvh] max-w-full max-h-[85dvh] object-contain mx-auto" />
             <button
               onClick={() => setShowLightbox(false)}
               aria-label="Close preview"

@@ -1,5 +1,28 @@
 const STORAGE_UPLOAD_BASE_MS = 30_000;
 const STORAGE_UPLOAD_MIN_THROUGHPUT_BYTES_PER_SEC = 40 * 1024; // 40 KiB/s
+export const STORAGE_CONTROL_PLANE_TIMEOUT_MS = 15_000;
+
+async function withTimeout<T>(
+  operation: PromiseLike<T>,
+  timeoutMs: number,
+  label: string,
+): Promise<T> {
+  const TIMED_OUT = Symbol("storage-timeout");
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const outcome = await Promise.race<T | typeof TIMED_OUT>([
+    operation,
+    new Promise<typeof TIMED_OUT>((resolve) => {
+      timer = setTimeout(() => resolve(TIMED_OUT), timeoutMs);
+    }),
+  ]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+
+  if (outcome === TIMED_OUT) {
+    throw new Error(`${label} timed out. Check your connection and try again.`);
+  }
+  return outcome;
+}
 
 export function storageUploadBudgetMs(fileSize: number): number {
   const bytes = Number.isFinite(fileSize) && fileSize > 0 ? fileSize : 0;
@@ -12,19 +35,12 @@ export async function withStorageUploadTimeout<T>(
   fileSize: number,
   label = "Storage upload",
 ): Promise<T> {
-  const TIMED_OUT = Symbol("storage-upload-timeout");
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const outcome = await Promise.race<T | typeof TIMED_OUT>([
-    upload,
-    new Promise<typeof TIMED_OUT>((resolve) => {
-      timer = setTimeout(() => resolve(TIMED_OUT), storageUploadBudgetMs(fileSize));
-    }),
-  ]).finally(() => {
-    if (timer) clearTimeout(timer);
-  });
+  return withTimeout(upload, storageUploadBudgetMs(fileSize), label);
+}
 
-  if (outcome === TIMED_OUT) {
-    throw new Error(`${label} timed out. Check your connection and try again.`);
-  }
-  return outcome;
+export async function withStorageControlTimeout<T>(
+  operation: PromiseLike<T>,
+  label = "Storage request",
+): Promise<T> {
+  return withTimeout(operation, STORAGE_CONTROL_PLANE_TIMEOUT_MS, label);
 }

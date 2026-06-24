@@ -3,7 +3,7 @@
 // days; the kanban card fetcher will refresh them when within 24h of expiry.
 
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { withStorageUploadTimeout } from "@/lib/storage-upload-timeout";
+import { withStorageControlTimeout, withStorageUploadTimeout } from "@/lib/storage-upload-timeout";
 
 const BUCKET = "ai-assets";
 const SIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
@@ -42,7 +42,10 @@ export async function uploadAssets(args: {
       `AI asset upload ${storageKey}`,
     );
     if (upErr) throw new Error(`Upload failed for ${storageKey}: ${upErr.message}`);
-    const { data, error: signErr } = await sb.storage.from(BUCKET).createSignedUrl(storageKey, SIGNED_URL_TTL_SECONDS);
+    const { data, error: signErr } = await withStorageControlTimeout(
+      sb.storage.from(BUCKET).createSignedUrl(storageKey, SIGNED_URL_TTL_SECONDS),
+      `AI asset signed URL ${storageKey}`,
+    );
     if (signErr || !data?.signedUrl) {
       throw new Error(`Signed URL failed for ${storageKey}: ${signErr?.message || "unknown"}`);
     }
@@ -62,7 +65,10 @@ export async function resignAssets(
   const sb = adminClient();
   const out: string[] = [];
   for (const key of storageKeys) {
-    const { data, error } = await sb.storage.from(BUCKET).createSignedUrl(key, SIGNED_URL_TTL_SECONDS);
+    const { data, error } = await withStorageControlTimeout(
+      sb.storage.from(BUCKET).createSignedUrl(key, SIGNED_URL_TTL_SECONDS),
+      `AI asset re-sign ${key}`,
+    );
     if (error || !data?.signedUrl) {
       throw new Error(`Re-sign failed for ${key}: ${error?.message || "unknown"}`);
     }
@@ -90,14 +96,20 @@ export async function rekeyAndResignAssets(args: {
       ? args.newPrefix + a.storageKey.slice(args.oldPrefix.length)
       : a.storageKey;
     if (newKey !== a.storageKey) {
-      const { error: moveErr } = await sb.storage.from(BUCKET).move(a.storageKey, newKey);
+      const { error: moveErr } = await withStorageControlTimeout(
+        sb.storage.from(BUCKET).move(a.storageKey, newKey),
+        `AI asset move ${a.storageKey}`,
+      );
       if (moveErr) {
         // Couldn't move — keep the old key + URL so the post stays usable.
         out.push(a);
         continue;
       }
     }
-    const { data, error: signErr } = await sb.storage.from(BUCKET).createSignedUrl(newKey, SIGNED_URL_TTL_SECONDS);
+    const { data, error: signErr } = await withStorageControlTimeout(
+      sb.storage.from(BUCKET).createSignedUrl(newKey, SIGNED_URL_TTL_SECONDS),
+      `AI asset re-sign ${newKey}`,
+    );
     if (signErr || !data?.signedUrl) {
       // Move succeeded but re-sign failed — fall back to the old (now stale) URL.
       out.push({ storageKey: newKey, signedUrl: a.signedUrl });

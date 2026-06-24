@@ -123,6 +123,29 @@ describe("GET /api/media/image-preview", () => {
     expect(heicDecodeMocks.decode.all).not.toHaveBeenCalled();
   });
 
+  it("converts HEIC by filename when Drive reports a misleading image MIME", async () => {
+    driveMocks.getFileMetadata.mockResolvedValueOnce({
+      id: FILE_ID,
+      name: "IMG_3748.HEIC",
+      mimeType: "image/jpeg",
+      size: 2 * 1024 * 1024,
+      parents: ["media-library-folder"],
+    });
+
+    const res = await GET(makeRequest());
+    const body = new Uint8Array(await res.arrayBuffer());
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/jpeg");
+    expect(Array.from(body)).toEqual([0xff, 0xd8, 0xff]);
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      expect.stringContaining(`/files/${FILE_ID}?alt=media`),
+      expect.objectContaining({
+        headers: { Authorization: "Bearer drive-token" },
+      }),
+    );
+  });
+
   it("falls back to heic-decode when Sharp rejects iPhone HEVC HEIC input", async () => {
     const heic = installHeicDecodeImages(4, 3);
     sharpMocks.pipeline.toBuffer

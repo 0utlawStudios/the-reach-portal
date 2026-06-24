@@ -39,6 +39,7 @@ export function canUploadPlaybackCopy(file: File, mimeType = normalizeDriveMimeT
 // the primary upload), so failing fast is strictly better than hanging.
 const PLAYBACK_UPLOAD_BASE_MS = 30_000;
 const PLAYBACK_UPLOAD_MIN_THROUGHPUT_BYTES_PER_SEC = 40 * 1024; // 40 KB/s ≈ 320 kbps
+const PLAYBACK_TARGET_TIMEOUT_MS = 15_000;
 
 export function playbackUploadBudgetMs(fileSize: number): number {
   const bytes = Number.isFinite(fileSize) && fileSize > 0 ? fileSize : 0;
@@ -51,16 +52,29 @@ async function getPlaybackUploadTarget(file: File, cardId?: string): Promise<Pla
   const headers: HeadersInit = { "Content-Type": "application/json" };
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
 
-  const res = await fetch("/api/media/playback-upload", {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      fileName: file.name,
-      mimeType: normalizeDriveMimeType(file.type, file.name),
-      fileSize: file.size,
-      cardId,
-    }),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PLAYBACK_TARGET_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch("/api/media/playback-upload", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        fileName: file.name,
+        mimeType: normalizeDriveMimeType(file.type, file.name),
+        fileSize: file.size,
+        cardId,
+      }),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (controller.signal.aborted) {
+      throw new Error("Playback upload target timed out. The original video uploaded fine; playback optimization can be retried.");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (!res.ok) {
     const detail = await res.text().catch(() => "");

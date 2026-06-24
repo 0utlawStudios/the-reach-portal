@@ -118,6 +118,7 @@ describe("Drive upload surfaces", () => {
     expect(mediaPage).toContain("toggleManualUsed");
     expect(mediaPage).toContain('aria-label={`${asset.name} video preview`}');
     expect(mediaPage).toContain('className="max-w-full max-h-[60vh] object-contain rounded-lg bg-black"');
+    expect(mediaPage).toContain('className="w-full h-[60vh] max-w-full max-h-[60vh] object-contain rounded-lg select-none"');
 
     const drawer = source("src/components/asset-review-drawer.tsx");
     expect(drawer).toContain("const displayUrl = file.playbackUrl || file.driveProxyUrl || file.url");
@@ -141,5 +142,41 @@ describe("Drive upload surfaces", () => {
 
     const setup = source("src/app/auth/setup/page.tsx");
     expect(setup).toMatch(/catch \(err\) \{[\s\S]*?setLoading\(false\)/);
+  });
+
+  it("keeps Drive video uploads when optional playback optimization fails", () => {
+    const createPost = source("src/components/create-post-modal.tsx");
+    expect(createPost).toContain("let playbackModule: typeof import(\"@/lib/media-playback\") | null = null");
+    expect(createPost).toContain("Uploaded ${f.name}, but fast video playback was skipped.");
+    expect(createPost).not.toContain("Retry this upload before creating the post.");
+
+    const mediaPicker = source("src/components/media-picker.tsx");
+    expect(mediaPicker).toMatch(
+      /phase: "media_picker_playback_upload"[\s\S]*?Uploaded \$\{item\.file\.name\}, but fast video playback was skipped\.[\s\S]*?selections\.push/,
+    );
+    expect(mediaPicker).not.toContain("Playback optimization failed for ${item.file.name}");
+
+    const drawer = source("src/components/asset-review-drawer.tsx");
+    expect(drawer).toContain("let playbackModule: typeof import(\"@/lib/media-playback\") | null = null");
+    expect(drawer).toMatch(
+      /phase: "drawer_playback_upload"[\s\S]*?Uploaded \$\{file\.name\}, but fast video playback was skipped\.[\s\S]*?const publishUrl/,
+    );
+    expect(drawer).not.toContain("Playback optimization failed for ${file.name}");
+  });
+
+  it("bounds storage and support control-plane requests that gate media work", () => {
+    const support = source("src/lib/support/use-support.ts");
+    expect(support).toContain("SUPPORT_API_TIMEOUT_MS");
+    expect(support).toContain("new AbortController()");
+    expect(support).toContain("Support request timed out");
+
+    for (const file of [
+      "src/components/pages/settings-page.tsx",
+      "src/components/kickback-modal.tsx",
+      "src/lib/ai/upload.ts",
+    ]) {
+      const contents = source(file);
+      expect(contents, `${file} must import the shared storage control timeout`).toContain("withStorageControlTimeout");
+    }
   });
 });

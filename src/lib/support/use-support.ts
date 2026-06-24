@@ -23,6 +23,7 @@ import type {
 } from "./types";
 
 const BUCKET = "support-attachments";
+const SUPPORT_API_TIMEOUT_MS = 15_000;
 
 export interface AttachmentClaim {
   storageKey: string;
@@ -40,14 +41,27 @@ async function apiFetch<T>(
   token: string,
   options: { method?: string; body?: unknown } = {},
 ): Promise<T> {
-  const res = await fetch(path, {
-    method: options.method || "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      ...(options.body !== undefined ? { "Content-Type": "application/json" } : {}),
-    },
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), SUPPORT_API_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(path, {
+      method: options.method || "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(options.body !== undefined ? { "Content-Type": "application/json" } : {}),
+      },
+      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (controller.signal.aborted) {
+      throw new Error("Support request timed out. Check your connection and try again.");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
   let json: unknown = null;
   try {
     json = await res.json();

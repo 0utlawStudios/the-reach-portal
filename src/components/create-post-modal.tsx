@@ -239,41 +239,46 @@ export function CreatePostModal({ open, onClose }: Props) {
 
       if (!uploadFailed) {
         const withPlayback = filesForCard.map((file) => ({ ...file }));
-        const playbackModule = await import("@/lib/media-playback");
-        for (let i = 0; i < withPlayback.length; i++) {
-          const f = withPlayback[i];
-          const rawMimeType = f.mimeType || (f.type === "video" ? "video/mp4" : "image/jpeg");
-          if (!rawMimeType.startsWith("video/") || f.playbackUrl) continue;
-          const sourceFile = rawFilesRef.current.get(f.id);
-          if (!sourceFile) continue;
-          if (!playbackModule.canUploadPlaybackCopy(sourceFile, rawMimeType)) continue;
+        let playbackModule: typeof import("@/lib/media-playback") | null = null;
+        try {
+          playbackModule = await import("@/lib/media-playback");
+        } catch {
+          playbackModule = null;
+        }
+        if (playbackModule) {
+          for (let i = 0; i < withPlayback.length; i++) {
+            const f = withPlayback[i];
+            const rawMimeType = f.mimeType || (f.type === "video" ? "video/mp4" : "image/jpeg");
+            if (!rawMimeType.startsWith("video/") || f.playbackUrl) continue;
+            const sourceFile = rawFilesRef.current.get(f.id);
+            if (!sourceFile) continue;
+            if (!playbackModule.canUploadPlaybackCopy(sourceFile, rawMimeType)) continue;
 
-          try {
-            setUploadingFileName(`Optimizing playback for ${f.name}`);
-            setUploadProgress(0);
-            const playback = await playbackModule.uploadVideoPlaybackCopy(sourceFile);
-            withPlayback[i] = {
-              ...f,
-              playbackUrl: playback.playbackUrl,
-              playbackStorageKey: playback.playbackStorageKey,
-            };
-          } catch (err) {
-            const errorMessage = uploadErrorMessage(err);
-            await reportUploadFailure({
-              phase: "create_post_playback_upload",
-              route: "/api/media/playback-upload",
-              uploadPath: uploadPathForSize(sourceFile),
-              postTitle: title.trim(),
-              folder: "raw-files",
-              fileName: sourceFile.name,
-              mimeType: rawMimeType,
-              fileSize: sourceFile.size,
-              errorMessage,
-              errorDetail: err instanceof Error ? err.stack : undefined,
-            });
-            addToast(`Couldn't optimize playback for ${f.name}. Retry this upload before creating the post.`, "error");
-            uploadFailed = true;
-            break;
+            try {
+              setUploadingFileName(`Optimizing playback for ${f.name}`);
+              setUploadProgress(0);
+              const playback = await playbackModule.uploadVideoPlaybackCopy(sourceFile);
+              withPlayback[i] = {
+                ...f,
+                playbackUrl: playback.playbackUrl,
+                playbackStorageKey: playback.playbackStorageKey,
+              };
+            } catch (err) {
+              const errorMessage = uploadErrorMessage(err);
+              await reportUploadFailure({
+                phase: "create_post_playback_upload",
+                route: "/api/media/playback-upload",
+                uploadPath: uploadPathForSize(sourceFile),
+                postTitle: title.trim(),
+                folder: "raw-files",
+                fileName: sourceFile.name,
+                mimeType: rawMimeType,
+                fileSize: sourceFile.size,
+                errorMessage,
+                errorDetail: err instanceof Error ? err.stack : undefined,
+              });
+              addToast(`Uploaded ${f.name}, but fast video playback was skipped.`, "warning");
+            }
           }
         }
         filesForCard = withPlayback;

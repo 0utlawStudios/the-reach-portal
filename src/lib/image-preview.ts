@@ -1,7 +1,7 @@
 import { normalizeDriveMimeType } from "@/lib/drive-policy";
 import { driveFileIdFromUrl } from "@/lib/media-resolver";
 
-const HEIC_IMAGE_MIME_TYPES = new Set(["image/heic", "image/heif"]);
+const HEIC_IMAGE_MIME_TYPES = new Set(["image/heic", "image/heic-sequence", "image/heif", "image/heif-sequence"]);
 const HEIC_EXT_RE = /\.(hei[cf])(?:[?#].*)?$/i;
 
 export function isHeicLikeImage(mimeType?: unknown, fileNameOrUrl?: unknown): boolean {

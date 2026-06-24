@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const DRIVE_FILE_ID_RE = /^[a-zA-Z0-9_-]{20,80}$/;
-const HEIC_IMAGE_MIME_TYPES = new Set(["image/heic", "image/heif"]);
+const HEIC_IMAGE_MIME_TYPES = new Set(["image/heic", "image/heic-sequence", "image/heif", "image/heif-sequence"]);
 const MAX_PREVIEW_SOURCE_BYTES = 50 * 1024 * 1024;
 const PREVIEW_MAX_EDGE = 1600;
 // heic-decode allocates raw RGBA in JS/WASM before Sharp can resize it. Cap the
@@ -246,7 +246,8 @@ export async function GET(request: NextRequest) {
   try {
     const [meta, token] = await Promise.all([getFileMetadata(fileId), getAccessToken()]);
     const mimeType = normalizeDriveMimeType(meta.mimeType, meta.name);
-    if (!HEIC_IMAGE_MIME_TYPES.has(mimeType)) {
+    const extensionMimeType = normalizeDriveMimeType("", meta.name);
+    if (!HEIC_IMAGE_MIME_TYPES.has(mimeType) && !HEIC_IMAGE_MIME_TYPES.has(extensionMimeType)) {
       return NextResponse.json({ error: "Preview conversion is only supported for HEIC/HEIF images" }, { status: 415 });
     }
     if (!Number.isFinite(meta.size) || meta.size <= 0 || meta.size > MAX_PREVIEW_SOURCE_BYTES) {
