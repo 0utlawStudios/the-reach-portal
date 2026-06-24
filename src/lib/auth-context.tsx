@@ -51,6 +51,7 @@ const DEFAULT_USER: UserProfile = {
 };
 const ACCESS_REVALIDATE_MS = 10 * 60 * 1000;
 const SERVER_SESSION_COOKIE_TIMEOUT_MS = 5_000;
+const WORKSPACE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 type AuthSession = NonNullable<Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"]>;
 
 /** Build a profile from auth metadata, with proper capitalization */
@@ -97,9 +98,13 @@ async function provisionWorkspace(token: string): Promise<{
   status: ProvisionStatus;
   message: string | null;
 }> {
+  const requestedWorkspaceId = workspaceIdFromLocation();
   try {
     const res = await fetch("/api/workspace/provision", {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(requestedWorkspaceId ? { "X-Workspace-Id": requestedWorkspaceId } : {}),
+      },
     });
     const body = await res.json().catch(() => ({}));
     if (res.ok && body?.workspaceId) {
@@ -115,6 +120,12 @@ async function provisionWorkspace(token: string): Promise<{
   } catch {
     return { result: null, status: "error", message: "Workspace provisioning failed." };
   }
+}
+
+function workspaceIdFromLocation(): string | null {
+  if (typeof window === "undefined") return null;
+  const workspaceId = new URLSearchParams(window.location.search).get("workspaceId")?.trim() || "";
+  return WORKSPACE_ID_RE.test(workspaceId) ? workspaceId : null;
 }
 
 async function syncServerSessionCookie(token: string): Promise<void> {

@@ -73,6 +73,30 @@ async function resolveWorkspaceId(
   return data.id;
 }
 
+function hasWorkspaceContext(request: NextRequest, body: ForgotPasswordBody): boolean {
+  return Boolean(
+    (typeof body.workspaceId === "string" && body.workspaceId.trim()) ||
+    (typeof body.workspaceSlug === "string" && body.workspaceSlug.trim()) ||
+    (typeof body.workspace === "string" && body.workspace.trim()) ||
+    request.headers.get("x-workspace-id") ||
+    request.headers.get("x-workspace-slug"),
+  );
+}
+
+async function resolveOptionalWorkspaceId(
+  admin: ReturnType<typeof getAdminClient>,
+  request: NextRequest,
+  body: ForgotPasswordBody,
+): Promise<string | null> {
+  if (!hasWorkspaceContext(request, body)) return null;
+  try {
+    return await resolveWorkspaceId(admin, request, body);
+  } catch (err) {
+    console.error("[forgot-password] workspace context ignored:", err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Rate limit: 5 requests per minute per IP. Fails open on infrastructure
@@ -172,7 +196,13 @@ export async function POST(request: NextRequest) {
     // Build our own confirmation URL
     const siteUrl = getSiteUrl();
     const tokenHash = linkData.properties.hashed_token;
-    const confirmUrl = `${siteUrl}/auth/confirm?token_hash=${encodeURIComponent(tokenHash)}&type=recovery`;
+    const recoveryWorkspaceId = await resolveOptionalWorkspaceId(admin, request, body);
+    const confirmParams = new URLSearchParams({
+      token_hash: tokenHash,
+      type: "recovery",
+    });
+    if (recoveryWorkspaceId) confirmParams.set("workspaceId", recoveryWorkspaceId);
+    const confirmUrl = `${siteUrl}/auth/confirm?${confirmParams.toString()}`;
 
     // Send branded password reset email
     try {

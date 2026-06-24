@@ -4,6 +4,7 @@ import { join } from "path";
 
 const SETUP_SRC = readFileSync(join(process.cwd(), "src/app/auth/setup/page.tsx"), "utf8");
 const AUTH_CONFIRM_SRC = readFileSync(join(process.cwd(), "src/app/auth/confirm/route.ts"), "utf8");
+const RESET_PASSWORD_SRC = readFileSync(join(process.cwd(), "src/app/auth/reset-password/page.tsx"), "utf8");
 const COMPLETE_SETUP_ROUTE_SRC = readFileSync(join(process.cwd(), "src/app/api/auth/complete-setup/route.ts"), "utf8");
 const TEAM_INVITE_ROUTE_SRC = readFileSync(join(process.cwd(), "src/app/api/team/invite/route.ts"), "utf8");
 const TEAM_RESEND_INVITE_ROUTE_SRC = readFileSync(join(process.cwd(), "src/app/api/team/resend-invite/route.ts"), "utf8");
@@ -45,10 +46,14 @@ describe("invite setup flow hardening", () => {
   it("carries workspace context through invite confirmation and setup activation", () => {
     expect(AUTH_CONFIRM_SRC).toContain("workspaceId");
     expect(AUTH_CONFIRM_SRC).toContain("/auth/setup${setupQuery.size");
+    expect(AUTH_CONFIRM_SRC).toContain("/auth/reset-password${resetQuery.size");
     expect(SETUP_SRC).toContain("workspaceIdFromUrl");
     expect(SETUP_SRC).toContain('"X-Workspace-Id"');
+    expect(RESET_PASSWORD_SRC).toContain("postResetLoginPath");
+    expect(RESET_PASSWORD_SRC).toContain("window.location.pathname}${window.location.search");
     expect(COMPLETE_SETUP_ROUTE_SRC).toContain("workspaceIdFromRequest");
     expect(COMPLETE_SETUP_ROUTE_SRC).toContain("Multiple invitations found");
+    expect(AUTH_CONTEXT_SRC).toContain('"X-Workspace-Id": requestedWorkspaceId');
     for (const src of [TEAM_INVITE_ROUTE_SRC, TEAM_RESEND_INVITE_ROUTE_SRC, TEAM_APPROVE_REQUEST_ROUTE_SRC, TEAM_CHANGE_EMAIL_ROUTE_SRC]) {
       expect(src).toContain("workspaceId=${encodeURIComponent");
     }

@@ -17,6 +17,17 @@ function getSupabase() {
   return createClient(url, key);
 }
 
+function workspaceIdFromUrl(): string | null {
+  if (typeof window === "undefined") return null;
+  const workspaceId = new URLSearchParams(window.location.search).get("workspaceId")?.trim() || "";
+  return workspaceId || null;
+}
+
+function postResetLoginPath(): string {
+  const workspaceId = workspaceIdFromUrl();
+  return workspaceId ? `/?workspaceId=${encodeURIComponent(workspaceId)}` : "/";
+}
+
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -37,7 +48,7 @@ export default function ResetPasswordPage() {
       const accessToken = params.get("access_token");
       const refreshToken = params.get("refresh_token");
       if (hash) {
-        window.history.replaceState({}, "", window.location.pathname);
+        window.history.replaceState({}, "", `${window.location.pathname}${window.location.search}`);
       }
       if (accessToken) {
         const supabase = getSupabase();
@@ -78,7 +89,7 @@ export default function ResetPasswordPage() {
       await supabase.auth.signOut();
 
       setSuccess(true);
-      setTimeout(() => { window.location.href = "/"; }, 2500);
+      setTimeout(() => { window.location.href = postResetLoginPath(); }, 2500);
     } catch {
       // A thrown/rejected request (offline, network blip) must never leave the
       // button spinning with no message. Surface it; finally re-enables submit.

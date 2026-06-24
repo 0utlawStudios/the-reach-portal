@@ -118,6 +118,26 @@ describe("POST /api/auth/forgot-password", () => {
     ]);
   });
 
+  it("preserves workspace context on recovery links when the request provides it", async () => {
+    linkResults = [{ data: { properties: { hashed_token: "hash+with/slash=" } }, error: null }];
+
+    const res = await POST(makeRequest({
+      email: "aldridge@ten80ten.com",
+      workspaceId: "00000000-0000-0000-0000-000000000001",
+    }));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true });
+    expect(recoveryUrl).toBe("https://thereach.ten80ten.com/auth/confirm?token_hash=hash%2Bwith%2Fslash%3D&type=recovery&workspaceId=00000000-0000-0000-0000-000000000001");
+    expect(sentMessages).toHaveLength(1);
+    expect(operations).toEqual([
+      {
+        method: "generateLink",
+        payload: { type: "recovery", email: "aldridge@ten80ten.com" },
+      },
+    ]);
+  });
+
   it("sends a setup invite for an active team member without an Auth user", async () => {
     teamMember = { name: "Aldridge Dagos", role: "superadmin", status: "active" };
     linkResults = [

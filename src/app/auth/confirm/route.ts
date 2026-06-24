@@ -110,8 +110,13 @@ export async function GET(request: NextRequest) {
     return res;
   }
 
-  // type === "recovery" — exhaustive over VALID_TYPES
-  const res = NextResponse.redirect(`${siteUrl}/auth/reset-password#${params.toString()}`);
+  // type === "recovery" — exhaustive over VALID_TYPES. Preserve workspace
+  // context so multi-workspace users do not reset successfully and then hit a
+  // context-required provisioning error on the next login.
+  const resetQuery = new URLSearchParams();
+  if (workspaceId) resetQuery.set("workspaceId", workspaceId);
+  const resetPath = `/auth/reset-password${resetQuery.size ? `?${resetQuery.toString()}` : ""}`;
+  const res = NextResponse.redirect(`${siteUrl}${resetPath}#${params.toString()}`);
   attachTokenCookies(res, accessToken, refreshToken ?? null);
   return res;
 }
