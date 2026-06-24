@@ -123,4 +123,23 @@ describe("Drive upload surfaces", () => {
     expect(drawer).toContain("const displayUrl = file.playbackUrl || file.driveProxyUrl || file.url");
     expect(drawer).toContain('href={file.url}');
   });
+
+  it("bounds direct Supabase Storage uploads outside the Drive media path", () => {
+    for (const file of [
+      "src/lib/support/use-support.ts",
+      "src/components/pages/settings-page.tsx",
+      "src/app/auth/setup/page.tsx",
+      "src/components/kickback-modal.tsx",
+      "src/lib/ai/upload.ts",
+    ]) {
+      const contents = source(file);
+      expect(contents, `${file} must import the shared storage upload timeout`).toContain("withStorageUploadTimeout");
+      expect(contents, `${file} must not call storage upload without the timeout wrapper nearby`).toMatch(
+        /withStorageUploadTimeout\([\s\S]*?(?:uploadToSignedUrl|\.upload)\(/,
+      );
+    }
+
+    const setup = source("src/app/auth/setup/page.tsx");
+    expect(setup).toMatch(/catch \(err\) \{[\s\S]*?setLoading\(false\)/);
+  });
 });

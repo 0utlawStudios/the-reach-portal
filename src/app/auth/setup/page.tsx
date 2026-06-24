@@ -7,6 +7,7 @@ import { Lock, CheckCircle, AlertCircle, Eye, EyeOff, User, Phone, Shield, Camer
 import { AvatarCropModal } from "@/components/avatar-crop-modal";
 import { ToastProvider } from "@/lib/toast-context";
 import { ToastContainer } from "@/components/toast-container";
+import { withStorageUploadTimeout } from "@/lib/storage-upload-timeout";
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -187,7 +188,19 @@ export default function SetupPasswordPage() {
     if (avatarFile && user?.id) {
       const ext = avatarFile.name.split(".").pop() || "jpg";
       const path = `profiles/${user.id}/${Date.now()}.${ext}`;
-      const { error: uploadErr } = await supabase.storage.from("avatars").upload(path, avatarFile, { upsert: true, cacheControl: "31536000", contentType: avatarFile.type || "image/jpeg" });
+      let uploadErr: { message?: string } | null = null;
+      try {
+        const result = await withStorageUploadTimeout(
+          supabase.storage.from("avatars").upload(path, avatarFile, { upsert: true, cacheControl: "31536000", contentType: avatarFile.type || "image/jpeg" }),
+          avatarFile.size,
+          "Setup photo upload",
+        );
+        uploadErr = result.error;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to upload photo. Please try again.");
+        setLoading(false);
+        return;
+      }
       if (uploadErr) {
         setError("Failed to upload photo. Please try again.");
         setLoading(false);

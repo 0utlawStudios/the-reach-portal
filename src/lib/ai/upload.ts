@@ -3,6 +3,7 @@
 // days; the kanban card fetcher will refresh them when within 24h of expiry.
 
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { withStorageUploadTimeout } from "@/lib/storage-upload-timeout";
 
 const BUCKET = "ai-assets";
 const SIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
@@ -32,10 +33,14 @@ export async function uploadAssets(args: {
     const img = args.images[i];
     const ext = img.mime === "image/png" ? "png" : img.mime === "image/jpeg" ? "jpg" : "webp";
     const storageKey = `${args.workspaceId}/${args.postId}/slide-${i + 1}.${ext}`;
-    const { error: upErr } = await sb.storage.from(BUCKET).upload(storageKey, img.bytes, {
-      contentType: img.mime,
-      upsert: true,
-    });
+    const { error: upErr } = await withStorageUploadTimeout(
+      sb.storage.from(BUCKET).upload(storageKey, img.bytes, {
+        contentType: img.mime,
+        upsert: true,
+      }),
+      img.bytes.byteLength,
+      `AI asset upload ${storageKey}`,
+    );
     if (upErr) throw new Error(`Upload failed for ${storageKey}: ${upErr.message}`);
     const { data, error: signErr } = await sb.storage.from(BUCKET).createSignedUrl(storageKey, SIGNED_URL_TTL_SECONDS);
     if (signErr || !data?.signedUrl) {

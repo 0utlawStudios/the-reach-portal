@@ -10,6 +10,7 @@
 
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { withStorageUploadTimeout } from "@/lib/storage-upload-timeout";
 import { useAuth } from "@/lib/auth-context";
 import { refreshSupportAlert } from "./use-support-alert";
 import { rowToThread, rowToMessage } from "./types";
@@ -97,9 +98,13 @@ async function uploadFiles(files: File[], token: string): Promise<AttachmentClai
   await Promise.all(
     uploads.map(async (target, i) => {
       const file = files[i];
-      const { error } = await supabase.storage
-        .from(BUCKET)
-        .uploadToSignedUrl(target.storageKey, target.token, file);
+      const { error } = await withStorageUploadTimeout(
+        supabase.storage
+          .from(BUCKET)
+          .uploadToSignedUrl(target.storageKey, target.token, file),
+        file.size,
+        `Support attachment "${file.name}"`,
+      );
       if (error) {
         throw new Error(`Could not upload "${file.name}". Please try a smaller file.`);
       }

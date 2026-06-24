@@ -5,6 +5,7 @@ import { useState, useRef, useEffect } from "react";
 import { usePipeline } from "@/lib/pipeline-context";
 import { useToast } from "@/lib/toast-context";
 import { supabase } from "@/lib/supabaseClient";
+import { withStorageUploadTimeout } from "@/lib/storage-upload-timeout";
 import { Button } from "@/components/ui/button";
 import { X, AlertTriangle, Send, Paperclip, Image as ImageIcon, Trash2 } from "lucide-react";
 import { MentionTextarea } from "./mention-textarea";
@@ -65,7 +66,11 @@ export function KickbackModal() {
         }
         const ext = file.name.split(".").pop();
         const path = `kickback/${user.id}/${pendingKickback.cardId}-${Date.now()}.${ext}`;
-        const { error } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
+        const { error } = await withStorageUploadTimeout(
+          supabase.storage.from("avatars").upload(path, file, { upsert: true }),
+          file.size,
+          "Revision attachment upload",
+        );
         if (!error) {
           const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
           attachmentUrl = urlData.publicUrl;
