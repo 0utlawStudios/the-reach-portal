@@ -41,6 +41,7 @@ import {
   DailyCapExceeded,
   PerRowCapExceeded,
 } from "./cost";
+import { aiAssetProxyUrl } from "./asset-url";
 
 function adminClient(): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -412,8 +413,8 @@ export async function runGenerateJob(jobId: string): Promise<void> {
         .from("posts")
         .update({
           asset_storage_keys: reSigned.map((a) => a.storageKey),
-          asset_urls: reSigned.map((a) => a.signedUrl),
-          thumbnail_url: reSigned[0]?.signedUrl || null,
+          asset_urls: reSigned.map((a) => aiAssetProxyUrl(a.storageKey)),
+          thumbnail_url: reSigned[0] ? aiAssetProxyUrl(reSigned[0].storageKey) : null,
         })
         .eq("id", inserted.id);
     } catch (err) {

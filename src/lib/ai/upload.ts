@@ -1,6 +1,6 @@
-// Upload processed images to the private `ai-assets` Supabase bucket and
-// hand back signed URLs the client can render directly. URLs expire in 7
-// days; the kanban card fetcher will refresh them when within 24h of expiry.
+// Upload processed images to the private `ai-assets` Supabase bucket. Signed
+// URLs are still useful inside the worker immediately after upload, but the UI
+// renders durable `/api/ai/asset?key=...` proxy URLs derived from storage keys.
 
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { withStorageControlTimeout, withStorageUploadTimeout } from "@/lib/storage-upload-timeout";

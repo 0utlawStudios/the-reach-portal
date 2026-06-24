@@ -60,6 +60,7 @@ export interface PeerPresence {
 }
 
 export interface PresenceSummaryRow {
+  workspace_id?: string;
   team_member_id: string;
   full_name: string | null;
   email: string;
@@ -216,7 +217,8 @@ export function PresenceProvider({
     try {
       const { data, error } = await supabase
         .from("v_user_presence_summary")
-        .select("email, presence_last_seen, audit_last, auth_last_sign_in, best_known_seen");
+        .select("workspace_id, email, presence_last_seen, audit_last, auth_last_sign_in, best_known_seen")
+        .eq("workspace_id", wsId);
       if (error || !data) return;
       const next: Record<string, PresenceSummaryRow> = {};
       for (const row of data as PresenceSummaryRow[]) {
@@ -226,7 +228,7 @@ export function PresenceProvider({
     } catch (err) {
       console.error("[presence] summary refresh failed", err);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, wsId]);
 
   // ── activity listener (throttled broadcast) ──
   useEffect(() => {

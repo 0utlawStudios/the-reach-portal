@@ -5,6 +5,7 @@ import { ReachWordmark } from "@/components/reach-wordmark";
 import { CopyBlock, ColorSwatch } from "@/components/copy-block";
 import { useToast } from "@/lib/toast-context";
 import { useAuth } from "@/lib/auth-context";
+import { usePipeline } from "@/lib/pipeline-context";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -67,6 +68,7 @@ const useSupabase = !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_
 export function BrandKitPage() {
   const { addToast } = useToast();
   const { currentUser } = useAuth();
+  const { workspaceId } = usePipeline();
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     if (typeof window === "undefined") return "copy";
     const requestedTab = window.sessionStorage.getItem("reach_brandkit_tab");
@@ -85,6 +87,7 @@ export function BrandKitPage() {
   const [editMode, setEditMode] = useState(false);
   const [editData, setEditData] = useState<PlaybookData>(DEFAULT_DATA);
   const [saving, setSaving] = useState(false);
+  const [playbookRowId, setPlaybookRowId] = useState<string | null>(null);
 
   useEffect(() => {
     if (activeTab !== "copy" || !focusTarget) return;
@@ -103,17 +106,36 @@ export function BrandKitPage() {
   }, []);
 
   useEffect(() => {
-    if (!useSupabase) return;
-    supabase.from("brand_playbook").select("data").eq("id", "singleton").single().then(({ data: row }) => {
-      if (row?.data) setData(row.data as PlaybookData);
-    });
-  }, []);
+    if (!useSupabase || !workspaceId) return;
+    let cancelled = false;
+    supabase
+      .from("brand_playbook")
+      .select("id, data")
+      .eq("workspace_id", workspaceId)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data: row, error }) => {
+        if (cancelled) return;
+        if (error) {
+          console.error("[brand-kit] load failed:", error.message);
+          return;
+        }
+        setPlaybookRowId(row?.id ? row.id as string : null);
+        setData(row?.data ? row.data as PlaybookData : DEFAULT_DATA);
+        setEditData(row?.data ? row.data as PlaybookData : DEFAULT_DATA);
+        setEditMode(false);
+      });
+    return () => { cancelled = true; };
+  }, [workspaceId]);
 
   useEffect(() => {
-    if (!useSupabase) return;
+    if (!useSupabase || !workspaceId) return;
     const channel = supabase
-      .channel("brand-playbook-realtime")
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "brand_playbook" }, (payload) => {
+      .channel(`brand-playbook-realtime-${workspaceId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "brand_playbook", filter: `workspace_id=eq.${workspaceId}` }, (payload) => {
+        if (payload.eventType === "DELETE") return;
+        if (payload.new?.id) setPlaybookRowId(payload.new.id as string);
         if (payload.new?.data) {
           setData(payload.new.data as PlaybookData);
           if (!editMode) addToast("Brand playbook updated by another user", "info");
@@ -121,7 +143,41 @@ export function BrandKitPage() {
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [editMode, addToast]);
+  }, [workspaceId, editMode, addToast]);
+
+  const persistPlaybook = async (nextData: PlaybookData) => {
+    if (!workspaceId) {
+      return { error: new Error("Workspace is still loading. Please try again.") };
+    }
+
+    if (playbookRowId) {
+      const updateResult = await supabase
+        .from("brand_playbook")
+        .update({ data: nextData, updated_by: currentUser.name })
+        .eq("id", playbookRowId)
+        .eq("workspace_id", workspaceId)
+        .select("id")
+        .maybeSingle();
+      if (updateResult.error || updateResult.data?.id) {
+        return updateResult;
+      }
+    }
+
+    const insertResult = await supabase
+      .from("brand_playbook")
+      .upsert({
+        id: `brand:${workspaceId}`,
+        workspace_id: workspaceId,
+        data: nextData,
+        updated_by: currentUser.name,
+      }, { onConflict: "id" })
+      .select("id")
+      .single();
+    if (!insertResult.error && insertResult.data?.id) {
+      setPlaybookRowId(insertResult.data.id as string);
+    }
+    return insertResult;
+  };
 
   const startEdit = () => { setEditData({ ...data }); setEditMode(true); };
   const cancelEdit = () => { setEditMode(false); };
@@ -133,7 +189,7 @@ export function BrandKitPage() {
     const previousData = data;
     setData(editData);
     if (useSupabase) {
-      const { error } = await supabase.from("brand_playbook").update({ data: editData, updated_by: currentUser.name }).eq("id", "singleton");
+      const { error } = await persistPlaybook(editData);
       if (error) {
         console.error("[brand-kit] saveEdit sync failed:", error.message);
         setData(previousData);

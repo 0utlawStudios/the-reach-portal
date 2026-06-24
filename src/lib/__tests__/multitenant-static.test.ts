@@ -66,4 +66,54 @@ describe("multitenant static contracts", () => {
       expect(source(file), file).toMatch(/workspaceId|workspace_id/);
     }
   });
+
+  it("scopes Brand Playbook reads, writes, realtime, and AI context by workspace", () => {
+    const brandKit = source("src/components/pages/brand-kit-page.tsx");
+    expect(brandKit).toContain("const { workspaceId } = usePipeline()");
+    expect(brandKit).toContain('.eq("workspace_id", workspaceId)');
+    expect(brandKit).toContain("filter: `workspace_id=eq.${workspaceId}`");
+    expect(brandKit).toContain("workspace_id: workspaceId");
+    expect(brandKit).not.toContain('.eq("id", "singleton")');
+    expect(brandKit).not.toContain('.channel("brand-playbook-realtime")');
+
+    const aiWorker = source("src/lib/ai/worker.ts");
+    expect(aiWorker).toMatch(/\.from\("brand_playbook"\)[\s\S]{0,120}\.eq\("workspace_id", plan\.workspace_id\)/);
+    expect(aiWorker).toMatch(/\.from\("brand_playbook"\)[\s\S]{0,120}\.eq\("workspace_id", post\.workspace_id\)/);
+
+    const migration = source("supabase/migrations/0055_media_tenant_hardening.sql");
+    expect(migration).toContain("brand_playbook_one_row_per_workspace_idx");
+    expect(migration).toContain("ON public.brand_playbook(workspace_id)");
+  });
+
+  it("scopes publish queue, audit logs, and presence to the active workspace", () => {
+    const migration = source("supabase/migrations/0055_media_tenant_hardening.sql");
+    expect(migration).toContain("DROP VIEW IF EXISTS public.v_publish_queue");
+    expect(migration).toContain("CREATE VIEW public.v_publish_queue");
+    expect(migration).toContain("WITH (security_invoker = true)");
+    expect(migration).toContain("public.is_active_workspace_member(j.workspace_id");
+    expect(migration).toContain("RAISE EXCEPTION 'audit workspace membership required'");
+    expect(migration).toContain("audit workspace does not match entity workspace");
+    expect(migration).toContain("ALTER COLUMN source_vault TYPE jsonb");
+
+    const settings = source("src/components/pages/settings-page.tsx");
+    expect(settings).toContain("fetchAllAuditLogs(500, workspaceId)");
+    expect(settings).toContain('.from("v_publish_queue")');
+    expect(settings).toContain('.eq("workspace_id", workspaceId)');
+
+    const audit = source("src/lib/audit.ts");
+    expect(audit).toContain("fetchAllAuditLogs(limit = 100, workspaceId?: string | null)");
+    expect(audit).toContain('.eq("workspace_id", workspaceId)');
+
+    const shell = source("src/components/authenticated-app-shell.tsx");
+    expect(shell).toContain("function WorkspacePresenceBoundary");
+    expect(shell).toContain("<PresenceProvider workspaceId={workspaceId}>");
+
+    const presence = source("src/lib/use-presence.tsx");
+    expect(presence).toContain('.select("workspace_id, email, presence_last_seen, audit_last, auth_last_sign_in, best_known_seen")');
+    expect(presence).toContain('.eq("workspace_id", wsId)');
+
+    const presenceDiag = source("src/app/api/presence/diag/route.ts");
+    expect(presenceDiag).toContain('.select("workspace_id, role, status")');
+    expect(presenceDiag).toContain('.eq("workspace_id", membership.workspace_id)');
+  });
 });

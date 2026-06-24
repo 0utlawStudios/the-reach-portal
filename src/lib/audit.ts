@@ -100,11 +100,12 @@ export async function fetchAuditLogs(postId: string): Promise<AuditEntry[]> {
   return (data as AuditLogV2Row[]).map(toAuditEntry);
 }
 
-export async function fetchAllAuditLogs(limit = 100): Promise<AuditEntry[]> {
-  if (!isConfigured) return [];
+export async function fetchAllAuditLogs(limit = 100, workspaceId?: string | null): Promise<AuditEntry[]> {
+  if (!isConfigured || !workspaceId) return [];
   const { data, error } = await supabase
     .from("v_audit_log_with_actor")
     .select(AUDIT_SELECT)
+    .eq("workspace_id", workspaceId)
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error || !data) return [];

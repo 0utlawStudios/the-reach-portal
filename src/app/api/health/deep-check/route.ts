@@ -49,8 +49,8 @@ type PostRow = {
 type MediaRow = {
   id?: string;
   url?: string | null;
-  drive_file_id?: string | null;
-  post_id?: string | null;
+  file_id?: string | null;
+  used_in?: string[] | null;
   added_by?: string | null;
 };
 
@@ -110,7 +110,7 @@ function errorMessage(error: unknown): string {
 
 const POSTS_SELECT =
   "id, title, stage, platforms, thumbnail_url, scheduled_date, caption, notes, asset_source, created_by, created_at, updated_at";
-const MEDIA_SELECT = "id, url, drive_file_id, post_id, added_by";
+const MEDIA_SELECT = "id, url, file_id, used_in, added_by";
 const AUDIT_SELECT = "id, entity_id, entity_type, action, actor_user_id, actor_role, metadata, created_at";
 const COMMENT_SELECT = "id, post_id";
 const TEAM_MEMBER_SELECT = "id, name, email, role, status, avatar_url, phone, joined_at";
@@ -167,6 +167,10 @@ export async function GET(req: Request) {
       admin.from("audit_log_v2").select(AUDIT_SELECT).order("created_at", { ascending: false }).limit(1000),
       admin.from("post_comments").select(COMMENT_SELECT),
     ]);
+    if (pRes.error) checks["00_posts_prefetch"] = fail(`Posts prefetch failed: ${pRes.error.message}`);
+    if (mRes.error) checks["00_media_prefetch"] = fail(`Media prefetch failed: ${mRes.error.message}`);
+    if (aRes.error) checks["00_audit_prefetch"] = fail(`Audit prefetch failed: ${aRes.error.message}`);
+    if (cRes.error) checks["00_comments_prefetch"] = fail(`Comments prefetch failed: ${cRes.error.message}`);
     allPosts = (pRes.data || []) as PostRow[];
     allMedia = (mRes.data || []) as MediaRow[];
     allAuditLogs = (aRes.data || []) as AuditRow[];
@@ -407,7 +411,7 @@ export async function GET(req: Request) {
     // Media assets referencing non-existent posts
     const media = allMedia;
     const postIds = new Set((posts || []).map((p) => p.id));
-    const orphanedMedia = (media || []).filter((m) => m.post_id && !postIds.has(m.post_id));
+    const orphanedMedia = (media || []).filter((m) => (m.used_in || []).some((postId) => postId && !postIds.has(postId)));
 
     // Audit logs referencing non-existent posts.
     // SEC-007: audit_log_v2 uses entity_id (scoped to entity_type 'post').
@@ -663,17 +667,17 @@ export async function GET(req: Request) {
   try {
     const media = allMedia;
     const count = allMedia.length;
-    const noUrl = (media || []).filter((m) => !m.url && !m.drive_file_id);
+    const noUrl = (media || []).filter((m) => !m.url && !m.file_id);
     const noOwner = (media || []).filter((m) => !m.added_by);
-    const noPost = (media || []).filter((m) => !m.post_id);
+    const noUsage = (media || []).filter((m) => !m.used_in || m.used_in.length === 0);
 
     const issues: string[] = [];
     if (noUrl.length > 0) issues.push(`${noUrl.length} asset(s) with no URL or Drive file`);
     if (noOwner.length > 0) issues.push(`${noOwner.length} asset(s) with no owner`);
-    if (noPost.length > 0) issues.push(`${noPost.length} unlinked asset(s) (no post_id)`);
+    if (noUsage.length > 0) issues.push(`${noUsage.length} unlinked asset(s) (no used_in)`);
 
     checks["18_media_health"] = issues.length > 0
-      ? warn(issues.join("; "), { total: count, noUrl: noUrl.length, noOwner: noOwner.length, noPost: noPost.length })
+      ? warn(issues.join("; "), { total: count, noUrl: noUrl.length, noOwner: noOwner.length, noUsage: noUsage.length })
       : pass(`${count || 0} media assets — all linked and intact`);
   } catch (e: unknown) {
     checks["18_media_health"] = fail(`Media check error: ${errorMessage(e)}`);

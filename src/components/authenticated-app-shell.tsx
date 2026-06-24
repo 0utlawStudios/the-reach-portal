@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { ReachWordmark } from "@/components/reach-wordmark";
 import { useAuth } from "@/lib/auth-context";
 import { NavigationProvider, useNavigation } from "@/lib/navigation-context";
@@ -110,27 +110,34 @@ function DashboardLayout() {
           incident on 2026-05-13. */}
       <ToastProvider>
         <PipelineProvider>
-          <TeamProvider>
-            <AvatarSync />
-            <div className="h-dvh flex bg-[#E1DFD5] dark:bg-[#0a0a0a] overflow-hidden">
-              <Sidebar onCreatePost={() => setCreateOpen(true)} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
-              <main className="flex-1 flex flex-col min-w-0">
-                <TopBar onMenuClick={() => setMobileOpen(true)} />
-                <PageContent />
-                <div className="h-8 flex items-center justify-center border-t border-[#6C655A]/15 dark:border-white/[0.04] bg-[#E1DFD5] dark:bg-[#111] shrink-0">
-                  <p className="text-[10px] text-[#6C655A]/70 dark:text-gray-600">The Reach &copy; 2026</p>
-                </div>
-              </main>
-              <PipelineOverlays />
-              {createOpen && <CreatePostModal open onClose={() => setCreateOpen(false)} />}
-              <IdleSupportWidget />
-              <ToastContainer />
-            </div>
-          </TeamProvider>
+          <WorkspacePresenceBoundary>
+            <TeamProvider>
+              <AvatarSync />
+              <div className="h-dvh flex bg-[#E1DFD5] dark:bg-[#0a0a0a] overflow-hidden">
+                <Sidebar onCreatePost={() => setCreateOpen(true)} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
+                <main className="flex-1 flex flex-col min-w-0">
+                  <TopBar onMenuClick={() => setMobileOpen(true)} />
+                  <PageContent />
+                  <div className="h-8 flex items-center justify-center border-t border-[#6C655A]/15 dark:border-white/[0.04] bg-[#E1DFD5] dark:bg-[#111] shrink-0">
+                    <p className="text-[10px] text-[#6C655A]/70 dark:text-gray-600">The Reach &copy; 2026</p>
+                  </div>
+                </main>
+                <PipelineOverlays />
+                {createOpen && <CreatePostModal open onClose={() => setCreateOpen(false)} />}
+                <IdleSupportWidget />
+                <ToastContainer />
+              </div>
+            </TeamProvider>
+          </WorkspacePresenceBoundary>
         </PipelineProvider>
       </ToastProvider>
     </NavigationProvider>
   );
+}
+
+function WorkspacePresenceBoundary({ children }: { children: ReactNode }) {
+  const { workspaceId } = usePipeline();
+  return <PresenceProvider workspaceId={workspaceId}>{children}</PresenceProvider>;
 }
 
 function PipelineOverlays() {
@@ -406,9 +413,5 @@ function AvatarSync() {
 }
 
 export function AuthenticatedAppShell() {
-  return (
-    <PresenceProvider>
-      <DashboardLayout />
-    </PresenceProvider>
-  );
+  return <DashboardLayout />;
 }

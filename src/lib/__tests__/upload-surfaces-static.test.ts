@@ -237,14 +237,20 @@ describe("Drive upload surfaces", () => {
     const imagePreview = source("src/app/api/media/image-preview/route.ts");
     expect(imagePreview).toContain("inFlightPreviewBuilds");
     expect(imagePreview).toContain('"private, max-age=86400, immutable"');
+    expect(imagePreview).toContain("PREVIEW_SIZES");
+    expect(imagePreview).toContain("previewSizeFromRequest");
+    expect(imagePreview).toContain("void writeCachedPreview");
 
     const imagePreviewLib = source("src/lib/image-preview.ts");
     expect(imagePreviewLib).toContain("warmBrowserImagePreview");
     expect(imagePreviewLib).toContain('cache: "force-cache"');
+    expect(imagePreviewLib).toContain('params.set("size", opts.size)');
 
     const previewImage = source("src/components/preview-image.tsx");
     expect(previewImage).toContain("IMAGE_PREVIEW_LOAD_TIMEOUT_MS");
     expect(previewImage).toContain("setFailedSrc(displaySrc)");
+    expect(previewImage).toContain('className.includes("object-contain")');
+    expect(previewImage).toContain('size: previewSize');
 
     for (const file of [
       "src/components/pages/media-page.tsx",
@@ -254,6 +260,58 @@ describe("Drive upload surfaces", () => {
     ]) {
       expect(source(file), file).toContain("warmBrowserImagePreview");
     }
+  });
+
+  it("renders AI assets through an authenticated storage-key proxy instead of expiring signed URLs", () => {
+    const route = source("src/app/api/ai/asset/route.ts");
+    expect(route).toContain('const BUCKET = "ai-assets"');
+    expect(route).toContain("parseAiAssetStorageKey");
+    expect(route).toContain("userHasWorkspaceAccess");
+    expect(route).toContain(".eq(\"workspace_id\", workspaceId)");
+
+    const assetUrl = source("src/lib/ai/asset-url.ts");
+    expect(assetUrl).toContain("/api/ai/asset?key=");
+
+    const pipeline = source("src/lib/pipeline-context.tsx");
+    expect(pipeline).toContain("aiAssetProxyUrls(row.asset_storage_keys)");
+
+    const persist = source("src/lib/ai/persist.ts");
+    expect(persist).toContain("aiAssetProxyUrl(a.storageKey)");
+    expect(persist).not.toContain("asset_urls: assets.map((a) => a.signedUrl)");
+  });
+
+  it("keeps full Drive metadata when mirroring uploaded videos into Media Library", () => {
+    const helper = source("src/lib/media-assets.ts");
+    for (const field of ["file_id", "publish_url", "drive_proxy_url", "playback_url", "playback_storage_key", "mime_type", "size_bytes"]) {
+      expect(helper, field).toContain(field);
+    }
+    expect(helper).toContain("mediaUrlAliases({ url, fileId, publishUrl, driveProxyUrl, playbackUrl })");
+
+    for (const file of [
+      "src/components/create-post-modal.tsx",
+      "src/components/asset-review-drawer.tsx",
+      "src/components/repurpose-modal.tsx",
+    ]) {
+      const contents = source(file);
+      expect(contents, file).toContain("publishUrl:");
+      expect(contents, file).toContain("driveProxyUrl:");
+      expect(contents, file).toContain("playbackUrl:");
+      expect(contents, file).toContain("mimeType:");
+      expect(contents, file).toContain("size:");
+    }
+  });
+
+  it("renders support attachments through the authenticated proxy, not stored signed URLs", () => {
+    const threadView = source("src/components/support/thread-view.tsx");
+    expect(threadView).toContain("attachmentProxyUrl(a.storageKey)");
+    expect(threadView).toContain("/api/support/attachment?key=");
+    expect(threadView).not.toContain("href={a.signedUrl}");
+    expect(threadView).not.toContain("src={a.signedUrl}");
+
+    const route = source("src/app/api/support/attachment/route.ts");
+    expect(route).toContain("parseAttachmentStorageKey");
+    expect(route).toContain("userHasWorkspaceAccess");
+    expect(route).toContain('.eq("workspace_id", workspaceId)');
   });
 
   it("keeps same-origin media tags authenticated with a server-readable session cookie", () => {

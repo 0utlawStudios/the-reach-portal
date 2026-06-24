@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
   // Check the caller has an admin-class workspace_members row.
   const { data: membership } = await admin
     .from("workspace_members")
-    .select("role, status")
+    .select("workspace_id, role, status")
     .eq("user_id", userId)
     .eq("status", "active")
     .maybeSingle();
@@ -68,6 +68,7 @@ export async function GET(req: NextRequest) {
   const { data, error } = await admin
     .from("v_user_presence_summary")
     .select("*")
+    .eq("workspace_id", membership.workspace_id)
     .order("best_known_seen", { ascending: false, nullsFirst: false });
 
   if (error) {

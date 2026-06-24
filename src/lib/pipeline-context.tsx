@@ -10,6 +10,7 @@ import { useAuth } from "./auth-context";
 import { useToast } from "./toast-context";
 import { APP_TIMEZONE, formatDateTimeCompact, isValidUuid } from "./utils";
 import { useManualPostedMovesEnabled } from "./manual-posted-settings";
+import { aiAssetProxyUrls } from "./ai/asset-url";
 
 // Real @mention pattern — @username form, not any "@" character. Avoids
 // false-positive mention notifications on pasted emails or URLs containing "@".
@@ -150,6 +151,7 @@ export function toScheduledAt(date?: string, time?: string): string | null | und
 
 export function dbToCard(row: PostRow): ContentCard {
   const notes = row.notes || undefined;
+  const aiAssetUrls = aiAssetProxyUrls(row.asset_storage_keys);
   // Reconstruct revised flag from notes — if notes contain "Revision Note" entries, card was revised
   const revised = notes ? /(Revision Note \(|Fix submitted —)/.test(notes) : false;
   // Reconstruct revision history from notes
@@ -166,7 +168,7 @@ export function dbToCard(row: PostRow): ContentCard {
     stage: row.stage,
     platforms: normalizePlatforms(row.platforms),
     contentType: row.content_type,
-    thumbnailUrl: row.thumbnail_url || "",
+    thumbnailUrl: aiAssetUrls[0] || row.thumbnail_url || "",
     scheduledDate: row.scheduled_date || undefined,
     scheduledTime: row.scheduled_time?.slice(0, 5) || undefined,
     caption: row.caption || undefined,
@@ -191,7 +193,7 @@ export function dbToCard(row: PostRow): ContentCard {
     aspectRatio: row.aspect_ratio || undefined,
     assetWidth: row.asset_width ?? undefined,
     assetHeight: row.asset_height ?? undefined,
-    assetUrls: row.asset_urls && row.asset_urls.length > 0 ? row.asset_urls : undefined,
+    assetUrls: aiAssetUrls.length > 0 ? aiAssetUrls : row.asset_urls && row.asset_urls.length > 0 ? row.asset_urls : undefined,
     assetStorageKeys: row.asset_storage_keys && row.asset_storage_keys.length > 0 ? row.asset_storage_keys : undefined,
     hashtags: row.hashtags && row.hashtags.length > 0 ? row.hashtags : undefined,
     cta: row.cta || undefined,

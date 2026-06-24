@@ -4,6 +4,7 @@ import { driveFileIdFromUrl } from "@/lib/media-resolver";
 const HEIC_IMAGE_MIME_TYPES = new Set(["image/heic", "image/heic-sequence", "image/heif", "image/heif-sequence"]);
 const HEIC_EXT_RE = /\.(hei[cf])(?:[?#].*)?$/i;
 const HEIC_PREVIEW_WARM_TIMEOUT_MS = 55_000;
+export type BrowserImagePreviewSize = "thumb" | "full";
 
 export function isHeicLikeImage(mimeType?: unknown, fileNameOrUrl?: unknown): boolean {
   const normalized = normalizeDriveMimeType(mimeType, fileNameOrUrl);
@@ -23,7 +24,7 @@ function driveStreamTokenFromUrl(url: string): string | null {
 
 export function heicImagePreviewUrl(
   url: string,
-  opts: { mimeType?: unknown; fileName?: unknown } = {},
+  opts: { mimeType?: unknown; fileName?: unknown; size?: BrowserImagePreviewSize } = {},
 ): string | null {
   if (!url || !isHeicLikeImage(opts.mimeType, opts.fileName || url)) return null;
 
@@ -33,19 +34,20 @@ export function heicImagePreviewUrl(
   const params = new URLSearchParams({ id: fileId });
   const token = driveStreamTokenFromUrl(url);
   if (token) params.set("token", token);
+  if (opts.size) params.set("size", opts.size);
   return `/api/media/image-preview?${params.toString()}`;
 }
 
 export function browserImagePreviewUrl(
   url: string,
-  opts: { mimeType?: unknown; fileName?: unknown } = {},
+  opts: { mimeType?: unknown; fileName?: unknown; size?: BrowserImagePreviewSize } = {},
 ): string {
   return heicImagePreviewUrl(url, opts) || url;
 }
 
 export function warmBrowserImagePreview(
   url: string,
-  opts: { mimeType?: unknown; fileName?: unknown } = {},
+  opts: { mimeType?: unknown; fileName?: unknown; size?: BrowserImagePreviewSize } = {},
 ): void {
   const previewUrl = heicImagePreviewUrl(url, opts);
   if (!previewUrl || typeof fetch !== "function") return;

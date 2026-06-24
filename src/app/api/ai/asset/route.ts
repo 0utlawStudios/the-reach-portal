@@ -1,12 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth/require";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const BUCKET = "support-attachments";
+const BUCKET = "ai-assets";
 const STORAGE_RESPONSE_TIMEOUT_MS = 45_000;
 const WORKSPACE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -22,7 +22,7 @@ function adminClient() {
   });
 }
 
-function parseAttachmentStorageKey(value: string | null): { key: string; workspaceId: string } | null {
+function parseAiAssetStorageKey(value: string | null): { key: string; workspaceId: string } | null {
   const key = (value || "").trim();
   if (
     !key ||
@@ -38,17 +38,6 @@ function parseAttachmentStorageKey(value: string | null): { key: string; workspa
   return { key, workspaceId };
 }
 
-function storageObjectUrl(key: string): string {
-  const base = assertEnv("NEXT_PUBLIC_SUPABASE_URL").replace(/\/+$/, "");
-  const encodedKey = key.split("/").map(encodeURIComponent).join("/");
-  return `${base}/storage/v1/object/${BUCKET}/${encodedKey}`;
-}
-
-function copyHeader(source: Headers, target: Headers, name: string) {
-  const value = source.get(name);
-  if (value) target.set(name, value);
-}
-
 async function userHasWorkspaceAccess(userId: string, workspaceId: string): Promise<boolean> {
   const { data, error } = await adminClient()
     .from("workspace_members")
@@ -60,16 +49,27 @@ async function userHasWorkspaceAccess(userId: string, workspaceId: string): Prom
   return !error && Boolean(data);
 }
 
+function storageObjectUrl(key: string): string {
+  const base = assertEnv("NEXT_PUBLIC_SUPABASE_URL").replace(/\/+$/, "");
+  const encodedKey = key.split("/").map(encodeURIComponent).join("/");
+  return `${base}/storage/v1/object/${BUCKET}/${encodedKey}`;
+}
+
+function copyHeader(source: Headers, target: Headers, name: string) {
+  const value = source.get(name);
+  if (value) target.set(name, value);
+}
+
 export async function GET(request: NextRequest) {
-  const parsed = parseAttachmentStorageKey(request.nextUrl.searchParams.get("key"));
+  const parsed = parseAiAssetStorageKey(request.nextUrl.searchParams.get("key"));
   if (!parsed) {
-    return NextResponse.json({ error: "Invalid or missing attachment key" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid or missing AI asset key" }, { status: 400 });
   }
 
   const userResult = await requireUser(request);
   if (userResult instanceof NextResponse) return userResult;
   if (!(await userHasWorkspaceAccess(userResult.user.id, parsed.workspaceId))) {
-    return NextResponse.json({ error: "Attachment does not belong to this workspace" }, { status: 403 });
+    return NextResponse.json({ error: "AI asset does not belong to this workspace" }, { status: 403 });
   }
 
   const headers: HeadersInit = {
@@ -92,7 +92,7 @@ export async function GET(request: NextRequest) {
   } catch {
     const aborted = controller.signal.aborted;
     return NextResponse.json(
-      { error: aborted ? "Attachment storage timed out" : "Attachment storage unavailable" },
+      { error: aborted ? "AI asset storage timed out" : "AI asset storage unavailable" },
       { status: aborted ? 504 : 502 },
     );
   } finally {
@@ -101,7 +101,7 @@ export async function GET(request: NextRequest) {
 
   if (!storageRes.ok && storageRes.status !== 206) {
     return NextResponse.json(
-      { error: storageRes.status === 404 ? "Attachment not found" : "Attachment storage failed" },
+      { error: storageRes.status === 404 ? "AI asset not found" : "AI asset storage failed" },
       { status: storageRes.status === 404 ? 404 : 502 },
     );
   }

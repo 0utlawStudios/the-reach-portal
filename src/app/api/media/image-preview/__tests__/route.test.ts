@@ -139,6 +139,7 @@ describe("GET /api/media/image-preview", () => {
     expect(res.headers.get("content-type")).toBe("image/jpeg");
     expect(res.headers.get("cache-control")).toBe("public, max-age=86400, immutable");
     expect(res.headers.get("x-preview-cache")).toBe("MISS");
+    expect(res.headers.get("x-preview-size")).toBe("full");
     expect(Array.from(body)).toEqual([0xff, 0xd8, 0xff]);
     expect(globalThis.fetch).toHaveBeenCalledWith(
       expect.stringContaining(`/files/${FILE_ID}?alt=media`),
@@ -147,12 +148,33 @@ describe("GET /api/media/image-preview", () => {
       }),
     );
     expect(sharpMocks.pipeline.resize).toHaveBeenCalledWith(expect.objectContaining({
+      width: 1600,
+      height: 1600,
       fit: "inside",
       withoutEnlargement: true,
     }));
     expect(heicDecodeMocks.decode.all).not.toHaveBeenCalled();
     expect(storageMocks.upload).toHaveBeenCalledWith(
-      `00000000-0000-0000-0000-000000000001/heic-previews/${FILE_ID}.jpg`,
+      `00000000-0000-0000-0000-000000000001/heic-previews/full/${FILE_ID}.jpg`,
+      expect.any(Buffer),
+      expect.objectContaining({ contentType: "image/jpeg", upsert: true }),
+    );
+  });
+
+  it("uses a smaller conversion budget for thumbnail HEIC previews", async () => {
+    const res = await GET(makeRequest(`/api/media/image-preview?id=${FILE_ID}&token=signed&size=thumb`));
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("x-preview-size")).toBe("thumb");
+    expect(sharpMocks.pipeline.resize).toHaveBeenCalledWith(expect.objectContaining({
+      width: 520,
+      height: 520,
+      fit: "inside",
+      withoutEnlargement: true,
+    }));
+    expect(sharpMocks.pipeline.jpeg).toHaveBeenCalledWith(expect.objectContaining({ quality: 78 }));
+    expect(storageMocks.upload).toHaveBeenCalledWith(
+      `00000000-0000-0000-0000-000000000001/heic-previews/thumb/${FILE_ID}.jpg`,
       expect.any(Buffer),
       expect.objectContaining({ contentType: "image/jpeg", upsert: true }),
     );

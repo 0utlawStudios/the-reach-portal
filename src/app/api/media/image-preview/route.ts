@@ -21,16 +21,21 @@ export const maxDuration = 60;
 const DRIVE_FILE_ID_RE = /^[a-zA-Z0-9_-]{20,80}$/;
 const HEIC_IMAGE_MIME_TYPES = new Set(["image/heic", "image/heic-sequence", "image/heif", "image/heif-sequence"]);
 const MAX_PREVIEW_SOURCE_BYTES = 50 * 1024 * 1024;
-const PREVIEW_MAX_EDGE = 1600;
 const PREVIEW_CACHE_BUCKET = "media-thumbnails";
 const PREVIEW_CACHE_READ_TIMEOUT_MS = 2_000;
 const PREVIEW_CACHE_WRITE_TIMEOUT_MS = 5_000;
+const PREVIEW_SIZES = {
+  thumb: { maxEdge: 520, quality: 78 },
+  full: { maxEdge: 1600, quality: 86 },
+} as const;
 // heic-decode allocates raw RGBA in JS/WASM before Sharp can resize it. Cap the
 // fallback below Sharp's native limit so common 48MP iPhone HEICs still preview
 // while larger panoramas fail closed before raw decode.
 const HEIC_FALLBACK_MAX_PIXELS = 50_000_000;
 const DRIVE_MEDIA_TIMEOUT_MS = 45_000;
 const inFlightPreviewBuilds = new Map<string, Promise<Buffer>>();
+
+type PreviewSize = keyof typeof PREVIEW_SIZES;
 
 type HeicDecodedImage = {
   width: number;
@@ -48,7 +53,12 @@ class ImagePreviewHttpError extends Error {
   }
 }
 
-function browserSafeJpegResponse(preview: Buffer, signed: boolean, cacheState: "HIT" | "MISS" | "BYPASS" = "BYPASS") {
+function browserSafeJpegResponse(
+  preview: Buffer,
+  signed: boolean,
+  size: PreviewSize,
+  cacheState: "HIT" | "MISS" | "BYPASS" = "BYPASS",
+) {
   const responseBody = preview.buffer.slice(preview.byteOffset, preview.byteOffset + preview.byteLength) as ArrayBuffer;
   const cacheControl = signed
     ? "public, max-age=86400, immutable"
@@ -62,13 +72,23 @@ function browserSafeJpegResponse(preview: Buffer, signed: boolean, cacheState: "
       "Cache-Control": cacheControl,
       "X-Content-Type-Options": "nosniff",
       "X-Preview-Cache": cacheState,
+      "X-Preview-Size": size,
     },
   });
 }
 
-function previewCacheKey(fileId: string, workspaceId?: string): string {
+function previewCacheKey(fileId: string, workspaceId: string | undefined, size: PreviewSize): string {
+  const namespace = (workspaceId || "legacy").replace(/[^a-zA-Z0-9_-]/g, "_");
+  return `${namespace}/heic-previews/${size}/${fileId}.jpg`;
+}
+
+function legacyPreviewCacheKey(fileId: string, workspaceId?: string): string {
   const namespace = (workspaceId || "legacy").replace(/[^a-zA-Z0-9_-]/g, "_");
   return `${namespace}/heic-previews/${fileId}.jpg`;
+}
+
+function previewSizeFromRequest(req: NextRequest): PreviewSize {
+  return req.nextUrl.searchParams.get("size") === "thumb" ? "thumb" : "full";
 }
 
 async function readCachedPreview(admin: SupabaseClient | null, key: string): Promise<Buffer | null> {
@@ -107,16 +127,17 @@ async function writeCachedPreview(admin: SupabaseClient | null, key: string, pre
   }
 }
 
-function resizeBrowserSafeJpeg(source: Buffer) {
+function resizeBrowserSafeJpeg(source: Buffer, size: PreviewSize) {
+  const preview = PREVIEW_SIZES[size];
   return sharp(source, { limitInputPixels: HEIC_FALLBACK_MAX_PIXELS })
     .rotate()
     .resize({
-      width: PREVIEW_MAX_EDGE,
-      height: PREVIEW_MAX_EDGE,
+      width: preview.maxEdge,
+      height: preview.maxEdge,
       fit: "inside",
       withoutEnlargement: true,
     })
-    .jpeg({ quality: 86, mozjpeg: true })
+    .jpeg({ quality: preview.quality, mozjpeg: true })
     .toBuffer();
 }
 
@@ -127,8 +148,9 @@ function assertFallbackPixelSafe(width: number, height: number) {
   }
 }
 
-function resizeRawBrowserSafeJpeg(image: HeicDecodedImage) {
+function resizeRawBrowserSafeJpeg(image: HeicDecodedImage, size: PreviewSize) {
   assertFallbackPixelSafe(image.width, image.height);
+  const preview = PREVIEW_SIZES[size];
   return sharp(image.data, {
     raw: {
       width: image.width,
@@ -138,22 +160,22 @@ function resizeRawBrowserSafeJpeg(image: HeicDecodedImage) {
     limitInputPixels: HEIC_FALLBACK_MAX_PIXELS,
   })
     .resize({
-      width: PREVIEW_MAX_EDGE,
-      height: PREVIEW_MAX_EDGE,
+      width: preview.maxEdge,
+      height: preview.maxEdge,
       fit: "inside",
       withoutEnlargement: true,
     })
-    .jpeg({ quality: 86, mozjpeg: true })
+    .jpeg({ quality: preview.quality, mozjpeg: true })
     .toBuffer();
 }
 
-async function convertHeicWithFallbackDecoder(source: Buffer) {
+async function convertHeicWithFallbackDecoder(source: Buffer, size: PreviewSize) {
   const images = await decodeHeic.all({ buffer: source });
   try {
     const image = images[0];
     if (!image) throw new Error("HEIF image not found");
     assertFallbackPixelSafe(image.width, image.height);
-    return resizeRawBrowserSafeJpeg(await image.decode());
+    return resizeRawBrowserSafeJpeg(await image.decode(), size);
   } finally {
     try {
       images.dispose();
@@ -163,16 +185,16 @@ async function convertHeicWithFallbackDecoder(source: Buffer) {
   }
 }
 
-async function buildHeicPreview(source: Buffer) {
+async function buildHeicPreview(source: Buffer, size: PreviewSize) {
   if (sharp.format.heif?.input.buffer) {
     try {
-      return await resizeBrowserSafeJpeg(source);
+      return await resizeBrowserSafeJpeg(source, size);
     } catch {
       // Some runtimes expose HEIF metadata support but cannot decode iPhone HEVC HEIC payloads.
     }
   }
 
-  return convertHeicWithFallbackDecoder(source);
+  return convertHeicWithFallbackDecoder(source, size);
 }
 
 function buildPreviewOnce(cacheKey: string, build: () => Promise<Buffer>): Promise<Buffer> {
@@ -334,17 +356,23 @@ export async function GET(request: NextRequest) {
     }
 
     const admin = serviceRoleClient();
-    const cacheKey = previewCacheKey(fileId, auth.workspaceId || meta.appProperties?.workspaceId);
+    const previewSize = previewSizeFromRequest(request);
+    const cacheKey = previewCacheKey(fileId, auth.workspaceId || meta.appProperties?.workspaceId, previewSize);
     const cached = await readCachedPreview(admin, cacheKey);
-    if (cached) return browserSafeJpegResponse(cached, auth.signed, "HIT");
+    if (cached) return browserSafeJpegResponse(cached, auth.signed, previewSize, "HIT");
+
+    if (previewSize === "full") {
+      const legacyCached = await readCachedPreview(admin, legacyPreviewCacheKey(fileId, auth.workspaceId || meta.appProperties?.workspaceId));
+      if (legacyCached) return browserSafeJpegResponse(legacyCached, auth.signed, previewSize, "HIT");
+    }
 
     const preview = await buildPreviewOnce(cacheKey, async () => {
       const source = await fetchDriveMedia(fileId, token);
-      const converted = await buildHeicPreview(source);
-      await writeCachedPreview(admin, cacheKey, converted);
+      const converted = await buildHeicPreview(source, previewSize);
+      void writeCachedPreview(admin, cacheKey, converted);
       return converted;
     });
-    return browserSafeJpegResponse(preview, auth.signed, "MISS");
+    return browserSafeJpegResponse(preview, auth.signed, previewSize, "MISS");
   } catch (err) {
     if (err instanceof ImagePreviewHttpError) {
       return NextResponse.json({ error: err.message }, { status: err.status });

@@ -93,6 +93,13 @@ export function RepurposeModal({ card, onClose }: Props) {
         ensureMediaAsset({
           name: rf.name,
           url: rf.playbackUrl || rf.driveProxyUrl || rf.url,
+          fileId: rf.fileId,
+          publishUrl: rf.publishUrl,
+          driveProxyUrl: rf.driveProxyUrl,
+          playbackUrl: rf.playbackUrl,
+          playbackStorageKey: rf.playbackStorageKey,
+          mimeType: rf.mimeType,
+          size: rf.size,
           fileType: rf.mimeType?.startsWith("video") ? "video" : "image",
           folder: "Content Engine Uploads",
           addedBy: currentUser.name,

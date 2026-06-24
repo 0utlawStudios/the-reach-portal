@@ -1325,15 +1325,16 @@ function AuditLogTab({ auditLogs, auditLoading, setAuditLogs, setAuditLoading }:
   auditLogs: AuditEntry[]; auditLoading: boolean;
   setAuditLogs: (logs: AuditEntry[]) => void; setAuditLoading: (v: boolean) => void;
 }) {
-  const { cards, selectCard } = usePipeline();
+  const { cards, selectCard, workspaceId } = usePipeline();
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
   const [category, setCategory] = useState<AuditCategory>("all");
   const [search, setSearch] = useState("");
 
   useEffect(() => {
+    if (!workspaceId) return;
     setAuditLoading(true);
-    fetchAllAuditLogs(500).then((logs) => { setAuditLogs(logs); setAuditLoading(false); });
-  }, [setAuditLoading, setAuditLogs]);
+    fetchAllAuditLogs(500, workspaceId).then((logs) => { setAuditLogs(logs); setAuditLoading(false); });
+  }, [setAuditLoading, setAuditLogs, workspaceId]);
 
   const actionMeta = useMemo<Record<string, { label: string; color: string; icon: "content" | "system" | "mention" }>>(() => ({
     stage_change: { label: "Stage Changed", color: "bg-blue-500", icon: "content" },
@@ -1522,6 +1523,7 @@ function AuditLogTab({ auditLogs, auditLoading, setAuditLogs, setAuditLoading }:
 // Force Retry resets the row to clean pending so the next n8n claim picks
 // it up.
 interface PublishQueueRow {
+  workspace_id: string;
   job_id: string;
   state: string;
   scheduled_at: string;
@@ -1572,17 +1574,20 @@ function formatClientError(err: unknown): string {
 }
 
 function PublishQueuePanel({ addToast }: { addToast: (msg: string, kind?: "info" | "success" | "error" | "warning") => void }) {
+  const { workspaceId } = usePipeline();
   const [rows, setRows] = useState<PublishQueueRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [retrying, setRetrying] = useState<string | null>(null);
 
   const load = useCallback(async (silent = false) => {
+    if (!workspaceId) return;
     if (!silent) setRefreshing(true);
     try {
       const { data, error } = await supabase
         .from("v_publish_queue")
         .select("*")
+        .eq("workspace_id", workspaceId)
         .limit(50);
       if (error) throw error;
       setRows((data || []) as PublishQueueRow[]);
@@ -1592,7 +1597,7 @@ function PublishQueuePanel({ addToast }: { addToast: (msg: string, kind?: "info"
       if (!silent) setRefreshing(false);
       setLoading(false);
     }
-  }, [addToast]);
+  }, [addToast, workspaceId]);
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {

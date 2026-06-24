@@ -33,6 +33,10 @@ function timeLabel(iso: string): string {
   return sameDay ? time : `${d.toLocaleDateString([], { month: "short", day: "numeric" })}, ${time}`;
 }
 
+function attachmentProxyUrl(storageKey: string): string {
+  return `/api/support/attachment?key=${encodeURIComponent(storageKey)}`;
+}
+
 interface ThreadViewProps {
   thread: SupportThread | null;
   messages: SupportMessage[];
@@ -176,18 +180,19 @@ export function ThreadView({
                 {m.body && <p className="whitespace-pre-wrap break-words">{m.body}</p>}
                 {m.attachments.length > 0 && (
                   <div className={`flex flex-col gap-2 ${m.body ? "mt-2" : ""}`}>
-                    {m.attachments.map((a, i) =>
-                      a.kind === "image" ? (
+                    {m.attachments.map((a, i) => {
+                      const attachmentUrl = attachmentProxyUrl(a.storageKey);
+                      return a.kind === "image" ? (
                         <a
                           key={`${a.storageKey}-${i}`}
-                          href={a.signedUrl}
+                          href={attachmentUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="block"
                         >
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
-                            src={a.signedUrl}
+                            src={attachmentUrl}
                             alt={a.name}
                             className="max-h-44 rounded-lg border border-black/5"
                           />
@@ -195,13 +200,13 @@ export function ThreadView({
                       ) : (
                         <video
                           key={`${a.storageKey}-${i}`}
-                          src={a.signedUrl}
+                          src={attachmentUrl}
                           controls
                           preload="metadata"
                           className="max-h-52 w-full rounded-lg bg-black"
                         />
-                      ),
-                    )}
+                      );
+                    })}
                   </div>
                 )}
               </div>

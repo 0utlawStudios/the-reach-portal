@@ -28,6 +28,8 @@ describe("image preview routing", () => {
       .toBe(`/api/media/image-preview?id=${FILE_ID}&token=signed`);
     expect(browserImagePreviewUrl(`/api/drive/stream?id=${FILE_ID}&token=signed`, opts))
       .toBe(`/api/media/image-preview?id=${FILE_ID}&token=signed`);
+    expect(browserImagePreviewUrl(`/api/drive/stream?id=${FILE_ID}&token=signed`, { ...opts, size: "thumb" }))
+      .toBe(`/api/media/image-preview?id=${FILE_ID}&token=signed&size=thumb`);
   });
 
   it("warms browser and server HEIC preview caches after upload", async () => {

@@ -21,9 +21,13 @@ export function PreviewImage({
   onError,
   ...props
 }: PreviewImageProps) {
+  const previewSize =
+    typeof className === "string" && className.includes("object-contain")
+      ? "full"
+      : "thumb";
   const displaySrc = useMemo(() => {
-    return typeof src === "string" ? browserImagePreviewUrl(src, { mimeType, fileName }) : src;
-  }, [src, mimeType, fileName]);
+    return typeof src === "string" ? browserImagePreviewUrl(src, { mimeType, fileName, size: previewSize }) : src;
+  }, [src, mimeType, fileName, previewSize]);
   const [failedSrc, setFailedSrc] = useState<string | undefined>(undefined);
   const [loadedSrc, setLoadedSrc] = useState<string | undefined>(undefined);
 

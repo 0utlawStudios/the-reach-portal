@@ -8,6 +8,13 @@ import { mediaUrlAliases } from "./media-usage";
 interface EnsureMediaAssetParams {
   name: string;
   url: string;
+  fileId?: string;
+  publishUrl?: string;
+  driveProxyUrl?: string;
+  playbackUrl?: string;
+  playbackStorageKey?: string;
+  mimeType?: string;
+  size?: number;
   fileType: "image" | "video";
   folder: string;
   addedBy: string;
@@ -21,14 +28,28 @@ interface EnsureMediaAssetParams {
  * post ID to the `used_in` array. Safe to call multiple times — idempotent.
  */
 export async function ensureMediaAsset(params: EnsureMediaAssetParams): Promise<void> {
-  const { name, url, fileType, folder, addedBy, workspaceId, usedIn } = params;
+  const { name, url, fileId, publishUrl, driveProxyUrl, playbackUrl, playbackStorageKey, mimeType, size, fileType, folder, addedBy, workspaceId, usedIn } = params;
   const wsId = workspaceId || "00000000-0000-0000-0000-000000000001";
+  const metadataUpdate: Record<string, unknown> = {
+    name,
+    url,
+    file_type: fileType,
+    folder,
+    added_by: addedBy,
+  };
+  if (fileId) metadataUpdate.file_id = fileId;
+  if (publishUrl) metadataUpdate.publish_url = publishUrl;
+  if (driveProxyUrl) metadataUpdate.drive_proxy_url = driveProxyUrl;
+  if (playbackUrl) metadataUpdate.playback_url = playbackUrl;
+  if (playbackStorageKey) metadataUpdate.playback_storage_key = playbackStorageKey;
+  if (mimeType) metadataUpdate.mime_type = mimeType;
+  if (typeof size === "number" && Number.isFinite(size)) metadataUpdate.size_bytes = size;
 
   // 1. Check if a row with this URL already exists IN THIS WORKSPACE.
   // RLS already gates this at the DB level, but the explicit workspace_id
   // filter is belt-and-suspenders against a future code path that mistakenly
   // uses the admin client here.
-  const aliases = Array.from(mediaUrlAliases({ url }));
+  const aliases = Array.from(mediaUrlAliases({ url, fileId, publishUrl, driveProxyUrl, playbackUrl }));
   const { data: existingRows } = await supabase
     .from("media_assets")
     .select("id, used_in")
@@ -39,27 +60,22 @@ export async function ensureMediaAsset(params: EnsureMediaAssetParams): Promise<
 
   if (existing) {
     // Row exists — only update used_in if we have a real post UUID to add
+    const nextUsedIn = new Set<string>(existing.used_in || []);
     if (usedIn && isValidUuid(usedIn)) {
-      const currentUsedIn: string[] = existing.used_in || [];
-      if (!currentUsedIn.includes(usedIn)) {
-        await supabase
-          .from("media_assets")
-          .update({ used_in: [...currentUsedIn, usedIn] })
-          .eq("id", existing.id)
-          .eq("workspace_id", wsId);
-      }
+      nextUsedIn.add(usedIn);
     }
+    await supabase
+      .from("media_assets")
+      .update({ ...metadataUpdate, used_in: Array.from(nextUsedIn) })
+      .eq("id", existing.id)
+      .eq("workspace_id", wsId);
     return;
   }
 
   // 2. Insert new row
   const usedInArray = usedIn && isValidUuid(usedIn) ? [usedIn] : [];
   const { error } = await supabase.from("media_assets").insert({
-    name,
-    url,
-    file_type: fileType,
-    folder,
-    added_by: addedBy,
+    ...metadataUpdate,
     workspace_id: wsId,
     used_in: usedInArray,
   });

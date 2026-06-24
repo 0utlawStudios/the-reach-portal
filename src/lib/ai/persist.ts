@@ -12,6 +12,7 @@ import type {
   ContentTypeFromPlan,
   PostInsertRow,
 } from "./types";
+import { aiAssetProxyUrl } from "./asset-url";
 
 function adminClient(): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -82,7 +83,8 @@ export function buildPostInsertRow(args: BuildPostArgs): PostInsertRow {
   const platforms = normalizePlanPlatforms(plan.platforms);
   const contentType = contentTypeFromPlan(plan.media_type, plan.format);
   const generatedByModel = `${args.textModel}+${args.imageModel}`;
-  const thumb = assets[0]?.signedUrl || null;
+  const assetUrls = assets.map((a) => aiAssetProxyUrl(a.storageKey));
+  const thumb = assetUrls[0] || null;
 
   return {
     workspace_id: args.workspaceId,
@@ -103,7 +105,7 @@ export function buildPostInsertRow(args: BuildPostArgs): PostInsertRow {
     aspect_ratio: resolved.ratio,
     asset_width: resolved.width,
     asset_height: resolved.height,
-    asset_urls: assets.map((a) => a.signedUrl),
+    asset_urls: assetUrls,
     asset_storage_keys: assets.map((a) => a.storageKey),
     hashtags: caption.hashtags,
     cta: caption.cta,
@@ -169,11 +171,11 @@ export async function updateRevisedPost(args: UpdateRevisedArgs): Promise<void> 
     source_notes: args.caption.source_notes,
     quality_score: args.caption.quality_score,
     approval_notes: args.caption.approval_notes,
-    asset_urls: args.assets.map((a) => a.signedUrl),
+    asset_urls: args.assets.map((a) => aiAssetProxyUrl(a.storageKey)),
     asset_storage_keys: args.assets.map((a) => a.storageKey),
     asset_width: args.resolved.width,
     asset_height: args.resolved.height,
-    thumbnail_url: args.assets[0]?.signedUrl || null,
+    thumbnail_url: args.assets[0] ? aiAssetProxyUrl(args.assets[0].storageKey) : null,
     generated_by_model: `${args.textModel}+${args.imageModel}`,
     prompt_version: args.promptVersion,
     revision_count: (current.revision_count || 0) + 1,
