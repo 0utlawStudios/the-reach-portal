@@ -17,15 +17,19 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 type GetUserResult = { data: { user: unknown }; error: unknown };
 let getUserResult: GetUserResult;
 // Keyed by table name → the resolved value for that table's terminal call.
-let tableResults: Record<string, { maybeSingle?: unknown; upsert?: unknown }>;
+let tableResults: Record<string, { select?: unknown; maybeSingle?: unknown; upsert?: unknown }>;
 
 // ── Chainable Supabase query-builder mock. Every filter/select method returns
 // `this`; terminal methods resolve with the per-table configured value. ─────
 function makeQuery(table: string) {
   const cfg = tableResults[table] || {};
   const builder: Record<string, unknown> = {};
+  let terminal = "";
   for (const m of ["select", "eq", "ilike", "limit", "order", "in"]) {
-    builder[m] = vi.fn(() => builder);
+    builder[m] = vi.fn(() => {
+      if (m === "select" && !terminal) terminal = "select";
+      return builder;
+    });
   }
   builder.maybeSingle = vi.fn(() =>
     Promise.resolve(cfg.maybeSingle ?? { data: null, error: null }),
@@ -33,6 +37,10 @@ function makeQuery(table: string) {
   builder.upsert = vi.fn(() =>
     Promise.resolve(cfg.upsert ?? { data: null, error: null }),
   );
+  builder.then = (resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) => {
+    const value = terminal === "select" ? (cfg.select ?? { data: null, error: null }) : { data: null, error: null };
+    return Promise.resolve(value).then(resolve, reject);
+  };
   return builder;
 }
 
@@ -91,8 +99,8 @@ describe("GET /api/workspace/provision — membership contract", () => {
     };
     // workspace_members lookup → not a member; team_members lookup → no row.
     tableResults = {
-      workspace_members: { maybeSingle: { data: null, error: null } },
-      team_members: { maybeSingle: { data: null, error: null } },
+      workspace_members: { select: { data: [], error: null } },
+      team_members: { select: { data: [], error: null } },
     };
     const res = await GET(makeRequest({ Authorization: "Bearer good-token" }));
     expect(res.status).toBe(403);
@@ -104,8 +112,8 @@ describe("GET /api/workspace/provision — membership contract", () => {
       error: null,
     };
     tableResults = {
-      workspace_members: { maybeSingle: { data: null, error: null } },
-      team_members: { maybeSingle: { data: { role: "", status: "active" }, error: null } },
+      workspace_members: { select: { data: [], error: null } },
+      team_members: { select: { data: [{ role: "", status: "active" }], error: null } },
     };
     const res = await GET(makeRequest({ Authorization: "Bearer good-token" }));
     expect(res.status).toBe(403);
@@ -118,8 +126,8 @@ describe("GET /api/workspace/provision — membership contract", () => {
     };
     tableResults = {
       workspace_members: {
-        maybeSingle: {
-          data: { workspace_id: "00000000-0000-0000-0000-000000000001", status: "active" },
+        select: {
+          data: [{ workspace_id: "00000000-0000-0000-0000-000000000001", status: "active" }],
           error: null,
         },
       },
@@ -137,10 +145,10 @@ describe("GET /api/workspace/provision — membership contract", () => {
     };
     tableResults = {
       workspace_members: {
-        maybeSingle: { data: { workspace_id: "00000000-0000-0000-0000-000000000001", status: "pending" }, error: null },
+        select: { data: [{ workspace_id: "00000000-0000-0000-0000-000000000001", status: "pending" }], error: null },
       },
       team_members: {
-        maybeSingle: { data: { role: "social_media_specialist", status: "pending" }, error: null },
+        select: { data: [{ role: "social_media_specialist", status: "pending" }], error: null },
       },
     };
     const res = await GET(makeRequest({ Authorization: "Bearer pending-token" }));
@@ -159,11 +167,11 @@ describe("GET /api/workspace/provision — membership contract", () => {
     // the route upserts membership and returns 200.
     tableResults = {
       workspace_members: {
-        maybeSingle: { data: null, error: null },
+        select: { data: [], error: null },
         upsert: { data: null, error: null },
       },
       team_members: {
-        maybeSingle: { data: { role: "editor", status: "active" }, error: null },
+        select: { data: [{ role: "editor", status: "active" }], error: null },
       },
     };
     const res = await GET(makeRequest({ Authorization: "Bearer good-token" }));
@@ -180,11 +188,11 @@ describe("GET /api/workspace/provision — membership contract", () => {
     };
     tableResults = {
       workspace_members: {
-        maybeSingle: { data: { workspace_id: "00000000-0000-0000-0000-000000000001", status: "pending" }, error: null },
+        select: { data: [{ workspace_id: "00000000-0000-0000-0000-000000000001", status: "pending" }], error: null },
         upsert: { data: null, error: null },
       },
       team_members: {
-        maybeSingle: { data: { role: "social_media_specialist", status: "active" }, error: null },
+        select: { data: [{ role: "social_media_specialist", status: "active" }], error: null },
       },
     };
     const res = await GET(makeRequest({ Authorization: "Bearer retry-token" }));
@@ -192,5 +200,25 @@ describe("GET /api/workspace/provision — membership contract", () => {
     const body = await res.json();
     expect(body.workspaceId).toBe("00000000-0000-0000-0000-000000000001");
     expect(body.provisioned).toBe(true);
+  });
+
+  it("returns 409 instead of guessing when a user has multiple active workspaces and no context", async () => {
+    getUserResult = {
+      data: { user: { id: "user-7", email: "multi@example.com" } },
+      error: null,
+    };
+    tableResults = {
+      workspace_members: {
+        select: {
+          data: [
+            { workspace_id: "00000000-0000-0000-0000-000000000001", status: "active" },
+            { workspace_id: "11111111-1111-1111-1111-111111111111", status: "active" },
+          ],
+          error: null,
+        },
+      },
+    };
+    const res = await GET(makeRequest({ Authorization: "Bearer good-token" }));
+    expect(res.status).toBe(409);
   });
 });

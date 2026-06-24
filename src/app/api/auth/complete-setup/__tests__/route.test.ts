@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 type MockResult = { data?: unknown; error?: { message: string } | null };
 type TableConfig = {
+  select?: MockResult | MockResult[];
   maybeSingle?: MockResult;
   update?: MockResult | MockResult[];
   upsert?: MockResult;
@@ -31,12 +32,16 @@ function makeQuery(table: string) {
     filters: [] as Array<[string, unknown]>,
   };
   const builder: Record<string, unknown> = {};
-  builder.select = vi.fn(() => builder);
+  builder.select = vi.fn(() => {
+    if (!state.method) state.method = "select";
+    return builder;
+  });
   builder.eq = vi.fn((column: string, value: unknown) => {
     state.filters.push([column, value]);
     return builder;
   });
   builder.limit = vi.fn(() => builder);
+  builder.order = vi.fn(() => builder);
   builder.update = vi.fn((payload: unknown) => {
     state.method = "update";
     state.payload = payload;
@@ -49,7 +54,7 @@ function makeQuery(table: string) {
     return Promise.resolve(cfg.upsert || { data: null, error: null });
   });
   builder.then = (resolve: (value: MockResult) => unknown, reject: (reason: unknown) => unknown) => {
-    const value = state.method === "update" ? nextResult(cfg.update) : { data: null, error: null };
+    const value = state.method === "update" ? nextResult(cfg.update) : nextResult(cfg.select);
     return Promise.resolve(value).then(resolve, reject);
   };
   return builder;
@@ -70,9 +75,16 @@ vi.mock("@supabase/supabase-js", () => ({
 
 import { POST } from "../route";
 
-function makeRequest(body: Record<string, unknown>, authorization = "Bearer good-token") {
+function makeRequest(body: Record<string, unknown>, authorization = "Bearer good-token", workspaceId?: string) {
   return {
-    headers: { get: (name: string) => (name.toLowerCase() === "authorization" ? authorization : null) },
+    headers: {
+      get: (name: string) => {
+        const lower = name.toLowerCase();
+        if (lower === "authorization") return authorization;
+        if (lower === "x-workspace-id") return workspaceId || null;
+        return null;
+      },
+    },
     json: () => Promise.resolve(body),
   } as unknown as Parameters<typeof POST>[0];
 }
@@ -88,13 +100,14 @@ beforeEach(() => {
   authUpdateResult = { data: null, error: null };
   tableResults = {
     team_members: {
-      maybeSingle: {
-        data: { id: "member-1", role: "social_media_specialist", status: "pending", avatar_url: null },
+      select: {
+        data: [{ id: "member-1", workspace_id: "00000000-0000-0000-0000-000000000001", role: "social_media_specialist", status: "pending", avatar_url: null }],
         error: null,
       },
       update: { data: null, error: null },
     },
     workspace_members: {
+      select: { data: [], error: null },
       upsert: { data: null, error: null },
     },
   };
@@ -144,7 +157,7 @@ describe("POST /api/auth/complete-setup", () => {
   });
 
   it("rejects setup when the invitation is missing", async () => {
-    tableResults.team_members = { maybeSingle: { data: null, error: null } };
+    tableResults.team_members = { select: { data: [], error: null } };
     const res = await POST(makeRequest({ name: "Ace Creatives" }));
     expect(res.status).toBe(403);
   });
@@ -169,18 +182,61 @@ describe("POST /api/auth/complete-setup", () => {
   });
 
   it("allows setup without a new avatar when the member already has a profile photo", async () => {
-    tableResults.team_members.maybeSingle = {
-      data: {
+    tableResults.team_members.select = {
+      data: [{
         id: "member-1",
+        workspace_id: "00000000-0000-0000-0000-000000000001",
         role: "social_media_specialist",
         status: "active",
         avatar_url: "https://test.supabase.co/storage/v1/object/public/avatars/existing.png",
-      },
+      }],
       error: null,
     };
     const res = await POST(makeRequest({ name: "Ace Creatives" }));
     expect(res.status).toBe(200);
     const teamUpdate = operations.find((op) => op.table === "team_members" && op.method === "update");
     expect(teamUpdate?.payload).not.toHaveProperty("avatar_url");
+  });
+
+  it("rejects ambiguous email-only invitations without workspace context", async () => {
+    tableResults.team_members.select = {
+      data: [
+        { id: "member-1", workspace_id: "00000000-0000-0000-0000-000000000001", role: "admin", status: "pending", avatar_url: null },
+        { id: "member-2", workspace_id: "11111111-1111-1111-1111-111111111111", role: "admin", status: "pending", avatar_url: null },
+      ],
+      error: null,
+    };
+    const res = await POST(makeRequest({
+      name: "Ace Creatives",
+      avatarUrl: "https://test.supabase.co/storage/v1/object/public/avatars/profiles/user-1/ace.png",
+    }));
+    expect(res.status).toBe(409);
+    expect(operations.some((op) => op.table === "workspace_members" && op.method === "upsert")).toBe(false);
+  });
+
+  it("uses explicit workspace context when activating a matching invite", async () => {
+    const workspaceId = "11111111-1111-1111-1111-111111111111";
+    tableResults.team_members.select = {
+      data: [{ id: "member-2", workspace_id: workspaceId, role: "admin", status: "pending", avatar_url: null }],
+      error: null,
+    };
+    const res = await POST(makeRequest({
+      name: "Ace Creatives",
+      avatarUrl: "https://test.supabase.co/storage/v1/object/public/avatars/profiles/user-1/ace.png",
+      workspaceId,
+    }, "Bearer good-token", workspaceId));
+    expect(res.status).toBe(200);
+    expect(operations).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        table: "team_members",
+        method: "update",
+        filters: expect.arrayContaining([["workspace_id", workspaceId]]),
+      }),
+      expect.objectContaining({
+        table: "workspace_members",
+        method: "upsert",
+        payload: expect.objectContaining({ workspace_id: workspaceId }),
+      }),
+    ]));
   });
 });

@@ -30,6 +30,7 @@ import { runHallucinationGate } from "./hallucination-gate";
 import {
   buildPostInsertRow,
   insertGeneratedPost,
+  RevisionNoLongerPendingError,
   updateRevisedPost,
 } from "./persist";
 import {
@@ -622,6 +623,17 @@ export async function runReviseJob(jobId: string): Promise<void> {
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    if (err instanceof RevisionNoLongerPendingError) {
+      await sb.from("ai_generation_jobs")
+        .update({
+          status: "cancelled",
+          completed_at: new Date().toISOString(),
+          error: msg,
+        })
+        .eq("id", jobId);
+      await recordAudit(sb, job.workspace_id, "ai_post_revise_cancelled", job.post_id || null, { job_id: jobId, error: msg });
+      return;
+    }
     const capHit = err instanceof DailyCapExceeded || err instanceof PerRowCapExceeded;
     await failJob(sb, jobId, msg);
     await recordAudit(sb, job.workspace_id, "ai_post_revise_failed", job.post_id || null, { job_id: jobId, error: msg, cap_hit: capHit });

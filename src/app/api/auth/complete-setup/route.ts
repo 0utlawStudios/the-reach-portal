@@ -5,11 +5,13 @@ import { createHash } from "node:crypto";
 export const maxDuration = 10;
 
 const BASELINE_WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
+const WORKSPACE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type CompleteSetupBody = {
   name?: unknown;
   phone?: unknown;
   avatarUrl?: unknown;
+  workspaceId?: unknown;
 };
 
 function getAdminClient() {
@@ -65,6 +67,18 @@ function cleanName(value: unknown): string | null {
   return name.length >= 2 ? name : null;
 }
 
+function workspaceIdFromRequest(request: NextRequest, body: CompleteSetupBody): string | null | NextResponse {
+  const raw = typeof body.workspaceId === "string"
+    ? body.workspaceId
+    : request.headers.get("x-workspace-id") || request.headers.get("x-reach-workspace-id") || "";
+  const workspaceId = raw.trim();
+  if (!workspaceId) return null;
+  if (!WORKSPACE_ID_RE.test(workspaceId)) {
+    return NextResponse.json({ error: "Invalid workspace context" }, { status: 400 });
+  }
+  return workspaceId;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const token = request.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
@@ -74,6 +88,8 @@ export async function POST(request: NextRequest) {
     const name = cleanName(body.name);
     if (!name) return NextResponse.json({ error: "Full name is required" }, { status: 400 });
     const phone = cleanPhone(body.phone);
+    const requestedWorkspaceId = workspaceIdFromRequest(request, body);
+    if (requestedWorkspaceId instanceof NextResponse) return requestedWorkspaceId;
 
     const admin = getAdminClient();
     const { data: authData, error: authErr } = await admin.auth.getUser(token);
@@ -83,34 +99,52 @@ export async function POST(request: NextRequest) {
     const email = (user.email || "").toLowerCase();
     if (!email) return NextResponse.json({ error: "No email on user" }, { status: 403 });
 
-    const { data: existingWorkspaceAccess } = await admin
+    let accessQuery = admin
       .from("workspace_members")
       .select("workspace_id, status")
       .eq("user_id", user.id)
-      .limit(1)
-      .maybeSingle();
+      .order("created_at", { ascending: false });
+    if (requestedWorkspaceId) {
+      accessQuery = accessQuery.eq("workspace_id", requestedWorkspaceId);
+    }
+    const { data: existingWorkspaceRows, error: workspaceReadErr } = await accessQuery.limit(2);
+    if (workspaceReadErr) {
+      console.error("[auth/complete-setup] workspace read failed:", workspaceReadErr.message);
+      return NextResponse.json({ error: "Could not verify workspace access" }, { status: 500 });
+    }
+    const activeWorkspaceRows = (existingWorkspaceRows || []).filter((row) => row.status === "active");
+    if (!requestedWorkspaceId && activeWorkspaceRows.length > 1) {
+      return NextResponse.json({ error: "Workspace context required. Open the invite link from your email again." }, { status: 409 });
+    }
+    const existingWorkspaceAccess = activeWorkspaceRows[0] || existingWorkspaceRows?.[0] || null;
 
     let memberQuery = admin
       .from("team_members")
       .select("id, workspace_id, role, status, avatar_url")
       .eq("email", email);
-    if (existingWorkspaceAccess?.workspace_id) {
+    if (requestedWorkspaceId) {
+      memberQuery = memberQuery.eq("workspace_id", requestedWorkspaceId);
+    } else if (existingWorkspaceAccess?.workspace_id) {
       memberQuery = memberQuery.eq("workspace_id", existingWorkspaceAccess.workspace_id);
     }
-    const { data: member, error: memberReadErr } = await memberQuery
-      .limit(1)
-      .maybeSingle();
+    const { data: memberRows, error: memberReadErr } = await memberQuery
+      .order("created_at", { ascending: false })
+      .limit(2);
 
     if (memberReadErr) {
       console.error("[auth/complete-setup] member read failed:", memberReadErr.message);
       return NextResponse.json({ error: "Could not verify invitation" }, { status: 500 });
     }
+    if (!requestedWorkspaceId && !existingWorkspaceAccess?.workspace_id && (memberRows?.length || 0) > 1) {
+      return NextResponse.json({ error: "Multiple invitations found. Open the invite link from your email again." }, { status: 409 });
+    }
+    const member = memberRows?.[0] || null;
     if (!member) return NextResponse.json({ error: "Invitation not found" }, { status: 403 });
     if (!member.role) return NextResponse.json({ error: "Invitation role is missing" }, { status: 409 });
     if (!["pending", "active"].includes(String(member.status))) {
       return NextResponse.json({ error: "Invitation is not active" }, { status: 403 });
     }
-    const workspaceId = (member.workspace_id as string | null) || existingWorkspaceAccess?.workspace_id || BASELINE_WORKSPACE_ID;
+    const workspaceId = (member.workspace_id as string | null) || requestedWorkspaceId || existingWorkspaceAccess?.workspace_id || BASELINE_WORKSPACE_ID;
     const avatarUrl = cleanOwnedProfileAvatarUrl(body.avatarUrl, user.id);
     const submittedAvatar = typeof body.avatarUrl === "string" && body.avatarUrl.trim().length > 0;
     const existingAvatarUrl = String(member.avatar_url || "").trim();

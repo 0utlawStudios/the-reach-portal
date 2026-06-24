@@ -3,6 +3,12 @@ import { readFileSync } from "fs";
 import { join } from "path";
 
 const SETUP_SRC = readFileSync(join(process.cwd(), "src/app/auth/setup/page.tsx"), "utf8");
+const AUTH_CONFIRM_SRC = readFileSync(join(process.cwd(), "src/app/auth/confirm/route.ts"), "utf8");
+const COMPLETE_SETUP_ROUTE_SRC = readFileSync(join(process.cwd(), "src/app/api/auth/complete-setup/route.ts"), "utf8");
+const TEAM_INVITE_ROUTE_SRC = readFileSync(join(process.cwd(), "src/app/api/team/invite/route.ts"), "utf8");
+const TEAM_RESEND_INVITE_ROUTE_SRC = readFileSync(join(process.cwd(), "src/app/api/team/resend-invite/route.ts"), "utf8");
+const TEAM_APPROVE_REQUEST_ROUTE_SRC = readFileSync(join(process.cwd(), "src/app/api/team/approve-request/route.ts"), "utf8");
+const TEAM_CHANGE_EMAIL_ROUTE_SRC = readFileSync(join(process.cwd(), "src/app/api/team/change-email/route.ts"), "utf8");
 const APP_SHELL_SRC = readFileSync(join(process.cwd(), "src/components/app-shell.tsx"), "utf8");
 const AUTHENTICATED_APP_SHELL_SRC = readFileSync(join(process.cwd(), "src/components/authenticated-app-shell.tsx"), "utf8");
 const GLOBALS_SRC = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
@@ -32,6 +38,18 @@ describe("invite setup flow hardening", () => {
   it("activates invitations through the server route, not a client-side team_members update", () => {
     expect(SETUP_SRC).toContain("/api/auth/complete-setup");
     expect(SETUP_SRC).not.toMatch(/from\(\s*["']team_members["']\s*\)\s*\.\s*update\(/);
+  });
+
+  it("carries workspace context through invite confirmation and setup activation", () => {
+    expect(AUTH_CONFIRM_SRC).toContain("workspaceId");
+    expect(AUTH_CONFIRM_SRC).toContain("/auth/setup${setupQuery.size");
+    expect(SETUP_SRC).toContain("workspaceIdFromUrl");
+    expect(SETUP_SRC).toContain('"X-Workspace-Id"');
+    expect(COMPLETE_SETUP_ROUTE_SRC).toContain("workspaceIdFromRequest");
+    expect(COMPLETE_SETUP_ROUTE_SRC).toContain("Multiple invitations found");
+    for (const src of [TEAM_INVITE_ROUTE_SRC, TEAM_RESEND_INVITE_ROUTE_SRC, TEAM_APPROVE_REQUEST_ROUTE_SRC, TEAM_CHANGE_EMAIL_ROUTE_SRC]) {
+      expect(src).toContain("workspaceId=${encodeURIComponent");
+    }
   });
 
   it("keeps the user session after setup so workspace provisioning can refresh immediately", () => {

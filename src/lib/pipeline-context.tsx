@@ -1068,7 +1068,10 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
           if (!token) throw new Error("Missing session token");
           const res = await fetch(`/api/posts/${cardId}`, {
             method: "DELETE",
-            headers: { Authorization: `Bearer ${token}` },
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "X-Workspace-Id": workspaceIdRef.current || BASELINE_WORKSPACE_ID,
+            },
           });
           const payload = await res.json().catch(() => ({}));
           if (!res.ok || payload?.success !== true) {

@@ -109,6 +109,7 @@ beforeEach(() => {
     mimeType: "image/heic",
     size: 2 * 1024 * 1024,
     parents: ["raw-files-folder"],
+    appProperties: { workspaceId: "00000000-0000-0000-0000-000000000001" },
   });
   driveMocks.getAccessToken.mockResolvedValue("drive-token");
   sharpMocks.pipeline.toBuffer.mockResolvedValue(Buffer.from([0xff, 0xd8, 0xff]));
@@ -123,6 +124,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   globalThis.fetch = originalFetch;
   if (originalSupabaseUrl === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
   else process.env.NEXT_PUBLIC_SUPABASE_URL = originalSupabaseUrl;
@@ -180,6 +182,38 @@ describe("GET /api/media/image-preview", () => {
     );
   });
 
+  it("serves Drive's JPEG thumbnail for first paint when available", async () => {
+    driveMocks.getFileMetadata.mockResolvedValueOnce({
+      id: FILE_ID,
+      name: "source.heic",
+      mimeType: "image/heic",
+      size: 2 * 1024 * 1024,
+      parents: ["raw-files-folder"],
+      appProperties: { workspaceId: "00000000-0000-0000-0000-000000000001" },
+      thumbnailLink: "https://drive.example/thumbnail",
+    });
+    globalThis.fetch = vi.fn(async () => new Response(new Uint8Array([0xff, 0xd8, 0x77]), {
+      status: 200,
+      headers: { "content-type": "image/jpeg" },
+    })) as unknown as typeof fetch;
+
+    const res = await GET(makeRequest(`/api/media/image-preview?id=${FILE_ID}&token=signed&size=thumb`));
+    const body = new Uint8Array(await res.arrayBuffer());
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/jpeg");
+    expect(res.headers.get("x-preview-size")).toBe("thumb");
+    expect(Array.from(body)).toEqual([0xff, 0xd8, 0x77]);
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "https://drive.example/thumbnail",
+      expect.objectContaining({
+        headers: { Authorization: "Bearer drive-token" },
+      }),
+    );
+    expect(sharpMocks.sharp).not.toHaveBeenCalled();
+    expect(heicDecodeMocks.decode.all).not.toHaveBeenCalled();
+  });
+
   it("serves a cached HEIC JPEG preview without fetching or decoding the Drive source", async () => {
     storageMocks.download.mockResolvedValueOnce({
       data: {
@@ -217,6 +251,7 @@ describe("GET /api/media/image-preview", () => {
       mimeType: "image/jpeg",
       size: 2 * 1024 * 1024,
       parents: ["media-library-folder"],
+      appProperties: { workspaceId: "00000000-0000-0000-0000-000000000001" },
     });
 
     const res = await GET(makeRequest());
@@ -311,6 +346,25 @@ describe("GET /api/media/image-preview", () => {
     }
   });
 
+  it("times out a stuck HEIC conversion instead of leaving preview requests waiting", async () => {
+    vi.useFakeTimers();
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    sharpMocks.pipeline.toBuffer.mockImplementationOnce(() => new Promise<Buffer>(() => {}));
+
+    try {
+      const pending = GET(makeRequest(`/api/media/image-preview?id=${FILE_ID}&token=signed&size=thumb`));
+      await vi.advanceTimersByTimeAsync(8_000);
+      const res = await pending;
+      const body = await res.json();
+
+      expect(res.status).toBe(504);
+      expect(body.error).toMatch(/HEIC preview conversion timed out/i);
+      expect(heicDecodeMocks.decode.all).not.toHaveBeenCalled();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
   it("rejects non-HEIC images instead of proxying arbitrary Drive files", async () => {
     driveMocks.getFileMetadata.mockResolvedValueOnce({
       id: FILE_ID,
@@ -318,6 +372,7 @@ describe("GET /api/media/image-preview", () => {
       mimeType: "image/jpeg",
       size: 1000,
       parents: ["raw-files-folder"],
+      appProperties: { workspaceId: "00000000-0000-0000-0000-000000000001" },
     });
 
     const res = await GET(makeRequest());
@@ -336,6 +391,7 @@ describe("GET /api/media/image-preview", () => {
       mimeType: "image/heic",
       size: 51 * 1024 * 1024,
       parents: ["raw-files-folder"],
+      appProperties: { workspaceId: "00000000-0000-0000-0000-000000000001" },
     });
 
     const res = await GET(makeRequest());

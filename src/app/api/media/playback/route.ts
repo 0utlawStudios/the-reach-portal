@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireRole, type WorkspaceRole } from "@/lib/auth/require";
+import { createClient } from "@supabase/supabase-js";
+import { requireUser } from "@/lib/auth/require";
 import { ALLOWED_DRIVE_ROLES } from "@/lib/drive-policy";
 
 export const runtime = "nodejs";
@@ -43,15 +44,30 @@ function copyHeader(source: Headers, target: Headers, name: string) {
   if (value) target.set(name, value);
 }
 
+async function userCanReadPlaybackWorkspace(userId: string, workspaceId: string): Promise<boolean> {
+  const admin = createClient(assertEnv("NEXT_PUBLIC_SUPABASE_URL"), assertEnv("SUPABASE_SERVICE_ROLE_KEY"), {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const { data, error } = await admin
+    .from("workspace_members")
+    .select("role")
+    .eq("user_id", userId)
+    .eq("workspace_id", workspaceId)
+    .eq("status", "active")
+    .maybeSingle();
+  if (error || !data?.role) return false;
+  return (ALLOWED_DRIVE_ROLES as readonly string[]).includes(String(data.role));
+}
+
 export async function GET(request: NextRequest) {
   const parsed = parsePlaybackStorageKey(request.nextUrl.searchParams.get("key"));
   if (!parsed) {
     return NextResponse.json({ error: "Invalid or missing playback key" }, { status: 400 });
   }
 
-  const auth = await requireRole(request, ALLOWED_DRIVE_ROLES as readonly WorkspaceRole[]);
-  if (auth instanceof NextResponse) return auth;
-  if (parsed.workspaceId !== auth.workspaceId) {
+  const userResult = await requireUser(request);
+  if (userResult instanceof NextResponse) return userResult;
+  if (!(await userCanReadPlaybackWorkspace(userResult.user.id, parsed.workspaceId))) {
     return NextResponse.json({ error: "Playback object does not belong to this workspace" }, { status: 403 });
   }
 

@@ -152,7 +152,7 @@ describe("POST /api/team/approve-request", () => {
       action: "approved",
       email: "hanes@ten80ten.com",
       emailSent: false,
-      inviteUrl: "https://thereach.ten80ten.com/auth/confirm?token_hash=hashed-token&type=invite",
+      inviteUrl: "https://thereach.ten80ten.com/auth/confirm?token_hash=hashed-token&type=invite&workspaceId=00000000-0000-0000-0000-000000000001",
     });
     expect(operations).toEqual(expect.arrayContaining([
       {
@@ -211,7 +211,7 @@ describe("POST /api/team/approve-request", () => {
       email: "stefani@thereach.travel",
       emailSent: false,
       reusedPendingInvite: true,
-      inviteUrl: "https://thereach.ten80ten.com/auth/confirm?token_hash=hashed-token&type=invite",
+      inviteUrl: "https://thereach.ten80ten.com/auth/confirm?token_hash=hashed-token&type=invite&workspaceId=00000000-0000-0000-0000-000000000001",
     });
     expect(operations.some((op) => op.table === "team_members" && op.method === "insert")).toBe(false);
     expect(operations).toEqual(expect.arrayContaining([

@@ -229,6 +229,16 @@ const DRIVE_STREAM_TOKEN_VERSION = "v1";
 const DRIVE_STREAM_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 const DRIVE_PUBLISH_STREAM_TOKEN_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 
+function appUrlOrigin(): string {
+  const configured = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL || "http://localhost:3000";
+  const withProtocol = /^https?:\/\//i.test(configured) ? configured : `https://${configured}`;
+  try {
+    return new URL(withProtocol).origin;
+  } catch {
+    return "http://localhost:3000";
+  }
+}
+
 function signDriveStreamPayload(fileId: string, workspaceId: string, expiresAt: number): string {
   return createHmac("sha256", streamSigningSecret())
     .update(`${fileId}.${workspaceId}.${expiresAt}`)
@@ -269,10 +279,8 @@ export function getStreamUrl(
   workspaceId: string,
   expiresAt = Date.now() + DRIVE_STREAM_TOKEN_TTL_MS,
 ): string {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
-  const base = siteUrl ? siteUrl.replace(/\/+$/, "") : "";
   const params = new URLSearchParams({ id: fileId, token: signDriveStreamToken(fileId, workspaceId, expiresAt) });
-  return `${base}/api/drive/stream?${params.toString()}`;
+  return `${appUrlOrigin()}/api/drive/stream?${params.toString()}`;
 }
 
 export function getPublishStreamUrl(fileId: string, workspaceId: string): string {
@@ -282,7 +290,7 @@ export function getPublishStreamUrl(fileId: string, workspaceId: string): string
 // ─── File metadata ───
 
 export async function getFileMetadata(fileId: string) {
-  const res = await driveFetch(`${DRIVE_API}/files/${fileId}?fields=id,name,mimeType,size,parents,appProperties&supportsAllDrives=true`);
+  const res = await driveFetch(`${DRIVE_API}/files/${fileId}?fields=id,name,mimeType,size,parents,appProperties,thumbnailLink&supportsAllDrives=true`);
   if (!res.ok) {
     const err = await res.text();
     throw new Error(`Failed to get file metadata: ${res.status} ${err}`);
@@ -297,5 +305,6 @@ export async function getFileMetadata(fileId: string) {
     appProperties: data.appProperties && typeof data.appProperties === "object"
       ? data.appProperties as Record<string, string>
       : {},
+    thumbnailLink: typeof data.thumbnailLink === "string" ? data.thumbnailLink : "",
   };
 }

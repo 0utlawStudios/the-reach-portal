@@ -146,18 +146,30 @@ export interface UpdateRevisedArgs {
   promptVersion: string;
 }
 
+export class RevisionNoLongerPendingError extends Error {
+  constructor(message = "Post left revision_needed before revise update") {
+    super(message);
+    this.name = "RevisionNoLongerPendingError";
+  }
+}
+
 export async function updateRevisedPost(args: UpdateRevisedArgs): Promise<void> {
   const sb = adminClient();
 
-  // Fetch current revision_count so we can increment atomically.
+  // Fetch current revision_count, then gate the final write on the post still
+  // being in revision_needed. The worker also checks earlier, but image upload
+  // can take long enough for an operator to move the card in between.
   const { data: current, error: fetchErr } = await sb
     .from("posts")
-    .select("revision_count")
+    .select("revision_count, stage")
     .eq("id", args.postId)
     .eq("workspace_id", args.workspaceId)
     .single();
   if (fetchErr || !current) {
     throw new Error(`Fetch post for revise failed: ${fetchErr?.message || "not found"}`);
+  }
+  if (current.stage !== "revision_needed") {
+    throw new RevisionNoLongerPendingError(`Post left revision_needed before revise update (now ${current.stage || "unknown"})`);
   }
 
   const update = {
@@ -182,10 +194,16 @@ export async function updateRevisedPost(args: UpdateRevisedArgs): Promise<void> 
     revision_count: (current.revision_count || 0) + 1,
   };
 
-  const { error: upErr } = await sb
+  const { data: updated, error: upErr } = await sb
     .from("posts")
     .update(update)
     .eq("id", args.postId)
-    .eq("workspace_id", args.workspaceId);
+    .eq("workspace_id", args.workspaceId)
+    .eq("stage", "revision_needed")
+    .select("id")
+    .maybeSingle();
   if (upErr) throw new Error(`Update revised post failed: ${upErr.message}`);
+  if (!updated) {
+    throw new RevisionNoLongerPendingError();
+  }
 }

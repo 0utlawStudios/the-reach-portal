@@ -98,7 +98,7 @@ describe("POST /api/team/resend-invite", () => {
     expect(body).toMatchObject({
       success: true,
       emailSent: false,
-      inviteUrl: "https://thereach.ten80ten.com/auth/confirm?token_hash=hashed-token&type=invite",
+      inviteUrl: "https://thereach.ten80ten.com/auth/confirm?token_hash=hashed-token&type=invite&workspaceId=workspace-1",
     });
     expect(operations).toEqual(expect.arrayContaining([
       { table: "workspace_members", method: "delete", filters: [["user_id", "old-auth-user"], ["workspace_id", "workspace-1"]] },

@@ -177,8 +177,9 @@ describe("Drive upload surfaces", () => {
     expect(playbackUploadRoute).toContain('const playbackUrl = `/api/media/playback?key=${encodeURIComponent(storageKey)}`');
 
     const playbackRoute = source("src/app/api/media/playback/route.ts");
-    expect(playbackRoute).toContain("requireRole(request, ALLOWED_DRIVE_ROLES as readonly WorkspaceRole[])");
-    expect(playbackRoute).toContain("parsed.workspaceId !== auth.workspaceId");
+    expect(playbackRoute).toContain("requireUser(request)");
+    expect(playbackRoute).toContain("userCanReadPlaybackWorkspace");
+    expect(playbackRoute).toContain('.eq("workspace_id", workspaceId)');
     expect(playbackRoute).toContain("SUPABASE_SERVICE_ROLE_KEY");
 
     const privateBucketsMigration = source("supabase/migrations/0051_private_media_derivative_buckets.sql");
@@ -255,7 +256,8 @@ describe("Drive upload surfaces", () => {
     expect(previewImage).toContain('size: "thumb"');
     expect(previewImage).toContain('size: "full"');
     expect(previewImage).toContain("shouldLoadPrimary");
-    expect(previewImage).toContain("!fallbackSrc || fallbackLoaded || fallbackFailed");
+    expect(previewImage).toContain("FALLBACK_PREVIEW_LOAD_TIMEOUT_MS");
+    expect(previewImage).toContain("!fallbackSrc || wantsFullPreview || fallbackLoaded || fallbackFailed");
 
     for (const file of [
       "src/components/pages/media-page.tsx",
@@ -319,7 +321,8 @@ describe("Drive upload surfaces", () => {
     expect(route).toContain("ownerUserId");
     expect(route).toContain("userSupportAttachmentAccess");
     expect(route).toContain('.eq("workspace_id", workspaceId)');
-    expect(route).toContain('.eq("role", "superadmin")');
+    expect(route).toContain('.eq("status", "active")');
+    expect(route).toContain("not cross tenant boundaries");
   });
 
   it("keeps same-origin media tags authenticated with a server-readable session cookie", () => {

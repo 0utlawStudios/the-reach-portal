@@ -220,7 +220,7 @@ async function updatePendingInviteEmail(admin: AdminClient, workspaceId: string,
     }
   }
 
-  const confirmUrl = `${getSiteUrl()}/auth/confirm?token_hash=${encodeURIComponent(linkData.properties.hashed_token)}&type=invite`;
+  const confirmUrl = `${getSiteUrl()}/auth/confirm?token_hash=${encodeURIComponent(linkData.properties.hashed_token)}&type=invite&workspaceId=${encodeURIComponent(workspaceId)}`;
   const emailResult = await sendInviteEmail(newEmail, member, confirmUrl);
   await auditEmailChange(admin, workspaceId, actorEmail, member, oldEmail, newEmail);
 

@@ -235,7 +235,7 @@ describe("POST /api/team/change-email", () => {
       success: true,
       email: "fresh@example.com",
       emailSent: false,
-      inviteUrl: "https://thereach.ten80ten.com/auth/confirm?token_hash=hashed-token&type=invite",
+      inviteUrl: "https://thereach.ten80ten.com/auth/confirm?token_hash=hashed-token&type=invite&workspaceId=workspace-1",
     });
     expect(operations).toEqual(expect.arrayContaining([
       {

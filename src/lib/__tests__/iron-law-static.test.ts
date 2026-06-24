@@ -265,6 +265,7 @@ describe("iron-law guards in pipeline-context.tsx", () => {
   it("post deletes go through the server route and require a confirmed deleted row", () => {
     expect(PIPELINE_SRC).toContain("fetch(`/api/posts/${cardId}`");
     expect(PIPELINE_SRC).toContain('method: "DELETE"');
+    expect(PIPELINE_SRC).toMatch(/fetch\(`\/api\/posts\/\$\{cardId\}`[\s\S]{0,220}"X-Workspace-Id": workspaceIdRef\.current \|\| BASELINE_WORKSPACE_ID/);
     expect(PIPELINE_SRC).not.toMatch(/from\(["']posts["']\)\.delete\(\)\.eq\(["']id["'],\s*cardId\)/);
     expect(POST_DELETE_ROUTE_SRC).toContain("requireBearerTeamRole(request, POST_DELETE_ALLOWED_ROLES)");
     expect(POST_DELETE_ROUTE_SRC).toContain('PROTECTED_DELETE_STAGES = new Set(["approved_scheduled", "posted"])');
@@ -413,7 +414,7 @@ describe("iron-law guards in pipeline-context.tsx", () => {
 
   it("AI worker audit events carry the job workspace id", () => {
     expect(AI_WORKER_SRC).toContain("p_workspace_id: workspaceId");
-    expect(AI_WORKER_SRC.match(/await recordAudit\(sb, job\.workspace_id/g) || []).toHaveLength(4);
+    expect(AI_WORKER_SRC.match(/await recordAudit\(sb, job\.workspace_id/g) || []).toHaveLength(5);
   });
 
   it("admin media backfill is scoped to the caller's workspace", () => {

@@ -15,6 +15,14 @@ function getSupabase() {
   return createClient(url, key);
 }
 
+const WORKSPACE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function workspaceIdFromUrl(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  const workspaceId = new URLSearchParams(window.location.search).get("workspaceId")?.trim();
+  return workspaceId && WORKSPACE_ID_RE.test(workspaceId) ? workspaceId : undefined;
+}
+
 export default function SetupPasswordPage() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -44,7 +52,7 @@ export default function SetupPasswordPage() {
       const accessToken = params.get("access_token");
       const refreshToken = params.get("refresh_token");
       if (hash) {
-        window.history.replaceState({}, "", window.location.pathname);
+        window.history.replaceState({}, "", `${window.location.pathname}${window.location.search}`);
       }
 
       const supabase = getSupabase();
@@ -215,11 +223,13 @@ export default function SetupPasswordPage() {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${accessToken}`,
+        ...(workspaceIdFromUrl() ? { "X-Workspace-Id": workspaceIdFromUrl() } : {}),
       },
       body: JSON.stringify({
         name: fullName,
         phone: cleanPhone,
         avatarUrl,
+        workspaceId: workspaceIdFromUrl(),
       }),
     });
     const activationBody = await activation.json().catch(() => ({}));

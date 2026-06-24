@@ -102,7 +102,57 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Failed to clean up previous workspace access" }, { status: 500 });
       }
       if (await hasOtherWorkspaceMembership(admin, existingAuthUser.id, ctx.workspaceId)) {
-        return NextResponse.json({ error: "That auth account belongs to another workspace" }, { status: 409 });
+        const { data: member, error: memberError } = await admin
+          .from("team_members")
+          .insert({
+            workspace_id: ctx.workspaceId,
+            name: body.name,
+            email,
+            role: body.role,
+            status: "active",
+          })
+          .select("id")
+          .single();
+        if (memberError || !member) {
+          console.error("[team/invite] existing-account team insert failed:", memberError?.message);
+          return NextResponse.json({ error: "Failed to register team member" }, { status: 500 });
+        }
+        const { error: workspaceErr } = await admin
+          .from("workspace_members")
+          .upsert(
+            {
+              workspace_id: ctx.workspaceId,
+              user_id: existingAuthUser.id,
+              role: body.role,
+              status: "active",
+            },
+            { onConflict: "workspace_id,user_id" },
+          );
+        if (workspaceErr) {
+          console.error("[team/invite] existing-account workspace upsert failed:", workspaceErr.message);
+          await admin.from("team_members").delete().eq("id", member.id).eq("workspace_id", ctx.workspaceId);
+          return NextResponse.json({ error: "Failed to grant workspace access" }, { status: 500 });
+        }
+        try {
+          await admin.rpc("record_audit_event", {
+            p_entity_type: "team",
+            p_action: "member_added_existing_account",
+            p_entity_id: null,
+            p_workspace_id: ctx.workspaceId,
+            p_metadata: {
+              user_name: actorEmail,
+              details: `Added existing account ${body.name} (${email}) as ${body.role}`,
+            },
+          });
+        } catch { /* audit log is best-effort */ }
+        return NextResponse.json({
+          success: true,
+          memberId: member.id,
+          email,
+          emailSent: false,
+          existingAccount: true,
+          message: `${email} already has an account and was added to this workspace.`,
+        });
       }
       const { error: orphanAuthDeleteErr } = await admin.auth.admin.deleteUser(existingAuthUser.id);
       if (orphanAuthDeleteErr) {
@@ -141,7 +191,7 @@ export async function POST(request: NextRequest) {
     // ─── Step 3: Build our own confirmation URL ───
     const siteUrl = getSiteUrl();
     const tokenHash = linkData.properties.hashed_token;
-    const confirmUrl = `${siteUrl}/auth/confirm?token_hash=${encodeURIComponent(tokenHash)}&type=invite`;
+    const confirmUrl = `${siteUrl}/auth/confirm?token_hash=${encodeURIComponent(tokenHash)}&type=invite&workspaceId=${encodeURIComponent(ctx.workspaceId)}`;
 
     // ─── Step 4: Insert team_members BEFORE email ───
     const { data: member, error: memberError } = await admin

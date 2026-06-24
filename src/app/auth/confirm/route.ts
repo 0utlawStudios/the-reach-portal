@@ -7,6 +7,7 @@ import { createClient } from "@supabase/supabase-js";
 // dedicated sign-in flow.
 const VALID_TYPES = ["invite", "recovery"] as const;
 type ValidType = (typeof VALID_TYPES)[number];
+const WORKSPACE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function isValidType(type: string): type is ValidType {
   return (VALID_TYPES as readonly string[]).includes(type);
@@ -50,6 +51,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type");
+  const workspaceId = searchParams.get("workspaceId")?.trim() || "";
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
@@ -60,6 +62,9 @@ export async function GET(request: NextRequest) {
   // Reject unknown types
   if (!isValidType(type)) {
     return NextResponse.redirect(`${siteUrl}?error=invalid_type`);
+  }
+  if (workspaceId && !WORKSPACE_ID_RE.test(workspaceId)) {
+    return NextResponse.redirect(`${siteUrl}?error=invalid_workspace`);
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -97,7 +102,10 @@ export async function GET(request: NextRequest) {
   if (refreshToken) params.set("refresh_token", refreshToken);
 
   if (type === "invite") {
-    const res = NextResponse.redirect(`${siteUrl}/auth/setup#${params.toString()}`);
+    const setupQuery = new URLSearchParams();
+    if (workspaceId) setupQuery.set("workspaceId", workspaceId);
+    const setupPath = `/auth/setup${setupQuery.size ? `?${setupQuery.toString()}` : ""}`;
+    const res = NextResponse.redirect(`${siteUrl}${setupPath}#${params.toString()}`);
     attachTokenCookies(res, accessToken, refreshToken ?? null);
     return res;
   }

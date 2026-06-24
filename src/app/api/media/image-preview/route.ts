@@ -11,7 +11,7 @@ import {
 } from "@/lib/google-drive";
 import { ALLOWED_DRIVE_ROLES, normalizeDriveMimeType, VALID_DRIVE_FOLDERS } from "@/lib/drive-policy";
 import { sanitizeUnknownUploadError, statusForSanitizedDriveError } from "@/lib/drive-errors";
-import { requireBearerTeamRole, requireRole, type WorkspaceRole } from "@/lib/auth/require";
+import { requireBearerTeamRole, requireRole, requireUser, type WorkspaceRole } from "@/lib/auth/require";
 import { withStorageControlTimeout } from "@/lib/storage-upload-timeout";
 
 export const runtime = "nodejs";
@@ -28,11 +28,16 @@ const PREVIEW_SIZES = {
   thumb: { maxEdge: 520, quality: 78 },
   full: { maxEdge: 1600, quality: 86 },
 } as const;
+const PREVIEW_CONVERSION_TIMEOUT_MS = {
+  thumb: 8_000,
+  full: 25_000,
+} as const;
 // heic-decode allocates raw RGBA in JS/WASM before Sharp can resize it. Cap the
 // fallback below Sharp's native limit so common 48MP iPhone HEICs still preview
 // while larger panoramas fail closed before raw decode.
 const HEIC_FALLBACK_MAX_PIXELS = 50_000_000;
 const DRIVE_MEDIA_TIMEOUT_MS = 45_000;
+const DRIVE_THUMBNAIL_TIMEOUT_MS = 8_000;
 const inFlightPreviewBuilds = new Map<string, Promise<Buffer>>();
 
 type PreviewSize = keyof typeof PREVIEW_SIZES;
@@ -153,6 +158,20 @@ function resizeBrowserSafeJpeg(source: Buffer, size: PreviewSize) {
     .toBuffer();
 }
 
+async function withPreviewTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new ImagePreviewHttpError(`${label} timed out`, 504)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 function assertFallbackPixelSafe(width: number, height: number) {
   const pixels = width * height;
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0 || pixels > HEIC_FALLBACK_MAX_PIXELS) {
@@ -182,12 +201,25 @@ function resizeRawBrowserSafeJpeg(image: HeicDecodedImage, size: PreviewSize) {
 }
 
 async function convertHeicWithFallbackDecoder(source: Buffer, size: PreviewSize) {
-  const images = await decodeHeic.all({ buffer: source });
+  const images = await withPreviewTimeout(
+    decodeHeic.all({ buffer: source }),
+    PREVIEW_CONVERSION_TIMEOUT_MS[size],
+    "HEIC preview conversion",
+  );
   try {
     const image = images[0];
     if (!image) throw new Error("HEIF image not found");
     assertFallbackPixelSafe(image.width, image.height);
-    return resizeRawBrowserSafeJpeg(await image.decode(), size);
+    const decoded = await withPreviewTimeout(
+      image.decode(),
+      PREVIEW_CONVERSION_TIMEOUT_MS[size],
+      "HEIC preview conversion",
+    );
+    return withPreviewTimeout(
+      resizeRawBrowserSafeJpeg(decoded, size),
+      PREVIEW_CONVERSION_TIMEOUT_MS[size],
+      "HEIC preview conversion",
+    );
   } finally {
     try {
       images.dispose();
@@ -200,13 +232,39 @@ async function convertHeicWithFallbackDecoder(source: Buffer, size: PreviewSize)
 async function buildHeicPreview(source: Buffer, size: PreviewSize) {
   if (sharp.format.heif?.input.buffer) {
     try {
-      return await resizeBrowserSafeJpeg(source, size);
-    } catch {
+      return await withPreviewTimeout(
+        resizeBrowserSafeJpeg(source, size),
+        PREVIEW_CONVERSION_TIMEOUT_MS[size],
+        "HEIC preview conversion",
+      );
+    } catch (err) {
+      if (err instanceof ImagePreviewHttpError) throw err;
       // Some runtimes expose HEIF metadata support but cannot decode iPhone HEVC HEIC payloads.
     }
   }
 
   return convertHeicWithFallbackDecoder(source, size);
+}
+
+async function fetchDriveThumbnail(thumbnailLink: string | undefined, accessToken: string): Promise<Buffer | null> {
+  if (!thumbnailLink) return null;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), DRIVE_THUMBNAIL_TIMEOUT_MS);
+  try {
+    const res = await fetch(thumbnailLink, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal: controller.signal,
+    });
+    if (!res.ok) return null;
+    const contentType = (res.headers.get("content-type") || "").toLowerCase();
+    if (!contentType.includes("image/jpeg") && !contentType.includes("image/jpg")) return null;
+    return Buffer.from(await res.arrayBuffer());
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function buildPreviewOnce(cacheKey: string, build: () => Promise<Buffer>): Promise<Buffer> {
@@ -282,19 +340,67 @@ async function isInAppManagedDriveFolder(fileId: string): Promise<boolean> {
   }
 }
 
-async function workspaceAuth(req: NextRequest): Promise<{ workspaceId: string } | null> {
+async function metadataIsInAppManagedDriveFolder(meta: { parents: string[] }): Promise<boolean> {
+  try {
+    const rootId = getRootFolderId();
+    const allowedParentIds = await Promise.all(VALID_DRIVE_FOLDERS.map((folder) => ensureSubfolder(folder, rootId)));
+    return meta.parents.some((parentId) => allowedParentIds.includes(parentId));
+  } catch {
+    return false;
+  }
+}
+
+async function activeDriveWorkspacesForUser(userId: string): Promise<string[]> {
+  const admin = serviceRoleClient();
+  if (!admin) return [];
+  const { data, error } = await admin
+    .from("workspace_members")
+    .select("workspace_id, role")
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .limit(50);
+  if (error || !data) return [];
+  const allowed = new Set((ALLOWED_DRIVE_ROLES as readonly string[]).map((role) => role.toLowerCase()));
+  return data
+    .filter((row) => allowed.has(String(row.role || "").toLowerCase()))
+    .map((row) => String(row.workspace_id))
+    .filter(Boolean);
+}
+
+async function resolveAuthedMediaWorkspace(userId: string, fileId: string, meta: { appProperties?: Record<string, string>; parents: string[] }): Promise<string | null> {
+  const allowedWorkspaces = await activeDriveWorkspacesForUser(userId);
+  const fileWorkspaceId = meta.appProperties?.workspaceId;
+  if (fileWorkspaceId) {
+    return allowedWorkspaces.includes(fileWorkspaceId) ? fileWorkspaceId : null;
+  }
+  if (!(await metadataIsInAppManagedDriveFolder(meta))) return null;
+  const matches: string[] = [];
+  for (const workspaceId of allowedWorkspaces) {
+    if (await isKnownAppDriveFile(fileId, workspaceId)) matches.push(workspaceId);
+    if (matches.length > 1) return null;
+  }
+  return matches[0] || null;
+}
+
+async function workspaceAuth(req: NextRequest): Promise<{ workspaceId?: string; userId?: string } | null> {
   const bearerToken = req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
   const auth = bearerToken
     ? await requireBearerTeamRole(req, ALLOWED_DRIVE_ROLES)
     : await requireRole(req, ALLOWED_DRIVE_ROLES as readonly WorkspaceRole[]);
-  if (auth instanceof Response) return null;
-  return { workspaceId: auth.workspaceId };
+  if (!(auth instanceof Response)) return { workspaceId: auth.workspaceId, userId: auth.user.id };
+  if (!bearerToken) {
+    const userResult = await requireUser(req);
+    if (!(userResult instanceof Response)) return { userId: userResult.user.id };
+  }
+  return null;
 }
 
 async function checkAuth(req: NextRequest, fileId: string): Promise<{
   ok: boolean;
   signed: boolean;
   workspaceId?: string;
+  userId?: string;
+  knownInWorkspace?: boolean;
   requiresWorkspaceAppProperty?: boolean;
 }> {
   const signedToken = req.nextUrl.searchParams.get("token");
@@ -302,10 +408,10 @@ async function checkAuth(req: NextRequest, fileId: string): Promise<{
   if (signedClaims) return { ok: true, signed: true, workspaceId: signedClaims.workspaceId };
 
   const auth = await workspaceAuth(req);
-  if (auth) {
+  if (auth?.workspaceId) {
     const knownInWorkspace = await isKnownAppDriveFile(fileId, auth.workspaceId);
     const appManaged = knownInWorkspace ? false : await isInAppManagedDriveFolder(fileId);
-    if (knownInWorkspace) return { ok: true, signed: false, workspaceId: auth.workspaceId };
+    if (knownInWorkspace) return { ok: true, signed: false, workspaceId: auth.workspaceId, knownInWorkspace: true };
     if (appManaged) {
       return {
         ok: true,
@@ -314,7 +420,9 @@ async function checkAuth(req: NextRequest, fileId: string): Promise<{
         requiresWorkspaceAppProperty: true,
       };
     }
+    return { ok: true, signed: false, workspaceId: auth.workspaceId };
   }
+  if (auth?.userId) return { ok: true, signed: false, userId: auth.userId };
 
   return { ok: false, signed: false };
 }
@@ -349,11 +457,18 @@ export async function GET(request: NextRequest) {
 
   try {
     const [meta, token] = await Promise.all([getFileMetadata(fileId), getAccessToken()]);
+    if (auth.userId && !auth.workspaceId) {
+      auth.workspaceId = await resolveAuthedMediaWorkspace(auth.userId, fileId, meta) || undefined;
+      if (!auth.workspaceId) {
+        return NextResponse.json({ error: "File does not belong to this workspace" }, { status: 403 });
+      }
+    }
+    const fileWorkspaceId = meta.appProperties?.workspaceId;
     if (
       auth.workspaceId &&
       (
-        (auth.requiresWorkspaceAppProperty && meta.appProperties?.workspaceId !== auth.workspaceId) ||
-        (meta.appProperties?.workspaceId && meta.appProperties.workspaceId !== auth.workspaceId)
+        (fileWorkspaceId && fileWorkspaceId !== auth.workspaceId) ||
+        (!fileWorkspaceId && !(await metadataIsInAppManagedDriveFolder(meta)))
       )
     ) {
       return NextResponse.json({ error: "File does not belong to this workspace" }, { status: 403 });
@@ -379,6 +494,13 @@ export async function GET(request: NextRequest) {
     }
 
     const preview = await buildPreviewOnce(cacheKey, async () => {
+      if (previewSize === "thumb") {
+        const thumbnail = await fetchDriveThumbnail(meta.thumbnailLink, token);
+        if (thumbnail) {
+          schedulePreviewCacheWrite(admin, cacheKey, thumbnail);
+          return thumbnail;
+        }
+      }
       const source = await fetchDriveMedia(fileId, token);
       const converted = await buildHeicPreview(source, previewSize);
       schedulePreviewCacheWrite(admin, cacheKey, converted);

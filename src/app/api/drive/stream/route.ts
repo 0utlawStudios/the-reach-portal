@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { ensureSubfolder, getAccessToken, getFileMetadata, getRootFolderId, verifyDriveStreamToken } from "@/lib/google-drive";
 import { ALLOWED_DRIVE_ROLES, VALID_DRIVE_FOLDERS } from "@/lib/drive-policy";
 import { sanitizeUnknownUploadError, statusForSanitizedDriveError } from "@/lib/drive-errors";
-import { requireBearerTeamRole, requireRole, type WorkspaceRole } from "@/lib/auth/require";
+import { requireBearerTeamRole, requireRole, requireUser, type WorkspaceRole } from "@/lib/auth/require";
 
 export const maxDuration = 60; // Fluid Compute — stays alive while streaming
 
@@ -103,13 +103,59 @@ async function isInAppManagedDriveFolder(fileId: string): Promise<boolean> {
   }
 }
 
-async function workspaceAuth(req: NextRequest): Promise<{ workspaceId: string } | null> {
+async function metadataIsInAppManagedDriveFolder(meta: { parents: string[] }): Promise<boolean> {
+  try {
+    const rootId = getRootFolderId();
+    const allowedParentIds = await Promise.all(VALID_DRIVE_FOLDERS.map((folder) => ensureSubfolder(folder, rootId)));
+    return meta.parents.some((parentId) => allowedParentIds.includes(parentId));
+  } catch {
+    return false;
+  }
+}
+
+async function activeDriveWorkspacesForUser(userId: string): Promise<string[]> {
+  const admin = serviceRoleClient();
+  if (!admin) return [];
+  const { data, error } = await admin
+    .from("workspace_members")
+    .select("workspace_id, role")
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .limit(50);
+  if (error || !data) return [];
+  const allowed = new Set((ALLOWED_DRIVE_ROLES as readonly string[]).map((role) => role.toLowerCase()));
+  return data
+    .filter((row) => allowed.has(String(row.role || "").toLowerCase()))
+    .map((row) => String(row.workspace_id))
+    .filter(Boolean);
+}
+
+async function resolveAuthedMediaWorkspace(userId: string, fileId: string, meta: { appProperties?: Record<string, string>; parents: string[] }): Promise<string | null> {
+  const allowedWorkspaces = await activeDriveWorkspacesForUser(userId);
+  const fileWorkspaceId = meta.appProperties?.workspaceId;
+  if (fileWorkspaceId) {
+    return allowedWorkspaces.includes(fileWorkspaceId) ? fileWorkspaceId : null;
+  }
+  if (!(await metadataIsInAppManagedDriveFolder(meta))) return null;
+  const matches: string[] = [];
+  for (const workspaceId of allowedWorkspaces) {
+    if (await isKnownAppDriveFile(fileId, workspaceId)) matches.push(workspaceId);
+    if (matches.length > 1) return null;
+  }
+  return matches[0] || null;
+}
+
+async function workspaceAuth(req: NextRequest): Promise<{ workspaceId?: string; userId?: string } | null> {
   const bearerToken = req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
   const auth = bearerToken
     ? await requireBearerTeamRole(req, ALLOWED_DRIVE_ROLES)
     : await requireRole(req, ALLOWED_DRIVE_ROLES as readonly WorkspaceRole[]);
-  if (auth instanceof Response) return null;
-  return { workspaceId: auth.workspaceId };
+  if (!(auth instanceof Response)) return { workspaceId: auth.workspaceId, userId: auth.user.id };
+  if (!bearerToken) {
+    const userResult = await requireUser(req);
+    if (!(userResult instanceof Response)) return { userId: userResult.user.id };
+  }
+  return null;
 }
 
 // SEC-003: Validate the request with a signed app URL, a Bearer token, or the
@@ -121,6 +167,8 @@ async function checkAuth(req: NextRequest, fileId: string): Promise<{
   authed: boolean;
   signed: boolean;
   workspaceId?: string;
+  userId?: string;
+  knownInWorkspace?: boolean;
   requiresWorkspaceAppProperty?: boolean;
 }> {
   const signedToken = req.nextUrl.searchParams.get("token");
@@ -130,11 +178,11 @@ async function checkAuth(req: NextRequest, fileId: string): Promise<{
   }
 
   const auth = await workspaceAuth(req);
-  if (auth) {
+  if (auth?.workspaceId) {
     const knownInWorkspace = await isKnownAppDriveFile(fileId, auth.workspaceId);
     const appManaged = knownInWorkspace ? false : await isInAppManagedDriveFolder(fileId);
     if (knownInWorkspace) {
-      return { ok: true, authed: true, signed: false, workspaceId: auth.workspaceId };
+      return { ok: true, authed: true, signed: false, workspaceId: auth.workspaceId, knownInWorkspace: true };
     }
     if (appManaged) {
       return {
@@ -145,7 +193,9 @@ async function checkAuth(req: NextRequest, fileId: string): Promise<{
         requiresWorkspaceAppProperty: true,
       };
     }
+    return { ok: true, authed: true, signed: false, workspaceId: auth.workspaceId };
   }
+  if (auth?.userId) return { ok: true, authed: true, signed: false, userId: auth.userId };
 
   return { ok: false, authed: false, signed: false };
 }
@@ -177,11 +227,21 @@ export async function GET(request: NextRequest) {
     // PERF-003: metadata fetch and token mint are independent — run them
     // concurrently instead of sequentially.
     const [meta, token] = await Promise.all([getFileMetadata(fileId), getAccessToken()]);
+    if (auth.userId && !auth.workspaceId) {
+      auth.workspaceId = await resolveAuthedMediaWorkspace(auth.userId, fileId, meta) || undefined;
+      if (!auth.workspaceId) {
+        return new Response(JSON.stringify({ error: "File does not belong to this workspace" }), {
+          status: 403,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        });
+      }
+    }
+    const fileWorkspaceId = meta.appProperties?.workspaceId;
     if (
       auth.workspaceId &&
       (
-        (auth.requiresWorkspaceAppProperty && meta.appProperties?.workspaceId !== auth.workspaceId) ||
-        (meta.appProperties?.workspaceId && meta.appProperties.workspaceId !== auth.workspaceId)
+        (fileWorkspaceId && fileWorkspaceId !== auth.workspaceId) ||
+        (!fileWorkspaceId && !(await metadataIsInAppManagedDriveFolder(meta)))
       )
     ) {
       return new Response(JSON.stringify({ error: "File does not belong to this workspace" }), {

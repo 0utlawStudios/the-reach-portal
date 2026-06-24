@@ -12,6 +12,7 @@ type PreviewImageProps = ImgHTMLAttributes<HTMLImageElement> & {
 };
 
 const IMAGE_PREVIEW_LOAD_TIMEOUT_MS = 60_000;
+const FALLBACK_PREVIEW_LOAD_TIMEOUT_MS = 2_500;
 
 export function PreviewImage({
   src,
@@ -48,10 +49,18 @@ export function PreviewImage({
   const isLoaded = typeof primarySrc !== "string" || loadedSrc === primarySrc;
   const fallbackLoaded = typeof fallbackSrc === "string" && loadedFallbackSrc === fallbackSrc;
   const canShowFallback = Boolean(fallbackSrc && fallbackLoaded && !fallbackFailed);
-  const shouldLoadPrimary = !fallbackSrc || fallbackLoaded || fallbackFailed;
+  const shouldLoadPrimary = !fallbackSrc || wantsFullPreview || fallbackLoaded || fallbackFailed;
   const missingOrFailed = !primarySrc || (primaryFailed && !canShowFallback);
   const showSpinner = !isLoaded && !canShowFallback;
   const effectiveLoading = loading || (wantsFullPreview ? "eager" : undefined);
+
+  useEffect(() => {
+    if (typeof fallbackSrc !== "string" || fallbackLoaded || fallbackFailed) return;
+    const timer = setTimeout(() => {
+      setFailedSrcs((prev) => ({ ...prev, [fallbackSrc]: true }));
+    }, FALLBACK_PREVIEW_LOAD_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [fallbackSrc, fallbackLoaded, fallbackFailed]);
 
   useEffect(() => {
     if (missingOrFailed || typeof primarySrc !== "string" || isLoaded || canShowFallback || !shouldLoadPrimary) return;

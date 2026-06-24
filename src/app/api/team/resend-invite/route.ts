@@ -90,7 +90,50 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Failed to clean up previous workspace access" }, { status: 500 });
       }
       if (await hasOtherWorkspaceMembership(admin, existingAuthUser.id, ctx.workspaceId)) {
-        return NextResponse.json({ error: "That auth account belongs to another workspace" }, { status: 409 });
+        const { error: memberErr } = await admin
+          .from("team_members")
+          .update({ status: "active" })
+          .eq("id", member.id)
+          .eq("workspace_id", ctx.workspaceId);
+        if (memberErr) {
+          console.error("[resend-invite] existing-account member activation failed:", memberErr.message);
+          return NextResponse.json({ error: "Failed to activate team member" }, { status: 500 });
+        }
+        const { error: workspaceErr } = await admin
+          .from("workspace_members")
+          .upsert(
+            {
+              workspace_id: ctx.workspaceId,
+              user_id: existingAuthUser.id,
+              role: member.role,
+              status: "active",
+            },
+            { onConflict: "workspace_id,user_id" },
+          );
+        if (workspaceErr) {
+          console.error("[resend-invite] existing-account workspace upsert failed:", workspaceErr.message);
+          await admin.from("team_members").update({ status: "pending" }).eq("id", member.id).eq("workspace_id", ctx.workspaceId);
+          return NextResponse.json({ error: "Failed to grant workspace access" }, { status: 500 });
+        }
+        try {
+          await admin.rpc("record_audit_event", {
+            p_entity_type: "team",
+            p_action: "member_added_existing_account",
+            p_entity_id: null,
+            p_workspace_id: ctx.workspaceId,
+            p_metadata: {
+              user_name: actorEmail,
+              details: `Activated existing account ${member.name} (${normalizedEmail}) as ${member.role}`,
+            },
+          });
+        } catch { /* audit log is best-effort */ }
+        return NextResponse.json({
+          success: true,
+          email: normalizedEmail,
+          emailSent: false,
+          existingAccount: true,
+          message: `${normalizedEmail} already has an account and was added to this workspace.`,
+        });
       }
       const { error: authDeleteErr } = await admin.auth.admin.deleteUser(existingAuthUser.id);
       if (authDeleteErr) {
@@ -126,7 +169,7 @@ export async function POST(request: NextRequest) {
 
     const siteUrl = getSiteUrl();
     const tokenHash = linkData.properties.hashed_token;
-    const confirmUrl = `${siteUrl}/auth/confirm?token_hash=${encodeURIComponent(tokenHash)}&type=invite`;
+    const confirmUrl = `${siteUrl}/auth/confirm?token_hash=${encodeURIComponent(tokenHash)}&type=invite&workspaceId=${encodeURIComponent(ctx.workspaceId)}`;
 
     // Send branded email
     let emailSent = false;

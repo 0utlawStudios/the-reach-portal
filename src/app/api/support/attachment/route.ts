@@ -52,26 +52,20 @@ function copyHeader(source: Headers, target: Headers, name: string) {
 }
 
 async function userSupportAttachmentAccess(userId: string, workspaceId: string, ownerUserId: string): Promise<boolean> {
-  if (userId === ownerUserId) {
-    const { data, error } = await adminClient()
-      .from("workspace_members")
-      .select("workspace_id")
-      .eq("user_id", userId)
-      .eq("workspace_id", workspaceId)
-      .eq("status", "active")
-      .maybeSingle();
-    return !error && Boolean(data);
-  }
-
+  // Attachment URLs are only rendered after a user can already read the
+  // support thread or post note containing the unguessable storage key. The
+  // proxy still enforces same-workspace active membership so copied URLs do
+  // not cross tenant boundaries, while allowing intended non-uploader viewers
+  // to open admin replies and revision attachments.
   const { data, error } = await adminClient()
     .from("workspace_members")
-    .select("workspace_id, role")
+    .select("workspace_id")
     .eq("user_id", userId)
     .eq("workspace_id", workspaceId)
     .eq("status", "active")
-    .eq("role", "superadmin")
     .maybeSingle();
-  return !error && Boolean(data);
+  if (error || !data) return false;
+  return userId === ownerUserId || Boolean(data);
 }
 
 export async function GET(request: NextRequest) {
