@@ -29,6 +29,23 @@ export function canUploadPlaybackCopy(file: File, mimeType = normalizeDriveMimeT
     && file.size <= MAX_PLAYBACK_VIDEO_FILE_SIZE;
 }
 
+// storage-js uploadToSignedUrl (2.99.x) exposes neither an AbortSignal on its
+// FileOptions nor upload-progress events, so it cannot use the Drive path's
+// progress watchdog and, left unbounded, hangs forever on a dead/slow uplink
+// (the "video upload takes forever" symptom). Bound it with a size-scaled
+// budget instead of a flat ceiling: a base allowance plus time for the bytes at
+// a slow-but-real uplink floor, so a genuinely slow upload still completes while
+// a stalled one fails closed. The copy is best-effort (callers catch and keep
+// the primary upload), so failing fast is strictly better than hanging.
+const PLAYBACK_UPLOAD_BASE_MS = 30_000;
+const PLAYBACK_UPLOAD_MIN_THROUGHPUT_BYTES_PER_SEC = 40 * 1024; // 40 KB/s ≈ 320 kbps
+
+export function playbackUploadBudgetMs(fileSize: number): number {
+  const bytes = Number.isFinite(fileSize) && fileSize > 0 ? fileSize : 0;
+  const transferMs = Math.ceil((bytes / PLAYBACK_UPLOAD_MIN_THROUGHPUT_BYTES_PER_SEC) * 1000);
+  return PLAYBACK_UPLOAD_BASE_MS + transferMs;
+}
+
 async function getPlaybackUploadTarget(file: File, cardId?: string): Promise<PlaybackUploadTarget> {
   const accessToken = await getAccessTokenFromCurrentSession();
   const headers: HeadersInit = { "Content-Type": "application/json" };
@@ -69,15 +86,29 @@ export async function uploadVideoPlaybackCopy(file: File, cardId?: string): Prom
   }
 
   const target = await getPlaybackUploadTarget(file, cardId);
-  const { error } = await supabase.storage
-    .from(target.bucket)
-    .uploadToSignedUrl(target.storageKey, target.token, file, {
-      contentType: target.mimeType,
-      upsert: true,
-    });
 
-  if (error) {
-    throw new Error(`Playback upload failed: ${error.message}`);
+  // Fail closed instead of hanging: uploadToSignedUrl cannot be aborted in this
+  // storage-js version, so race it against a size-scaled budget. The orphaned
+  // request (if any) is harmless — the copy uses upsert:true and is best-effort.
+  const TIMED_OUT = Symbol("playback-upload-timeout");
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const outcome = await Promise.race([
+    supabase.storage
+      .from(target.bucket)
+      .uploadToSignedUrl(target.storageKey, target.token, file, {
+        contentType: target.mimeType,
+        upsert: true,
+      }),
+    new Promise<typeof TIMED_OUT>((resolve) => {
+      timer = setTimeout(() => resolve(TIMED_OUT), playbackUploadBudgetMs(file.size));
+    }),
+  ]).finally(() => { if (timer) clearTimeout(timer); });
+
+  if (outcome === TIMED_OUT) {
+    throw new Error("Playback copy timed out. The original video uploaded fine; the fast-play copy can be retried.");
+  }
+  if (outcome.error) {
+    throw new Error(`Playback upload failed: ${outcome.error.message}`);
   }
 
   return {
