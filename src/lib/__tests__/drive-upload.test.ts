@@ -84,7 +84,7 @@ function installProxyUploadXhrMock(run: MockUploadRun) {
   globalThis.XMLHttpRequest = MockXHR as unknown as typeof XMLHttpRequest;
 }
 
-function installMixedUploadMocks(run: MixedUploadRun) {
+function installMixedUploadMocks(run: MixedUploadRun, onSend?: (timeout: number) => void) {
   class MockXHR {
     upload: { onprogress: XhrHandler } = { onprogress: null };
     onload: XhrHandler = null;
@@ -109,6 +109,9 @@ function installMixedUploadMocks(run: MixedUploadRun) {
       this.onabort?.();
     }
     send(body: FormData | File | Blob) {
+      // Capture whatever xhr.timeout the production code set before send(). A
+      // non-zero ceiling here is the 2026-06-24 "Upload timed out" bug.
+      onSend?.(this.timeout);
       const isProxy = this.method === "POST" && this.url === "/api/drive/proxy-upload";
       const isChunk = this.method === "POST" && this.url === "/api/drive/upload-chunk";
       const fileName = isProxy
@@ -440,5 +443,41 @@ describe("uploadManyToDrive", () => {
 
   it("returns an empty result for an empty batch", async () => {
     await expect(uploadManyToDrive([], "raw-files")).resolves.toEqual([]);
+  });
+
+  // Regression: 2026-06-24 production incident. A 5.55 MB JPEG on the resumable
+  // path failed with "Upload timed out." (client xhr.ontimeout) even though the
+  // server never errored — a slow-but-still-progressing uplink hit a fixed
+  // xhr.timeout ceiling. The byte-transfer XHRs (proxy POST and resumable
+  // chunk POST) must NOT arm a hard timeout: a moving upload is bounded only by
+  // the no-progress stall watchdog and the post-send response timer, so a slow
+  // connection can take as long as it needs as long as bytes keep flowing.
+  it("never arms a hard XHR timeout ceiling on the byte-transfer requests", async () => {
+    const transferTimeouts: number[] = [];
+    const run: MixedUploadRun = {
+      proxySends: [],
+      directSends: [],
+      sessionRequests: [],
+      finalizeRequests: [],
+      active: 0,
+      maxActive: 0,
+      failDirectNames: new Set(),
+    };
+    installMixedUploadMocks(run, (timeout) => transferTimeouts.push(timeout));
+    const largeVideo = new Uint8Array(4 * 1024 * 1024 + 1);
+
+    const results = await uploadManyToDrive([
+      makeImage("small.jpg"), // < 4 MB → proxy POST
+      new File([largeVideo], "big.mp4", { type: "video/mp4" }), // ≥ 4 MB → resumable chunk POST
+    ], "raw-files", { concurrency: 2 });
+
+    expect(results.every((item) => item.result && !item.error)).toBe(true);
+    // Both transfer paths must have been exercised (proxy + ≥1 chunk).
+    expect(transferTimeouts.length).toBeGreaterThan(1);
+    expect(run.proxySends).toContain("small.jpg");
+    expect(run.directSends).toContain("big.mp4");
+    // The bug set this to 120000 on every transfer XHR. A moving upload must
+    // never be killed by a fixed ceiling — the watchdog + response timer govern.
+    expect(transferTimeouts.every((timeout) => timeout === 0)).toBe(true);
   });
 });

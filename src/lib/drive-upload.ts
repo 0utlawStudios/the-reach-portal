@@ -73,18 +73,27 @@ const RETRY_DELAYS = process.env.NODE_ENV === "test" ? [1, 3, 7] : [1000, 3000, 
 // retry rather than the full ladder. A retry starts a fresh Google session.
 const PUT_RETRY_DELAYS = process.env.NODE_ENV === "test" ? [1] : [3000];
 
-// Abort an upload that makes no progress for this long. XMLHttpRequest has no
-// default timeout, so without this a stalled connection hangs with no end —
-// the literal "upload took forever" symptom. The watchdog resets on every
-// progress event, so a slow-but-moving upload is never killed.
+// Upload liveness is governed by TWO progress-aware timers, never a fixed
+// whole-request ceiling:
+//
+//   1. STALL_TIMEOUT_MS — the no-progress watchdog. Re-armed on every upload
+//      progress event, so it fires ONLY when bytes genuinely stop moving. A
+//      slow-but-moving upload is never killed. This is what kills the literal
+//      "upload hangs with no end" symptom (XMLHttpRequest has no default
+//      timeout, so without a watchdog a dead connection hangs forever).
+//   2. DIRECT_RESPONSE_WAIT_MS — armed once every byte is sent, bounding how
+//      long we wait for the server's response (the send watchdog can't help
+//      here: no more upload-progress events arrive after the last byte).
+//
+// We deliberately do NOT set xhr.timeout. A fixed whole-request ceiling fires
+// ontimeout even while bytes are still flowing. On 2026-06-24 a 5.55 MB JPEG on
+// a slow uplink hit the old 120s xhr.timeout and failed "Upload timed out."
+// although the server never errored and the upload was still progressing — the
+// byte-transfer time counts against the client clock but NOT Vercel's function
+// maxDuration (the body streams in at the platform layer before the function
+// runs), so the server logged nothing and only the client gave up. The two
+// timers above catch real stalls without punishing slow connections.
 const STALL_TIMEOUT_MS = 30000;
-const PROXY_TOTAL_TIMEOUT_MS = 120000;
-const DIRECT_RESPONSE_TIMEOUT_MS = 120000;
-// After a chunk's bytes are fully sent, the server's response should arrive
-// quickly. This bound is intentionally shorter than the xhr.timeout backstop
-// (DIRECT_RESPONSE_TIMEOUT_MS) so a no-response stall fails with the clear
-// "did not respond" message instead of racing the generic "Upload timed out."
-// at the same 120s mark.
 const DIRECT_RESPONSE_WAIT_MS = 60000;
 const AUTH_SESSION_TIMEOUT_MS = 10000;
 
@@ -285,12 +294,26 @@ async function uploadViaProxy(
       // would silently create a DUPLICATE. So a post-send failure is reported
       // as non-retryable with an honest "check the library" message instead.
       let fullySent = false;
-      const fail = (err: Error) => { if (settled) return; settled = true; watchdog.clear(); reject(err); };
-      const done = (value: DriveUploadResult) => { if (settled) return; settled = true; watchdog.clear(); resolve(value); };
+      let responseTimer: ReturnType<typeof setTimeout> | null = null;
+      const clearResponseTimer = () => {
+        if (responseTimer) { clearTimeout(responseTimer); responseTimer = null; }
+      };
+      // Once every byte is sent, upload-progress events stop and the stall
+      // watchdog can no longer help, so bound the wait for the server response.
+      // A post-send timeout is non-retryable: the server may have already
+      // created the Drive file, so auto-retrying could DUPLICATE it.
+      const armResponseTimer = () => {
+        clearResponseTimer();
+        responseTimer = setTimeout(() => fail(new DriveUploadError(
+          "The upload reached the server but timed out waiting for a response. Check the media library before retrying.",
+          { reason: "timeout", retryable: false },
+        )), DIRECT_RESPONSE_WAIT_MS);
+      };
+      const fail = (err: Error) => { if (settled) return; settled = true; watchdog.clear(); clearResponseTimer(); reject(err); };
+      const done = (value: DriveUploadResult) => { if (settled) return; settled = true; watchdog.clear(); clearResponseTimer(); resolve(value); };
       const watchdog = makeStallWatchdog(xhr, () => fail(new Error("Upload stalled (no progress for 30s)")));
 
       xhr.open("POST", "/api/drive/proxy-upload", true);
-      xhr.timeout = PROXY_TOTAL_TIMEOUT_MS;
       if (accessToken) xhr.setRequestHeader("Authorization", `Bearer ${accessToken}`);
 
       xhr.upload.onprogress = (e) => {
@@ -300,6 +323,7 @@ async function uploadViaProxy(
           if (e.loaded >= e.total) {
             fullySent = true;
             watchdog.clear();
+            armResponseTimer();
             onProgress?.(92);
           }
         }
@@ -425,7 +449,6 @@ async function uploadResumableChunk(
     const watchdog = makeStallWatchdog(xhr, () => fail(new Error("Upload stalled (no progress for 30s)")));
 
     xhr.open("POST", "/api/drive/upload-chunk", true);
-    xhr.timeout = DIRECT_RESPONSE_TIMEOUT_MS;
     xhr.setRequestHeader("Content-Type", mimeType);
     xhr.setRequestHeader("Content-Range", `bytes ${start}-${end}/${total}`);
     xhr.setRequestHeader("X-Upload-Uri", uploadUri);
