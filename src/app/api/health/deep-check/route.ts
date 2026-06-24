@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { timingSafeEqual } from "node:crypto";
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
 
 // ─── Auth ───
 
 const HEALTH_SECRET = process.env.HEALTH_CHECK_SECRET;
+const HEALTH_EXTERNAL_FETCH_TIMEOUT_MS = 8_000;
 
 // SEC-002: Constant-time secret comparison. A plain `!==` leaks the secret
 // one byte at a time via response-timing differences.
@@ -225,9 +227,11 @@ export async function GET(req: Request) {
       const folderId = getRootFolderId();
 
       // Check root folder accessible
-      const folderRes = await fetch(
+      const folderRes = await fetchWithTimeout(
         `https://www.googleapis.com/drive/v3/files/${folderId}?fields=id,name&supportsAllDrives=true`,
-        { headers: { Authorization: `Bearer ${driveToken}` } }
+        { headers: { Authorization: `Bearer ${driveToken}` } },
+        HEALTH_EXTERNAL_FETCH_TIMEOUT_MS,
+        "Google Drive root folder check",
       );
 
       if (!folderRes.ok) {
@@ -236,9 +240,11 @@ export async function GET(req: Request) {
         const folder = (await folderRes.json()) as DriveFile;
 
         // Count files in root folder
-        const listRes = await fetch(
+        const listRes = await fetchWithTimeout(
           `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents&fields=files(id,name,mimeType)&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true`,
-          { headers: { Authorization: `Bearer ${driveToken}` } }
+          { headers: { Authorization: `Bearer ${driveToken}` } },
+          HEALTH_EXTERNAL_FETCH_TIMEOUT_MS,
+          "Google Drive root folder list",
         );
         const listData = listRes.ok ? ((await listRes.json()) as { files?: DriveFile[] }) : { files: [] };
         const files = listData.files || [];

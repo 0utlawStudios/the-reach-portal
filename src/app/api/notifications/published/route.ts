@@ -41,6 +41,7 @@ type PublishedRequest = {
   audit?: {
     platforms?: PlatformResult[];
     timestamp?: string;
+    jobId?: string | null;
   };
 };
 
@@ -54,6 +55,12 @@ type PostRow = {
   caption: string | null;
   posted_at: string | null;
   posted_urls: Record<string, string | null> | null;
+};
+
+type PublishJobRow = {
+  id: string;
+  post_id: string;
+  workspace_id: string;
 };
 
 function getAdminClient() {
@@ -194,6 +201,10 @@ export async function POST(request: NextRequest) {
     if (!isValidUuid(postId)) {
       return NextResponse.json({ error: "Invalid post id" }, { status: 400 });
     }
+    const jobId = String(body.jobId || body.audit?.jobId || "").trim();
+    if (!isValidUuid(jobId)) {
+      return NextResponse.json({ error: "Invalid job id" }, { status: 400 });
+    }
 
     const admin = getAdminClient();
     const { data: post, error: postError } = await admin
@@ -209,6 +220,22 @@ export async function POST(request: NextRequest) {
     if (!post) return NextResponse.json({ error: "Post not found" }, { status: 404 });
 
     const postRow = post as PostRow;
+    const { data: job, error: jobError } = await admin
+      .from("publish_jobs")
+      .select("id, post_id, workspace_id")
+      .eq("id", jobId)
+      .eq("post_id", postId)
+      .eq("workspace_id", postRow.workspace_id)
+      .maybeSingle();
+
+    if (jobError) {
+      console.error("[notifications/published] job lookup failed:", jobError.message);
+      return NextResponse.json({ error: "Could not verify publish job" }, { status: 500 });
+    }
+    if (!(job as PublishJobRow | null)) {
+      return NextResponse.json({ error: "Publish job does not match post workspace" }, { status: 409 });
+    }
+
     const platforms = normalizePlatforms(body, postRow);
     const postTitle = postRow.title || "Published post";
     const published = platforms.some((p) => p.state === "succeeded") || Number(body.publishedCount || 0) > 0;
@@ -260,7 +287,7 @@ export async function POST(request: NextRequest) {
       p_workspace_id: postRow.workspace_id,
       p_metadata: {
         user_name: EXECUTOR,
-        job_id: body.jobId || null,
+        job_id: jobId,
         job_state: jobState,
         email_recipients: recipients,
         email_sent: emailSent,

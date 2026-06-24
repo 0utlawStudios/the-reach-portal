@@ -4,6 +4,7 @@ const sendMail = vi.fn<(mail: Record<string, unknown>) => Promise<void>>(() => P
 const rpc = vi.fn(() => Promise.resolve({ data: null, error: null }));
 
 let postRow: Record<string, unknown> | null;
+let jobRow: Record<string, unknown> | null;
 let teamRows: Array<Record<string, unknown>>;
 
 function makeFrom(table: string) {
@@ -11,7 +12,10 @@ function makeFrom(table: string) {
   for (const method of ["select", "eq", "in"]) {
     builder[method] = vi.fn(() => builder);
   }
-  builder.maybeSingle = vi.fn(() => Promise.resolve({ data: table === "posts" ? postRow : null, error: null }));
+  builder.maybeSingle = vi.fn(() => Promise.resolve({
+    data: table === "posts" ? postRow : table === "publish_jobs" ? jobRow : null,
+    error: null,
+  }));
   builder.then = (resolve: (value: unknown) => unknown) =>
     resolve({ data: table === "team_members" ? teamRows : [], error: null });
   return builder;
@@ -64,6 +68,11 @@ beforeEach(() => {
     posted_at: "2026-06-04T12:00:00.000Z",
     posted_urls: { facebook: "https://facebook.example/post" },
   };
+  jobRow = {
+    id: "22222222-2222-4222-8222-222222222222",
+    post_id: "11111111-1111-4111-8111-111111111111",
+    workspace_id: "00000000-0000-0000-0000-000000000001",
+  };
   teamRows = [
     { email: "admin@example.com", role: "admin", status: "active" },
     { email: "director@example.com", role: "creative_director", status: "active" },
@@ -110,6 +119,7 @@ describe("POST /api/notifications/published", () => {
       { "x-publisher-secret": "service-role-secret" },
       {
         postId: "11111111-1111-4111-8111-111111111111",
+        jobId: "22222222-2222-4222-8222-222222222222",
         jobState: "failed",
         publishedCount: 0,
         platforms: [{ platform: "facebook", state: "failed", error: "token expired" }],
@@ -119,5 +129,25 @@ describe("POST /api/notifications/published", () => {
     expect(res.status).toBe(200);
     expect(sendMail).not.toHaveBeenCalled();
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects notifications when the publish job does not match the post workspace", async () => {
+    jobRow = null;
+
+    const res = await POST(makeRequest(
+      { Authorization: "Bearer service-role-secret" },
+      {
+        postId: "11111111-1111-4111-8111-111111111111",
+        jobId: "22222222-2222-4222-8222-222222222222",
+        jobState: "succeeded",
+        publishedCount: 1,
+        platforms: [{ platform: "facebook", state: "succeeded", postUrl: "https://facebook.example/post" }],
+      },
+    ));
+
+    expect(res.status).toBe(409);
+    expect(sendMail).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
   });
 });

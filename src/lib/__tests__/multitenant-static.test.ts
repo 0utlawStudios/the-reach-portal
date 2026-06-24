@@ -65,6 +65,11 @@ describe("multitenant static contracts", () => {
     ]) {
       expect(source(file), file).toMatch(/workspaceId|workspace_id/);
     }
+
+    const published = source("src/app/api/notifications/published/route.ts");
+    expect(published).toContain('.from("publish_jobs")');
+    expect(published).toContain('.eq("post_id", postId)');
+    expect(published).toContain('.eq("workspace_id", postRow.workspace_id)');
   });
 
   it("scopes Brand Playbook reads, writes, realtime, and AI context by workspace", () => {
