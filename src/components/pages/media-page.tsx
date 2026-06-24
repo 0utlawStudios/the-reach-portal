@@ -248,8 +248,14 @@ export function MediaPage() {
         .update({ used_in: nextUsedIn })
         .eq("id", asset.id)
         .eq("workspace_id", wsId)
-        .then(({ error }) => {
-          if (!error) return;
+        .select("id")
+        .maybeSingle()
+        .then(({ data, error }) => {
+          if (!error && data) return;
+          if (!error) {
+            console.error("[media] automatic used_in sync failed: no matching workspace row was updated");
+            return;
+          }
           console.error("[media] automatic used_in sync failed:", error.message);
         });
     }
@@ -443,7 +449,7 @@ export function MediaPage() {
     // Delete from Supabase
     if (useDb && idsToDelete.length > 0) {
       const wsId = workspaceId || BASELINE_WORKSPACE_ID;
-      supabase.from("media_assets").delete().in("id", idsToDelete).eq("workspace_id", wsId).then(({ error }) => {
+      supabase.from("media_assets").delete().in("id", idsToDelete).eq("workspace_id", wsId).select("id").then(({ data, error }) => {
         if (error) {
           console.error("[media] deleteSelected sync failed:", error.message);
           // Restore the removed assets so they do not vanish on a failed delete.
@@ -453,6 +459,18 @@ export function MediaPage() {
             return toRestore.length > 0 ? [...toRestore, ...prev] : prev;
           });
           addToast(`Delete failed: ${error.message}. Files were restored.`, "error");
+          return;
+        }
+        const deletedIds = new Set((data || []).map((row) => row.id as string));
+        const missed = removedAssets.filter((asset) => !deletedIds.has(asset.id));
+        if (missed.length > 0) {
+          console.error("[media] deleteSelected sync failed: some rows were not deleted");
+          setMedia((prev) => {
+            const present = new Set(prev.map((m) => m.id));
+            const toRestore = missed.filter((a) => !present.has(a.id));
+            return toRestore.length > 0 ? [...toRestore, ...prev] : prev;
+          });
+          addToast("Delete failed for some files. They were restored.", "error");
         }
       });
     }
@@ -481,9 +499,17 @@ export function MediaPage() {
       .update({ used_in: nextUsedIn })
       .eq("id", asset.id)
       .eq("workspace_id", workspaceId || BASELINE_WORKSPACE_ID)
-      .then(({ error }) => {
-        if (!error) {
+      .select("id")
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (!error && data) {
           addToast(nextManual ? "Marked as used." : "Manual used tag cleared.", "success");
+          return;
+        }
+        if (!error) {
+          console.error("[media] manual used tag update failed: no matching workspace row was updated");
+          setMedia((prev) => prev.map((m) => (m.id === asset.id ? { ...m, usedIn: current } : m)));
+          addToast("Tag update failed: no matching library row was updated.", "error");
           return;
         }
         console.error("[media] manual used tag update failed:", error.message);

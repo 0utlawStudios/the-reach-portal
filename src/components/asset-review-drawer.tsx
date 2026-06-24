@@ -450,7 +450,7 @@ export function AssetReviewDrawer() {
       const existingFiles = selectedCard.sourceVault?.rawFiles || [];
       const rawFiles = [...existingFiles];
       const failures = items.filter((item) => item.error || !item.result);
-      let mediaAssetSyncFailures = 0;
+      const mediaAssetSyncs: Array<() => Promise<void>> = [];
       let playbackModule: typeof import("@/lib/media-playback") | null = null;
       try {
         playbackModule = await import("@/lib/media-playback");
@@ -532,55 +532,61 @@ export function AssetReviewDrawer() {
         rawFiles.push(newFile);
         // Sync to Media Library
         if (isDrivePublishableMediaMime(resultMimeType, file.name)) {
-          try {
-            await ensureMediaAsset({
-              name: file.name,
-              url: playbackUrl || driveProxyUrl,
-              fileId: result.fileId,
-              publishUrl,
-              driveProxyUrl,
-              playbackUrl,
-              playbackStorageKey,
-              mimeType: resultMimeType,
-              size: result.size || file.size,
-              fileType: resultMimeType.startsWith("video") ? "video" : "image",
-              folder: "Content Engine Uploads",
-              addedBy: currentUser.name,
-              workspaceId,
-              usedIn: selectedCard.id,
-            });
-          } catch (err) {
-            mediaAssetSyncFailures += 1;
-            console.error("[drawer] media_assets sync failed:", err);
+          mediaAssetSyncs.push(async () => {
             try {
-              await reportUploadFailure({
-                phase: "drawer_media_asset_sync",
-                route: "/api/drive/upload-failure",
-                uploadPath: uploadPathForSize(file),
-                cardId: selectedCard.id,
-                workspaceId,
-                postTitle: selectedCard.title,
-                folder: "raw-files",
-                fileName: file.name,
+              await ensureMediaAsset({
+                name: file.name,
+                url: playbackUrl || driveProxyUrl,
+                fileId: result.fileId,
+                publishUrl,
+                driveProxyUrl,
+                playbackUrl,
+                playbackStorageKey,
                 mimeType: resultMimeType,
-                fileSize: file.size,
-                errorMessage: uploadErrorMessage(err),
-                errorDetail: err instanceof Error ? err.stack : undefined,
+                size: result.size || file.size,
+                fileType: resultMimeType.startsWith("video") ? "video" : "image",
+                folder: "Content Engine Uploads",
+                addedBy: currentUser.name,
+                workspaceId,
+                usedIn: selectedCard.id,
               });
-            } catch (reportErr) {
-              console.error("[drawer] media_assets sync telemetry failed:", reportErr);
+            } catch (err) {
+              console.error("[drawer] media_assets sync failed:", err);
+              try {
+                await reportUploadFailure({
+                  phase: "drawer_media_asset_sync",
+                  route: "/api/drive/upload-failure",
+                  uploadPath: uploadPathForSize(file),
+                  cardId: selectedCard.id,
+                  workspaceId,
+                  postTitle: selectedCard.title,
+                  folder: "raw-files",
+                  fileName: file.name,
+                  mimeType: resultMimeType,
+                  fileSize: file.size,
+                  errorMessage: uploadErrorMessage(err),
+                  errorDetail: err instanceof Error ? err.stack : undefined,
+                });
+              } catch (reportErr) {
+                console.error("[drawer] media_assets sync telemetry failed:", reportErr);
+              }
+              throw err;
             }
-          }
+          });
         }
         logAudit(selectedCard.id, currentUser.name, "raw_file_uploaded", `Uploaded ${file.name} (${newFile.usageType})`);
-      }
-      if (mediaAssetSyncFailures > 0) {
-        addToast("Uploaded, but Media Library linking needs a retry.", "warning");
       }
       if (rawFiles.length > existingFiles.length) {
         updateCard(selectedCard.id, { sourceVault: { ...(selectedCard.sourceVault || {}), rawFiles } });
         const uploadedCount = rawFiles.length - existingFiles.length;
         addToast(uploadedCount === 1 ? `${items.find((item) => item.result)?.file.name} uploaded` : `${uploadedCount} files uploaded`, "success");
+        if (mediaAssetSyncs.length > 0) {
+          void Promise.allSettled(mediaAssetSyncs.map((run) => run())).then((results) => {
+            if (results.some((result) => result.status === "rejected")) {
+              addToast("Uploaded, but Media Library linking needs a retry.", "warning");
+            }
+          });
+        }
       }
     } catch (err) {
       // NO BLOB FALLBACK — show error, let user retry

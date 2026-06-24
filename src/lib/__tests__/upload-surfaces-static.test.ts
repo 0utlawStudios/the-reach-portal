@@ -206,6 +206,7 @@ describe("Drive upload surfaces", () => {
       "src/lib/ai/upload.ts",
       "src/lib/support/server.ts",
       "src/app/api/media/image-preview/route.ts",
+      "src/app/api/media/playback-upload/route.ts",
     ]) {
       const contents = source(file);
       expect(contents, `${file} must import the shared storage control timeout`).toContain("withStorageControlTimeout");
@@ -293,9 +294,11 @@ describe("Drive upload surfaces", () => {
     expect(previewImage).toContain('size: "thumb"');
     expect(previewImage).toContain('size: "full"');
     expect(previewImage).toContain("shouldLoadPrimary");
+    expect(previewImage).toContain("FULL_PREVIEW_LOAD_DELAY_MS");
+    expect(previewImage).toContain("primaryDelayElapsed");
     expect(previewImage).toContain("FALLBACK_PREVIEW_LOAD_TIMEOUT_MS");
     expect(previewImage).toContain("timedOutFallbackSrcs");
-    expect(previewImage).toContain("!fallbackSrc || fallbackLoaded || fallbackFailed || fallbackTimedOut");
+    expect(previewImage).toContain("!fallbackSrc || fallbackLoaded || fallbackFailed || fallbackTimedOut || primaryDelayElapsed");
 
     const mediaPage = source("src/components/pages/media-page.tsx");
     expect(mediaPage).toContain('warmBrowserImagePreview(currentUrl, { mimeType: lightboxAsset.mimeType, fileName: lightboxAsset.name, size: "thumb" })');
@@ -336,13 +339,21 @@ describe("Drive upload surfaces", () => {
     const persist = source("src/lib/ai/persist.ts");
     expect(persist).toContain("aiAssetPublishUrl(a.storageKey)");
     expect(persist).not.toContain("asset_urls: assets.map((a) => a.signedUrl)");
+
+    const worker = source("src/lib/ai/worker.ts");
+    expect(worker).toContain("moveAssetsBestEffort");
+    expect(worker).toContain("AI asset re-key rollback");
+    expect(worker).toContain(".select(\"id\")");
+    expect(worker).toContain("AI asset re-key did not update the post row");
   });
 
   it("renders media-library videos with source fallback instead of a permanent black preview", () => {
     const mediaVideo = source("src/components/media-video.tsx");
     expect(mediaVideo).toContain("DEFAULT_VIDEO_LOAD_TIMEOUT_MS");
     expect(mediaVideo).toContain("advanceSource");
+    expect(mediaVideo).toContain("retrySources");
     expect(mediaVideo).toContain("Video preview unavailable");
+    expect(mediaVideo).toContain("Retry");
 
     for (const file of [
       "src/components/pages/media-page.tsx",
@@ -368,6 +379,8 @@ describe("Drive upload surfaces", () => {
     expect(helper).toContain("mediaUrlAliases({ url, fileId, publishUrl, driveProxyUrl, playbackUrl })");
     expect(helper).toContain("lookupError");
     expect(helper).toContain("updateError");
+    expect(helper).toContain("MEDIA_ASSET_SYNC_TIMEOUT_MS");
+    expect(helper).toContain("withMediaAssetTimeout");
     expect(helper).toContain("throw new Error(`Media asset lookup failed:");
     expect(helper).toContain("throw new Error(`Media asset update failed:");
     expect(helper).toContain("throw new Error(`Media asset insert failed:");
@@ -431,7 +444,8 @@ describe("Drive upload surfaces", () => {
     expect(repurpose).toContain("Media Library linking needs a retry");
 
     const mediaPicker = source("src/components/media-picker.tsx");
-    expect(mediaPicker).toContain("await ensureMediaAsset");
+    expect(mediaPicker).toContain("mediaAssetSyncs");
+    expect(mediaPicker).toContain("Promise.allSettled(mediaAssetSyncs.map((run) => run()))");
     expect(mediaPicker).toContain("media_picker_media_asset_sync");
     expect(mediaPicker).toContain("The post attachment still worked");
   });
@@ -469,6 +483,9 @@ describe("Drive upload surfaces", () => {
     expect(route).toContain("userSupportAttachmentAccess");
     expect(route).toContain('.eq("workspace_id", workspaceId)');
     expect(route).toContain('.eq("status", "active")');
+    expect(route).toContain('from("team_members")');
+    expect(route).toContain("streamWithInactivityTimeout");
+    expect(route).toContain("Supabase support attachment stream");
     expect(route).toContain("not cross tenant boundaries");
   });
 
@@ -493,7 +510,8 @@ describe("Drive upload surfaces", () => {
       const contents = source(file);
       expect(contents, file).toContain("requireRole");
       expect(contents, file).toContain("requiresWorkspaceAppProperty");
-      expect(contents, file).toContain("(!fileWorkspaceId && auth.requiresWorkspaceAppProperty)");
+      expect(contents, file).toContain("!auth.signed");
+      expect(contents, file).toContain("mutable");
       expect(contents, file).not.toContain('headers.get("referer")');
       expect(contents, file).not.toContain("refOk");
     }

@@ -17,7 +17,7 @@ import { resolveAspect, imageCountForPlan } from "./aspect-resolver";
 import { callTextJson } from "./openai-text";
 import { callImage } from "./openai-image";
 import { processImage } from "./image-postprocess";
-import { uploadAssets, rekeyAndResignAssets } from "./upload";
+import { moveAssetsBestEffort, uploadAssets, rekeyAndResignAssets } from "./upload";
 import {
   buildTextSystem,
   buildTextUser,
@@ -417,15 +417,24 @@ export async function runGenerateJob(jobId: string): Promise<void> {
     // Re-key the assets to the real post id so the bucket layout is
     // canonical, AND re-sign URLs because Supabase signed URLs are bound
     // to the original storage path — moving an object invalidates the URL.
-    // Failure here is non-fatal (the post will keep working with the
-    // provisional path), but logged.
+    // This must be verified: once storage objects move to the real post id,
+    // a silent DB no-op leaves the post row pointing at stale provisional keys.
+    // Fail the job rather than completing with broken media.
     try {
+      const oldPrefix = `${plan.workspace_id}/${provisionalId}/`;
+      const newPrefix = `${plan.workspace_id}/${inserted.id}/`;
       const reSigned = await rekeyAndResignAssets({
-        oldPrefix: `${plan.workspace_id}/${provisionalId}/`,
-        newPrefix: `${plan.workspace_id}/${inserted.id}/`,
+        oldPrefix,
+        newPrefix,
         assets,
       });
-      await sb
+      const rollbackMoves = reSigned
+        .filter((asset) => asset.storageKey.startsWith(newPrefix))
+        .map((asset) => ({
+          from: asset.storageKey,
+          to: oldPrefix + asset.storageKey.slice(newPrefix.length),
+        }));
+      const { data: assetUpdate, error: assetUpdateError } = await sb
         .from("posts")
         .update({
           asset_storage_keys: reSigned.map((a) => a.storageKey),
@@ -433,9 +442,16 @@ export async function runGenerateJob(jobId: string): Promise<void> {
           thumbnail_url: reSigned[0] ? aiAssetProxyUrl(reSigned[0].storageKey) : null,
         })
         .eq("id", inserted.id)
-        .eq("workspace_id", job.workspace_id);
+        .eq("workspace_id", job.workspace_id)
+        .select("id")
+        .maybeSingle();
+      if (assetUpdateError || !assetUpdate) {
+        await moveAssetsBestEffort(rollbackMoves, "AI asset re-key rollback");
+        throw new Error(assetUpdateError?.message || "AI asset re-key did not update the post row");
+      }
     } catch (err) {
-      console.error("[ai-worker] asset rename failed (non-fatal)", err);
+      console.error("[ai-worker] asset rename failed", err);
+      throw err;
     }
 
     // Reconcile pre-charge with actual cost. tally was kept up to date

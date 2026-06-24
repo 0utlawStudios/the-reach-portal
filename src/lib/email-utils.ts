@@ -2,6 +2,18 @@ import nodemailer from "nodemailer";
 
 // ─── Shared Utilities ───
 
+export const DEFAULT_SMTP_CONNECTION_TIMEOUT_MS = 4_000;
+export const DEFAULT_SMTP_DNS_TIMEOUT_MS = 4_000;
+export const DEFAULT_SMTP_GREETING_TIMEOUT_MS = 4_000;
+export const DEFAULT_SMTP_SOCKET_TIMEOUT_MS = 8_000;
+
+function smtpTimeout(name: string, fallbackMs: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallbackMs;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallbackMs;
+}
+
 export function getTransporter() {
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
@@ -10,6 +22,10 @@ export function getTransporter() {
     host: process.env.SMTP_HOST || "smtp.gmail.com",
     port: Number(process.env.SMTP_PORT || 465),
     secure: true,
+    connectionTimeout: smtpTimeout("SMTP_CONNECTION_TIMEOUT_MS", DEFAULT_SMTP_CONNECTION_TIMEOUT_MS),
+    dnsTimeout: smtpTimeout("SMTP_DNS_TIMEOUT_MS", DEFAULT_SMTP_DNS_TIMEOUT_MS),
+    greetingTimeout: smtpTimeout("SMTP_GREETING_TIMEOUT_MS", DEFAULT_SMTP_GREETING_TIMEOUT_MS),
+    socketTimeout: smtpTimeout("SMTP_SOCKET_TIMEOUT_MS", DEFAULT_SMTP_SOCKET_TIMEOUT_MS),
     auth: { user, pass },
   });
 }

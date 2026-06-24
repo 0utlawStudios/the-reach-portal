@@ -22,9 +22,12 @@ function code(name: string): string {
 describe("publisher workflow hardening contracts", () => {
   it("turns pre-flight validation failures into a terminal failed result before any platform publish", () => {
     const preflight = code("Pre-flight");
+    const resolveMedia = code("Resolve Media");
     expect(preflight).toContain("preflightFailed: true");
     expect(preflight).toContain("post: { ...post, platforms: [] }");
     expect(preflight).toContain("platform: 'preflight', success: false");
+    expect(resolveMedia).toContain("preflightFailed: true");
+    expect(resolveMedia).toContain("platform: 'preflight', success: false");
 
     for (const nodeName of ["Publish Facebook", "Publish Instagram", "Publish LinkedIn"]) {
       const publish = code(nodeName);
@@ -42,6 +45,17 @@ describe("publisher workflow hardening contracts", () => {
     expect(finalize).not.toContain("post_url:");
     expect(finalize).toContain("external_post_id: result.externalPostId || null");
     expect(finalize).toContain("response_payload: JSON.stringify({ response: result.response || null, postUrl: result.postUrl || null })");
+  });
+
+  it("fails finalization when critical post or job patches update zero rows", () => {
+    const finalize = code("Finalize Job");
+    expect(finalize).toContain("hRepresentation");
+    expect(finalize).toContain("return=representation");
+    expect(finalize).toContain("patchExactlyOne");
+    expect(finalize).toContain("updated ' + rows.length + ' rows");
+    expect(finalize).toContain("Post finalization");
+    expect(finalize).toContain("Publish job finalization");
+    expect(finalize).toContain("if (!lastError && item.error)");
   });
 
   it("resets retry state when a failed publish job is re-queued", () => {
@@ -96,5 +110,13 @@ describe("publisher workflow hardening contracts", () => {
     expect(AI_PERSIST_SRC).toContain(".select(\"id\")");
     expect(AI_WORKER_SRC).toContain("err instanceof RevisionNoLongerPendingError");
     expect(AI_WORKER_SRC).toContain("ai_post_revise_cancelled");
+  });
+
+  it("asserts the post update after AI asset re-keying", () => {
+    expect(AI_WORKER_SRC).toContain("rekeyAndResignAssets");
+    expect(AI_WORKER_SRC).toContain("moveAssetsBestEffort");
+    expect(AI_WORKER_SRC).toContain("AI asset re-key rollback");
+    expect(AI_WORKER_SRC).toContain(".select(\"id\")");
+    expect(AI_WORKER_SRC).toContain("AI asset re-key did not update the post row");
   });
 });

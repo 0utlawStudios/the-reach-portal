@@ -38,7 +38,7 @@ const PREVIEW_CONVERSION_TIMEOUT_MS = {
 const HEIC_FALLBACK_MAX_PIXELS = 50_000_000;
 const DRIVE_MEDIA_TIMEOUT_MS = 45_000;
 const DRIVE_THUMBNAIL_TIMEOUT_MS = 2_500;
-const PREVIEW_FAST_THUMBNAIL_LOOKUP_TIMEOUT_MS = 2_750;
+const PREVIEW_FAST_THUMBNAIL_LOOKUP_TIMEOUT_MS = 1_200;
 const MAX_DRIVE_THUMBNAIL_BYTES = 5 * 1024 * 1024;
 const inFlightPreviewBuilds = new Map<string, Promise<Buffer>>();
 
@@ -446,19 +446,15 @@ async function activeDriveWorkspacesForUser(userId: string): Promise<string[]> {
     .filter(Boolean);
 }
 
-async function resolveAuthedMediaWorkspace(userId: string, fileId: string, meta: { appProperties?: Record<string, string>; parents: string[] }): Promise<string | null> {
+async function resolveAuthedMediaWorkspace(userId: string, meta: { appProperties?: Record<string, string>; parents: string[] }): Promise<string | null> {
   const allowedWorkspaces = await activeDriveWorkspacesForUser(userId);
   const fileWorkspaceId = meta.appProperties?.workspaceId;
   if (fileWorkspaceId) {
     return allowedWorkspaces.includes(fileWorkspaceId) ? fileWorkspaceId : null;
   }
-  if (!(await metadataIsInAppManagedDriveFolder(meta))) return null;
-  const matches: string[] = [];
-  for (const workspaceId of allowedWorkspaces) {
-    if (await isKnownAppDriveFile(fileId, workspaceId)) matches.push(workspaceId);
-    if (matches.length > 1) return null;
-  }
-  return matches[0] || null;
+  // Untagged Drive files must not inherit workspace ownership from mutable
+  // client-writable DB references. Signed app URLs still use signedClaims.
+  return null;
 }
 
 async function workspaceAuth(req: NextRequest): Promise<{ workspaceId?: string; userId?: string } | null> {
@@ -537,7 +533,7 @@ export async function GET(request: NextRequest) {
   try {
     const [meta, token] = await Promise.all([getFileMetadata(fileId), getAccessToken()]);
     if (auth.userId && !auth.workspaceId) {
-      auth.workspaceId = await resolveAuthedMediaWorkspace(auth.userId, fileId, meta) || undefined;
+      auth.workspaceId = await resolveAuthedMediaWorkspace(auth.userId, meta) || undefined;
       if (!auth.workspaceId) {
         return NextResponse.json({ error: "File does not belong to this workspace" }, { status: 403 });
       }
@@ -547,7 +543,7 @@ export async function GET(request: NextRequest) {
       auth.workspaceId &&
       (
         (fileWorkspaceId && fileWorkspaceId !== auth.workspaceId) ||
-        (!fileWorkspaceId && auth.requiresWorkspaceAppProperty) ||
+        (!fileWorkspaceId && (auth.requiresWorkspaceAppProperty || !auth.signed)) ||
         (!fileWorkspaceId && !(await metadataIsInAppManagedDriveFolder(meta)))
       )
     ) {

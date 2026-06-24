@@ -37,7 +37,7 @@ describe("PreviewImage", () => {
     expect(images[1].className).toContain("opacity-0");
   });
 
-  it("gives a cold HEIC thumbnail time to render before falling back to full conversion", async () => {
+  it("starts the full HEIC preview shortly after a cold thumbnail starts", async () => {
     vi.useFakeTimers();
     const { container } = render(
       <PreviewImage
@@ -52,7 +52,7 @@ describe("PreviewImage", () => {
     expect(Array.from(container.querySelectorAll("img"))).toHaveLength(1);
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(8_999);
+      await vi.advanceTimersByTimeAsync(1_199);
     });
 
     expect(Array.from(container.querySelectorAll("img"))).toHaveLength(1);

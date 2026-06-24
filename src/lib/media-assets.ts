@@ -5,6 +5,8 @@ import { supabase } from "./supabaseClient";
 import { isValidUuid } from "./utils";
 import { mediaUrlAliases } from "./media-usage";
 
+export const MEDIA_ASSET_SYNC_TIMEOUT_MS = 8_000;
+
 interface EnsureMediaAssetParams {
   name: string;
   url: string;
@@ -22,12 +24,34 @@ interface EnsureMediaAssetParams {
   usedIn?: string; // post UUID — only set when the post has a real UUID, not a temp timestamp
 }
 
+async function withMediaAssetTimeout<T>(operation: PromiseLike<T>, label: string): Promise<T> {
+  const TIMED_OUT = Symbol("media-asset-timeout");
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const outcome = await Promise.race<T | typeof TIMED_OUT>([
+    operation,
+    new Promise<typeof TIMED_OUT>((resolve) => {
+      timer = setTimeout(() => resolve(TIMED_OUT), MEDIA_ASSET_SYNC_TIMEOUT_MS);
+    }),
+  ]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+
+  if (outcome === TIMED_OUT) {
+    throw new Error(`${label} timed out. The uploaded media was kept, but Media Library linking needs a retry.`);
+  }
+  return outcome;
+}
+
 /**
  * Insert a media asset row if one doesn't already exist for this URL.
  * If a row already exists and a valid post UUID is provided, appends the
  * post ID to the `used_in` array. Safe to call multiple times — idempotent.
  */
 export async function ensureMediaAsset(params: EnsureMediaAssetParams): Promise<void> {
+  return withMediaAssetTimeout(ensureMediaAssetInner(params), "Media asset sync");
+}
+
+async function ensureMediaAssetInner(params: EnsureMediaAssetParams): Promise<void> {
   const { name, url, fileId, publishUrl, driveProxyUrl, playbackUrl, playbackStorageKey, mimeType, size, fileType, folder, addedBy, workspaceId, usedIn } = params;
   const wsId = workspaceId || "00000000-0000-0000-0000-000000000001";
   const metadataUpdate: Record<string, unknown> = {
@@ -67,26 +91,38 @@ export async function ensureMediaAsset(params: EnsureMediaAssetParams): Promise<
     if (usedIn && isValidUuid(usedIn)) {
       nextUsedIn.add(usedIn);
     }
-    const { error: updateError } = await supabase
+    const { data: updated, error: updateError } = await supabase
       .from("media_assets")
       .update({ ...metadataUpdate, used_in: Array.from(nextUsedIn) })
       .eq("id", existing.id)
-      .eq("workspace_id", wsId);
+      .eq("workspace_id", wsId)
+      .select("id")
+      .maybeSingle();
     if (updateError) {
       throw new Error(`Media asset update failed: ${updateError.message}`);
+    }
+    if (!updated) {
+      throw new Error("Media asset update failed: no matching workspace row was updated.");
     }
     return;
   }
 
   // 2. Insert new row
   const usedInArray = usedIn && isValidUuid(usedIn) ? [usedIn] : [];
-  const { error } = await supabase.from("media_assets").insert({
-    ...metadataUpdate,
-    workspace_id: wsId,
-    used_in: usedInArray,
-  });
+  const { data: inserted, error } = await supabase
+    .from("media_assets")
+    .insert({
+      ...metadataUpdate,
+      workspace_id: wsId,
+      used_in: usedInArray,
+    })
+    .select("id")
+    .maybeSingle();
 
   if (error) {
     throw new Error(`Media asset insert failed: ${error.message}`);
+  }
+  if (!inserted) {
+    throw new Error("Media asset insert failed: no row was created.");
   }
 }

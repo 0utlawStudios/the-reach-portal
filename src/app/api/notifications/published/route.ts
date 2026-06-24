@@ -15,6 +15,7 @@ export const maxDuration = 15;
 
 const NOTIFY_ROLES = ["superadmin", "admin", "owner", "creative_director"];
 const EXECUTOR = "Aldr1dge Hypervisor System - Agent 052";
+const TELEGRAM_SEND_TIMEOUT_MS = 8_000;
 
 type PlatformResult = {
   platform?: string | null;
@@ -153,21 +154,32 @@ async function sendTelegram(params: {
     `Executed by ${EXECUTOR}`,
   ].filter(Boolean).join("\n\n");
 
-  let sent = 0;
-  for (const chatId of chatIds) {
-    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: message,
-        parse_mode: "HTML",
-        disable_web_page_preview: false,
-      }),
-    });
-    if (res.ok) sent += 1;
-    else console.error("[notifications/published] Telegram failed:", await res.text());
-  }
+  const results = await Promise.allSettled(chatIds.map(async (chatId) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TELEGRAM_SEND_TIMEOUT_MS);
+    try {
+      const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: message,
+          parse_mode: "HTML",
+          disable_web_page_preview: false,
+        }),
+        signal: controller.signal,
+      });
+      if (res.ok) return true;
+      console.error("[notifications/published] Telegram failed:", await res.text().catch(() => `HTTP ${res.status}`));
+      return false;
+    } catch (err) {
+      console.error("[notifications/published] Telegram failed:", controller.signal.aborted ? "timed out" : err);
+      return false;
+    } finally {
+      clearTimeout(timer);
+    }
+  }));
+  const sent = results.filter((result) => result.status === "fulfilled" && result.value).length;
   return { sent };
 }
 

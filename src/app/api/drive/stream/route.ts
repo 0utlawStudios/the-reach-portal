@@ -131,19 +131,16 @@ async function activeDriveWorkspacesForUser(userId: string): Promise<string[]> {
     .filter(Boolean);
 }
 
-async function resolveAuthedMediaWorkspace(userId: string, fileId: string, meta: { appProperties?: Record<string, string>; parents: string[] }): Promise<string | null> {
+async function resolveAuthedMediaWorkspace(userId: string, meta: { appProperties?: Record<string, string>; parents: string[] }): Promise<string | null> {
   const allowedWorkspaces = await activeDriveWorkspacesForUser(userId);
   const fileWorkspaceId = meta.appProperties?.workspaceId;
   if (fileWorkspaceId) {
     return allowedWorkspaces.includes(fileWorkspaceId) ? fileWorkspaceId : null;
   }
-  if (!(await metadataIsInAppManagedDriveFolder(meta))) return null;
-  const matches: string[] = [];
-  for (const workspaceId of allowedWorkspaces) {
-    if (await isKnownAppDriveFile(fileId, workspaceId)) matches.push(workspaceId);
-    if (matches.length > 1) return null;
-  }
-  return matches[0] || null;
+  // Untagged legacy Drive files cannot be assigned to a workspace from mutable
+  // media_assets/posts references. New uploads are tagged at upload/finalize.
+  // Old signed app URLs still pass through the signed-token path.
+  return null;
 }
 
 async function workspaceAuth(req: NextRequest): Promise<{ workspaceId?: string; userId?: string } | null> {
@@ -229,7 +226,7 @@ export async function GET(request: NextRequest) {
     // concurrently instead of sequentially.
     const [meta, token] = await Promise.all([getFileMetadata(fileId), getAccessToken()]);
     if (auth.userId && !auth.workspaceId) {
-      auth.workspaceId = await resolveAuthedMediaWorkspace(auth.userId, fileId, meta) || undefined;
+      auth.workspaceId = await resolveAuthedMediaWorkspace(auth.userId, meta) || undefined;
       if (!auth.workspaceId) {
         return new Response(JSON.stringify({ error: "File does not belong to this workspace" }), {
           status: 403,
@@ -242,7 +239,7 @@ export async function GET(request: NextRequest) {
       auth.workspaceId &&
       (
         (fileWorkspaceId && fileWorkspaceId !== auth.workspaceId) ||
-        (!fileWorkspaceId && auth.requiresWorkspaceAppProperty) ||
+        (!fileWorkspaceId && (auth.requiresWorkspaceAppProperty || !auth.signed)) ||
         (!fileWorkspaceId && !(await metadataIsInAppManagedDriveFolder(meta)))
       )
     ) {

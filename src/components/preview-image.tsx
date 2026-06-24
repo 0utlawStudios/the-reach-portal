@@ -12,7 +12,8 @@ type PreviewImageProps = ImgHTMLAttributes<HTMLImageElement> & {
 };
 
 const IMAGE_PREVIEW_LOAD_TIMEOUT_MS = 60_000;
-const FALLBACK_PREVIEW_LOAD_TIMEOUT_MS = 9_000;
+const FALLBACK_PREVIEW_LOAD_TIMEOUT_MS = 4_000;
+const FULL_PREVIEW_LOAD_DELAY_MS = 1_200;
 
 export function PreviewImage({
   src,
@@ -38,6 +39,7 @@ export function PreviewImage({
   }, [src, mimeType, fileName, wantsFullPreview]);
   const [failedSrcs, setFailedSrcs] = useState<Record<string, true>>({});
   const [timedOutFallbackSrcs, setTimedOutFallbackSrcs] = useState<Record<string, true>>({});
+  const [delayedPrimarySrcs, setDelayedPrimarySrcs] = useState<Record<string, true>>({});
   const [loadedSrc, setLoadedSrc] = useState<string | undefined>(undefined);
   const [loadedFallbackSrc, setLoadedFallbackSrc] = useState<string | undefined>(undefined);
 
@@ -50,11 +52,26 @@ export function PreviewImage({
   const fallbackTimedOut = typeof fallbackSrc === "string" && Boolean(timedOutFallbackSrcs[fallbackSrc]);
   const isLoaded = typeof primarySrc !== "string" || loadedSrc === primarySrc;
   const fallbackLoaded = typeof fallbackSrc === "string" && loadedFallbackSrc === fallbackSrc;
+  const primaryDelayKey =
+    typeof fallbackSrc === "string" && typeof primarySrc === "string"
+      ? `${fallbackSrc}\n${primarySrc}`
+      : undefined;
+  const primaryDelayElapsed = Boolean(primaryDelayKey && delayedPrimarySrcs[primaryDelayKey]);
   const canShowFallback = Boolean(fallbackSrc && fallbackLoaded && !fallbackFailed);
-  const shouldLoadPrimary = !fallbackSrc || fallbackLoaded || fallbackFailed || fallbackTimedOut;
+  const shouldLoadPrimary = !fallbackSrc || fallbackLoaded || fallbackFailed || fallbackTimedOut || primaryDelayElapsed;
   const missingOrFailed = !primarySrc || (primaryFailed && !canShowFallback);
   const showSpinner = !isLoaded && !canShowFallback;
   const effectiveLoading = loading || (wantsFullPreview ? "eager" : undefined);
+
+  useEffect(() => {
+    if (!primaryDelayKey || primaryDelayElapsed) return;
+    const timer = setTimeout(() => {
+      setDelayedPrimarySrcs((prev) => (
+        prev[primaryDelayKey] ? prev : { ...prev, [primaryDelayKey]: true }
+      ));
+    }, FULL_PREVIEW_LOAD_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [primaryDelayKey, primaryDelayElapsed]);
 
   useEffect(() => {
     if (typeof fallbackSrc !== "string" || fallbackLoaded || fallbackFailed || fallbackTimedOut) return;
@@ -84,7 +101,7 @@ export function PreviewImage({
   return (
     <div className={`${className || ""} relative overflow-hidden bg-[#6C655A]/10 dark:bg-white/[0.03]`}>
       {showSpinner && (
-        <div className="absolute inset-0 flex items-center justify-center bg-[#f4f1ec]/95 text-[#975428] dark:bg-[#111214]/95 dark:text-white/80" aria-hidden="true">
+        <div className="absolute inset-0 flex items-center justify-center bg-[#f4f1ec]/95 text-[#975428] dark:bg-[#1b1c20]/95 dark:text-white/80" aria-hidden="true">
           <div className="h-8 w-8 rounded-full border-2 border-current/25 border-t-current animate-spin" />
         </div>
       )}

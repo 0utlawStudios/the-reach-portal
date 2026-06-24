@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { requireUser } from "@/lib/auth/require";
+import { STREAM_INACTIVITY_TIMEOUT_MS, streamWithInactivityTimeout } from "@/lib/stream-inactivity-timeout";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,13 +52,14 @@ function copyHeader(source: Headers, target: Headers, name: string) {
   if (value) target.set(name, value);
 }
 
-async function userSupportAttachmentAccess(userId: string, workspaceId: string, ownerUserId: string): Promise<boolean> {
+async function userSupportAttachmentAccess(userId: string, email: string | undefined, workspaceId: string, ownerUserId: string): Promise<boolean> {
   // Attachment URLs are only rendered after a user can already read the
   // support thread or post note containing the unguessable storage key. The
   // proxy still enforces same-workspace active membership so copied URLs do
   // not cross tenant boundaries, while allowing intended non-uploader viewers
   // to open admin replies and revision attachments.
-  const { data, error } = await adminClient()
+  const admin = adminClient();
+  const { data, error } = await admin
     .from("workspace_members")
     .select("workspace_id")
     .eq("user_id", userId)
@@ -65,6 +67,15 @@ async function userSupportAttachmentAccess(userId: string, workspaceId: string, 
     .eq("status", "active")
     .maybeSingle();
   if (error || !data) return false;
+  const lowerEmail = (email || "").toLowerCase();
+  if (!lowerEmail) return false;
+  const { data: teamMember, error: teamError } = await admin
+    .from("team_members")
+    .select("status")
+    .eq("workspace_id", workspaceId)
+    .eq("email", lowerEmail)
+    .maybeSingle();
+  if (teamError || teamMember?.status !== "active") return false;
   return userId === ownerUserId || Boolean(data);
 }
 
@@ -76,7 +87,7 @@ export async function GET(request: NextRequest) {
 
   const userResult = await requireUser(request);
   if (userResult instanceof NextResponse) return userResult;
-  if (!(await userSupportAttachmentAccess(userResult.user.id, parsed.workspaceId, parsed.ownerUserId))) {
+  if (!(await userSupportAttachmentAccess(userResult.user.id, userResult.user.email, parsed.workspaceId, parsed.ownerUserId))) {
     return NextResponse.json({ error: "Attachment does not belong to this workspace" }, { status: 403 });
   }
 
@@ -125,8 +136,16 @@ export async function GET(request: NextRequest) {
   if (!responseHeaders.has("content-type")) responseHeaders.set("Content-Type", "application/octet-stream");
   if (!responseHeaders.has("accept-ranges")) responseHeaders.set("Accept-Ranges", "bytes");
 
-  return new Response(storageRes.body, {
-    status: storageRes.status,
-    headers: responseHeaders,
-  });
+  return new Response(
+    streamWithInactivityTimeout(
+      storageRes.body,
+      STREAM_INACTIVITY_TIMEOUT_MS,
+      "Supabase support attachment stream",
+      () => controller.abort(),
+    ),
+    {
+      status: storageRes.status,
+      headers: responseHeaders,
+    },
+  );
 }

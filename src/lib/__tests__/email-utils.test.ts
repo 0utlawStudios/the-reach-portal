@@ -8,8 +8,72 @@
 //   isValidEmail()   — strict single-address validator.
 //   safeRecipients() — dedupes + drops invalid entries from a recipient list.
 
-import { describe, it, expect } from "vitest";
-import { esc, safeSubject, isValidEmail, safeRecipients } from "../email-utils";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
+
+const createTransport = vi.hoisted(() => vi.fn());
+
+vi.mock("nodemailer", () => ({
+  default: { createTransport },
+}));
+
+import {
+  DEFAULT_SMTP_CONNECTION_TIMEOUT_MS,
+  DEFAULT_SMTP_DNS_TIMEOUT_MS,
+  DEFAULT_SMTP_GREETING_TIMEOUT_MS,
+  DEFAULT_SMTP_SOCKET_TIMEOUT_MS,
+  esc,
+  getTransporter,
+  safeSubject,
+  isValidEmail,
+  safeRecipients,
+} from "../email-utils";
+
+const originalEnv = { ...process.env };
+
+beforeEach(() => {
+  createTransport.mockReset();
+  process.env.SMTP_USER = "smtp@example.com";
+  process.env.SMTP_PASS = "smtp-pass";
+  delete process.env.SMTP_HOST;
+  delete process.env.SMTP_PORT;
+  delete process.env.SMTP_CONNECTION_TIMEOUT_MS;
+  delete process.env.SMTP_DNS_TIMEOUT_MS;
+  delete process.env.SMTP_GREETING_TIMEOUT_MS;
+  delete process.env.SMTP_SOCKET_TIMEOUT_MS;
+});
+
+afterEach(() => {
+  process.env = { ...originalEnv };
+});
+
+describe("getTransporter — bounded SMTP network waits", () => {
+  it("sets explicit SMTP timeouts so dead mail servers cannot hang notification routes", () => {
+    getTransporter();
+
+    expect(createTransport).toHaveBeenCalledWith(expect.objectContaining({
+      connectionTimeout: DEFAULT_SMTP_CONNECTION_TIMEOUT_MS,
+      dnsTimeout: DEFAULT_SMTP_DNS_TIMEOUT_MS,
+      greetingTimeout: DEFAULT_SMTP_GREETING_TIMEOUT_MS,
+      socketTimeout: DEFAULT_SMTP_SOCKET_TIMEOUT_MS,
+    }));
+  });
+
+  it("allows production SMTP timeout overrides while ignoring invalid values", () => {
+    process.env.SMTP_CONNECTION_TIMEOUT_MS = "12000";
+    process.env.SMTP_DNS_TIMEOUT_MS = "14000";
+    process.env.SMTP_GREETING_TIMEOUT_MS = "13000";
+    process.env.SMTP_SOCKET_TIMEOUT_MS = "not-a-number";
+
+    getTransporter();
+
+    expect(createTransport).toHaveBeenCalledWith(expect.objectContaining({
+      connectionTimeout: 12_000,
+      dnsTimeout: 14_000,
+      greetingTimeout: 13_000,
+      socketTimeout: DEFAULT_SMTP_SOCKET_TIMEOUT_MS,
+    }));
+  });
+});
 
 describe("esc — HTML entity escaping", () => {
   it("escapes all five dangerous characters: & < > \" '", () => {

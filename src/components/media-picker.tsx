@@ -392,7 +392,7 @@ export function MediaPicker({
         }
         const successes = items.filter((item) => item.result);
         const selections: MediaPickerSelection[] = [];
-        let mediaAssetSyncFailures = 0;
+        const mediaAssetSyncs: Array<() => Promise<void>> = [];
         // Load the playback-optimization module ONCE up front. If its code-split
         // chunk fails to load, videos still upload (they just skip playback
         // optimization) instead of the failure throwing mid-loop and dropping
@@ -445,63 +445,68 @@ export function MediaPicker({
             size: result.size || item.file.size,
           });
           if (isDrivePublishableMediaMime(mimeType, item.file.name)) {
-            try {
-              await ensureMediaAsset({
-                name: item.file.name,
-                url: playbackUrl || result.driveProxyUrl || result.url,
-                fileId: result.fileId,
-                publishUrl: result.publishUrl || getPublicDriveDownloadUrl(result.fileId),
-                driveProxyUrl: result.driveProxyUrl || result.url,
-                playbackUrl,
-                playbackStorageKey,
-                mimeType,
-                size: result.size || item.file.size,
-                fileType: mimeType.startsWith("video/") ? "video" : "image",
-                folder: "Content Engine Uploads",
-                addedBy: currentUser.name,
-                workspaceId,
-                usedIn: cardId,
-              });
-            } catch (err) {
-              mediaAssetSyncFailures += 1;
-              const errorMessage = uploadErrorMessage(err);
-              console.error("[media-picker] media_assets sync failed:", err);
+            mediaAssetSyncs.push(async () => {
               try {
-                await reportUploadFailure({
-                  phase: "media_picker_media_asset_sync",
-                  route: "/api/drive/upload-failure",
-                  uploadPath: uploadPathForSize(item.file),
-                  cardId,
-                  workspaceId,
-                  folder,
-                  fileName: item.file.name,
+                await ensureMediaAsset({
+                  name: item.file.name,
+                  url: playbackUrl || result.driveProxyUrl || result.url,
+                  fileId: result.fileId,
+                  publishUrl: result.publishUrl || getPublicDriveDownloadUrl(result.fileId),
+                  driveProxyUrl: result.driveProxyUrl || result.url,
+                  playbackUrl,
+                  playbackStorageKey,
                   mimeType,
-                  fileSize: item.file.size,
-                  errorMessage,
-                  errorDetail: err instanceof Error ? err.stack : undefined,
+                  size: result.size || item.file.size,
+                  fileType: mimeType.startsWith("video/") ? "video" : "image",
+                  folder: "Content Engine Uploads",
+                  addedBy: currentUser.name,
+                  workspaceId,
+                  usedIn: cardId,
                 });
-              } catch (reportErr) {
-                console.error("[media-picker] media_assets sync telemetry failed:", reportErr);
+              } catch (err) {
+                const errorMessage = uploadErrorMessage(err);
+                console.error("[media-picker] media_assets sync failed:", err);
+                try {
+                  await reportUploadFailure({
+                    phase: "media_picker_media_asset_sync",
+                    route: "/api/drive/upload-failure",
+                    uploadPath: uploadPathForSize(item.file),
+                    cardId,
+                    workspaceId,
+                    folder,
+                    fileName: item.file.name,
+                    mimeType,
+                    fileSize: item.file.size,
+                    errorMessage,
+                    errorDetail: err instanceof Error ? err.stack : undefined,
+                  });
+                } catch (reportErr) {
+                  console.error("[media-picker] media_assets sync telemetry failed:", reportErr);
+                }
+                throw err;
               }
-            }
+            });
           }
           warmBrowserImagePreview(result.driveProxyUrl || result.url, { mimeType, fileName: item.file.name });
         }
         if (selections.length > 0) {
           if (onSelectMany) onSelectMany(selections);
           else selections.forEach(onSelect);
-        }
-        if (selections.length > 0) {
-          if (mediaAssetSyncFailures > 0) {
-            addToast(
-              mediaAssetSyncFailures === 1
-                ? "Uploaded, but saving one file to Media Library failed. The post attachment still worked."
-                : `Uploaded, but saving ${mediaAssetSyncFailures} files to Media Library failed. The post attachments still worked.`,
-              "warning",
-            );
-          }
           addToast(selections.length === 1 ? `${selections[0].name} uploaded` : `${selections.length} files uploaded`, "success");
           onClose();
+          if (mediaAssetSyncs.length > 0) {
+            void Promise.allSettled(mediaAssetSyncs.map((run) => run())).then((results) => {
+              const mediaAssetSyncFailures = results.filter((result) => result.status === "rejected").length;
+              if (mediaAssetSyncFailures > 0) {
+                addToast(
+                  mediaAssetSyncFailures === 1
+                    ? "Uploaded, but saving one file to Media Library failed. The post attachment still worked."
+                    : `Uploaded, but saving ${mediaAssetSyncFailures} files to Media Library failed. The post attachments still worked.`,
+                  "warning",
+                );
+              }
+            });
+          }
         }
       } catch (err) {
         const errorMessage = uploadErrorMessage(err);

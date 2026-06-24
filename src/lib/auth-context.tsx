@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef, ReactNode } from "react";
 import { supabase } from "./supabaseClient";
 import { saveState } from "./persistence";
+import { fetchWithTimeout } from "./fetch-timeout";
 
 interface UserProfile {
   name: string;
@@ -28,6 +29,7 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
+const WORKSPACE_PROVISION_TIMEOUT_MS = 8_000;
 
 function getInitials(name: string): string {
   return name
@@ -100,12 +102,12 @@ async function provisionWorkspace(token: string): Promise<{
 }> {
   const requestedWorkspaceId = workspaceIdFromLocation();
   try {
-    const res = await fetch("/api/workspace/provision", {
+    const res = await fetchWithTimeout("/api/workspace/provision", {
       headers: {
         Authorization: `Bearer ${token}`,
         ...(requestedWorkspaceId ? { "X-Workspace-Id": requestedWorkspaceId } : {}),
       },
-    });
+    }, WORKSPACE_PROVISION_TIMEOUT_MS, "Workspace provisioning");
     const body = await res.json().catch(() => ({}));
     if (res.ok && body?.workspaceId) {
       return { result: { workspaceId: body.workspaceId }, status: "active", message: null };

@@ -11,6 +11,7 @@ import { useToast } from "./toast-context";
 import { APP_TIMEZONE, formatDateTimeCompact, isValidUuid } from "./utils";
 import { useManualPostedMovesEnabled } from "./manual-posted-settings";
 import { aiAssetProxyUrls } from "./ai/asset-url";
+import { fetchWithTimeout } from "./fetch-timeout";
 
 // Real @mention pattern — @username form, not any "@" character. Avoids
 // false-positive mention notifications on pasted emails or URLs containing "@".
@@ -21,6 +22,8 @@ const BASELINE_WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 const POSTS_SELECT_FULL = "*, publish_jobs(state, platform_publish_attempts(platform, state, external_post_id))";
 const POSTS_SELECT_BASIC = "*";
 const POSTS_SELECT_STORAGE_KEY = "reach_posts_select_shape";
+const WORKSPACE_PROVISION_TIMEOUT_MS = 8_000;
+const POST_UPDATE_TIMEOUT_MS = 15_000;
 
 // ─── Supabase <-> ContentCard mappers ───
 
@@ -316,6 +319,24 @@ export function formatPipelineError(error: unknown): string {
   return String(error);
 }
 
+async function withPipelineTimeout<T>(operation: PromiseLike<T>, timeoutMs: number, label: string): Promise<T> {
+  const TIMED_OUT = Symbol("pipeline-timeout");
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const outcome = await Promise.race<T | typeof TIMED_OUT>([
+    operation,
+    new Promise<typeof TIMED_OUT>((resolve) => {
+      timer = setTimeout(() => resolve(TIMED_OUT), timeoutMs);
+    }),
+  ]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+
+  if (outcome === TIMED_OUT) {
+    throw new Error(`${label} timed out. Changes reverted so the board does not show unsaved media.`);
+  }
+  return outcome;
+}
+
 function isSupabaseConfigured(): boolean {
   return !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 }
@@ -460,9 +481,9 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
               // Fallback: provision wasn't pre-fetched (e.g. first login), fetch now
               const token = accessTokenRef.current || (await supabase.auth.getSession()).data.session?.access_token;
               if (token) {
-                const res = await fetch("/api/workspace/provision", {
+                const res = await fetchWithTimeout("/api/workspace/provision", {
                   headers: { Authorization: `Bearer ${token}` },
-                });
+                }, WORKSPACE_PROVISION_TIMEOUT_MS, "Workspace provisioning");
                 if (res.ok) {
                   const json = await res.json();
                   if (json.workspaceId) {
@@ -1002,24 +1023,29 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
     setSelectedCard((prev) => (prev?.id === cardId ? { ...prev, ...updates } : prev));
     if (useSupabase && isValidUuid(cardId)) {
       markMutation(cardId);
-      supabase.from("posts")
-        .update(cardToDb(updates))
-        .eq("id", cardId)
-        .eq("workspace_id", workspaceIdRef.current || BASELINE_WORKSPACE_ID)
-        .select("id")
-        .maybeSingle()
+      withPipelineTimeout(
+        supabase.from("posts")
+          .update(cardToDb(updates))
+          .eq("id", cardId)
+          .eq("workspace_id", workspaceIdRef.current || BASELINE_WORKSPACE_ID)
+          .select("id")
+          .maybeSingle(),
+        POST_UPDATE_TIMEOUT_MS,
+        "Post save",
+      )
         .then(({ data, error }) => {
-        if (error) {
-          console.error("[pipeline] updateCard sync failed:", error.message);
-          if (previousCard) {
-            setCards((prev) => prev.map((c) => c.id === cardId ? previousCard : c));
-            setSelectedCard(previousSelected);
+          if (error) {
+            console.error("[pipeline] updateCard sync failed:", error.message);
+            if (previousCard) {
+              setCards((prev) => prev.map((c) => c.id === cardId ? previousCard : c));
+              setSelectedCard(previousSelected);
+            }
+            // Clear the dedup mark so a realtime echo can re-sync the card (DATA-003).
+            recentMutations.current.delete(cardId);
+            addToast(`Save failed: ${error.message}. Changes reverted.`, "error");
+            onResult?.(false);
+            return;
           }
-          // Clear the dedup mark so a realtime echo can re-sync the card (DATA-003).
-          recentMutations.current.delete(cardId);
-          addToast(`Save failed: ${error.message}. Changes reverted.`, "error");
-          onResult?.(false);
-        } else {
           try {
             assertPostUpdateCommitted(data as PostUpdateCommitRow, cardId);
           } catch (commitError) {
@@ -1037,7 +1063,17 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
           // The write committed — callers gating a side-effect (e.g. an
           // @mention email) on a confirmed persist can safely fire now.
           onResult?.(true);
-        }
+        })
+        .catch((error) => {
+          const message = formatPipelineError(error);
+          console.error("[pipeline] updateCard sync failed:", message);
+          if (previousCard) {
+            setCards((prev) => prev.map((c) => c.id === cardId ? previousCard : c));
+            setSelectedCard(previousSelected);
+          }
+          recentMutations.current.delete(cardId);
+          addToast(`Save failed: ${message}. Changes reverted.`, "error");
+          onResult?.(false);
         });
     } else {
       // No DB write happened (local-only mode or a temp-id card mid-create).

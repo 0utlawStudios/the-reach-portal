@@ -190,6 +190,7 @@ describe("media resolver", () => {
   it("keeps playback storage policy enforced by the bucket, not only client metadata", () => {
     const routeSrc = readFileSync(join(process.cwd(), "src/app/api/media/playback-upload/route.ts"), "utf8");
     const migrationSrc = readFileSync(join(process.cwd(), "supabase/migrations/0049_media_playback_bucket.sql"), "utf8");
+    expect(routeSrc).toContain("withStorageControlTimeout");
     expect(routeSrc).toContain("fileSizeLimit: MAX_PLAYBACK_VIDEO_FILE_SIZE");
     expect(routeSrc).toContain("allowedMimeTypes: [...PLAYBACK_VIDEO_MIME_TYPES]");
     expect(routeSrc).toContain("extensionFor(mimeType)");

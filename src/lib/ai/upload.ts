@@ -119,3 +119,25 @@ export async function rekeyAndResignAssets(args: {
   }
   return out;
 }
+
+export async function moveAssetsBestEffort(
+  moves: ReadonlyArray<{ from: string; to: string }>,
+  label = "AI asset move",
+): Promise<void> {
+  if (moves.length === 0) return;
+  const sb = adminClient();
+  for (const move of moves) {
+    if (!move.from || !move.to || move.from === move.to) continue;
+    try {
+      const { error } = await withStorageControlTimeout(
+        sb.storage.from(BUCKET).move(move.from, move.to),
+        `${label} ${move.from}`,
+      );
+      if (error) {
+        console.warn(`[ai-upload] ${label} failed for ${move.from}:`, error.message);
+      }
+    } catch (err) {
+      console.warn(`[ai-upload] ${label} skipped for ${move.from}:`, err instanceof Error ? err.message : err);
+    }
+  }
+}

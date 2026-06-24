@@ -6,6 +6,7 @@ import { ALLOWED_DRIVE_UPLOAD_ROLES, normalizeDriveMimeType } from "@/lib/drive-
 import { MAX_PLAYBACK_VIDEO_FILE_SIZE, PLAYBACK_VIDEO_MIME_TYPES } from "@/lib/media-playback-policy";
 import { consume, getClientIp } from "@/lib/rate-limit";
 import { appRateLimitError } from "@/lib/drive-errors";
+import { withStorageControlTimeout } from "@/lib/storage-upload-timeout";
 
 export const maxDuration = 10;
 export const dynamic = "force-dynamic";
@@ -60,7 +61,10 @@ const PLAYBACK_BUCKET_OPTIONS = {
 };
 
 async function ensurePlaybackBucket(admin: SupabaseClient): Promise<void> {
-  const existing = await admin.storage.getBucket(BUCKET);
+  const existing = await withStorageControlTimeout(
+    admin.storage.getBucket(BUCKET),
+    "Playback bucket lookup",
+  );
   if (!existing.error) {
     const current = existing.data as typeof existing.data & {
       file_size_limit?: number | string | null;
@@ -71,14 +75,20 @@ async function ensurePlaybackBucket(admin: SupabaseClient): Promise<void> {
     const hasMimePolicy = PLAYBACK_VIDEO_MIME_TYPES.every((mime) => currentMimes.has(mime));
     if (!current.public && currentLimit === MAX_PLAYBACK_VIDEO_FILE_SIZE && hasMimePolicy) return;
 
-    const updated = await admin.storage.updateBucket(BUCKET, PLAYBACK_BUCKET_OPTIONS);
+    const updated = await withStorageControlTimeout(
+      admin.storage.updateBucket(BUCKET, PLAYBACK_BUCKET_OPTIONS),
+      "Playback bucket policy update",
+    );
     if (updated.error) {
       throw new Error(`Playback bucket unavailable: ${updated.error.message}`);
     }
     return;
   }
 
-  const created = await admin.storage.createBucket(BUCKET, PLAYBACK_BUCKET_OPTIONS);
+  const created = await withStorageControlTimeout(
+    admin.storage.createBucket(BUCKET, PLAYBACK_BUCKET_OPTIONS),
+    "Playback bucket creation",
+  );
 
   if (created.error && !/already exists/i.test(created.error.message)) {
     throw new Error(`Playback bucket unavailable: ${created.error.message}`);
@@ -125,7 +135,10 @@ export async function POST(request: NextRequest) {
     const ext = extensionFor(mimeType);
     const baseName = safeSegment(fileName.replace(/\.[^.]+$/, ""));
     const storageKey = `${auth.workspaceId}/${cardId}/${randomUUID()}-${baseName}.${ext}`;
-    const { data, error } = await admin.storage.from(BUCKET).createSignedUploadUrl(storageKey);
+    const { data, error } = await withStorageControlTimeout(
+      admin.storage.from(BUCKET).createSignedUploadUrl(storageKey),
+      "Playback signed upload URL creation",
+    );
     if (error || !data?.token) {
       throw new Error(error?.message || "Failed to create playback upload URL");
     }
