@@ -32,7 +32,7 @@ import { useToast } from "@/lib/toast-context";
 import { ensureMediaAsset } from "@/lib/media-assets";
 import { isDrivePublishableMediaMime, normalizeDriveMimeType } from "@/lib/drive-policy";
 import { getPublicDriveDownloadUrl } from "@/lib/drive-url-utils";
-import { warmBrowserImagePreview } from "@/lib/image-preview";
+import { browserImagePreviewUrl, warmBrowserImagePreview } from "@/lib/image-preview";
 import { driveFileIdFromUrl, isVideoContentType, resolveCardVideoUrl, thumbnailIsDefinitelyImage } from "@/lib/media-resolver";
 import { formatDate, formatDateTime, formatDateShort, formatDateTimeCompact } from "@/lib/utils";
 import { useFocusTrap } from "./use-focus-trap";
@@ -346,21 +346,43 @@ export function AssetReviewDrawer() {
           thumbnailMimeType: resultMimeType,
         },
       });
-      // Sync to Media Library — fire and catch so primary op is never blocked
-      ensureMediaAsset({
-        name: file.name,
-        url: result.url,
-        fileId: result.fileId,
-        publishUrl: result.publishUrl,
-        driveProxyUrl: result.driveProxyUrl || result.url,
-        mimeType: resultMimeType,
-        size: result.size || file.size,
-        fileType: resultMimeType.startsWith("video") ? "video" : "image",
-        folder: "Content Engine Uploads",
-        addedBy: currentUser.name,
-        workspaceId,
-        usedIn: selectedCard.id,
-      }).catch((err) => console.error("[drawer] media_assets sync failed:", err));
+      try {
+        await ensureMediaAsset({
+          name: file.name,
+          url: result.url,
+          fileId: result.fileId,
+          publishUrl: result.publishUrl,
+          driveProxyUrl: result.driveProxyUrl || result.url,
+          mimeType: resultMimeType,
+          size: result.size || file.size,
+          fileType: resultMimeType.startsWith("video") ? "video" : "image",
+          folder: "Content Engine Uploads",
+          addedBy: currentUser.name,
+          workspaceId,
+          usedIn: selectedCard.id,
+        });
+      } catch (err) {
+        console.error("[drawer] media_assets sync failed:", err);
+        addToast("Cover uploaded, but saving it to Media Library failed.", "warning");
+        try {
+          await driveModule?.reportUploadFailure({
+            phase: "drawer_media_asset_sync",
+            route: "/api/drive/upload-failure",
+            uploadPath: uploadPathForSize(file),
+            cardId: selectedCard.id,
+            workspaceId,
+            postTitle: selectedCard.title,
+            folder: "thumbnails",
+            fileName: file.name,
+            mimeType: resultMimeType,
+            fileSize: file.size,
+            errorMessage: uploadErrorMessage(err),
+            errorDetail: err instanceof Error ? err.stack : undefined,
+          });
+        } catch (reportErr) {
+          console.error("[drawer] media_assets sync telemetry failed:", reportErr);
+        }
+      }
       logAudit(selectedCard.id, currentUser.name, "asset_replaced", `Replaced cover with ${file.name}`);
       addToast("Cover image uploaded", "success");
     } catch (err) {
@@ -426,6 +448,7 @@ export function AssetReviewDrawer() {
       const existingFiles = selectedCard.sourceVault?.rawFiles || [];
       const rawFiles = [...existingFiles];
       const failures = items.filter((item) => item.error || !item.result);
+      let mediaAssetSyncFailures = 0;
       let playbackModule: typeof import("@/lib/media-playback") | null = null;
       try {
         playbackModule = await import("@/lib/media-playback");
@@ -507,24 +530,50 @@ export function AssetReviewDrawer() {
         rawFiles.push(newFile);
         // Sync to Media Library
         if (isDrivePublishableMediaMime(resultMimeType, file.name)) {
-          ensureMediaAsset({
-            name: file.name,
-            url: playbackUrl || driveProxyUrl,
-            fileId: result.fileId,
-            publishUrl,
-            driveProxyUrl,
-            playbackUrl,
-            playbackStorageKey,
-            mimeType: resultMimeType,
-            size: result.size || file.size,
-            fileType: resultMimeType.startsWith("video") ? "video" : "image",
-            folder: "Content Engine Uploads",
-            addedBy: currentUser.name,
-            workspaceId,
-            usedIn: selectedCard.id,
-          }).catch((err) => console.error("[drawer] media_assets sync failed:", err));
+          try {
+            await ensureMediaAsset({
+              name: file.name,
+              url: playbackUrl || driveProxyUrl,
+              fileId: result.fileId,
+              publishUrl,
+              driveProxyUrl,
+              playbackUrl,
+              playbackStorageKey,
+              mimeType: resultMimeType,
+              size: result.size || file.size,
+              fileType: resultMimeType.startsWith("video") ? "video" : "image",
+              folder: "Content Engine Uploads",
+              addedBy: currentUser.name,
+              workspaceId,
+              usedIn: selectedCard.id,
+            });
+          } catch (err) {
+            mediaAssetSyncFailures += 1;
+            console.error("[drawer] media_assets sync failed:", err);
+            try {
+              await reportUploadFailure({
+                phase: "drawer_media_asset_sync",
+                route: "/api/drive/upload-failure",
+                uploadPath: uploadPathForSize(file),
+                cardId: selectedCard.id,
+                workspaceId,
+                postTitle: selectedCard.title,
+                folder: "raw-files",
+                fileName: file.name,
+                mimeType: resultMimeType,
+                fileSize: file.size,
+                errorMessage: uploadErrorMessage(err),
+                errorDetail: err instanceof Error ? err.stack : undefined,
+              });
+            } catch (reportErr) {
+              console.error("[drawer] media_assets sync telemetry failed:", reportErr);
+            }
+          }
         }
         logAudit(selectedCard.id, currentUser.name, "raw_file_uploaded", `Uploaded ${file.name} (${newFile.usageType})`);
+      }
+      if (mediaAssetSyncFailures > 0) {
+        addToast("Uploaded, but Media Library linking needs a retry.", "warning");
       }
       if (rawFiles.length > existingFiles.length) {
         updateCard(selectedCard.id, { sourceVault: { ...(selectedCard.sourceVault || {}), rawFiles } });
@@ -908,6 +957,7 @@ export function AssetReviewDrawer() {
                   const isImage = file.mimeType?.startsWith("image/") || /\.(heic|heif|jpg|jpeg|png|gif|webp|svg)$/i.test(file.name);
                   const isVideo = /\.(mp4|mov|avi|webm|mkv)$/i.test(file.name);
                   const displayUrl = file.playbackUrl || file.driveProxyUrl || file.url;
+                  const openUrl = browserImagePreviewUrl(file.driveProxyUrl || file.url, { mimeType: file.mimeType, fileName: file.name, size: "full" });
                   return (
                     <div key={i} className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-white dark:bg-white/[0.02] border border-gray-100 dark:border-white/[0.05] hover:border-orange-200 dark:hover:border-orange-500/20 transition-colors group">
                       {isImage ? (
@@ -921,7 +971,7 @@ export function AssetReviewDrawer() {
                         <p className="text-[11px] font-medium text-gray-700 dark:text-gray-300 truncate">{file.name}</p>
                         <p className="text-[9px] text-gray-400">{formatDateShort(file.uploadedAt)}</p>
                       </div>
-                      <a href={file.url} target="_blank" rel="noopener noreferrer" className="p-1 rounded hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-300 hover:text-blue-500 transition-colors cursor-pointer" title="Open file">
+                      <a href={openUrl} target="_blank" rel="noopener noreferrer" className="p-1 rounded hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-300 hover:text-blue-500 transition-colors cursor-pointer" title="Open file">
                         <ExternalLink className="w-3 h-3" />
                       </a>
                       <button
@@ -1201,16 +1251,19 @@ export function AssetReviewDrawer() {
                   {/* Uploaded files list */}
                   {(selectedCard.sourceVault?.rawFiles || []).length > 0 && (
                     <div className="space-y-1.5">
-                      {selectedCard.sourceVault!.rawFiles!.map((file, i) => (
-                        <div key={i} className="flex items-center gap-3 px-3 py-2.5 bg-gray-50 dark:bg-white/[0.03] rounded-xl border border-gray-200 dark:border-white/[0.06]">
-                          <FileText className="w-4 h-4 text-violet-500 shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[12px] font-medium text-gray-700 dark:text-gray-300 truncate">{file.name}</p>
-                            <p className="text-[9px] text-gray-400">{formatDateTimeCompact(file.uploadedAt)}</p>
+                      {selectedCard.sourceVault!.rawFiles!.map((file, i) => {
+                        const openUrl = browserImagePreviewUrl(file.driveProxyUrl || file.url, { mimeType: file.mimeType, fileName: file.name, size: "full" });
+                        return (
+                          <div key={i} className="flex items-center gap-3 px-3 py-2.5 bg-gray-50 dark:bg-white/[0.03] rounded-xl border border-gray-200 dark:border-white/[0.06]">
+                            <FileText className="w-4 h-4 text-violet-500 shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[12px] font-medium text-gray-700 dark:text-gray-300 truncate">{file.name}</p>
+                              <p className="text-[9px] text-gray-400">{formatDateTimeCompact(file.uploadedAt)}</p>
+                            </div>
+                            <a href={openUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-500/10 text-gray-400 hover:text-blue-500 transition-colors"><ExternalLink className="w-3.5 h-3.5" /></a>
                           </div>
-                          <a href={file.url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-500/10 text-gray-400 hover:text-blue-500 transition-colors"><ExternalLink className="w-3.5 h-3.5" /></a>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>

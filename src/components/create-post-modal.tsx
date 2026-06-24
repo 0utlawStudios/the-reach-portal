@@ -190,6 +190,7 @@ export function CreatePostModal({ open, onClose }: Props) {
     const rawFiles: import("@/lib/types").RawFile[] = [];
     let filesForCard: UploadedFile[] = files;
     let uploadFailed = false;
+    let reportUploadFailureForTelemetry: typeof import("@/lib/drive-upload").reportUploadFailure | null = null;
 
     // Upload all files to Drive — NO BLOB FALLBACK.
     // Files upload concurrently (3-wide pool) instead of one-at-a-time, while
@@ -197,7 +198,8 @@ export function CreatePostModal({ open, onClose }: Props) {
     // fail-closed, so the card is not created with missing files.
     if (files.length > 0) {
       try {
-      const { uploadManyToDrive, reportUploadFailure } = await import("@/lib/drive-upload");
+        const { uploadManyToDrive, reportUploadFailure } = await import("@/lib/drive-upload");
+        reportUploadFailureForTelemetry = reportUploadFailure;
 
       // New files that actually need uploading, tagged with their original index.
       // Successfully uploaded files are stored on `files`, so a retry after a
@@ -393,6 +395,7 @@ export function CreatePostModal({ open, onClose }: Props) {
     if (!createdCard) return;
 
     // Insert uploaded files into media_assets so they appear in Media Library
+    let mediaAssetSyncFailures = 0;
     for (const rf of rawFiles) {
       try {
         await ensureMediaAsset({
@@ -412,8 +415,29 @@ export function CreatePostModal({ open, onClose }: Props) {
           usedIn: createdCard.id,
         });
       } catch (err) {
+        mediaAssetSyncFailures += 1;
         console.error("[create-post] media_assets insert failed:", err);
+        try {
+          await reportUploadFailureForTelemetry?.({
+            phase: "create_post_media_asset_sync",
+            route: "/api/drive/upload-failure",
+            uploadPath: "unknown",
+            workspaceId,
+            postTitle: title.trim(),
+            folder: "raw-files",
+            fileName: rf.name,
+            mimeType: rf.mimeType,
+            fileSize: rf.size,
+            errorMessage: uploadErrorMessage(err),
+            errorDetail: err instanceof Error ? err.stack : undefined,
+          });
+        } catch (reportErr) {
+          console.error("[create-post] media_assets sync telemetry failed:", reportErr);
+        }
       }
+    }
+    if (mediaAssetSyncFailures > 0) {
+      addToast("Post saved, but Media Library linking needs a retry.", "warning");
     }
 
     rawFilesRef.current.clear();

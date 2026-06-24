@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { requireUser } from "@/lib/auth/require";
 import { ALLOWED_DRIVE_ROLES } from "@/lib/drive-policy";
+import { streamWithInactivityTimeout } from "@/lib/stream-inactivity-timeout";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -116,8 +117,19 @@ export async function GET(request: NextRequest) {
   if (!responseHeaders.has("content-type")) responseHeaders.set("Content-Type", "video/mp4");
   if (!responseHeaders.has("accept-ranges")) responseHeaders.set("Accept-Ranges", "bytes");
 
-  return new Response(storageRes.body, {
-    status: storageRes.status,
-    headers: responseHeaders,
-  });
+  return new Response(
+    streamWithInactivityTimeout(
+      storageRes.body,
+      STORAGE_RESPONSE_TIMEOUT_MS,
+      "Supabase playback media stream",
+      () => {
+        console.error("[media/playback] Supabase playback media stream stalled");
+        controller.abort();
+      },
+    ),
+    {
+      status: storageRes.status,
+      headers: responseHeaders,
+    },
+  );
 }

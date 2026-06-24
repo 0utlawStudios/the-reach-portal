@@ -4,6 +4,7 @@ import { ensureSubfolder, getAccessToken, getFileMetadata, getRootFolderId, veri
 import { ALLOWED_DRIVE_ROLES, VALID_DRIVE_FOLDERS } from "@/lib/drive-policy";
 import { sanitizeUnknownUploadError, statusForSanitizedDriveError } from "@/lib/drive-errors";
 import { requireBearerTeamRole, requireRole, requireUser, type WorkspaceRole } from "@/lib/auth/require";
+import { STREAM_INACTIVITY_TIMEOUT_MS, streamWithInactivityTimeout } from "@/lib/stream-inactivity-timeout";
 
 export const maxDuration = 60; // Fluid Compute — stays alive while streaming
 
@@ -263,13 +264,10 @@ export async function GET(request: NextRequest) {
       driveHeaders["Range"] = rangeHeader;
     }
 
-    // Fetch from Google Drive. Bound the time-to-response with an AbortController
-    // (mirrors proxy-upload / upload-chunk / driveFetch) so a Google connection
-    // that stalls before sending response headers fails fast with a sanitized
-    // error instead of hanging until maxDuration. The timer is cleared the moment
-    // headers arrive, so it never interrupts a legitimate in-flight byte stream.
+    // Fetch from Google Drive. Bound time-to-response and, below, time between
+    // body chunks so a black/stalled media view fails instead of hanging forever.
     const streamController = new AbortController();
-    const streamTimer = setTimeout(() => streamController.abort(), 45000);
+    const streamTimer = setTimeout(() => streamController.abort(), STREAM_INACTIVITY_TIMEOUT_MS);
     let driveRes: Response;
     try {
       driveRes = await fetch(driveUrl, { headers: driveHeaders, signal: streamController.signal });
@@ -304,11 +302,22 @@ export async function GET(request: NextRequest) {
     if (contentRange) responseHeaders["Content-Range"] = contentRange;
     if (contentLength) responseHeaders["Content-Length"] = contentLength;
 
-    // Stream the response body — never buffer
-    return new Response(driveRes.body, {
-      status: driveRes.status,
-      headers: responseHeaders,
-    });
+    // Stream the response body — never buffer.
+    return new Response(
+      streamWithInactivityTimeout(
+        driveRes.body,
+        STREAM_INACTIVITY_TIMEOUT_MS,
+        "Google Drive media stream",
+        () => {
+          console.error("[drive/stream] Google Drive media stream stalled");
+          streamController.abort();
+        },
+      ),
+      {
+        status: driveRes.status,
+        headers: responseHeaders,
+      },
+    );
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     const sanitized = sanitizeUnknownUploadError(err);

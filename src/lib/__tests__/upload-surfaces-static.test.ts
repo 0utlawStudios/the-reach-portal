@@ -122,7 +122,8 @@ describe("Drive upload surfaces", () => {
 
     const drawer = source("src/components/asset-review-drawer.tsx");
     expect(drawer).toContain("const displayUrl = file.playbackUrl || file.driveProxyUrl || file.url");
-    expect(drawer).toContain('href={file.url}');
+    expect(drawer).toContain("browserImagePreviewUrl(file.driveProxyUrl || file.url");
+    expect(drawer).toContain("href={openUrl}");
   });
 
   it("bounds direct Supabase Storage uploads outside the Drive media path", () => {
@@ -181,6 +182,7 @@ describe("Drive upload surfaces", () => {
     expect(playbackRoute).toContain("userCanReadPlaybackWorkspace");
     expect(playbackRoute).toContain('.eq("workspace_id", workspaceId)');
     expect(playbackRoute).toContain("SUPABASE_SERVICE_ROLE_KEY");
+    expect(playbackRoute).toContain("streamWithInactivityTimeout");
 
     const privateBucketsMigration = source("supabase/migrations/0051_private_media_derivative_buckets.sql");
     expect(privateBucketsMigration).toContain("set public = false");
@@ -218,6 +220,14 @@ describe("Drive upload surfaces", () => {
     expect(upload).toContain("UPLOAD_FAILURE_REPORT_TIMEOUT_MS");
     expect(upload).toContain('fetch("/api/drive/upload-failure"');
     expect(upload).toContain("signal: controller.signal");
+
+    const driveStreamRoute = source("src/app/api/drive/stream/route.ts");
+    expect(driveStreamRoute).toContain("streamWithInactivityTimeout");
+    expect(driveStreamRoute).toContain("Google Drive media stream");
+
+    const playbackRoute = source("src/app/api/media/playback/route.ts");
+    expect(playbackRoute).toContain("streamWithInactivityTimeout");
+    expect(playbackRoute).toContain("Supabase playback media stream");
   });
 
   it("keeps revision attachments private instead of writing them to public avatars/kickback", () => {
@@ -375,7 +385,17 @@ describe("Drive upload surfaces", () => {
     expect(mediaPicker).not.toContain("setMediaAssets([])");
   });
 
-  it("confirms repurpose saves before success and surfaces media mirror failures", () => {
+  it("confirms save before success and surfaces media mirror failures", () => {
+    const createPost = source("src/components/create-post-modal.tsx");
+    expect(createPost).toContain("reportUploadFailureForTelemetry");
+    expect(createPost).toContain("create_post_media_asset_sync");
+    expect(createPost).toContain("Post saved, but Media Library linking needs a retry");
+
+    const drawer = source("src/components/asset-review-drawer.tsx");
+    expect(drawer).toContain("drawer_media_asset_sync");
+    expect(drawer).toContain("Cover uploaded, but saving it to Media Library failed.");
+    expect(drawer).toContain("Uploaded, but Media Library linking needs a retry.");
+
     const repurpose = source("src/components/repurpose-modal.tsx");
     expect(repurpose).toContain("const createdCard = await createCard");
     expect(repurpose).toContain("if (!createdCard) return;");
