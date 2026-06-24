@@ -139,6 +139,8 @@ WHERE auth.role() = 'service_role'
 
 GRANT SELECT ON public.v_audit_log_with_actor TO authenticated;
 
+DROP VIEW IF EXISTS public.v_user_presence_summary;
+
 CREATE OR REPLACE VIEW public.v_user_presence_summary AS
 WITH last_audit AS (
   SELECT workspace_id, actor_user_id AS auth_user_id, MAX(created_at) AS audit_last
