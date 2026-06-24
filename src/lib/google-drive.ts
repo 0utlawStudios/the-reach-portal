@@ -127,7 +127,8 @@ export async function createResumableUploadSession(
   fileName: string,
   mimeType: string,
   parentFolderId: string,
-  contentLength?: number
+  contentLength?: number,
+  workspaceId?: string,
 ): Promise<{ uploadUri: string }> {
   // Standard Google resumable upload: single POST creates session + file in one call
   // The fileId is returned AFTER the client completes the PUT upload
@@ -144,6 +145,7 @@ export async function createResumableUploadSession(
         name: fileName,
         parents: [parentFolderId],
         mimeType,
+        ...(workspaceId ? { appProperties: { workspaceId } } : {}),
       }),
     }
   );
@@ -189,35 +191,55 @@ function streamSigningSecret(): string {
   return secret;
 }
 
-export function signDriveStreamToken(fileId: string): string {
+const DRIVE_STREAM_TOKEN_VERSION = "v1";
+const DRIVE_STREAM_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+
+function signDriveStreamPayload(fileId: string, workspaceId: string, expiresAt: number): string {
   return createHmac("sha256", streamSigningSecret())
-    .update(fileId)
+    .update(`${fileId}.${workspaceId}.${expiresAt}`)
     .digest("base64url");
 }
 
-export function verifyDriveStreamToken(fileId: string, token: string | null | undefined): boolean {
-  if (!token) return false;
+export function signDriveStreamToken(
+  fileId: string,
+  workspaceId: string,
+  expiresAt = Date.now() + DRIVE_STREAM_TOKEN_TTL_MS,
+): string {
+  const signature = signDriveStreamPayload(fileId, workspaceId, expiresAt);
+  return `${DRIVE_STREAM_TOKEN_VERSION}.${expiresAt}.${workspaceId}.${signature}`;
+}
+
+export function verifyDriveStreamToken(
+  fileId: string,
+  token: string | null | undefined,
+): { workspaceId: string; expiresAt: number } | null {
+  if (!token) return null;
   try {
-    const expected = signDriveStreamToken(fileId);
+    const [version, expiresAtRaw, workspaceId, signature] = token.split(".");
+    if (version !== DRIVE_STREAM_TOKEN_VERSION || !expiresAtRaw || !workspaceId || !signature) return null;
+    const expiresAt = Number(expiresAtRaw);
+    if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) return null;
+    const expected = signDriveStreamPayload(fileId, workspaceId, expiresAt);
     const a = Buffer.from(expected);
-    const b = Buffer.from(token);
-    return a.length === b.length && timingSafeEqual(a, b);
+    const b = Buffer.from(signature);
+    if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+    return { workspaceId, expiresAt };
   } catch {
-    return false;
+    return null;
   }
 }
 
-export function getStreamUrl(fileId: string): string {
+export function getStreamUrl(fileId: string, workspaceId: string): string {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
   const base = siteUrl ? siteUrl.replace(/\/+$/, "") : "";
-  const params = new URLSearchParams({ id: fileId, token: signDriveStreamToken(fileId) });
+  const params = new URLSearchParams({ id: fileId, token: signDriveStreamToken(fileId, workspaceId) });
   return `${base}/api/drive/stream?${params.toString()}`;
 }
 
 // ─── File metadata ───
 
 export async function getFileMetadata(fileId: string) {
-  const res = await driveFetch(`${DRIVE_API}/files/${fileId}?fields=id,name,mimeType,size,parents&supportsAllDrives=true`);
+  const res = await driveFetch(`${DRIVE_API}/files/${fileId}?fields=id,name,mimeType,size,parents,appProperties&supportsAllDrives=true`);
   if (!res.ok) {
     const err = await res.text();
     throw new Error(`Failed to get file metadata: ${res.status} ${err}`);
@@ -229,5 +251,8 @@ export async function getFileMetadata(fileId: string) {
     mimeType: data.mimeType as string,
     size: Number(data.size || 0),
     parents: Array.isArray(data.parents) ? data.parents as string[] : [],
+    appProperties: data.appProperties && typeof data.appProperties === "object"
+      ? data.appProperties as Record<string, string>
+      : {},
   };
 }

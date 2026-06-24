@@ -106,6 +106,7 @@ export async function POST(request: NextRequest) {
       mimeType,
       parentId,
       fileSize,
+      authContext.workspaceId,
     );
 
     const isImage = mimeType.startsWith("image/");

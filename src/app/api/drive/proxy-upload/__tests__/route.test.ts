@@ -18,6 +18,7 @@ const driveMocks = vi.hoisted(() => ({
   setPublicPermission: vi.fn(),
   getAccessToken: vi.fn(),
   getStreamUrl: vi.fn(),
+  getDriveDownloadUrl: vi.fn(),
 }));
 
 const alertMocks = vi.hoisted(() => ({
@@ -39,6 +40,7 @@ vi.mock("@/lib/google-drive", () => ({
   setPublicPermission: driveMocks.setPublicPermission,
   getAccessToken: driveMocks.getAccessToken,
   getStreamUrl: driveMocks.getStreamUrl,
+  getDriveDownloadUrl: driveMocks.getDriveDownloadUrl,
 }));
 
 vi.mock("@/lib/upload-alerts", () => ({
@@ -92,6 +94,7 @@ beforeEach(() => {
   driveMocks.setPublicPermission.mockResolvedValue(undefined);
   driveMocks.getAccessToken.mockResolvedValue("drive-token");
   driveMocks.getStreamUrl.mockReturnValue("/api/drive/stream?id=file-1");
+  driveMocks.getDriveDownloadUrl.mockReturnValue("https://drive.google.com/uc?export=download&id=file-1");
   alertMocks.notifyUploadFailure.mockResolvedValue({ emailSent: false, telegramSent: false });
   global.fetch = vi.fn(() => Promise.resolve(new Response(JSON.stringify({
     id: "file-1",
@@ -158,5 +161,16 @@ describe("POST /api/drive/proxy-upload", () => {
       errorStatus: 403,
       errorDetail: expect.stringContaining("raw quota details"),
     }));
+  });
+
+  it("tags proxy-uploaded Drive files with the caller workspace and signs the stream URL for that workspace", async () => {
+    const res = await POST(makeRequest({ Authorization: "Bearer token" }, makeUploadForm()));
+
+    expect(res.status).toBe(200);
+    expect(driveMocks.getStreamUrl).toHaveBeenCalledWith("file-1", "00000000-0000-0000-0000-000000000001");
+    const uploadCall = vi.mocked(global.fetch).mock.calls[0];
+    const body = uploadCall?.[1]?.body;
+    expect(Buffer.isBuffer(body)).toBe(true);
+    expect((body as Buffer).toString("utf8")).toContain('"appProperties":{"workspaceId":"00000000-0000-0000-0000-000000000001"}');
   });
 });

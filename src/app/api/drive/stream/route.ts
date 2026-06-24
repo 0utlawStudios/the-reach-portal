@@ -1,8 +1,9 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { ensureSubfolder, getAccessToken, getFileMetadata, getRootFolderId, verifyDriveStreamToken } from "@/lib/google-drive";
-import { VALID_DRIVE_FOLDERS } from "@/lib/drive-policy";
+import { ALLOWED_DRIVE_ROLES, VALID_DRIVE_FOLDERS } from "@/lib/drive-policy";
 import { sanitizeUnknownUploadError, statusForSanitizedDriveError } from "@/lib/drive-errors";
+import { requireBearerTeamRole } from "@/lib/auth/require";
 
 export const maxDuration = 60; // Fluid Compute — stays alive while streaming
 
@@ -58,30 +59,36 @@ function sourceReferencesDriveFile(value: unknown, fileId: string): boolean {
   return false;
 }
 
-async function isKnownAppDriveFile(fileId: string): Promise<boolean> {
+async function isKnownAppDriveFile(fileId: string, workspaceId?: string): Promise<boolean> {
   const admin = serviceRoleClient();
   if (!admin) return false;
 
-  const [media, posts] = await Promise.all([
-    admin
+  let mediaQuery = admin
       .from("media_assets")
       .select("id")
       .ilike("url", `%${fileId}%`)
-      .limit(1),
-    admin
+      .limit(1);
+  let postsQuery = admin
       .from("posts")
       .select("id, thumbnail_url, source_vault")
       .or(`thumbnail_url.ilike.%${fileId}%`)
-      .limit(1),
-  ]);
+      .limit(1);
+  if (workspaceId) {
+    mediaQuery = mediaQuery.eq("workspace_id", workspaceId);
+    postsQuery = postsQuery.eq("workspace_id", workspaceId);
+  }
+
+  const [media, posts] = await Promise.all([mediaQuery, postsQuery]);
   if (!media.error && media.data && media.data.length > 0) return true;
   if (!posts.error && posts.data && posts.data.length > 0) return true;
 
-  const { data: sourceRows, error: sourceError } = await admin
+  let sourceQuery = admin
     .from("posts")
     .select("id, source_vault")
     .not("source_vault", "is", null)
     .limit(1000);
+  if (workspaceId) sourceQuery = sourceQuery.eq("workspace_id", workspaceId);
+  const { data: sourceRows, error: sourceError } = await sourceQuery;
   if (sourceError || !sourceRows) return false;
   return sourceRows.some((row) => sourceReferencesDriveFile(row.source_vault, fileId));
 }
@@ -101,10 +108,11 @@ async function isInAppManagedDriveFolder(fileId: string): Promise<boolean> {
 // is not enough because it can be forged; the referer fallback is constrained
 // to file IDs already referenced by app rows or physically inside app-managed
 // Drive folders.
-async function checkAuth(req: NextRequest, fileId: string): Promise<{ ok: boolean; authed: boolean; signed: boolean }> {
+async function checkAuth(req: NextRequest, fileId: string): Promise<{ ok: boolean; authed: boolean; signed: boolean; workspaceId?: string }> {
   const signedToken = req.nextUrl.searchParams.get("token");
-  if (verifyDriveStreamToken(fileId, signedToken)) {
-    return { ok: true, authed: true, signed: true };
+  const signedClaims = verifyDriveStreamToken(fileId, signedToken);
+  if (signedClaims) {
+    return { ok: true, authed: true, signed: true, workspaceId: signedClaims.workspaceId };
   }
 
   // Media tag fallback: allowed only for file IDs already present in app data
@@ -119,22 +127,21 @@ async function checkAuth(req: NextRequest, fileId: string): Promise<{ ok: boolea
     }
   }
 
-  // Bearer-token check.
+  // Bearer-token check. A valid user token is not enough; the file must be
+  // known in that user's active workspace, or be a freshly-uploaded app-folder
+  // file whose workspace appProperties are verified after metadata loads.
   const token = req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
-  let tokenOk = false;
   if (token) {
-    const admin = serviceRoleClient();
-    if (admin) {
-      try {
-        const { data, error } = await admin.auth.getUser(token);
-        tokenOk = !error && !!data.user;
-      } catch {
-        tokenOk = false;
+    const auth = await requireBearerTeamRole(req, ALLOWED_DRIVE_ROLES);
+    if (!(auth instanceof Response)) {
+      const knownInWorkspace = await isKnownAppDriveFile(fileId, auth.workspaceId);
+      const appManaged = knownInWorkspace ? false : await isInAppManagedDriveFolder(fileId);
+      if (knownInWorkspace || appManaged) {
+        return { ok: true, authed: true, signed: false, workspaceId: auth.workspaceId };
       }
     }
   }
 
-  if (tokenOk) return { ok: true, authed: true, signed: false };
   return {
     ok: refOk && (await isKnownAppDriveFile(fileId) || await isInAppManagedDriveFolder(fileId)),
     authed: false,
@@ -169,6 +176,12 @@ export async function GET(request: NextRequest) {
     // PERF-003: metadata fetch and token mint are independent — run them
     // concurrently instead of sequentially.
     const [meta, token] = await Promise.all([getFileMetadata(fileId), getAccessToken()]);
+    if (auth.workspaceId && meta.appProperties?.workspaceId && meta.appProperties.workspaceId !== auth.workspaceId) {
+      return new Response(JSON.stringify({ error: "File does not belong to this workspace" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
     const driveUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
 
     const rangeHeader = request.headers.get("range");

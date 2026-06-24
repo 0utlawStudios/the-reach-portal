@@ -83,7 +83,10 @@ function installHeicDecodeImages(width = 4, height = 3) {
 beforeEach(() => {
   vi.clearAllMocks();
   sharpMocks.sharp.format = { heif: { input: { buffer: true } } };
-  driveMocks.verifyDriveStreamToken.mockReturnValue(true);
+  driveMocks.verifyDriveStreamToken.mockReturnValue({
+    workspaceId: "00000000-0000-0000-0000-000000000001",
+    expiresAt: Date.now() + 60_000,
+  });
   driveMocks.getFileMetadata.mockResolvedValue({
     id: FILE_ID,
     name: "source.heic",

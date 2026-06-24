@@ -16,6 +16,9 @@ describe("Drive route security contracts", () => {
     expect(DRIVE_STREAM_SRC).not.toContain("return { ok: refOk || tokenOk");
     expect(DRIVE_STREAM_SRC).toContain('from("media_assets")');
     expect(DRIVE_STREAM_SRC).toContain('from("posts")');
+    expect(DRIVE_STREAM_SRC).toContain('.eq("workspace_id", workspaceId)');
+    expect(DRIVE_STREAM_SRC).toContain("signedClaims.workspaceId");
+    expect(DRIVE_STREAM_SRC).toContain("File does not belong to this workspace");
     expect(DRIVE_STREAM_SRC).toContain("VALID_DRIVE_FOLDERS.map");
     expect(DRIVE_STREAM_SRC).toContain("verifyDriveStreamToken(fileId, signedToken)");
     expect(GOOGLE_DRIVE_SRC).toContain("signDriveStreamToken");
@@ -36,7 +39,9 @@ describe("Drive route security contracts", () => {
     expect(DRIVE_FINALIZE_SRC).not.toContain("VALID_DRIVE_FOLDERS.map");
     expect(DRIVE_FINALIZE_SRC).toContain("isAllowedDriveMediaMime(mimeType)");
     expect(DRIVE_FINALIZE_SRC).toContain("meta.size > MAX_DRIVE_MEDIA_FILE_SIZE");
-    expect(GOOGLE_DRIVE_SRC).toContain("fields=id,name,mimeType,size,parents");
+    expect(GOOGLE_DRIVE_SRC).toContain("fields=id,name,mimeType,size,parents,appProperties");
+    expect(DRIVE_FINALIZE_SRC).toContain("meta.appProperties?.workspaceId");
+    expect(DRIVE_FINALIZE_SRC).toContain("getStreamUrl(fileId, authContext.workspaceId)");
   });
 
   it("rejects proxy uploads above the small-file threshold before buffering", () => {
@@ -49,9 +54,11 @@ describe("Drive route security contracts", () => {
   });
 
   it("returns signed app stream URLs from both Drive upload paths", () => {
-    expect(DRIVE_PROXY_UPLOAD_SRC).toContain("getStreamUrl(fileId)");
-    expect(DRIVE_FINALIZE_SRC).toContain("getStreamUrl(fileId)");
-    expect(GOOGLE_DRIVE_SRC).toContain("token: signDriveStreamToken(fileId)");
+    expect(DRIVE_PROXY_UPLOAD_SRC).toContain("getStreamUrl(fileId, authContext.workspaceId)");
+    expect(DRIVE_FINALIZE_SRC).toContain("getStreamUrl(fileId, authContext.workspaceId)");
+    expect(GOOGLE_DRIVE_SRC).toContain("token: signDriveStreamToken(fileId, workspaceId)");
+    expect(GOOGLE_DRIVE_SRC).toContain("workspaceId: string");
+    expect(GOOGLE_DRIVE_SRC).toContain("expiresAt <= Date.now()");
   });
 
   it("sanitizes stream route catch responses before returning them to the browser", () => {

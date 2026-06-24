@@ -99,6 +99,9 @@ export async function POST(request: NextRequest) {
     if (!belongsToAppFolder) {
       return NextResponse.json({ error: "File is not in an app-managed Drive folder" }, { status: 403 });
     }
+    if (meta.appProperties?.workspaceId && meta.appProperties.workspaceId !== authContext.workspaceId) {
+      return NextResponse.json({ error: "File does not belong to this workspace" }, { status: 403 });
+    }
     const mimeType = normalizeDriveMimeType(meta.mimeType, meta.name);
     if (!isAllowedDriveMediaMime(mimeType)) {
       return NextResponse.json({ error: "Unsupported file type" }, { status: 415 });
@@ -121,7 +124,7 @@ export async function POST(request: NextRequest) {
 
     // Always use our stream proxy as primary URL — it's authenticated server-side
     // and works immediately (lh3 URLs break during Google permission propagation)
-    const proxyUrl = getStreamUrl(fileId);
+    const proxyUrl = getStreamUrl(fileId, authContext.workspaceId);
     const publishUrl = getDriveDownloadUrl(fileId);
 
     return NextResponse.json({

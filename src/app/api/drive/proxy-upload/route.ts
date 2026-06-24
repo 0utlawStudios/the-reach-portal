@@ -106,6 +106,7 @@ export async function POST(request: NextRequest) {
       name: driveFileName,
       parents: [parentId],
       mimeType,
+      appProperties: { workspaceId: authContext.workspaceId },
     });
 
     const fileBuffer = Buffer.from(await file.arrayBuffer());
@@ -183,7 +184,7 @@ export async function POST(request: NextRequest) {
       // Don't fail — file is uploaded, just not public yet
     }
 
-    const driveProxyUrl = getStreamUrl(fileId);
+    const driveProxyUrl = getStreamUrl(fileId, authContext.workspaceId);
     const publishUrl = getDriveDownloadUrl(fileId);
 
     return jsonResponse({

@@ -96,6 +96,7 @@ describe("POST /api/drive/finalize", () => {
     expect(driveMocks.ensureSubfolder).toHaveBeenCalledTimes(1);
     expect(driveMocks.ensureSubfolder).toHaveBeenCalledWith("raw-files", "root-folder");
     expect(driveMocks.setPublicPermission).toHaveBeenCalledWith(FILE_ID);
+    expect(driveMocks.getStreamUrl).toHaveBeenCalledWith(FILE_ID, "00000000-0000-0000-0000-000000000001");
   });
 
   it("rejects a file whose parent is not the requested folder before permission changes", async () => {
@@ -112,6 +113,25 @@ describe("POST /api/drive/finalize", () => {
     expect(res.status).toBe(403);
     expect(driveMocks.ensureSubfolder).toHaveBeenCalledTimes(1);
     expect(driveMocks.setPublicPermission).not.toHaveBeenCalled();
+  });
+
+  it("rejects a managed-folder file tagged to another workspace before permission changes", async () => {
+    driveMocks.getFileMetadata.mockResolvedValueOnce({
+      id: FILE_ID,
+      name: "clip.mp4",
+      mimeType: "video/mp4",
+      size: 5 * 1024 * 1024,
+      parents: ["raw-folder"],
+      appProperties: { workspaceId: "workspace-b" },
+    });
+
+    const res = await POST(makeRequest({ fileId: FILE_ID, folder: "raw-files" }));
+    const data = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(data.error).toMatch(/workspace/i);
+    expect(driveMocks.setPublicPermission).not.toHaveBeenCalled();
+    expect(driveMocks.getStreamUrl).not.toHaveBeenCalled();
   });
 
   it("rejects an invalid folder before Drive metadata or permission calls", async () => {

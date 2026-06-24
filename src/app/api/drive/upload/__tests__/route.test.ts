@@ -95,6 +95,7 @@ describe("POST /api/drive/upload", () => {
       "application/pdf",
       "sub-folder",
       4096,
+      "00000000-0000-0000-0000-000000000001",
     );
   });
 
@@ -139,6 +140,7 @@ describe("POST /api/drive/upload", () => {
       "image/png",
       "sub-folder",
       2048,
+      "00000000-0000-0000-0000-000000000001",
     );
   });
 

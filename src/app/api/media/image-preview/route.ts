@@ -9,8 +9,9 @@ import {
   getRootFolderId,
   verifyDriveStreamToken,
 } from "@/lib/google-drive";
-import { normalizeDriveMimeType, VALID_DRIVE_FOLDERS } from "@/lib/drive-policy";
+import { ALLOWED_DRIVE_ROLES, normalizeDriveMimeType, VALID_DRIVE_FOLDERS } from "@/lib/drive-policy";
 import { sanitizeUnknownUploadError, statusForSanitizedDriveError } from "@/lib/drive-errors";
+import { requireBearerTeamRole } from "@/lib/auth/require";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -142,30 +143,36 @@ function sourceReferencesDriveFile(value: unknown, fileId: string): boolean {
   return false;
 }
 
-async function isKnownAppDriveFile(fileId: string): Promise<boolean> {
+async function isKnownAppDriveFile(fileId: string, workspaceId?: string): Promise<boolean> {
   const admin = serviceRoleClient();
   if (!admin) return false;
 
-  const [media, posts] = await Promise.all([
-    admin
+  let mediaQuery = admin
       .from("media_assets")
       .select("id")
       .ilike("url", `%${fileId}%`)
-      .limit(1),
-    admin
+      .limit(1);
+  let postsQuery = admin
       .from("posts")
       .select("id, thumbnail_url, source_vault")
       .or(`thumbnail_url.ilike.%${fileId}%`)
-      .limit(1),
-  ]);
+      .limit(1);
+  if (workspaceId) {
+    mediaQuery = mediaQuery.eq("workspace_id", workspaceId);
+    postsQuery = postsQuery.eq("workspace_id", workspaceId);
+  }
+
+  const [media, posts] = await Promise.all([mediaQuery, postsQuery]);
   if (!media.error && media.data && media.data.length > 0) return true;
   if (!posts.error && posts.data && posts.data.length > 0) return true;
 
-  const { data: sourceRows, error: sourceError } = await admin
+  let sourceQuery = admin
     .from("posts")
     .select("id, source_vault")
     .not("source_vault", "is", null)
     .limit(1000);
+  if (workspaceId) sourceQuery = sourceQuery.eq("workspace_id", workspaceId);
+  const { data: sourceRows, error: sourceError } = await sourceQuery;
   if (sourceError || !sourceRows) return false;
   return sourceRows.some((row) => sourceReferencesDriveFile(row.source_vault, fileId));
 }
@@ -180,19 +187,19 @@ async function isInAppManagedDriveFolder(fileId: string): Promise<boolean> {
   }
 }
 
-async function checkAuth(req: NextRequest, fileId: string): Promise<{ ok: boolean; signed: boolean }> {
+async function checkAuth(req: NextRequest, fileId: string): Promise<{ ok: boolean; signed: boolean; workspaceId?: string }> {
   const signedToken = req.nextUrl.searchParams.get("token");
-  if (verifyDriveStreamToken(fileId, signedToken)) return { ok: true, signed: true };
+  const signedClaims = verifyDriveStreamToken(fileId, signedToken);
+  if (signedClaims) return { ok: true, signed: true, workspaceId: signedClaims.workspaceId };
 
   const token = req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
   if (token) {
-    const admin = serviceRoleClient();
-    if (admin) {
-      try {
-        const { data, error } = await admin.auth.getUser(token);
-        if (!error && data.user) return { ok: true, signed: false };
-      } catch {
-        // Fall through to same-origin file checks.
+    const auth = await requireBearerTeamRole(req, ALLOWED_DRIVE_ROLES);
+    if (!(auth instanceof Response)) {
+      const knownInWorkspace = await isKnownAppDriveFile(fileId, auth.workspaceId);
+      const appManaged = knownInWorkspace ? false : await isInAppManagedDriveFolder(fileId);
+      if (knownInWorkspace || appManaged) {
+        return { ok: true, signed: false, workspaceId: auth.workspaceId };
       }
     }
   }
@@ -245,6 +252,9 @@ export async function GET(request: NextRequest) {
 
   try {
     const [meta, token] = await Promise.all([getFileMetadata(fileId), getAccessToken()]);
+    if (auth.workspaceId && meta.appProperties?.workspaceId && meta.appProperties.workspaceId !== auth.workspaceId) {
+      return NextResponse.json({ error: "File does not belong to this workspace" }, { status: 403 });
+    }
     const mimeType = normalizeDriveMimeType(meta.mimeType, meta.name);
     const extensionMimeType = normalizeDriveMimeType("", meta.name);
     if (!HEIC_IMAGE_MIME_TYPES.has(mimeType) && !HEIC_IMAGE_MIME_TYPES.has(extensionMimeType)) {
