@@ -11,6 +11,7 @@ import {
   getSupportAdminClient,
   getTeamRole,
   resolveActiveSupportWorkspace,
+  workspaceIdFromHeaders,
   resolveUserName,
   parseAttachmentClaims,
   buildAttachmentsFromClaims,
@@ -57,13 +58,13 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
   const thread = threadRow as SupportThreadRow;
 
   // Resolve the sender: thread owner → user; superadmin → admin; else 404.
-  const callerWorkspaceId = await resolveActiveSupportWorkspace(admin, auth.user.id, auth.user.email ?? "");
+  const callerWorkspaceId = await resolveActiveSupportWorkspace(admin, auth.user.id, auth.user.email ?? "", workspaceIdFromHeaders(request.headers));
   const isOwner = thread.created_by === auth.user.id && thread.workspace_id === callerWorkspaceId;
   let senderType: SupportSenderType;
   if (isOwner) {
     senderType = "user";
   } else {
-    const role = await getTeamRole(admin, auth.user.email ?? "", auth.user.id);
+    const role = await getTeamRole(admin, auth.user.email ?? "", auth.user.id, callerWorkspaceId);
     if (role !== "superadmin") return NextResponse.json({ error: "Not found" }, { status: 404 });
     // Multi-tenant guard: a superadmin only reaches threads in their own workspace.
     if (thread.workspace_id !== callerWorkspaceId) {

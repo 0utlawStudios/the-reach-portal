@@ -8,10 +8,10 @@ import {
   getSupportAdminClient,
   getTeamRole,
   resolveActiveSupportWorkspace,
+  workspaceIdFromHeaders,
   resignAttachments,
   recordSupportAudit,
   resolveUserName,
-  resolveWorkspaceId,
 } from "@/lib/support/server";
 import { rowToThread, rowToMessage } from "@/lib/support/types";
 import type {
@@ -45,10 +45,10 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ id: str
   if (!threadRow) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const thread = threadRow as SupportThreadRow;
-  const callerWorkspaceId = await resolveActiveSupportWorkspace(admin, auth.user.id, auth.user.email ?? "");
+  const callerWorkspaceId = await resolveActiveSupportWorkspace(admin, auth.user.id, auth.user.email ?? "", workspaceIdFromHeaders(request.headers));
   const isOwner = thread.created_by === auth.user.id && thread.workspace_id === callerWorkspaceId;
   if (!isOwner) {
-    const role = await getTeamRole(admin, auth.user.email ?? "", auth.user.id);
+    const role = await getTeamRole(admin, auth.user.email ?? "", auth.user.id, callerWorkspaceId);
     // Don't reveal that the thread exists to anyone but its owner / superadmin.
     if (role !== "superadmin") return NextResponse.json({ error: "Not found" }, { status: 404 });
     // Multi-tenant guard: a superadmin only reaches threads in their own workspace.
@@ -96,7 +96,7 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
   }
 
   const admin = getSupportAdminClient();
-  const workspaceId = await resolveWorkspaceId(admin, adminAuth.user.id);
+  const workspaceId = adminAuth.workspaceId;
   const { data: threadRow, error } = await admin
     .from("support_threads")
     .update({ status, updated_at: new Date().toISOString() })

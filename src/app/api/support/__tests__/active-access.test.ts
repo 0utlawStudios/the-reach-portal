@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   createUploadTargets: vi.fn(),
   getOrCreateChatThread: vi.fn(),
   buildAttachmentsFromClaims: vi.fn(),
+  workspaceIdFromHeaders: vi.fn(() => "workspace-1"),
 }));
 
 vi.mock("@/lib/auth/require", () => ({
@@ -23,6 +24,7 @@ vi.mock("@/lib/support/server", () => {
     SupportValidationError,
     getSupportAdminClient: mocks.getSupportAdminClient,
     resolveWorkspaceId: vi.fn(() => Promise.resolve("workspace-1")),
+    workspaceIdFromHeaders: mocks.workspaceIdFromHeaders,
     resolveActiveSupportWorkspace: mocks.resolveActiveSupportWorkspace,
     resolveUserName: vi.fn(() => Promise.resolve("Pending User")),
     parseAttachmentClaims: vi.fn(() => []),
@@ -59,6 +61,7 @@ describe("support user routes active workspace gate", () => {
     const res = await getThreads(makeRequest());
     expect(res.status).toBe(403);
     await expect(res.json()).resolves.toMatchObject({ error: "No active workspace access" });
+    expect(mocks.resolveActiveSupportWorkspace).toHaveBeenCalledWith(expect.anything(), "user-1", "pending@example.com", "workspace-1");
   });
 
   it("blocks ticket creation before support rows are written", async () => {

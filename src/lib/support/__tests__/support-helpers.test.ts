@@ -9,7 +9,7 @@ type MockQueryResult = { data: unknown; error?: unknown };
 type MockQuery = {
   select: () => MockQuery;
   eq: () => MockQuery;
-  limit: () => MockQuery;
+  limit: () => Promise<MockQueryResult>;
   maybeSingle: () => Promise<MockQueryResult>;
 };
 
@@ -19,7 +19,7 @@ function makeAdmin(resultsByTable: Record<string, MockQueryResult>): SupabaseCli
       const query: MockQuery = {
         select: () => query,
         eq: () => query,
-        limit: () => query,
+        limit: async () => resultsByTable[table] ?? { data: null, error: null },
         maybeSingle: async () => resultsByTable[table] ?? { data: null, error: null },
       };
       return query;
@@ -132,7 +132,7 @@ describe("getTeamRole", () => {
   it("returns a lowercased role only for an active team member with active workspace access", async () => {
     const admin = makeAdmin({
       team_members: { data: { role: "SuperAdmin", status: "active" } },
-      workspace_members: { data: { workspace_id: "00000000-0000-0000-0000-000000000001" } },
+      workspace_members: { data: [{ workspace_id: "00000000-0000-0000-0000-000000000001" }] },
     });
     await expect(getTeamRole(admin, "OWNER@EXAMPLE.COM", "u1")).resolves.toBe("superadmin");
   });
@@ -140,7 +140,7 @@ describe("getTeamRole", () => {
   it("rejects inactive or pending team rows", async () => {
     const admin = makeAdmin({
       team_members: { data: { role: "superadmin", status: "pending" } },
-      workspace_members: { data: { workspace_id: "00000000-0000-0000-0000-000000000001" } },
+      workspace_members: { data: [{ workspace_id: "00000000-0000-0000-0000-000000000001" }] },
     });
     await expect(getTeamRole(admin, "owner@example.com", "u1")).resolves.toBeNull();
   });

@@ -11,6 +11,7 @@ import { consume } from "@/lib/rate-limit";
 import {
   getSupportAdminClient,
   resolveActiveSupportWorkspace,
+  workspaceIdFromHeaders,
   resolveUserName,
   findChatThread,
   getOrCreateChatThread,
@@ -39,7 +40,7 @@ export async function GET(request: NextRequest) {
 
   const admin = getSupportAdminClient();
   const email = (auth.user.email ?? "").toLowerCase();
-  const workspaceId = await resolveActiveSupportWorkspace(admin, auth.user.id, email);
+  const workspaceId = await resolveActiveSupportWorkspace(admin, auth.user.id, email, workspaceIdFromHeaders(request.headers));
   if (!workspaceId) return NextResponse.json({ error: "No active workspace access" }, { status: 403 });
   const thread = await findChatThread(admin, auth.user.id, workspaceId);
   if (!thread) return NextResponse.json({ thread: null, messages: [] });
@@ -90,7 +91,7 @@ export async function POST(request: NextRequest) {
 
   const admin = getSupportAdminClient();
   const email = (auth.user.email ?? "").toLowerCase();
-  const workspaceId = await resolveActiveSupportWorkspace(admin, auth.user.id, email);
+  const workspaceId = await resolveActiveSupportWorkspace(admin, auth.user.id, email, workspaceIdFromHeaders(request.headers));
   if (!workspaceId) return NextResponse.json({ error: "No active workspace access" }, { status: 403 });
   const name = await resolveUserName(admin, email, workspaceId);
 

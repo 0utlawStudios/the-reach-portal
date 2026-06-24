@@ -271,6 +271,7 @@ export function AssetReviewDrawer() {
       if (!MENTION_RE.test(trimmed)) return;
       const headers: HeadersInit = { "Content-Type": "application/json" };
       if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+      if (workspaceId) headers["X-Workspace-Id"] = workspaceId;
       fetch("/api/notifications/mention", {
         method: "POST",
         headers,

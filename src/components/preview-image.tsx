@@ -48,18 +48,19 @@ export function PreviewImage({
   const isLoaded = typeof primarySrc !== "string" || loadedSrc === primarySrc;
   const fallbackLoaded = typeof fallbackSrc === "string" && loadedFallbackSrc === fallbackSrc;
   const canShowFallback = Boolean(fallbackSrc && fallbackLoaded && !fallbackFailed);
+  const shouldLoadPrimary = !fallbackSrc || fallbackLoaded || fallbackFailed;
   const missingOrFailed = !primarySrc || (primaryFailed && !canShowFallback);
   const showSpinner = !isLoaded && !canShowFallback;
   const effectiveLoading = loading || (wantsFullPreview ? "eager" : undefined);
 
   useEffect(() => {
-    if (missingOrFailed || typeof primarySrc !== "string" || isLoaded || canShowFallback) return;
+    if (missingOrFailed || typeof primarySrc !== "string" || isLoaded || canShowFallback || !shouldLoadPrimary) return;
     const timer = setTimeout(() => {
       setFailedSrcs((prev) => ({ ...prev, [primarySrc]: true }));
       onError?.({} as SyntheticEvent<HTMLImageElement, Event>);
     }, IMAGE_PREVIEW_LOAD_TIMEOUT_MS);
     return () => clearTimeout(timer);
-  }, [primarySrc, isLoaded, missingOrFailed, canShowFallback, onError]);
+  }, [primarySrc, isLoaded, missingOrFailed, canShowFallback, shouldLoadPrimary, onError]);
 
   if (missingOrFailed) {
     return (
@@ -84,9 +85,8 @@ export function PreviewImage({
           src={fallbackSrc}
           loading={effectiveLoading}
           className={`absolute inset-0 h-full w-full ${fitClass} transition-opacity duration-150 ${canShowFallback && !isLoaded ? "opacity-100" : "opacity-0"}`}
-          onLoad={(event: SyntheticEvent<HTMLImageElement, Event>) => {
+          onLoad={() => {
             setLoadedFallbackSrc(fallbackSrc);
-            onLoad?.(event);
           }}
           onError={(event: SyntheticEvent<HTMLImageElement, Event>) => {
             onError?.(event);
@@ -94,22 +94,24 @@ export function PreviewImage({
           }}
         />
       )}
-      <RawImage
-        {...props}
-        src={primarySrc}
-        loading={effectiveLoading}
-        className={`absolute inset-0 h-full w-full ${fitClass} transition-opacity duration-150 ${isLoaded ? "opacity-100" : "opacity-0"}`}
-        onLoad={(event: SyntheticEvent<HTMLImageElement, Event>) => {
-          setLoadedSrc(typeof primarySrc === "string" ? primarySrc : undefined);
-          onLoad?.(event);
-        }}
-        onError={(event: SyntheticEvent<HTMLImageElement, Event>) => {
-          onError?.(event);
-          if (typeof primarySrc === "string") {
-            setFailedSrcs((prev) => ({ ...prev, [primarySrc]: true }));
-          }
-        }}
-      />
+      {shouldLoadPrimary && (
+        <RawImage
+          {...props}
+          src={primarySrc}
+          loading={effectiveLoading}
+          className={`absolute inset-0 h-full w-full ${fitClass} transition-opacity duration-150 ${isLoaded ? "opacity-100" : "opacity-0"}`}
+          onLoad={(event: SyntheticEvent<HTMLImageElement, Event>) => {
+            setLoadedSrc(typeof primarySrc === "string" ? primarySrc : undefined);
+            onLoad?.(event);
+          }}
+          onError={(event: SyntheticEvent<HTMLImageElement, Event>) => {
+            onError?.(event);
+            if (typeof primarySrc === "string") {
+              setFailedSrcs((prev) => ({ ...prev, [primarySrc]: true }));
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

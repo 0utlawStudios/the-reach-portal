@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isValidUuid } from "@/lib/utils";
 import { requireBearerUser } from "@/lib/auth/require";
-import { getSupportAdminClient, getTeamRole, resolveActiveSupportWorkspace } from "@/lib/support/server";
+import { getSupportAdminClient, getTeamRole, resolveActiveSupportWorkspace, workspaceIdFromHeaders } from "@/lib/support/server";
 
 export const runtime = "nodejs";
 export const maxDuration = 15;
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 
   const nowIso = new Date().toISOString();
   const thread = threadRow as { created_by: string | null; workspace_id: string };
-  const callerWorkspaceId = await resolveActiveSupportWorkspace(admin, auth.user.id, auth.user.email ?? "");
+  const callerWorkspaceId = await resolveActiveSupportWorkspace(admin, auth.user.id, auth.user.email ?? "", workspaceIdFromHeaders(request.headers));
   const isOwner = thread.created_by === auth.user.id && thread.workspace_id === callerWorkspaceId;
   if (isOwner) {
     await admin
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
     return NextResponse.json({ ok: true });
   }
 
-  const role = await getTeamRole(admin, auth.user.email ?? "", auth.user.id);
+  const role = await getTeamRole(admin, auth.user.email ?? "", auth.user.id, callerWorkspaceId);
   if (role !== "superadmin") return NextResponse.json({ error: "Not found" }, { status: 404 });
   // Multi-tenant guard: a superadmin only reaches threads in their own workspace.
   if (thread.workspace_id !== callerWorkspaceId) {

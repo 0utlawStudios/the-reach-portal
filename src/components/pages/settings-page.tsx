@@ -241,6 +241,7 @@ function EditProfileModal({
         const { data: { session } } = await supabase.auth.getSession();
         const headers: HeadersInit = { "Content-Type": "application/json" };
         if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+        headers["X-Workspace-Id"] = workspaceId;
         const res = await fetch("/api/team/change-email", {
           method: "POST",
           headers,
@@ -577,6 +578,7 @@ export function SettingsPage() {
       const { data: { session } } = await supabase.auth.getSession();
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+      headers["X-Workspace-Id"] = workspaceId;
       const res = await fetch("/api/team/approve-request", {
         method: "POST",
         headers,
@@ -615,6 +617,7 @@ export function SettingsPage() {
       const { data: { session } } = await supabase.auth.getSession();
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+      headers["X-Workspace-Id"] = workspaceId;
       const res = await fetch("/api/team/invite", {
         method: "POST",
         headers,
@@ -656,6 +659,7 @@ export function SettingsPage() {
       const { data: { session } } = await supabase.auth.getSession();
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+      headers["X-Workspace-Id"] = workspaceId;
       const res = await fetch("/api/team/resend-invite", {
         method: "POST",
         headers,
@@ -1614,6 +1618,7 @@ function PublishQueuePanel({ addToast }: { addToast: (msg: string, kind?: "info"
       const { data: { session } } = await supabase.auth.getSession();
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+      headers["X-Workspace-Id"] = workspaceId;
       const res = await fetch(`/api/admin/publish-jobs/${jobId}/retry`, { method: "POST", headers });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
@@ -1624,7 +1629,7 @@ function PublishQueuePanel({ addToast }: { addToast: (msg: string, kind?: "info"
     } finally {
       setRetrying(null);
     }
-  }, [addToast, load]);
+  }, [addToast, load, workspaceId]);
 
   if (loading) {
     return <div className="px-4 py-4 flex items-center gap-2 text-[12px] text-gray-400"><Loader2 className="w-3 h-3 animate-spin" /> Loading queue…</div>;

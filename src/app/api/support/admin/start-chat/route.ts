@@ -12,7 +12,6 @@ import { requireBearerTeamRole } from "@/lib/auth/require";
 import { consume } from "@/lib/rate-limit";
 import {
   getSupportAdminClient,
-  resolveWorkspaceId,
   resolveUserName,
   getOrCreateChatThread,
 } from "@/lib/support/server";
@@ -96,7 +95,7 @@ export async function POST(request: NextRequest) {
   }
 
   const admin = getSupportAdminClient();
-  const workspaceId = await resolveWorkspaceId(admin, adminAuth.user.id);
+  const workspaceId = adminAuth.workspaceId;
 
   // Resolve the recipient to an auth user id — only if they are an active
   // member of THIS workspace. Cross-workspace recipients resolve to null.

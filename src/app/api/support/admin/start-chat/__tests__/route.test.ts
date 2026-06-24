@@ -2,7 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 type MockResult = { data?: unknown; error?: { message: string } | null };
 
-let actor = { user: { id: "admin-1" }, email: "admin@example.com", role: "superadmin" };
+let actor = {
+  user: { id: "admin-1" },
+  email: "admin@example.com",
+  role: "superadmin",
+  workspaceId: "00000000-0000-0000-0000-000000000001",
+};
 let rpcResult: MockResult;
 let teamMemberResult: MockResult;
 let workspaceUpsertResult: MockResult;
@@ -84,7 +89,12 @@ function makeRequest(email: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  actor = { user: { id: "admin-1" }, email: "admin@example.com", role: "superadmin" };
+  actor = {
+    user: { id: "admin-1" },
+    email: "admin@example.com",
+    role: "superadmin",
+    workspaceId: "00000000-0000-0000-0000-000000000001",
+  };
   rpcResult = { data: null, error: null };
   teamMemberResult = { data: { role: "admin", status: "active" }, error: null };
   workspaceUpsertResult = { data: null, error: null };

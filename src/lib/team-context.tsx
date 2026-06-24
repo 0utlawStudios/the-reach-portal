@@ -277,6 +277,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       supabase.auth.getSession().then(({ data: { session } }) => {
         const headers: HeadersInit = { "Content-Type": "application/json" };
         if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+        headers["X-Workspace-Id"] = workspaceId;
         fetch("/api/team/remove-member", {
           method: "POST",
           headers,
@@ -312,7 +313,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
         void refreshMembers();
       });
     }
-  }, [useDb, members, addToast, refreshMembers]);
+  }, [useDb, members, addToast, refreshMembers, workspaceId]);
 
   const updateMember = useCallback(async (id: string, updates: Partial<TeamMember>): Promise<boolean> => {
     // DATA-007: snapshot the member so a failed update can be rolled back.
@@ -328,6 +329,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
         const { data: { session } } = await supabase.auth.getSession();
         const headers: HeadersInit = { "Content-Type": "application/json" };
         if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+        headers["X-Workspace-Id"] = workspaceId;
         const res = await fetch("/api/team/update-member", {
           method: "POST",
           headers,
@@ -347,7 +349,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       }
     }
     return true;
-  }, [useDb, members, addToast]);
+  }, [useDb, members, addToast, workspaceId]);
 
   const value = useMemo(
     () => ({ members, pendingRequests, inviteMember, removeMember, updateMember, refreshMembers, refreshPendingRequests }),

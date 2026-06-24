@@ -9,8 +9,10 @@ const IMAGE_EXT = /\.(png|jpg|jpeg|gif|webp|svg)(\?|$)/i;
 const VIDEO_EXT = /\.(mp4|mov|webm|avi|mkv)(\?|$)/i;
 const DOC_EXT = /\.(pdf|txt|doc|docx|xls|xlsx|ppt|pptx)(\?|$)/i;
 const DRIVE_STREAM = /\/api\/drive\/stream\?id=/;
+const SUPPORT_ATTACHMENT = /\/api\/support\/attachment\?key=/;
 
 function getUrlType(url: string): "image" | "video" | "document" | "link" {
+  if (SUPPORT_ATTACHMENT.test(url)) return "link";
   if (IMAGE_EXT.test(url) || (DRIVE_STREAM.test(url) && !VIDEO_EXT.test(url) && !DOC_EXT.test(url))) return "image";
   if (VIDEO_EXT.test(url)) return "video";
   if (DOC_EXT.test(url)) return "document";
@@ -18,7 +20,12 @@ function getUrlType(url: string): "image" | "video" | "document" | "link" {
 }
 
 function getFileName(url: string): string {
-  try { return decodeURIComponent(new URL(url, "https://example.com").pathname.split("/").pop() || "file"); }
+  try {
+    const parsed = new URL(url, "https://example.com");
+    const name = parsed.searchParams.get("name");
+    if (name) return name;
+    return decodeURIComponent(parsed.pathname.split("/").pop() || "file");
+  }
   catch { return "file"; }
 }
 
@@ -89,7 +96,7 @@ export function RichComment({ text, className = "" }: Props) {
   const segments: { type: "text" | "url" | "mention"; value: string }[] = [];
   // Combined regex for URLs and mentions
   // Match @FirstName LastName (exactly 2-3 capitalized words) or URLs
-  const combined = /(@[A-Z][a-z]+(?:\s[A-Z][a-z]+){0,2})|(https?:\/\/[^\s<>"{}|\\^`[\]]+)/g;
+  const combined = /(@[A-Z][a-z]+(?:\s[A-Z][a-z]+){0,2})|(https?:\/\/[^\s<>"{}|\\^`[\]]+|\/api\/support\/attachment\?[^\s<>"{}|\\^`[\]]+)/g;
   let lastIdx = 0;
   let match: RegExpExecArray | null;
   const combinedRegex = new RegExp(combined.source, "g");

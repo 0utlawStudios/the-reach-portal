@@ -30,7 +30,8 @@ function onIdle(cb: () => void): () => void {
 }
 
 export function useSupportAlert(enabled: boolean) {
-  const { accessToken } = useAuth();
+  const { accessToken, provisionResult } = useAuth();
+  const workspaceId = provisionResult?.workspaceId || null;
   const [hasAlert, setHasAlert] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -39,7 +40,10 @@ export function useSupportAlert(enabled: boolean) {
     }
     try {
       const res = await fetch("/api/support/alert", {
-        headers: { Authorization: `Bearer ${accessToken}` },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          ...(workspaceId ? { "X-Workspace-Id": workspaceId } : {}),
+        },
       });
       if (!res.ok) return;
       const json = (await res.json()) as { hasAlert?: boolean };
@@ -47,7 +51,7 @@ export function useSupportAlert(enabled: boolean) {
     } catch (err) {
       console.error("[support-alert] refresh failed:", err);
     }
-  }, [accessToken, enabled]);
+  }, [accessToken, enabled, workspaceId]);
 
   useEffect(() => {
     if (!enabled || !accessToken) return;

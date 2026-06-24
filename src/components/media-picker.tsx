@@ -6,10 +6,12 @@ import { usePipeline } from "@/lib/pipeline-context";
 import { useToast } from "@/lib/toast-context";
 import { supabase } from "@/lib/supabaseClient";
 import type { RawFile } from "@/lib/types";
+import { useAuth } from "@/lib/auth-context";
 import { isDrivePublishableMediaMime, normalizeDriveMimeType } from "@/lib/drive-policy";
 import { getPublicDriveDownloadUrl } from "@/lib/drive-url-utils";
 import { warmBrowserImagePreview } from "@/lib/image-preview";
 import { driveFileIdFromUrl } from "@/lib/media-resolver";
+import { ensureMediaAsset } from "@/lib/media-assets";
 import { videoPreviewFrameUrl } from "@/lib/media-usage";
 import { X, Upload, FolderOpen, Image as ImageIcon, Search, CheckCircle, Clock, Link2, ExternalLink } from "lucide-react";
 import { PLACEHOLDER_MEDIA } from "@/lib/placeholder-data";
@@ -114,6 +116,7 @@ function selectionFromAsset(asset: MediaEntry): MediaPickerSelection {
     mediaAssetId: asset.assetId,
     name: asset.name,
     mimeType: asset.mimeType || inferAssetMimeType(asset.type, asset.name),
+    size: asset.size,
   };
 }
 
@@ -132,6 +135,7 @@ export function MediaPicker({
   allowMultipleUpload = true,
 }: MediaPickerProps) {
   const { cards, workspaceId } = usePipeline();
+  const { currentUser } = useAuth();
   const { addToast } = useToast();
   const [mediaAssets, setMediaAssets] = useState<MediaAssetRow[]>([]);
   const [tab, setTab] = useState<PickerTab>(defaultTab);
@@ -273,6 +277,7 @@ export function MediaPicker({
             name: f.name,
             type: f.mimeType?.startsWith("video") ? "video" : "image",
             mimeType: f.mimeType,
+            size: f.size,
             fileId: f.fileId,
             usedInCards: [{ id: c.id, title: c.title }],
           });
@@ -394,6 +399,24 @@ export function MediaPicker({
             mimeType,
             size: result.size || item.file.size,
           });
+          if (isDrivePublishableMediaMime(mimeType, item.file.name)) {
+            ensureMediaAsset({
+              name: item.file.name,
+              url: playbackUrl || result.driveProxyUrl || result.url,
+              fileId: result.fileId,
+              publishUrl: result.publishUrl || getPublicDriveDownloadUrl(result.fileId),
+              driveProxyUrl: result.driveProxyUrl || result.url,
+              playbackUrl,
+              playbackStorageKey,
+              mimeType,
+              size: result.size || item.file.size,
+              fileType: mimeType.startsWith("video/") ? "video" : "image",
+              folder: "Content Engine Uploads",
+              addedBy: currentUser.name,
+              workspaceId,
+              usedIn: cardId,
+            }).catch((err) => console.error("[media-picker] media_assets sync failed:", err));
+          }
           warmBrowserImagePreview(result.driveProxyUrl || result.url, { mimeType, fileName: item.file.name });
         }
         if (selections.length > 0) {

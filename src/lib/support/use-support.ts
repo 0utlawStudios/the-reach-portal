@@ -39,7 +39,7 @@ export interface NewTicketInput {
 async function apiFetch<T>(
   path: string,
   token: string,
-  options: { method?: string; body?: unknown } = {},
+  options: { method?: string; body?: unknown; workspaceId?: string | null } = {},
 ): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), SUPPORT_API_TIMEOUT_MS);
@@ -49,6 +49,7 @@ async function apiFetch<T>(
       method: options.method || "GET",
       headers: {
         Authorization: `Bearer ${token}`,
+        ...(options.workspaceId ? { "X-Workspace-Id": options.workspaceId } : {}),
         ...(options.body !== undefined ? { "Content-Type": "application/json" } : {}),
       },
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
@@ -99,12 +100,13 @@ function onIdle(cb: () => void): () => void {
  * return the storage keys to attach. Keeps large files off the 4.5 MB Vercel
  * function body limit.
  */
-async function uploadFiles(files: File[], token: string): Promise<AttachmentClaim[]> {
+async function uploadFiles(files: File[], token: string, workspaceId?: string | null): Promise<AttachmentClaim[]> {
   if (files.length === 0) return [];
   const { uploads } = await apiFetch<{
     uploads: Array<{ storageKey: string; token: string; name: string }>;
   }>("/api/support/uploads", token, {
     method: "POST",
+    workspaceId,
     body: { files: files.map((f) => ({ name: f.name, mime: f.type, size: f.size })) },
   });
   // Upload every file in parallel — each goes straight to storage and none
@@ -176,7 +178,7 @@ export function useSupport(scope: SupportScope = "own", options: UseSupportOptio
     setLoading(true);
     try {
       const path = scope === "all" ? "/api/support/threads?scope=all" : "/api/support/threads";
-      const { threads: list } = await apiFetch<{ threads: SupportThread[] }>(path, accessToken);
+      const { threads: list } = await apiFetch<{ threads: SupportThread[] }>(path, accessToken, { workspaceId });
       setThreads(list);
       if (scope === "all") refreshSupportAlert();
       loadedRef.current = true;
@@ -185,7 +187,7 @@ export function useSupport(scope: SupportScope = "own", options: UseSupportOptio
     } finally {
       setLoading(false);
     }
-  }, [accessToken, scope]);
+  }, [accessToken, scope, workspaceId]);
 
   const upsertThread = useCallback((t: SupportThread) => {
     setThreads((prev) => {
@@ -201,16 +203,16 @@ export function useSupport(scope: SupportScope = "own", options: UseSupportOptio
   const createTicket = useCallback(
     async (input: NewTicketInput): Promise<SupportThread> => {
       if (!accessToken) throw new Error("Please sign in again.");
-      const claims = await uploadFiles(input.files, accessToken);
+      const claims = await uploadFiles(input.files, accessToken, workspaceId);
       const { thread } = await apiFetch<{ thread: SupportThread }>(
         "/api/support/threads",
         accessToken,
-        { method: "POST", body: { body: input.body, category: input.category, attachments: claims } },
+        { method: "POST", workspaceId, body: { body: input.body, category: input.category, attachments: claims } },
       );
       upsertThread(thread);
       return thread;
     },
-    [accessToken, upsertThread],
+    [accessToken, upsertThread, workspaceId],
   );
 
   const openThread = useCallback(
@@ -221,7 +223,7 @@ export function useSupport(scope: SupportScope = "own", options: UseSupportOptio
         const { thread, messages } = await apiFetch<{
           thread: SupportThread;
           messages: SupportMessage[];
-        }>(`/api/support/threads/${threadId}`, accessToken);
+        }>(`/api/support/threads/${threadId}`, accessToken, { workspaceId });
         // Ignore a stale response if the user already opened another thread.
         if (activeIdRef.current !== threadId) return;
         setActiveThread(thread);
@@ -232,7 +234,7 @@ export function useSupport(scope: SupportScope = "own", options: UseSupportOptio
         throw err;
       }
     },
-    [accessToken],
+    [accessToken, workspaceId],
   );
 
   const closeThread = useCallback(() => {
@@ -244,11 +246,11 @@ export function useSupport(scope: SupportScope = "own", options: UseSupportOptio
   const sendMessage = useCallback(
     async (threadId: string, body: string, files: File[]) => {
       if (!accessToken) throw new Error("Please sign in again.");
-      const claims = await uploadFiles(files, accessToken);
+      const claims = await uploadFiles(files, accessToken, workspaceId);
       const { message } = await apiFetch<{ message: SupportMessage }>(
         `/api/support/threads/${threadId}/messages`,
         accessToken,
-        { method: "POST", body: { body, attachments: claims } },
+        { method: "POST", workspaceId, body: { body, attachments: claims } },
       );
       if (activeIdRef.current === threadId) {
         setActiveMessages((prev) =>
@@ -256,20 +258,20 @@ export function useSupport(scope: SupportScope = "own", options: UseSupportOptio
         );
       }
     },
-    [accessToken],
+    [accessToken, workspaceId],
   );
 
   const markRead = useCallback(
     async (threadId: string) => {
       if (!accessToken) return;
       try {
-        await apiFetch(`/api/support/threads/${threadId}/read`, accessToken, { method: "POST" });
+        await apiFetch(`/api/support/threads/${threadId}/read`, accessToken, { method: "POST", workspaceId });
         refreshSupportAlert();
       } catch (err) {
         console.error("[support] markRead failed:", err);
       }
     },
-    [accessToken],
+    [accessToken, workspaceId],
   );
 
   const setStatus = useCallback(
@@ -278,12 +280,12 @@ export function useSupport(scope: SupportScope = "own", options: UseSupportOptio
       const { thread } = await apiFetch<{ thread: SupportThread }>(
         `/api/support/threads/${threadId}`,
         accessToken,
-        { method: "PATCH", body: { status } },
+        { method: "PATCH", workspaceId, body: { status } },
       );
       upsertThread(thread);
       refreshSupportAlert();
     },
-    [accessToken, upsertThread],
+    [accessToken, upsertThread, workspaceId],
   );
 
   // Load the caller's single live-chat thread into the active slot.
@@ -293,31 +295,33 @@ export function useSupport(scope: SupportScope = "own", options: UseSupportOptio
       const { thread, messages } = await apiFetch<{
         thread: SupportThread | null;
         messages: SupportMessage[];
-      }>("/api/support/chat", accessToken);
+      }>("/api/support/chat", accessToken, { workspaceId });
       activeIdRef.current = thread ? thread.id : null;
       setActiveThread(thread);
       setActiveMessages(messages);
       if (thread) {
         void apiFetch(`/api/support/threads/${thread.id}/read`, accessToken, {
           method: "POST",
+          workspaceId,
         }).catch(() => {});
       }
     } catch (err) {
       console.error("[support] loadChat failed:", err);
       throw err;
     }
-  }, [accessToken]);
+  }, [accessToken, workspaceId]);
 
   // Send a chat message; the server lazily creates the chat thread.
   const sendChatMessage = useCallback(
     async (body: string, files: File[]) => {
       if (!accessToken) throw new Error("Please sign in again.");
-      const claims = await uploadFiles(files, accessToken);
+      const claims = await uploadFiles(files, accessToken, workspaceId);
       const { thread, message } = await apiFetch<{
         thread: SupportThread;
         message: SupportMessage;
       }>("/api/support/chat", accessToken, {
         method: "POST",
+        workspaceId,
         body: { body, attachments: claims },
       });
       upsertThread(thread);
@@ -327,7 +331,7 @@ export function useSupport(scope: SupportScope = "own", options: UseSupportOptio
         prev.some((m) => m.id === message.id) ? prev : [...prev, message],
       );
     },
-    [accessToken, upsertThread],
+    [accessToken, upsertThread, workspaceId],
   );
 
   // Superadmin: open (or reuse) a live-chat thread with a chosen teammate,
@@ -338,13 +342,13 @@ export function useSupport(scope: SupportScope = "own", options: UseSupportOptio
       const { thread } = await apiFetch<{ thread: SupportThread }>(
         "/api/support/admin/start-chat",
         accessToken,
-        { method: "POST", body: { email } },
+        { method: "POST", workspaceId, body: { email } },
       );
       upsertThread(thread);
       await openThread(thread.id);
       return thread;
     },
-    [accessToken, upsertThread, openThread],
+    [accessToken, upsertThread, openThread, workspaceId],
   );
 
   // Initial load — deferred to browser idle so the support feature never sits

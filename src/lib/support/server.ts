@@ -37,6 +37,7 @@ const BUCKET = "support-attachments";
 const SIGNED_URL_TTL = 7 * 24 * 60 * 60; // 7 days
 const ADMIN_PING_DEBOUNCE_MS = 5 * 60 * 1000;
 const USER_EMAIL_DEBOUNCE_MS = 10 * 60 * 1000;
+const WORKSPACE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Thrown for caller-fixable input problems. Routes map this to HTTP 400. */
 export class SupportValidationError extends Error {}
@@ -55,15 +56,28 @@ export function supportThreadUrl(threadId: string): string {
 }
 
 /** The active workspace for a user; baseline workspace if none is found. */
-export async function resolveWorkspaceId(admin: SupabaseClient, userId: string): Promise<string> {
-  const { data } = await admin
+export function workspaceIdFromHeaders(headers: Headers): string | null {
+  const value = headers.get("x-workspace-id") || headers.get("x-reach-workspace-id");
+  if (!value) return null;
+  const workspaceId = value.trim();
+  return WORKSPACE_ID_RE.test(workspaceId) ? workspaceId : null;
+}
+
+export async function resolveWorkspaceId(admin: SupabaseClient, userId: string, requestedWorkspaceId?: string | null): Promise<string | null> {
+  const query = admin
     .from("workspace_members")
     .select("workspace_id")
     .eq("user_id", userId)
-    .eq("status", "active")
-    .limit(1)
-    .maybeSingle();
-  return (data?.workspace_id as string | undefined) || BASELINE_WORKSPACE_ID;
+    .eq("status", "active");
+  if (requestedWorkspaceId) {
+    if (!WORKSPACE_ID_RE.test(requestedWorkspaceId)) return null;
+    const { data } = await query.eq("workspace_id", requestedWorkspaceId).maybeSingle();
+    return (data?.workspace_id as string | undefined) || null;
+  }
+  const { data } = await query.limit(2);
+  if (!data || data.length === 0) return BASELINE_WORKSPACE_ID;
+  if (data.length > 1) return null;
+  return (data[0]?.workspace_id as string | undefined) || BASELINE_WORKSPACE_ID;
 }
 
 /**
@@ -75,18 +89,26 @@ export async function resolveActiveSupportWorkspace(
   admin: SupabaseClient,
   userId: string,
   email: string,
+  requestedWorkspaceId?: string | null,
 ): Promise<string | null> {
   const lower = (email || "").toLowerCase();
   if (!userId || !lower) return null;
 
-  const { data: workspaceMember } = await admin
+  const workspaceQuery = admin
     .from("workspace_members")
     .select("workspace_id")
     .eq("user_id", userId)
-    .eq("status", "active")
-    .limit(1)
-    .maybeSingle();
-  const workspaceId = workspaceMember?.workspace_id as string | undefined;
+    .eq("status", "active");
+  let workspaceId: string | undefined;
+  if (requestedWorkspaceId) {
+    if (!WORKSPACE_ID_RE.test(requestedWorkspaceId)) return null;
+    const { data: workspaceMember } = await workspaceQuery.eq("workspace_id", requestedWorkspaceId).maybeSingle();
+    workspaceId = workspaceMember?.workspace_id as string | undefined;
+  } else {
+    const { data: memberships } = await workspaceQuery.limit(2);
+    if (!memberships || memberships.length === 0 || memberships.length > 1) return null;
+    workspaceId = memberships[0]?.workspace_id as string | undefined;
+  }
   if (!workspaceId) return null;
 
   const { data: teamMember } = await admin
@@ -101,20 +123,26 @@ export async function resolveActiveSupportWorkspace(
 }
 
 /** The caller's active team role (lowercased), or null. Used to detect the superadmin. */
-export async function getTeamRole(admin: SupabaseClient, email: string, userId?: string): Promise<string | null> {
+export async function getTeamRole(admin: SupabaseClient, email: string, userId?: string, workspaceIdHint?: string | null): Promise<string | null> {
   const lower = (email || "").toLowerCase();
   if (!lower) return null;
-  let workspaceId: string | null = null;
+  let workspaceId: string | null = workspaceIdHint || null;
   if (userId) {
-    const { data: workspaceMember } = await admin
+    const workspaceQuery = admin
       .from("workspace_members")
       .select("workspace_id")
       .eq("user_id", userId)
-      .eq("status", "active")
-      .limit(1)
-      .maybeSingle();
-    if (!workspaceMember) return null;
-    workspaceId = workspaceMember.workspace_id as string;
+      .eq("status", "active");
+    if (workspaceId) {
+      if (!WORKSPACE_ID_RE.test(workspaceId)) return null;
+      const { data: workspaceMember } = await workspaceQuery.eq("workspace_id", workspaceId).maybeSingle();
+      if (!workspaceMember) return null;
+      workspaceId = workspaceMember.workspace_id as string;
+    } else {
+      const { data: memberships } = await workspaceQuery.limit(2);
+      if (!memberships || memberships.length === 0 || memberships.length > 1) return null;
+      workspaceId = memberships[0].workspace_id as string;
+    }
   }
 
   const { data } = await admin

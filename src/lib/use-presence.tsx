@@ -94,6 +94,10 @@ const STATUS_RANK: Record<PresenceStatus, number> = {
   offline: 0,
 };
 
+function isPresenceStatus(value: unknown): value is PresenceStatus {
+  return value === "active" || value === "idle" || value === "away" || value === "offline";
+}
+
 const isSupabaseConfigured = !!(
   process.env.NEXT_PUBLIC_SUPABASE_URL &&
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
@@ -139,6 +143,7 @@ export function PresenceProvider({
 
   // DB-hydrated summary (last_seen_at + audit_last + auth_last_sign_in per email).
   const [summaryMap, setSummaryMap] = useState<Record<string, PresenceSummaryRow>>({});
+  const summaryMapRef = useRef<Record<string, PresenceSummaryRow>>({});
 
   // Sync state. Numeric refs initialised to 0 (not Date.now()) to keep render
   // pure per react-hooks/purity; seeded to wall-clock values in the first
@@ -180,7 +185,6 @@ export function PresenceProvider({
       currentStatusRef.current = next;
       lastBroadcastRef.current = now;
       ch.track({
-        email: myEmail,
         status: next,
         lastSeen: new Date(now).toISOString(),
       }).catch(() => undefined);
@@ -224,6 +228,7 @@ export function PresenceProvider({
       for (const row of data as PresenceSummaryRow[]) {
         if (row.email) next[row.email.toLowerCase()] = row;
       }
+      summaryMapRef.current = next;
       setSummaryMap(next);
     } catch (err) {
       console.error("[presence] summary refresh failed", err);
@@ -396,12 +401,16 @@ export function PresenceProvider({
         const map: Record<string, PeerPresence> = {};
         for (const [key, entries] of Object.entries(state)) {
           if (!entries || entries.length === 0) continue;
+          const email = key.toLowerCase();
+          const knownMembers = Object.keys(summaryMapRef.current).length > 0;
+          if (knownMembers && !summaryMapRef.current[email] && email !== myEmail.toLowerCase()) continue;
           // Multi-tab aggregation: pick the highest-priority status across tabs.
           let best: PeerPresence | null = null;
           for (const raw of entries as unknown as PeerPresence[]) {
+            const status = isPresenceStatus(raw.status) ? raw.status : "active";
             const cand: PeerPresence = {
-              email: raw.email || key,
-              status: (raw.status || "active") as PresenceStatus,
+              email,
+              status,
               lastSeen: raw.lastSeen || new Date().toISOString(),
             };
             if (!best || STATUS_RANK[cand.status] > STATUS_RANK[best.status]) {
@@ -420,7 +429,6 @@ export function PresenceProvider({
           currentStatusRef.current = "active";
           lastBroadcastRef.current = Date.now();
           await channel.track({
-            email: myEmail,
             status: "active" as PresenceStatus,
             lastSeen: new Date().toISOString(),
           });

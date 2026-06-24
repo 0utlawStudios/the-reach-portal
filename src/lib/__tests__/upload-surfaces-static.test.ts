@@ -254,6 +254,8 @@ describe("Drive upload surfaces", () => {
     expect(previewImage).toContain('className.includes("object-contain")');
     expect(previewImage).toContain('size: "thumb"');
     expect(previewImage).toContain('size: "full"');
+    expect(previewImage).toContain("shouldLoadPrimary");
+    expect(previewImage).toContain("!fallbackSrc || fallbackLoaded || fallbackFailed");
 
     for (const file of [
       "src/components/pages/media-page.tsx",
@@ -265,10 +267,11 @@ describe("Drive upload surfaces", () => {
     }
   });
 
-  it("renders AI assets through an authenticated storage-key proxy instead of expiring signed URLs", () => {
+  it("renders AI assets through an authenticated storage-key proxy and publishes via signed app URLs", () => {
     const route = source("src/app/api/ai/asset/route.ts");
     expect(route).toContain('const BUCKET = "ai-assets"');
     expect(route).toContain("parseAiAssetStorageKey");
+    expect(route).toContain("verifyAiAssetToken");
     expect(route).toContain("userHasWorkspaceAccess");
     expect(route).toContain(".eq(\"workspace_id\", workspaceId)");
 
@@ -279,7 +282,7 @@ describe("Drive upload surfaces", () => {
     expect(pipeline).toContain("aiAssetProxyUrls(row.asset_storage_keys)");
 
     const persist = source("src/lib/ai/persist.ts");
-    expect(persist).toContain("aiAssetProxyUrl(a.storageKey)");
+    expect(persist).toContain("aiAssetPublishUrl(a.storageKey)");
     expect(persist).not.toContain("asset_urls: assets.map((a) => a.signedUrl)");
   });
 
@@ -313,8 +316,10 @@ describe("Drive upload surfaces", () => {
 
     const route = source("src/app/api/support/attachment/route.ts");
     expect(route).toContain("parseAttachmentStorageKey");
-    expect(route).toContain("userHasWorkspaceAccess");
+    expect(route).toContain("ownerUserId");
+    expect(route).toContain("userSupportAttachmentAccess");
     expect(route).toContain('.eq("workspace_id", workspaceId)');
+    expect(route).toContain('.eq("role", "superadmin")');
   });
 
   it("keeps same-origin media tags authenticated with a server-readable session cookie", () => {

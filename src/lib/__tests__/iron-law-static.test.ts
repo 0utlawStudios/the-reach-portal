@@ -422,7 +422,7 @@ describe("iron-law guards in pipeline-context.tsx", () => {
     expect(BACKFILL_MEDIA_ROUTE_SRC).toMatch(/\.from\("posts"\)[\s\S]{0,220}\.eq\("workspace_id", workspaceId\)/);
     expect(BACKFILL_MEDIA_ROUTE_SRC).toMatch(/\.from\("media_assets"\)[\s\S]{0,220}\.eq\("workspace_id", workspaceId\)/);
     expect(BACKFILL_MEDIA_ROUTE_SRC).toMatch(
-      /\.update\(\{ used_in: newUsedIn \}\)[\s\S]{0,160}\.eq\("workspace_id", workspaceId\)/,
+      /\.update\(\{[\s\S]{0,80}used_in: newUsedIn[\s\S]{0,160}\.eq\("workspace_id", workspaceId\)/,
     );
   });
 });

@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth/require";
+import { verifyAiAssetToken } from "@/lib/ai/asset-publish-url";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -66,10 +67,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Invalid or missing AI asset key" }, { status: 400 });
   }
 
-  const userResult = await requireUser(request);
-  if (userResult instanceof NextResponse) return userResult;
-  if (!(await userHasWorkspaceAccess(userResult.user.id, parsed.workspaceId))) {
-    return NextResponse.json({ error: "AI asset does not belong to this workspace" }, { status: 403 });
+  const signed = Boolean(verifyAiAssetToken(parsed.key, request.nextUrl.searchParams.get("token")));
+  if (!signed) {
+    const userResult = await requireUser(request);
+    if (userResult instanceof NextResponse) return userResult;
+    if (!(await userHasWorkspaceAccess(userResult.user.id, parsed.workspaceId))) {
+      return NextResponse.json({ error: "AI asset does not belong to this workspace" }, { status: 403 });
+    }
   }
 
   const headers: HeadersInit = {
@@ -107,7 +111,7 @@ export async function GET(request: NextRequest) {
   }
 
   const responseHeaders = new Headers({
-    "Cache-Control": "private, max-age=86400, immutable",
+    "Cache-Control": signed ? "public, max-age=86400, immutable" : "private, max-age=86400, immutable",
     "X-Content-Type-Options": "nosniff",
   });
   copyHeader(storageRes.headers, responseHeaders, "content-type");

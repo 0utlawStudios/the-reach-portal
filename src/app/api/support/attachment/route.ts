@@ -22,7 +22,7 @@ function adminClient() {
   });
 }
 
-function parseAttachmentStorageKey(value: string | null): { key: string; workspaceId: string } | null {
+function parseAttachmentStorageKey(value: string | null): { key: string; workspaceId: string; ownerUserId: string } | null {
   const key = (value || "").trim();
   if (
     !key ||
@@ -34,8 +34,10 @@ function parseAttachmentStorageKey(value: string | null): { key: string; workspa
     return null;
   }
   const workspaceId = key.split("/")[0] || "";
+  const ownerUserId = key.split("/")[1] || "";
   if (!WORKSPACE_ID_RE.test(workspaceId)) return null;
-  return { key, workspaceId };
+  if (!ownerUserId) return null;
+  return { key, workspaceId, ownerUserId };
 }
 
 function storageObjectUrl(key: string): string {
@@ -49,13 +51,25 @@ function copyHeader(source: Headers, target: Headers, name: string) {
   if (value) target.set(name, value);
 }
 
-async function userHasWorkspaceAccess(userId: string, workspaceId: string): Promise<boolean> {
+async function userSupportAttachmentAccess(userId: string, workspaceId: string, ownerUserId: string): Promise<boolean> {
+  if (userId === ownerUserId) {
+    const { data, error } = await adminClient()
+      .from("workspace_members")
+      .select("workspace_id")
+      .eq("user_id", userId)
+      .eq("workspace_id", workspaceId)
+      .eq("status", "active")
+      .maybeSingle();
+    return !error && Boolean(data);
+  }
+
   const { data, error } = await adminClient()
     .from("workspace_members")
-    .select("workspace_id")
+    .select("workspace_id, role")
     .eq("user_id", userId)
     .eq("workspace_id", workspaceId)
     .eq("status", "active")
+    .eq("role", "superadmin")
     .maybeSingle();
   return !error && Boolean(data);
 }
@@ -68,7 +82,7 @@ export async function GET(request: NextRequest) {
 
   const userResult = await requireUser(request);
   if (userResult instanceof NextResponse) return userResult;
-  if (!(await userHasWorkspaceAccess(userResult.user.id, parsed.workspaceId))) {
+  if (!(await userSupportAttachmentAccess(userResult.user.id, parsed.workspaceId, parsed.ownerUserId))) {
     return NextResponse.json({ error: "Attachment does not belong to this workspace" }, { status: 403 });
   }
 

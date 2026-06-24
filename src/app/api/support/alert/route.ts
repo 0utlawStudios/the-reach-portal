@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireBearerTeamRole } from "@/lib/auth/require";
-import { getSupportAdminClient, resolveWorkspaceId } from "@/lib/support/server";
+import { getSupportAdminClient } from "@/lib/support/server";
 
 export const runtime = "nodejs";
 export const maxDuration = 15;
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   const admin = getSupportAdminClient();
-  const workspaceId = await resolveWorkspaceId(admin, auth.user.id);
+  const workspaceId = auth.workspaceId;
 
   const { data: unread, error: unreadErr } = await admin
     .from("support_threads")

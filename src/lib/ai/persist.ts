@@ -13,6 +13,7 @@ import type {
   PostInsertRow,
 } from "./types";
 import { aiAssetProxyUrl } from "./asset-url";
+import { aiAssetPublishUrl } from "./asset-publish-url";
 
 function adminClient(): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -83,8 +84,8 @@ export function buildPostInsertRow(args: BuildPostArgs): PostInsertRow {
   const platforms = normalizePlanPlatforms(plan.platforms);
   const contentType = contentTypeFromPlan(plan.media_type, plan.format);
   const generatedByModel = `${args.textModel}+${args.imageModel}`;
-  const assetUrls = assets.map((a) => aiAssetProxyUrl(a.storageKey));
-  const thumb = assetUrls[0] || null;
+  const assetUrls = assets.map((a) => aiAssetPublishUrl(a.storageKey));
+  const thumb = assets[0] ? aiAssetProxyUrl(assets[0].storageKey) : null;
 
   return {
     workspace_id: args.workspaceId,
@@ -171,7 +172,7 @@ export async function updateRevisedPost(args: UpdateRevisedArgs): Promise<void> 
     source_notes: args.caption.source_notes,
     quality_score: args.caption.quality_score,
     approval_notes: args.caption.approval_notes,
-    asset_urls: args.assets.map((a) => aiAssetProxyUrl(a.storageKey)),
+    asset_urls: args.assets.map((a) => aiAssetPublishUrl(a.storageKey)),
     asset_storage_keys: args.assets.map((a) => a.storageKey),
     asset_width: args.resolved.width,
     asset_height: args.resolved.height,

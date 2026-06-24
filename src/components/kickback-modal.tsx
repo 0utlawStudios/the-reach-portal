@@ -14,7 +14,7 @@ import { useFocusTrap } from "./use-focus-trap";
 const useSupabase = !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 const PRIVATE_ATTACHMENT_BUCKET = "support-attachments";
 
-async function revisionAttachmentUrl(file: File): Promise<string> {
+async function revisionAttachmentUrl(file: File, workspaceId?: string): Promise<string> {
   const { data: { session } } = await withStorageControlTimeout(
     supabase.auth.getSession(),
     "Revision attachment session check",
@@ -29,6 +29,7 @@ async function revisionAttachmentUrl(file: File): Promise<string> {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${session.access_token}`,
+        ...(workspaceId ? { "X-Workspace-Id": workspaceId } : {}),
       },
       body: JSON.stringify({ files: [{ name: file.name, mime: file.type, size: file.size }] }),
     }),
@@ -61,7 +62,7 @@ async function revisionAttachmentUrl(file: File): Promise<string> {
 }
 
 export function KickbackModal() {
-  const { pendingKickback, submitKickback, cancelKickback } = usePipeline();
+  const { pendingKickback, submitKickback, cancelKickback, workspaceId } = usePipeline();
   const { addToast } = useToast();
   const [note, setNote] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -106,7 +107,7 @@ export function KickbackModal() {
       let attachmentUrl: string | undefined;
 
       if (file && useSupabase) {
-        attachmentUrl = await revisionAttachmentUrl(file);
+        attachmentUrl = await revisionAttachmentUrl(file, workspaceId);
       } else if (file) {
         attachmentUrl = filePreview || undefined;
       }

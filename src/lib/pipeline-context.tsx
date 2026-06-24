@@ -415,7 +415,10 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
 
   const postNotification = useCallback(async (path: string, body: Record<string, unknown>) => {
     const token = accessTokenRef.current || (await supabase.auth.getSession()).data.session?.access_token;
-    const headers: HeadersInit = { "Content-Type": "application/json" };
+    const headers: HeadersInit = {
+      "Content-Type": "application/json",
+      "X-Workspace-Id": workspaceIdRef.current || BASELINE_WORKSPACE_ID,
+    };
     if (token) headers.Authorization = `Bearer ${token}`;
     const res = await fetch(path, {
       method: "POST",

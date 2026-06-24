@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireBearerTeamRole } from "@/lib/auth/require";
 import { createServiceRoleClient } from "@/lib/supabase/server";
+import { mediaUrlAliases } from "@/lib/media-usage";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ADMIN_ROLES = ["superadmin", "admin", "owner"] as const;
@@ -10,6 +11,48 @@ export const maxDuration = 60;
 
 function isValidUuid(v: string): boolean {
   return UUID_REGEX.test(v);
+}
+
+type BackfillRawFile = {
+  name?: string;
+  url?: string;
+  fileId?: string;
+  publishUrl?: string;
+  driveProxyUrl?: string;
+  playbackUrl?: string;
+  playbackStorageKey?: string;
+  mimeType?: string;
+  size?: number;
+};
+
+type BackfillEntry = {
+  name: string;
+  url: string;
+  fileType: "image" | "video";
+  fileId?: string;
+  publishUrl?: string;
+  driveProxyUrl?: string;
+  playbackUrl?: string;
+  playbackStorageKey?: string;
+  mimeType?: string;
+  size?: number;
+};
+
+function compactMetadata(entry: BackfillEntry) {
+  const update: Record<string, unknown> = {
+    name: entry.name,
+    url: entry.url,
+    file_type: entry.fileType,
+    folder: "Content Engine Uploads",
+  };
+  if (entry.fileId) update.file_id = entry.fileId;
+  if (entry.publishUrl) update.publish_url = entry.publishUrl;
+  if (entry.driveProxyUrl) update.drive_proxy_url = entry.driveProxyUrl;
+  if (entry.playbackUrl) update.playback_url = entry.playbackUrl;
+  if (entry.playbackStorageKey) update.playback_storage_key = entry.playbackStorageKey;
+  if (entry.mimeType) update.mime_type = entry.mimeType;
+  if (typeof entry.size === "number" && Number.isFinite(entry.size)) update.size_bytes = entry.size;
+  return update;
 }
 
 export async function POST(request: NextRequest) {
@@ -33,14 +76,28 @@ export async function POST(request: NextRequest) {
   // can appear in another workspace without affecting this backfill.
   const { data: existingAssets } = await admin
     .from("media_assets")
-    .select("id, url, used_in")
+    .select("id, url, file_id, publish_url, drive_proxy_url, playback_url, used_in")
     .eq("workspace_id", workspaceId);
-  const existingByUrl = new Map<string, { id: string; used_in: string[] }>(
-    (existingAssets || []).map((a: { id: string; url: string; used_in: string[] }) => [
-      a.url,
-      { id: a.id, used_in: a.used_in || [] },
-    ])
-  );
+  const existingByAlias = new Map<string, { id: string; used_in: string[] }>();
+  for (const asset of existingAssets || []) {
+    const typed = asset as {
+      id: string;
+      url?: string | null;
+      file_id?: string | null;
+      publish_url?: string | null;
+      drive_proxy_url?: string | null;
+      playback_url?: string | null;
+      used_in?: string[] | null;
+    };
+    const record = { id: typed.id, used_in: typed.used_in || [] };
+    mediaUrlAliases({
+      url: typed.url || undefined,
+      fileId: typed.file_id || undefined,
+      publishUrl: typed.publish_url || undefined,
+      driveProxyUrl: typed.drive_proxy_url || undefined,
+      playbackUrl: typed.playback_url || undefined,
+    }).forEach((alias) => existingByAlias.set(alias, record));
+  }
 
   let inserted = 0;
   let skipped = 0;
@@ -51,43 +108,62 @@ export async function POST(request: NextRequest) {
     const isVideo = post.content_type === "video" || post.content_type === "reel";
 
     // Collect all image/video URLs for this post
-    const entries: { name: string; url: string; fileType: "image" | "video" }[] = [];
+    const entries: BackfillEntry[] = [];
 
     if (post.thumbnail_url && !post.thumbnail_url.startsWith("blob:")) {
       entries.push({
         name: post.title || "Post thumbnail",
         url: post.thumbnail_url,
         fileType: isVideo ? "video" : "image",
+        fileId: post.source_vault?.thumbnailFileId,
+        driveProxyUrl: post.thumbnail_url,
+        mimeType: post.source_vault?.thumbnailMimeType,
       });
     }
 
-    const rawFiles: { name?: string; url?: string; mimeType?: string }[] =
+    const rawFiles: BackfillRawFile[] =
       post.source_vault?.rawFiles || [];
     for (const rf of rawFiles) {
-      if (rf.url && !rf.url.startsWith("blob:")) {
+      const url = rf.playbackUrl || rf.driveProxyUrl || rf.url;
+      if (url && !url.startsWith("blob:")) {
         entries.push({
           name: rf.name || "Raw file",
-          url: rf.url,
+          url,
           fileType: rf.mimeType?.startsWith("video") ? "video" : "image",
+          fileId: rf.fileId,
+          publishUrl: rf.publishUrl || rf.url,
+          driveProxyUrl: rf.driveProxyUrl,
+          playbackUrl: rf.playbackUrl,
+          playbackStorageKey: rf.playbackStorageKey,
+          mimeType: rf.mimeType,
+          size: rf.size,
         });
       }
     }
 
     for (const entry of entries) {
-      const existing = existingByUrl.get(entry.url);
+      const aliases = mediaUrlAliases(entry);
+      const existing = Array.from(aliases).map((alias) => existingByAlias.get(alias)).find(Boolean);
 
       if (existing) {
         // Row already exists — update used_in if this post isn't already in it
         skipped++;
+        const metadataUpdate = compactMetadata(entry);
         if (isValidUuid(post.id) && !existing.used_in.includes(post.id)) {
           const newUsedIn = [...existing.used_in, post.id];
           await admin
             .from("media_assets")
-            .update({ used_in: newUsedIn })
+            .update({ ...metadataUpdate, used_in: newUsedIn })
             .eq("id", existing.id)
             .eq("workspace_id", workspaceId);
-          existingByUrl.set(entry.url, { id: existing.id, used_in: newUsedIn });
+          aliases.forEach((alias) => existingByAlias.set(alias, { id: existing.id, used_in: newUsedIn }));
           updated++;
+        } else {
+          await admin
+            .from("media_assets")
+            .update(metadataUpdate)
+            .eq("id", existing.id)
+            .eq("workspace_id", workspaceId);
         }
         continue;
       }
@@ -95,10 +171,7 @@ export async function POST(request: NextRequest) {
       // Insert new row
       const usedInArray = isValidUuid(post.id) ? [post.id] : [];
       const { error } = await admin.from("media_assets").insert({
-        name: entry.name,
-        url: entry.url,
-        file_type: entry.fileType,
-        folder: "Content Engine Uploads",
+        ...compactMetadata(entry),
         added_by: post.created_by || "System Backfill",
         workspace_id: wsId,
         used_in: usedInArray,
@@ -106,7 +179,7 @@ export async function POST(request: NextRequest) {
 
       if (!error) {
         inserted++;
-        existingByUrl.set(entry.url, { id: "backfilled", used_in: usedInArray });
+        aliases.forEach((alias) => existingByAlias.set(alias, { id: "backfilled", used_in: usedInArray }));
       } else {
         console.error("[backfill] insert failed for url", entry.url, error.message);
       }
