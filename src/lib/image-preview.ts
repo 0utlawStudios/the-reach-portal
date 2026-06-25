@@ -2,6 +2,16 @@ import { normalizeDriveMimeType } from "@/lib/drive-policy";
 import { driveFileIdFromUrl } from "@/lib/media-resolver";
 
 const HEIC_IMAGE_MIME_TYPES = new Set(["image/heic", "image/heic-sequence", "image/heif", "image/heif-sequence"]);
+const THUMBNAIL_IMAGE_MIME_TYPES = new Set([
+  "image/avif",
+  "image/bmp",
+  "image/gif",
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/tiff",
+  "image/webp",
+]);
 const HEIC_EXT_RE = /\.(hei[cf])(?:[?#].*)?$/i;
 const HEIC_PREVIEW_WARM_TIMEOUT_MS = 55_000;
 export type BrowserImagePreviewSize = "thumb" | "full";
@@ -26,10 +36,28 @@ export function heicImagePreviewUrl(
   return `/api/media/image-preview?${params.toString()}`;
 }
 
+export function imageThumbnailPreviewUrl(
+  url: string,
+  opts: { mimeType?: unknown; fileName?: unknown } = {},
+): string | null {
+  if (!url) return null;
+  const normalized = normalizeDriveMimeType(opts.mimeType, opts.fileName || url);
+  const isSupportedThumbnail =
+    HEIC_IMAGE_MIME_TYPES.has(normalized) ||
+    THUMBNAIL_IMAGE_MIME_TYPES.has(normalized);
+  if (!isSupportedThumbnail) return null;
+
+  const fileId = driveFileIdFromUrl(url);
+  if (!fileId) return null;
+
+  return `/api/media/image-preview?${new URLSearchParams({ id: fileId, size: "thumb" }).toString()}`;
+}
+
 export function browserImagePreviewUrl(
   url: string,
   opts: { mimeType?: unknown; fileName?: unknown; size?: BrowserImagePreviewSize } = {},
 ): string {
+  if (opts.size === "thumb") return imageThumbnailPreviewUrl(url, opts) || url;
   return heicImagePreviewUrl(url, opts) || url;
 }
 
@@ -57,7 +85,9 @@ export function warmBrowserImagePreview(
   url: string,
   opts: { mimeType?: unknown; fileName?: unknown; size?: BrowserImagePreviewSize } = {},
 ): void {
-  const previewUrl = heicImagePreviewUrl(url, opts);
+  const previewUrl = opts.size === "thumb"
+    ? imageThumbnailPreviewUrl(url, opts)
+    : heicImagePreviewUrl(url, opts);
   if (!previewUrl || typeof fetch !== "function") return;
 
   if (opts.size) {
@@ -65,7 +95,7 @@ export function warmBrowserImagePreview(
     return;
   }
 
-  const thumbUrl = heicImagePreviewUrl(url, { ...opts, size: "thumb" });
+  const thumbUrl = imageThumbnailPreviewUrl(url, opts);
   void (async () => {
     if (thumbUrl) await warmPreviewUrl(thumbUrl);
     await warmPreviewUrl(previewUrl);

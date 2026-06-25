@@ -4,6 +4,10 @@ import { PreviewImage } from "../preview-image";
 
 const FILE_ID = "abcdefghijklmnopqrst";
 const mockSignedMediaViewUrl = vi.hoisted(() => vi.fn());
+const thumbnailCacheMocks = vi.hoisted(() => ({
+  cachedPrivateThumbnailUrl: vi.fn(),
+  rememberPrivateThumbnail: vi.fn(),
+}));
 
 vi.mock("@/lib/media-view-url", () => ({
   isPrivateMediaRouteUrl: (url: string | null | undefined) => (
@@ -13,14 +17,28 @@ vi.mock("@/lib/media-view-url", () => ({
   signedMediaViewUrl: mockSignedMediaViewUrl,
 }));
 
+vi.mock("@/lib/private-thumbnail-cache", () => ({
+  cachedPrivateThumbnailUrl: thumbnailCacheMocks.cachedPrivateThumbnailUrl,
+  isCacheablePrivateThumbnailUrl: (url: string | null | undefined) => (
+    typeof url === "string" &&
+    url.startsWith("/api/media/image-preview") &&
+    url.includes("size=thumb")
+  ),
+  rememberPrivateThumbnail: thumbnailCacheMocks.rememberPrivateThumbnail,
+}));
+
 describe("PreviewImage", () => {
   beforeEach(() => {
     mockSignedMediaViewUrl.mockResolvedValue(null);
+    thumbnailCacheMocks.cachedPrivateThumbnailUrl.mockResolvedValue(null);
+    thumbnailCacheMocks.rememberPrivateThumbnail.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
     vi.useRealTimers();
     mockSignedMediaViewUrl.mockReset();
+    thumbnailCacheMocks.cachedPrivateThumbnailUrl.mockReset();
+    thumbnailCacheMocks.rememberPrivateThumbnail.mockReset();
   });
 
   it("shows the HEIC thumbnail before starting the full preview conversion", async () => {
@@ -96,7 +114,7 @@ describe("PreviewImage", () => {
   });
 
   it("signs and retries a private image URL before showing the broken icon", async () => {
-    mockSignedMediaViewUrl.mockResolvedValue(`/api/drive/stream?id=${FILE_ID}&token=signed`);
+    mockSignedMediaViewUrl.mockResolvedValue(`/api/media/image-preview?id=${FILE_ID}&size=thumb&token=signed`);
 
     const { container } = render(
       <PreviewImage
@@ -109,21 +127,25 @@ describe("PreviewImage", () => {
     );
 
     const img = container.querySelector("img");
-    expect(img).toHaveAttribute("src", `/api/drive/stream?id=${FILE_ID}`);
+    expect(img).toHaveAttribute("src", `/api/media/image-preview?id=${FILE_ID}&size=thumb`);
 
     await act(async () => {
       fireEvent.error(img!);
     });
 
-    expect(mockSignedMediaViewUrl).toHaveBeenCalledWith(`/api/drive/stream?id=${FILE_ID}`);
+    expect(mockSignedMediaViewUrl).toHaveBeenCalledWith(`/api/media/image-preview?id=${FILE_ID}&size=thumb`);
     await waitFor(() => {
       expect(container.querySelector("svg")).toBeNull();
-      expect(container.querySelector("img")).toHaveAttribute("src", `/api/drive/stream?id=${FILE_ID}&token=signed`);
+      expect(container.querySelector("img")).toHaveAttribute("src", `/api/media/image-preview?id=${FILE_ID}&size=thumb&token=signed`);
+      expect(thumbnailCacheMocks.rememberPrivateThumbnail).toHaveBeenCalledWith(
+        `/api/media/image-preview?id=${FILE_ID}&size=thumb`,
+        `/api/media/image-preview?id=${FILE_ID}&size=thumb&token=signed`,
+      );
     });
   });
 
   it("starts signing private image URLs before the browser reports a load error", async () => {
-    mockSignedMediaViewUrl.mockResolvedValue(`/api/drive/stream?id=${FILE_ID}&token=signed`);
+    mockSignedMediaViewUrl.mockResolvedValue(`/api/media/image-preview?id=${FILE_ID}&size=thumb&token=signed`);
 
     const { container } = render(
       <PreviewImage
@@ -135,10 +157,42 @@ describe("PreviewImage", () => {
       />,
     );
 
-    expect(container.querySelector("img")).toHaveAttribute("src", `/api/drive/stream?id=${FILE_ID}`);
+    expect(container.querySelector("img")).toHaveAttribute("src", `/api/media/image-preview?id=${FILE_ID}&size=thumb`);
     await waitFor(() => {
-      expect(mockSignedMediaViewUrl).toHaveBeenCalledWith(`/api/drive/stream?id=${FILE_ID}`);
-      expect(container.querySelector("img")).toHaveAttribute("src", `/api/drive/stream?id=${FILE_ID}&token=signed`);
+      expect(mockSignedMediaViewUrl).toHaveBeenCalledWith(`/api/media/image-preview?id=${FILE_ID}&size=thumb`);
+      expect(container.querySelector("img")).toHaveAttribute("src", `/api/media/image-preview?id=${FILE_ID}&size=thumb&token=signed`);
     });
+  });
+
+  it("shows a cached private thumbnail immediately while the signed URL refreshes in the background", async () => {
+    const revoke = vi.fn();
+    thumbnailCacheMocks.cachedPrivateThumbnailUrl.mockResolvedValue({
+      url: "blob:cached-thumb",
+      revoke,
+    });
+    mockSignedMediaViewUrl.mockResolvedValue(`/api/media/image-preview?id=${FILE_ID}&size=thumb&token=signed`);
+
+    const { container, unmount } = render(
+      <PreviewImage
+        src={`/api/drive/stream?id=${FILE_ID}`}
+        mimeType="image/png"
+        fileName="8.png"
+        alt="8.png"
+        className="w-full h-full object-cover"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(thumbnailCacheMocks.cachedPrivateThumbnailUrl).toHaveBeenCalledWith(`/api/media/image-preview?id=${FILE_ID}&size=thumb`);
+      expect(container.querySelector("img")).toHaveAttribute("src", "blob:cached-thumb");
+    });
+    await waitFor(() => {
+      expect(thumbnailCacheMocks.rememberPrivateThumbnail).toHaveBeenCalledWith(
+        `/api/media/image-preview?id=${FILE_ID}&size=thumb`,
+        `/api/media/image-preview?id=${FILE_ID}&size=thumb&token=signed`,
+      );
+    });
+    unmount();
+    expect(revoke).toHaveBeenCalledTimes(1);
   });
 });

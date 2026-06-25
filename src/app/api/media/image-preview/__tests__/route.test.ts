@@ -509,7 +509,48 @@ describe("GET /api/media/image-preview", () => {
     }
   });
 
-  it("rejects non-HEIC images instead of proxying arbitrary Drive files", async () => {
+  it("converts browser-safe image thumbnails without using the HEIC decoder", async () => {
+    driveMocks.getFileMetadata.mockResolvedValueOnce({
+      id: FILE_ID,
+      name: "cover.jpg",
+      mimeType: "image/jpeg",
+      size: 1000,
+      parents: ["raw-files-folder"],
+      appProperties: { workspaceId: "00000000-0000-0000-0000-000000000001" },
+    });
+
+    const res = await GET(makeRequest(`/api/media/image-preview?id=${FILE_ID}&token=signed&size=thumb`));
+    const body = new Uint8Array(await res.arrayBuffer());
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/jpeg");
+    expect(res.headers.get("x-preview-size")).toBe("thumb");
+    expect(Array.from(body)).toEqual([0xff, 0xd8, 0xff]);
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      expect.stringContaining(`/files/${FILE_ID}?alt=media`),
+      expect.objectContaining({
+        headers: { Authorization: "Bearer drive-token" },
+      }),
+    );
+    expect(sharpMocks.sharp).toHaveBeenCalledWith(
+      expect.any(Buffer),
+      expect.objectContaining({ limitInputPixels: 50_000_000 }),
+    );
+    expect(sharpMocks.pipeline.resize).toHaveBeenCalledWith(expect.objectContaining({
+      width: 520,
+      height: 520,
+      fit: "inside",
+      withoutEnlargement: true,
+    }));
+    expect(heicDecodeMocks.decode.all).not.toHaveBeenCalled();
+    expect(storageMocks.upload).toHaveBeenCalledWith(
+      `00000000-0000-0000-0000-000000000001/image-previews/thumb/${FILE_ID}.jpg`,
+      expect.any(Buffer),
+      expect.objectContaining({ contentType: "image/jpeg", upsert: true }),
+    );
+  });
+
+  it("rejects non-HEIC full previews instead of proxying arbitrary Drive files", async () => {
     driveMocks.getFileMetadata.mockResolvedValueOnce({
       id: FILE_ID,
       name: "cover.jpg",
@@ -524,6 +565,25 @@ describe("GET /api/media/image-preview", () => {
 
     expect(res.status).toBe(415);
     expect(body.error).toMatch(/HEIC\/HEIF/i);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(sharpMocks.sharp).not.toHaveBeenCalled();
+  });
+
+  it("rejects non-image thumbnail requests before fetching Drive bytes", async () => {
+    driveMocks.getFileMetadata.mockResolvedValueOnce({
+      id: FILE_ID,
+      name: "brief.pdf",
+      mimeType: "application/pdf",
+      size: 1000,
+      parents: ["raw-files-folder"],
+      appProperties: { workspaceId: "00000000-0000-0000-0000-000000000001" },
+    });
+
+    const res = await GET(makeRequest(`/api/media/image-preview?id=${FILE_ID}&token=signed&size=thumb`));
+    const body = await res.json();
+
+    expect(res.status).toBe(415);
+    expect(body.error).toMatch(/only supported for images/i);
     expect(globalThis.fetch).not.toHaveBeenCalled();
     expect(sharpMocks.sharp).not.toHaveBeenCalled();
   });

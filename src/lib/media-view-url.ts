@@ -10,6 +10,11 @@ type CachedViewUrl = {
   expiresAt: number;
 };
 
+export type MediaViewSessionContext = {
+  accessToken: string;
+  userId?: string;
+};
+
 const signedViewUrlCache = new Map<string, CachedViewUrl>();
 
 export function clearSignedMediaViewUrlCache(): void {
@@ -38,7 +43,7 @@ export function hasMediaViewToken(url: string | null | undefined): boolean {
   }
 }
 
-async function getSessionAccessToken(): Promise<string | null> {
+export async function getMediaViewSessionContext(): Promise<MediaViewSessionContext | null> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const result = await Promise.race([
@@ -48,7 +53,12 @@ async function getSessionAccessToken(): Promise<string | null> {
       }),
     ]);
     if (result === "timeout") return null;
-    return result.data.session?.access_token || null;
+    const accessToken = result.data.session?.access_token;
+    if (!accessToken) return null;
+    return {
+      accessToken,
+      userId: result.data.session?.user?.id,
+    };
   } catch {
     return null;
   } finally {
@@ -59,7 +69,8 @@ async function getSessionAccessToken(): Promise<string | null> {
 export async function signedMediaViewUrl(url: string): Promise<string | null> {
   if (!isPrivateMediaRouteUrl(url) || hasMediaViewToken(url)) return null;
 
-  const token = await getSessionAccessToken();
+  const session = await getMediaViewSessionContext();
+  const token = session?.accessToken;
   if (!token) return null;
 
   const cacheKey = `${url}\n${token}`;

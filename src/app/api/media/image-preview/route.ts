@@ -21,6 +21,16 @@ export const maxDuration = 60;
 
 const DRIVE_FILE_ID_RE = /^[a-zA-Z0-9_-]{20,80}$/;
 const HEIC_IMAGE_MIME_TYPES = new Set(["image/heic", "image/heic-sequence", "image/heif", "image/heif-sequence"]);
+const BROWSER_SAFE_IMAGE_MIME_TYPES = new Set([
+  "image/avif",
+  "image/bmp",
+  "image/gif",
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/tiff",
+  "image/webp",
+]);
 const MAX_PREVIEW_SOURCE_BYTES = 50 * 1024 * 1024;
 const PREVIEW_CACHE_BUCKET = "media-thumbnails";
 const PREVIEW_CACHE_READ_TIMEOUT_MS = 2_000;
@@ -48,6 +58,7 @@ const MAX_DRIVE_THUMBNAIL_BYTES = 5 * 1024 * 1024;
 const inFlightPreviewBuilds = new Map<string, Promise<Buffer>>();
 
 type PreviewSize = keyof typeof PREVIEW_SIZES;
+type PreviewCacheFamily = "heic-previews" | "image-previews";
 
 type HeicDecodedImage = {
   width: number;
@@ -95,9 +106,22 @@ function browserSafeJpegResponse(
   });
 }
 
-function previewCacheKey(fileId: string, workspaceId: string | undefined, size: PreviewSize): string {
+function isHeicPreviewMime(mimeType: string, extensionMimeType: string): boolean {
+  return HEIC_IMAGE_MIME_TYPES.has(mimeType) || HEIC_IMAGE_MIME_TYPES.has(extensionMimeType);
+}
+
+function isBrowserSafeThumbnailMime(mimeType: string, extensionMimeType: string): boolean {
+  return BROWSER_SAFE_IMAGE_MIME_TYPES.has(mimeType) || BROWSER_SAFE_IMAGE_MIME_TYPES.has(extensionMimeType);
+}
+
+function previewCacheKey(
+  fileId: string,
+  workspaceId: string | undefined,
+  size: PreviewSize,
+  family: PreviewCacheFamily = "heic-previews",
+): string {
   const namespace = (workspaceId || "legacy").replace(/[^a-zA-Z0-9_-]/g, "_");
-  return `${namespace}/heic-previews/${size}/${fileId}.jpg`;
+  return `${namespace}/${family}/${size}/${fileId}.jpg`;
 }
 
 function legacyPreviewCacheKey(fileId: string, workspaceId?: string): string {
@@ -514,28 +538,40 @@ export async function GET(request: NextRequest) {
     ) {
       return NextResponse.json({ error: "File does not belong to this workspace" }, { status: 403 });
     }
+    const previewSize = previewSizeFromRequest(request);
     const mimeType = normalizeDriveMimeType(meta.mimeType, meta.name);
     const extensionMimeType = normalizeDriveMimeType("", meta.name);
-    if (!HEIC_IMAGE_MIME_TYPES.has(mimeType) && !HEIC_IMAGE_MIME_TYPES.has(extensionMimeType)) {
+    const heicPreview = isHeicPreviewMime(mimeType, extensionMimeType);
+    if (!heicPreview && previewSize !== "thumb") {
       return NextResponse.json({ error: "Preview conversion is only supported for HEIC/HEIF images" }, { status: 415 });
+    }
+    if (!heicPreview && !isBrowserSafeThumbnailMime(mimeType, extensionMimeType)) {
+      return NextResponse.json({ error: "Thumbnail preview is only supported for images" }, { status: 415 });
     }
     if (!Number.isFinite(meta.size) || meta.size <= 0 || meta.size > MAX_PREVIEW_SOURCE_BYTES) {
       return NextResponse.json({ error: "Image is too large for preview conversion" }, { status: 413 });
     }
 
     const admin = serviceRoleClient();
-    const previewSize = previewSizeFromRequest(request);
     const cacheWorkspaceId = auth.workspaceId || meta.appProperties?.workspaceId;
-    const cacheKey = previewCacheKey(fileId, cacheWorkspaceId, previewSize);
+    const cacheFamily: PreviewCacheFamily = heicPreview ? "heic-previews" : "image-previews";
+    const cacheKey = previewCacheKey(fileId, cacheWorkspaceId, previewSize, cacheFamily);
     if (previewSize === "thumb") {
-      const fastThumbnail = await withNullTimeout(
-        firstAvailablePreview([
-          readCachedPreview(admin, cacheKey).then((preview) => preview ? { preview, cacheState: "HIT" } : null),
+      const thumbnailCandidates: Promise<PreviewCandidate | null>[] = [
+        readCachedPreview(admin, cacheKey).then((preview) => preview ? { preview, cacheState: "HIT" } : null),
+        fetchDriveThumbnail(meta.thumbnailLink, token)
+          .then((preview) => preview ? { preview, cacheState: "MISS", writeCacheKey: cacheKey } : null),
+      ];
+      if (heicPreview) {
+        thumbnailCandidates.splice(
+          1,
+          0,
           buildThumbnailFromCachedPreview(admin, fileId, cacheWorkspaceId)
             .then((preview) => preview ? { preview, cacheState: "HIT", writeCacheKey: cacheKey } : null),
-          fetchDriveThumbnail(meta.thumbnailLink, token)
-            .then((preview) => preview ? { preview, cacheState: "MISS", writeCacheKey: cacheKey } : null),
-        ]),
+        );
+      }
+      const fastThumbnail = await withNullTimeout(
+        firstAvailablePreview(thumbnailCandidates),
         PREVIEW_FAST_THUMBNAIL_LOOKUP_TIMEOUT_MS,
       );
       if (fastThumbnail) {
@@ -553,7 +589,13 @@ export async function GET(request: NextRequest) {
 
     const preview = await buildPreviewOnce(cacheKey, async () => {
       const source = await fetchDriveMedia(fileId, token);
-      const converted = await buildHeicPreview(source, previewSize);
+      const converted = heicPreview
+        ? await buildHeicPreview(source, previewSize)
+        : await withPreviewTimeout(
+          resizeBrowserSafeJpeg(source, "thumb"),
+          PREVIEW_CONVERSION_TIMEOUT_MS.thumb,
+          "image thumbnail conversion",
+        );
       schedulePreviewCacheWrite(admin, cacheKey, converted);
       return converted;
     });

@@ -84,9 +84,37 @@ describe("image preview routing", () => {
     await Promise.resolve();
   });
 
-  it("leaves non-HEIC images and local blobs untouched", () => {
+  it("warms standard Drive image thumbnails when requested explicitly", async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 200 }));
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    warmBrowserImagePreview(`/api/drive/stream?id=${FILE_ID}&token=signed`, {
+      mimeType: "image/jpeg",
+      fileName: "cover.jpg",
+      size: "thumb",
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/media/image-preview?id=${FILE_ID}&size=thumb`,
+      expect.objectContaining({
+        method: "GET",
+        credentials: "same-origin",
+        cache: "force-cache",
+      }),
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("routes standard Drive image thumbnails through the browser-safe preview path", () => {
     expect(browserImagePreviewUrl(`/api/drive/stream?id=${FILE_ID}`, { mimeType: "image/jpeg" }))
       .toBe(`/api/drive/stream?id=${FILE_ID}`);
+    expect(browserImagePreviewUrl(`/api/drive/stream?id=${FILE_ID}`, { mimeType: "image/jpeg", size: "thumb" }))
+      .toBe(`/api/media/image-preview?id=${FILE_ID}&size=thumb`);
+    expect(browserImagePreviewUrl(`/api/drive/stream?id=${FILE_ID}`, { mimeType: "image/jpeg", size: "full" }))
+      .toBe(`/api/drive/stream?id=${FILE_ID}`);
+  });
+
+  it("leaves local blobs untouched", () => {
     expect(browserImagePreviewUrl("blob:local-image", { mimeType: "image/heic", fileName: "source.heic" }))
       .toBe("blob:local-image");
   });

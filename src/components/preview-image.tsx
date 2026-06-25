@@ -6,6 +6,11 @@ import { ImageOff } from "lucide-react";
 import { RawImage } from "@/components/raw-image";
 import { browserImagePreviewUrl, isHeicLikeImage } from "@/lib/image-preview";
 import { isPrivateMediaRouteUrl, signedMediaViewUrl } from "@/lib/media-view-url";
+import {
+  cachedPrivateThumbnailUrl,
+  isCacheablePrivateThumbnailUrl,
+  rememberPrivateThumbnail,
+} from "@/lib/private-thumbnail-cache";
 
 type PreviewImageProps = ImgHTMLAttributes<HTMLImageElement> & {
   mimeType?: unknown;
@@ -43,6 +48,8 @@ export function PreviewImage({
   const [delayedPrimarySrcs, setDelayedPrimarySrcs] = useState<Record<string, true>>({});
   const [signedSrcs, setSignedSrcs] = useState<Record<string, string>>({});
   const [signingSrcs, setSigningSrcs] = useState<Record<string, true>>({});
+  const [cachedThumbnailSrcs, setCachedThumbnailSrcs] = useState<Record<string, string>>({});
+  const cachedThumbnailRevokersRef = useRef<Record<string, () => void>>({});
   const [loadedSrc, setLoadedSrc] = useState<string | undefined>(undefined);
   const [loadedFallbackSrc, setLoadedFallbackSrc] = useState<string | undefined>(undefined);
   const proactiveSignAttemptsRef = useRef<Set<string>>(new Set());
@@ -71,8 +78,12 @@ export function PreviewImage({
     typeof primarySrc === "string" &&
     primarySrc.startsWith("blob:") &&
     isHeicLikeImage(mimeType, fileName || primarySrc);
-  const renderedPrimarySrc = typeof primarySrc === "string" ? signedSrcs[primarySrc] || primarySrc : primarySrc;
-  const renderedFallbackSrc = typeof fallbackSrc === "string" ? signedSrcs[fallbackSrc] || fallbackSrc : fallbackSrc;
+  const renderedPrimarySrc = typeof primarySrc === "string"
+    ? cachedThumbnailSrcs[primarySrc] || signedSrcs[primarySrc] || primarySrc
+    : primarySrc;
+  const renderedFallbackSrc = typeof fallbackSrc === "string"
+    ? cachedThumbnailSrcs[fallbackSrc] || signedSrcs[fallbackSrc] || fallbackSrc
+    : fallbackSrc;
 
   const requestSignedSrc = useCallback((source: string, failOnMiss: boolean): boolean => {
     if (!isPrivateMediaRouteUrl(source)) return false;
@@ -90,6 +101,9 @@ export function PreviewImage({
           return;
         }
         setSignedSrcs((prev) => ({ ...prev, [source]: signedUrl }));
+        if (isCacheablePrivateThumbnailUrl(source)) {
+          void rememberPrivateThumbnail(source, signedUrl);
+        }
         setFailedSrcs((prev) => {
           if (!prev[source]) return prev;
           const next = { ...prev };
@@ -129,6 +143,50 @@ export function PreviewImage({
       cancelled = true;
     };
   }, [fallbackSrc, primarySrc, requestSignedSrc]);
+
+  useEffect(() => {
+    const activeSources = new Set(
+      [fallbackSrc, primarySrc].filter((source): source is string => (
+        typeof source === "string" && isCacheablePrivateThumbnailUrl(source)
+      )),
+    );
+
+    for (const [source, revoke] of Object.entries(cachedThumbnailRevokersRef.current)) {
+      if (activeSources.has(source)) continue;
+      revoke();
+      delete cachedThumbnailRevokersRef.current[source];
+      setCachedThumbnailSrcs((prev) => {
+        if (!prev[source]) return prev;
+        const next = { ...prev };
+        delete next[source];
+        return next;
+      });
+    }
+
+    let cancelled = false;
+    for (const source of activeSources) {
+      if (cachedThumbnailRevokersRef.current[source]) continue;
+      void cachedPrivateThumbnailUrl(source).then((cached) => {
+        if (!cached) return;
+        if (cancelled || cachedThumbnailRevokersRef.current[source]) {
+          cached.revoke();
+          return;
+        }
+        cachedThumbnailRevokersRef.current[source] = cached.revoke;
+        setCachedThumbnailSrcs((prev) => ({ ...prev, [source]: cached.url }));
+      });
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [fallbackSrc, primarySrc]);
+
+  useEffect(() => {
+    return () => {
+      for (const revoke of Object.values(cachedThumbnailRevokersRef.current)) revoke();
+      cachedThumbnailRevokersRef.current = {};
+    };
+  }, []);
 
   useEffect(() => {
     if (!primaryDelayKey || primaryDelayElapsed) return;
