@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth/require";
 import { verifyAiAssetToken } from "@/lib/ai/asset-publish-url";
+import { STREAM_INACTIVITY_TIMEOUT_MS, streamWithInactivityTimeout } from "@/lib/stream-inactivity-timeout";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -121,8 +122,15 @@ export async function GET(request: NextRequest) {
   if (!responseHeaders.has("content-type")) responseHeaders.set("Content-Type", "application/octet-stream");
   if (!responseHeaders.has("accept-ranges")) responseHeaders.set("Accept-Ranges", "bytes");
 
-  return new Response(storageRes.body, {
+  return new Response(
+    streamWithInactivityTimeout(
+      storageRes.body,
+      STREAM_INACTIVITY_TIMEOUT_MS,
+      "Supabase AI asset stream",
+    ),
+    {
     status: storageRes.status,
     headers: responseHeaders,
-  });
+    },
+  );
 }

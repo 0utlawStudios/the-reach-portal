@@ -28,6 +28,7 @@ BEGIN
     SELECT j2.id
     FROM public.publish_jobs j2
     JOIN public.posts p ON p.id = j2.post_id
+      AND p.workspace_id = j2.workspace_id
     WHERE j2.state = 'pending'
       AND j2.scheduled_at <= now()
       AND (j2.next_retry_at IS NULL OR j2.next_retry_at <= now())

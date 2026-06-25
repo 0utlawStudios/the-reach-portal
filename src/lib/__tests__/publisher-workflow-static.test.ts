@@ -58,6 +58,25 @@ describe("publisher workflow hardening contracts", () => {
     expect(finalize).toContain("if (!lastError && item.error)");
   });
 
+  it("keeps service-role publisher finalization scoped to the claimed workspace", () => {
+    const claim = code("Claim Next Job");
+    const finalize = code("Finalize Job");
+    expect(claim).toContain("&workspace_id=eq.' + job.workspace_id");
+    expect(finalize).toContain("Publish finalization missing post/job workspace identity");
+    expect(finalize).toContain("Publish finalization post/job workspace mismatch");
+    expect(finalize).toContain("const postFilter = 'id=eq.' + item.post.id + '&workspace_id=eq.' + item.job.workspace_id");
+    expect(finalize).toContain("const jobFilter = 'id=eq.' + item.job.id + '&post_id=eq.' + item.post.id + '&workspace_id=eq.' + item.job.workspace_id");
+    expect(finalize).toContain("SB + '/rest/v1/posts?' + postFilter");
+    expect(finalize).toContain("SB + '/rest/v1/publish_jobs?' + jobFilter");
+
+    expect(LEGACY_WORKFLOW_SRC).toContain("&workspace_id=eq.' + job.workspace_id");
+    expect(LEGACY_WORKFLOW_SRC).toContain("Publish finalization missing post/job workspace identity");
+    expect(LEGACY_WORKFLOW_SRC).toContain("Publish finalization post/job workspace mismatch");
+    expect(LEGACY_WORKFLOW_SRC).toContain("SB + '/rest/v1/posts?' + postFilter");
+    expect(LEGACY_WORKFLOW_SRC).toContain("SB + '/rest/v1/publish_jobs?' + jobFilter");
+    expect(PARTIAL_RETRY_MIGRATION).toContain("p.workspace_id = j2.workspace_id");
+  });
+
   it("resets retry state when a failed publish job is re-queued", () => {
     expect(REQUEUE_RESET_MIGRATION).toContain("attempts = 0");
     expect(REQUEUE_RESET_MIGRATION).toContain("last_error = null");

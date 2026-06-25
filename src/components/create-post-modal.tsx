@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { PreviewImage } from "@/components/preview-image";
 import { useState, useRef, useEffect } from "react";
 import { usePipeline } from "@/lib/pipeline-context";
-import { Platform, ContentType, ALL_PLATFORMS, DEFAULT_CHECKLIST } from "@/lib/types";
+import { Platform, ContentType, ALL_PLATFORMS, DEFAULT_CHECKLIST, type RawFile } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { X, Image as ImageIcon, Film, Layers, PlayCircle, Upload, FileVideo, Plus, CheckSquare, FileText, Link2, MessageSquare, FolderOpen } from "lucide-react";
 import { PlatformIcon } from "./platform-icons";
@@ -75,8 +75,15 @@ function uploadPathForSize(file: File): "proxy" | "resumable" {
   return file.size >= 4 * 1024 * 1024 ? "resumable" : "proxy";
 }
 
+type PlaybackOptimizationResult = {
+  fileId?: string;
+  name: string;
+  playbackUrl: string;
+  playbackStorageKey: string;
+};
+
 export function CreatePostModal({ open, onClose }: Props) {
-  const { createCard, workspaceId } = usePipeline();
+  const { createCard, updateCard, workspaceId } = usePipeline();
   const { addToast } = useToast();
   const { currentUser } = useAuth();
   const [title, setTitle] = useState("");
@@ -187,7 +194,8 @@ export function CreatePostModal({ open, onClose }: Props) {
     let thumbnailUrl = "";
     let thumbnailFileId: string | undefined;
     let thumbnailMimeType = "";
-    const rawFiles: import("@/lib/types").RawFile[] = [];
+    const rawFiles: RawFile[] = [];
+    const uploadedRawFiles: Array<{ rawFile: RawFile; sourceFile?: File }> = [];
     let filesForCard: UploadedFile[] = files;
     let uploadFailed = false;
     let reportUploadFailureForTelemetry: typeof import("@/lib/drive-upload").reportUploadFailure | null = null;
@@ -242,55 +250,6 @@ export function CreatePostModal({ open, onClose }: Props) {
         }
       }
 
-      if (!uploadFailed) {
-        const withPlayback = filesForCard.map((file) => ({ ...file }));
-        let playbackModule: typeof import("@/lib/media-playback") | null = null;
-        try {
-          playbackModule = await import("@/lib/media-playback");
-        } catch {
-          playbackModule = null;
-        }
-        if (playbackModule) {
-          for (let i = 0; i < withPlayback.length; i++) {
-            const f = withPlayback[i];
-            const rawMimeType = f.mimeType || (f.type === "video" ? "video/mp4" : "image/jpeg");
-            if (!rawMimeType.startsWith("video/") || f.playbackUrl) continue;
-            const sourceFile = rawFilesRef.current.get(f.id);
-            if (!sourceFile) continue;
-            if (!playbackModule.canUploadPlaybackCopy(sourceFile, rawMimeType)) continue;
-
-            try {
-              setUploadingFileName(`Optimizing playback for ${f.name}`);
-              setUploadProgress(0);
-              const playback = await playbackModule.uploadVideoPlaybackCopy(sourceFile, undefined, workspaceId);
-              withPlayback[i] = {
-                ...f,
-                playbackUrl: playback.playbackUrl,
-                playbackStorageKey: playback.playbackStorageKey,
-              };
-            } catch (err) {
-              const errorMessage = uploadErrorMessage(err);
-              await reportUploadFailure({
-                phase: "create_post_playback_upload",
-                route: "/api/media/playback-upload",
-                uploadPath: uploadPathForSize(sourceFile),
-                workspaceId,
-                postTitle: title.trim(),
-                folder: "raw-files",
-                fileName: sourceFile.name,
-                mimeType: rawMimeType,
-                fileSize: sourceFile.size,
-                errorMessage,
-                errorDetail: err instanceof Error ? err.stack : undefined,
-              });
-              addToast(`Uploaded ${f.name}, but fast video playback was skipped.`, "warning");
-            }
-          }
-        }
-        filesForCard = withPlayback;
-        setFiles(withPlayback);
-      }
-
       // Rebuild rawFiles in the original file order (master = index 0).
       if (!uploadFailed) {
         for (let i = 0; i < filesForCard.length; i++) {
@@ -300,7 +259,7 @@ export function CreatePostModal({ open, onClose }: Props) {
             const publishUrl = f.publishUrl || (f.driveFileId ? getPublicDriveDownloadUrl(f.driveFileId) : f.driveUrl);
             const driveProxyUrl = f.driveProxyUrl || f.driveUrl;
             warmBrowserImagePreview(driveProxyUrl, { mimeType: rawMimeType, fileName: f.name });
-            rawFiles.push({
+            const rawFile: RawFile = {
               name: f.name,
               url: publishUrl,
               fileId: f.driveFileId,
@@ -312,7 +271,9 @@ export function CreatePostModal({ open, onClose }: Props) {
               mimeType: rawMimeType,
               size: f.driveSize || 0,
               uploadedAt: new Date().toISOString(),
-            });
+            };
+            rawFiles.push(rawFile);
+            uploadedRawFiles.push({ rawFile, sourceFile: rawFilesRef.current.get(f.id) });
             if (i === 0) {
               thumbnailUrl = driveProxyUrl;
               thumbnailFileId = f.driveFileId;
@@ -394,18 +355,14 @@ export function CreatePostModal({ open, onClose }: Props) {
     });
     if (!createdCard) return;
 
-    // Insert uploaded files into media_assets so they appear in Media Library
-    let mediaAssetSyncFailures = 0;
-    for (const rf of rawFiles) {
+    const mediaAssetSyncs = rawFiles.map((rf) => async () => {
       try {
         await ensureMediaAsset({
           name: rf.name,
-          url: rf.playbackUrl || rf.driveProxyUrl || rf.url,
+          url: rf.driveProxyUrl || rf.url,
           fileId: rf.fileId,
           publishUrl: rf.publishUrl,
           driveProxyUrl: rf.driveProxyUrl,
-          playbackUrl: rf.playbackUrl,
-          playbackStorageKey: rf.playbackStorageKey,
           mimeType: rf.mimeType,
           size: rf.size,
           fileType: rf.mimeType?.startsWith("video") ? "video" : "image",
@@ -415,7 +372,6 @@ export function CreatePostModal({ open, onClose }: Props) {
           usedIn: createdCard.id,
         });
       } catch (err) {
-        mediaAssetSyncFailures += 1;
         console.error("[create-post] media_assets insert failed:", err);
         try {
           await reportUploadFailureForTelemetry?.({
@@ -434,10 +390,86 @@ export function CreatePostModal({ open, onClose }: Props) {
         } catch (reportErr) {
           console.error("[create-post] media_assets sync telemetry failed:", reportErr);
         }
+        throw err;
       }
+    });
+    if (mediaAssetSyncs.length > 0) {
+      void Promise.allSettled(mediaAssetSyncs.map((run) => run())).then((results) => {
+        if (results.some((result) => result.status === "rejected")) {
+          addToast("Post saved, but Media Library linking needs a retry.", "warning");
+        }
+      });
     }
-    if (mediaAssetSyncFailures > 0) {
-      addToast("Post saved, but Media Library linking needs a retry.", "warning");
+
+    const playbackOptimizations: Array<() => Promise<PlaybackOptimizationResult | null | undefined>> = uploadedRawFiles
+      .filter(({ rawFile, sourceFile }) => rawFile.mimeType?.startsWith("video") && sourceFile)
+      .map(({ rawFile, sourceFile }) => async () => {
+        try {
+          const playbackModule = await import("@/lib/media-playback");
+          if (!sourceFile || !playbackModule.canUploadPlaybackCopy(sourceFile, rawFile.mimeType)) return;
+          const playback = await playbackModule.uploadVideoPlaybackCopy(sourceFile, createdCard.id, workspaceId);
+          await ensureMediaAsset({
+            name: rawFile.name,
+            url: playback.playbackUrl,
+            fileId: rawFile.fileId,
+            publishUrl: rawFile.publishUrl,
+            driveProxyUrl: rawFile.driveProxyUrl,
+            playbackUrl: playback.playbackUrl,
+            playbackStorageKey: playback.playbackStorageKey,
+            mimeType: rawFile.mimeType,
+            size: rawFile.size,
+            fileType: "video",
+            folder: "Content Engine Uploads",
+            addedBy: currentUser.name,
+            workspaceId,
+            usedIn: createdCard.id,
+          });
+          return {
+            fileId: rawFile.fileId,
+            name: rawFile.name,
+            playbackUrl: playback.playbackUrl,
+            playbackStorageKey: playback.playbackStorageKey,
+          };
+        } catch (err) {
+          console.error("[create-post] playback optimization failed:", err);
+          try {
+            await reportUploadFailureForTelemetry?.({
+              phase: "create_post_playback_upload",
+              route: "/api/media/playback-upload",
+              uploadPath: sourceFile ? uploadPathForSize(sourceFile) : "unknown",
+              workspaceId,
+              postTitle: title.trim(),
+              folder: "raw-files",
+              fileName: rawFile.name,
+              mimeType: rawFile.mimeType,
+              fileSize: rawFile.size,
+              errorMessage: uploadErrorMessage(err),
+              errorDetail: err instanceof Error ? err.stack : undefined,
+            });
+          } catch (reportErr) {
+            console.error("[create-post] playback telemetry failed:", reportErr);
+          }
+          addToast(`Uploaded ${rawFile.name}, but fast video playback was skipped.`, "warning");
+          return null;
+        }
+      });
+    if (playbackOptimizations.length > 0) {
+      void Promise.allSettled(playbackOptimizations.map((run) => run())).then((results) => {
+        const playbackResults: PlaybackOptimizationResult[] = [];
+        for (const result of results) {
+          if (result.status === "fulfilled" && result.value) playbackResults.push(result.value);
+        }
+        if (playbackResults.length === 0) return;
+        const nextRawFiles = rawFiles.map((file) => {
+          const playback = playbackResults.find((result) => (
+            (result.fileId && file.fileId === result.fileId) || file.name === result.name
+          ));
+          return playback ? { ...file, playbackUrl: playback.playbackUrl, playbackStorageKey: playback.playbackStorageKey } : file;
+        });
+        updateCard(createdCard.id, {
+          sourceVault: { ...(createdCard.sourceVault || {}), rawFiles: nextRawFiles },
+        });
+      });
     }
 
     rawFilesRef.current.clear();

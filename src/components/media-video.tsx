@@ -10,12 +10,13 @@ type MediaVideoProps = Omit<VideoHTMLAttributes<HTMLVideoElement>, "src"> & {
   loadTimeoutMs?: number;
 };
 
-const DEFAULT_VIDEO_LOAD_TIMEOUT_MS = 10_000;
+const DEFAULT_VIDEO_LOAD_TIMEOUT_MS = 4_000;
 
 type PlaybackState = {
   sourceKey: string;
   failedSources: Record<string, true>;
   loadedSource: string | null;
+  attemptedSource: string | null;
 };
 
 function uniqueSources(sources: Array<string | null | undefined>): string[] {
@@ -35,8 +36,12 @@ export function MediaVideo({
   className,
   loadTimeoutMs = DEFAULT_VIDEO_LOAD_TIMEOUT_MS,
   onError,
+  onLoadStart,
   onLoadedMetadata,
   onCanPlay,
+  onPlay,
+  preload,
+  style,
   ...props
 }: MediaVideoProps) {
   const usableSources = useMemo(() => uniqueSources(sources), [sources]);
@@ -45,17 +50,20 @@ export function MediaVideo({
     sourceKey: "",
     failedSources: {},
     loadedSource: null,
+    attemptedSource: null,
   });
   const activeState =
     playbackState.sourceKey === sourceKey
       ? playbackState
-      : { sourceKey, failedSources: {}, loadedSource: null };
+      : { sourceKey, failedSources: {}, loadedSource: null, attemptedSource: null };
   const { failedSources, loadedSource } = activeState;
   const currentSource = usableSources.find((source) => !failedSources[source]);
   const loaded = Boolean(currentSource && loadedSource === currentSource);
+  const attempted = Boolean(currentSource && activeState.attemptedSource === currentSource);
+  const shouldWatchLoad = Boolean(currentSource && !loaded && (preload !== "none" || attempted));
 
   const retrySources = useCallback(() => {
-    setPlaybackState({ sourceKey, failedSources: {}, loadedSource: null });
+    setPlaybackState({ sourceKey, failedSources: {}, loadedSource: null, attemptedSource: null });
   }, [sourceKey]);
 
   const advanceSource = useCallback(() => {
@@ -64,13 +72,24 @@ export function MediaVideo({
       const base =
         prev.sourceKey === sourceKey
           ? prev
-          : { sourceKey, failedSources: {}, loadedSource: null };
+          : { sourceKey, failedSources: {}, loadedSource: null, attemptedSource: null };
       return {
         sourceKey,
         failedSources: { ...base.failedSources, [currentSource]: true },
         loadedSource: base.loadedSource === currentSource ? null : base.loadedSource,
+        attemptedSource: base.attemptedSource === currentSource ? null : base.attemptedSource,
       };
     });
+  }, [currentSource, sourceKey]);
+
+  const markAttempted = useCallback(() => {
+    if (!currentSource) return;
+    setPlaybackState((prev) => ({
+      sourceKey,
+      failedSources: prev.sourceKey === sourceKey ? prev.failedSources : {},
+      loadedSource: prev.sourceKey === sourceKey ? prev.loadedSource : null,
+      attemptedSource: currentSource,
+    }));
   }, [currentSource, sourceKey]);
 
   const markLoaded = useCallback(() => {
@@ -79,14 +98,15 @@ export function MediaVideo({
       sourceKey,
       failedSources: prev.sourceKey === sourceKey ? prev.failedSources : {},
       loadedSource: currentSource,
+      attemptedSource: currentSource,
     }));
   }, [currentSource, sourceKey]);
 
   useEffect(() => {
-    if (!currentSource || loaded) return;
+    if (!shouldWatchLoad) return;
     const timer = setTimeout(advanceSource, loadTimeoutMs);
     return () => clearTimeout(timer);
-  }, [advanceSource, currentSource, loadTimeoutMs, loaded]);
+  }, [advanceSource, loadTimeoutMs, shouldWatchLoad]);
 
   if (!currentSource) {
     return (
@@ -112,7 +132,13 @@ export function MediaVideo({
       {...props}
       src={currentSource}
       className={className}
+      preload={preload}
+      style={{ backgroundColor: "#18181b", ...style }}
       aria-label={props["aria-label"] || label}
+      onLoadStart={(event: SyntheticEvent<HTMLVideoElement, Event>) => {
+        markAttempted();
+        onLoadStart?.(event);
+      }}
       onLoadedMetadata={(event: SyntheticEvent<HTMLVideoElement, Event>) => {
         markLoaded();
         onLoadedMetadata?.(event);
@@ -120,6 +146,10 @@ export function MediaVideo({
       onCanPlay={(event: SyntheticEvent<HTMLVideoElement, Event>) => {
         markLoaded();
         onCanPlay?.(event);
+      }}
+      onPlay={(event: SyntheticEvent<HTMLVideoElement, Event>) => {
+        markAttempted();
+        onPlay?.(event);
       }}
       onError={(event: SyntheticEvent<HTMLVideoElement, Event>) => {
         onError?.(event);

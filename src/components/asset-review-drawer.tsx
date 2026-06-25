@@ -55,6 +55,13 @@ function uploadPathForSize(file: File): "proxy" | "resumable" {
   return file.size >= 4 * 1024 * 1024 ? "resumable" : "proxy";
 }
 
+type PlaybackOptimizationResult = {
+  fileId?: string;
+  name: string;
+  playbackUrl: string;
+  playbackStorageKey: string;
+};
+
 export function AssetReviewDrawer() {
   const { selectedCard, isDrawerOpen, isEditingOnOpen, closeDrawer, moveCard, requestReapproval, submitKickback, updateCard, deleteCard, workspaceId } = usePipeline();
   const { addToast } = useToast();
@@ -451,12 +458,7 @@ export function AssetReviewDrawer() {
       const rawFiles = [...existingFiles];
       const failures = items.filter((item) => item.error || !item.result);
       const mediaAssetSyncs: Array<() => Promise<void>> = [];
-      let playbackModule: typeof import("@/lib/media-playback") | null = null;
-      try {
-        playbackModule = await import("@/lib/media-playback");
-      } catch {
-        playbackModule = null;
-      }
+      const playbackOptimizations: Array<() => Promise<PlaybackOptimizationResult | null | undefined>> = [];
       for (const item of items) {
         const file = item.file;
         if (item.error || !item.result) {
@@ -484,15 +486,38 @@ export function AssetReviewDrawer() {
         const result = item.result;
         const resultMimeType = result.mimeType || normalizeDriveMimeType(file.type, file.name);
         const isFirstFile = rawFiles.length === 0;
-        let playbackUrl: string | undefined;
-        let playbackStorageKey: string | undefined;
-        if (resultMimeType.startsWith("video/") && playbackModule) {
-          if (playbackModule.canUploadPlaybackCopy(file, resultMimeType)) {
+        const publishUrl = result.publishUrl || getPublicDriveDownloadUrl(result.fileId);
+        const driveProxyUrl = result.driveProxyUrl || result.url;
+        if (resultMimeType.startsWith("video/")) {
+          playbackOptimizations.push(async () => {
             try {
-              setUploadingFileName(`Optimizing playback for ${file.name}`);
+              const playbackModule = await import("@/lib/media-playback");
+              if (!playbackModule.canUploadPlaybackCopy(file, resultMimeType)) return;
               const playback = await playbackModule.uploadVideoPlaybackCopy(file, selectedCard.id, workspaceId);
-              playbackUrl = playback.playbackUrl;
-              playbackStorageKey = playback.playbackStorageKey;
+              if (isDrivePublishableMediaMime(resultMimeType, file.name)) {
+                await ensureMediaAsset({
+                  name: file.name,
+                  url: playback.playbackUrl,
+                  fileId: result.fileId,
+                  publishUrl,
+                  driveProxyUrl,
+                  playbackUrl: playback.playbackUrl,
+                  playbackStorageKey: playback.playbackStorageKey,
+                  mimeType: resultMimeType,
+                  size: result.size || file.size,
+                  fileType: "video",
+                  folder: "Content Engine Uploads",
+                  addedBy: currentUser.name,
+                  workspaceId,
+                  usedIn: selectedCard.id,
+                });
+              }
+              return {
+                fileId: result.fileId,
+                name: file.name,
+                playbackUrl: playback.playbackUrl,
+                playbackStorageKey: playback.playbackStorageKey,
+              };
             } catch (err) {
               const errorMessage = uploadErrorMessage(err);
               await reportUploadFailure({
@@ -510,11 +535,10 @@ export function AssetReviewDrawer() {
                 errorDetail: err instanceof Error ? err.stack : undefined,
               });
               addToast(`Uploaded ${file.name}, but fast video playback was skipped.`, "warning");
+              return null;
             }
-          }
+          });
         }
-        const publishUrl = result.publishUrl || getPublicDriveDownloadUrl(result.fileId);
-        const driveProxyUrl = result.driveProxyUrl || result.url;
         warmBrowserImagePreview(driveProxyUrl, { mimeType: resultMimeType, fileName: file.name });
         const newFile = {
           name: file.name,
@@ -522,8 +546,6 @@ export function AssetReviewDrawer() {
           fileId: result.fileId,
           publishUrl,
           driveProxyUrl,
-          playbackUrl,
-          playbackStorageKey,
           usageType: (isFirstFile ? "master" : "supplementary") as "master" | "supplementary",
           mimeType: resultMimeType,
           size: result.size || file.size,
@@ -536,12 +558,10 @@ export function AssetReviewDrawer() {
             try {
               await ensureMediaAsset({
                 name: file.name,
-                url: playbackUrl || driveProxyUrl,
+                url: driveProxyUrl,
                 fileId: result.fileId,
                 publishUrl,
                 driveProxyUrl,
-                playbackUrl,
-                playbackStorageKey,
                 mimeType: resultMimeType,
                 size: result.size || file.size,
                 fileType: resultMimeType.startsWith("video") ? "video" : "image",
@@ -585,6 +605,22 @@ export function AssetReviewDrawer() {
             if (results.some((result) => result.status === "rejected")) {
               addToast("Uploaded, but Media Library linking needs a retry.", "warning");
             }
+          });
+        }
+        if (playbackOptimizations.length > 0) {
+          void Promise.allSettled(playbackOptimizations.map((run) => run())).then((results) => {
+            const playbackResults: PlaybackOptimizationResult[] = [];
+            for (const result of results) {
+              if (result.status === "fulfilled" && result.value) playbackResults.push(result.value);
+            }
+            if (playbackResults.length === 0) return;
+            const nextRawFiles = rawFiles.map((file) => {
+              const playback = playbackResults.find((result) => (
+                (result.fileId && file.fileId === result.fileId) || file.name === result.name
+              ));
+              return playback ? { ...file, playbackUrl: playback.playbackUrl, playbackStorageKey: playback.playbackStorageKey } : file;
+            });
+            updateCard(selectedCard.id, { sourceVault: { ...(selectedCard.sourceVault || {}), rawFiles: nextRawFiles } });
           });
         }
       }

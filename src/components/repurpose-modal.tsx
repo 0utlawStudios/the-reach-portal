@@ -79,7 +79,7 @@ export function RepurposeModal({ card, onClose }: Props) {
       });
       if (!createdCard) return;
 
-      const mediaSyncs: Promise<void>[] = [];
+      const mediaSyncs: Promise<unknown>[] = [];
       if (card.thumbnailUrl) {
         mediaSyncs.push(ensureMediaAsset({
           name: card.title || "Repurposed asset",

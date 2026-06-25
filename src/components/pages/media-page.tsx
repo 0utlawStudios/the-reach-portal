@@ -8,10 +8,12 @@ import { usePipeline } from "@/lib/pipeline-context";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
 import { supabase } from "@/lib/supabaseClient";
+import { ensureMediaAsset } from "@/lib/media-assets";
 import {
   getAutomaticMediaUsage,
   hasManualUsedTag,
   MEDIA_MANUAL_USED_TAG,
+  mediaAssetAliases,
   sameUsedIn,
   syncedUsedInValue,
   videoPreviewFrameUrl,
@@ -77,6 +79,22 @@ function dbToAsset(row: MediaAssetRow): MediaAsset {
     addedBy: row.added_by || undefined,
     usedIn: row.used_in || undefined,
   };
+}
+
+function mediaAssetsOverlap(a: MediaAsset, b: MediaAsset): boolean {
+  const aliases = mediaAssetAliases(a);
+  for (const alias of mediaAssetAliases(b)) {
+    if (aliases.has(alias)) return true;
+  }
+  return false;
+}
+
+function upsertMediaAsset(prev: MediaAsset[], asset: MediaAsset): MediaAsset[] {
+  const index = prev.findIndex((existing) => mediaAssetsOverlap(existing, asset));
+  if (index === -1) return [asset, ...prev];
+  const next = [...prev];
+  next[index] = { ...next[index], ...asset };
+  return next;
 }
 
 function uploadErrorMessage(error: unknown): string {
@@ -161,10 +179,7 @@ export function MediaPage() {
         { event: "INSERT", schema: "public", table: "media_assets", filter: `workspace_id=eq.${wsId}` },
         (payload) => {
           const newAsset = dbToAsset(payload.new as MediaAssetRow);
-          setMedia((prev) => {
-            if (prev.some((m) => m.id === newAsset.id)) return prev;
-            return [newAsset, ...prev];
-          });
+          setMedia((prev) => upsertMediaAsset(prev, newAsset));
         }
       )
       .on(
@@ -172,7 +187,7 @@ export function MediaPage() {
         { event: "UPDATE", schema: "public", table: "media_assets", filter: `workspace_id=eq.${wsId}` },
         (payload) => {
           const updated = dbToAsset(payload.new as MediaAssetRow);
-          setMedia((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
+          setMedia((prev) => upsertMediaAsset(prev, updated));
         }
       )
       .on(
@@ -311,15 +326,12 @@ export function MediaPage() {
         });
       }
 
-      let playbackModule: typeof import("@/lib/media-playback") | null = null;
-      try {
-        playbackModule = await import("@/lib/media-playback");
-      } catch {
-        playbackModule = null;
-      }
+      const mediaAssetSyncs: Array<() => Promise<void>> = [];
+      const playbackOptimizations: Array<() => Promise<void>> = [];
 
-      // Persist results. Uploads already ran in parallel; the saves below are
-      // quick and run after, preserving the original per-file save + toast.
+      // Show results as soon as the primary Drive upload succeeds. Media
+      // Library persistence and optional video playback copies are bounded
+      // background work, so they cannot make a completed upload feel stuck.
       for (const it of items) {
         const file = it.file;
         if (it.error || !it.result) {
@@ -328,39 +340,14 @@ export function MediaPage() {
         }
         const result = it.result;
         const mimeType = result.mimeType || normalizeDriveMimeType(file.type, file.name);
-        let playbackUrl: string | undefined;
-        let playbackStorageKey: string | undefined;
-        if (mimeType.startsWith("video/") && playbackModule?.canUploadPlaybackCopy(file, mimeType)) {
-          try {
-            setUploadingFileName(`Optimizing playback for ${file.name}`);
-            const playback = await playbackModule.uploadVideoPlaybackCopy(file, "media-library", workspaceId);
-            playbackUrl = playback.playbackUrl;
-            playbackStorageKey = playback.playbackStorageKey;
-          } catch (playbackErr) {
-            await reportUploadFailure({
-              phase: "media_library_playback_upload",
-              route: "/api/media/playback-upload",
-              uploadPath: "unknown",
-              folder: "media-library",
-              workspaceId,
-              fileName: file.name,
-              mimeType,
-              fileSize: file.size,
-              errorMessage: uploadErrorMessage(playbackErr),
-              errorDetail: playbackErr instanceof Error ? playbackErr.stack : undefined,
-            });
-            addToast(`Uploaded ${file.name}, but fast video playback was skipped.`, "warning");
-          }
-        }
+        const driveProxyUrl = result.driveProxyUrl || result.url;
         const asset: MediaAsset = {
           id: `m-${Date.now()}-${Math.random().toString(36).slice(2)}`,
           name: file.name,
-          url: playbackUrl || result.url,
+          url: driveProxyUrl,
           fileId: result.fileId,
           publishUrl: result.publishUrl,
-          driveProxyUrl: result.driveProxyUrl || result.url,
-          playbackUrl,
-          playbackStorageKey,
+          driveProxyUrl,
           mimeType,
           size: result.size || file.size,
           type: mimeType.startsWith("video") ? "video" : "image",
@@ -370,37 +357,105 @@ export function MediaPage() {
         };
         warmBrowserImagePreview(asset.driveProxyUrl || asset.url, { mimeType: asset.mimeType, fileName: asset.name });
 
-        // Persist to Supabase
         if (useDb) {
-          const { data: inserted, error } = await supabase
-            .from("media_assets")
-            .insert({
-              name: asset.name,
-              url: asset.url,
-              file_id: asset.fileId,
-              publish_url: asset.publishUrl,
-              drive_proxy_url: asset.driveProxyUrl,
-              playback_url: asset.playbackUrl,
-              playback_storage_key: asset.playbackStorageKey,
-              mime_type: asset.mimeType,
-              size_bytes: asset.size,
-              file_type: asset.type,
-              folder: asset.folder,
-              added_by: asset.addedBy,
-              workspace_id: workspaceId || BASELINE_WORKSPACE_ID,
-            })
-            .select("id")
-            .single();
-          if (error) {
-            console.error("[media] upload library insert failed:", error.message);
-            addToast(`Uploaded ${file.name}, but saving to the library failed. Try again.`, "error");
-            continue;
-          }
-          if (inserted) asset.id = inserted.id;
+          mediaAssetSyncs.push(async () => {
+            try {
+              const id = await ensureMediaAsset({
+                name: asset.name,
+                url: asset.url,
+                fileId: asset.fileId,
+                publishUrl: asset.publishUrl,
+                driveProxyUrl: asset.driveProxyUrl,
+                mimeType: asset.mimeType,
+                size: asset.size,
+                fileType: asset.type,
+                folder: asset.folder,
+                addedBy: asset.addedBy || currentUser.name,
+                workspaceId: workspaceId || BASELINE_WORKSPACE_ID,
+              });
+              setMedia((prev) => prev.map((existing) => (
+                mediaAssetsOverlap(existing, asset) ? { ...existing, id } : existing
+              )));
+            } catch (err) {
+              console.error("[media] upload library insert failed:", err);
+              addToast(`Uploaded ${file.name}, but saving to the library failed. Try again.`, "error");
+              await reportUploadFailure({
+                phase: "media_library_media_asset_sync",
+                route: "/api/drive/upload-failure",
+                uploadPath: uploadPathForSize(file),
+                folder: "media-library",
+                workspaceId,
+                fileName: file.name,
+                mimeType,
+                fileSize: file.size,
+                errorMessage: uploadErrorMessage(err),
+                errorDetail: err instanceof Error ? err.stack : undefined,
+              });
+            }
+          });
         }
 
-        setMedia((prev) => [asset, ...prev]);
+        if (mimeType.startsWith("video/")) {
+          playbackOptimizations.push(async () => {
+            try {
+              const playbackModule = await import("@/lib/media-playback");
+              if (!playbackModule.canUploadPlaybackCopy(file, mimeType)) return;
+              const playback = await playbackModule.uploadVideoPlaybackCopy(file, "media-library", workspaceId);
+              const updatedAsset: MediaAsset = {
+                ...asset,
+                url: playback.playbackUrl,
+                playbackUrl: playback.playbackUrl,
+                playbackStorageKey: playback.playbackStorageKey,
+              };
+              setMedia((prev) => prev.map((existing) => (
+                mediaAssetsOverlap(existing, asset) ? { ...existing, ...updatedAsset } : existing
+              )));
+              if (useDb) {
+                const id = await ensureMediaAsset({
+                  name: asset.name,
+                  url: playback.playbackUrl,
+                  fileId: asset.fileId,
+                  publishUrl: asset.publishUrl,
+                  driveProxyUrl: asset.driveProxyUrl,
+                  playbackUrl: playback.playbackUrl,
+                  playbackStorageKey: playback.playbackStorageKey,
+                  mimeType,
+                  size: asset.size,
+                  fileType: "video",
+                  folder: asset.folder,
+                  addedBy: asset.addedBy || currentUser.name,
+                  workspaceId: workspaceId || BASELINE_WORKSPACE_ID,
+                });
+                setMedia((prev) => prev.map((existing) => (
+                  mediaAssetsOverlap(existing, updatedAsset) ? { ...existing, id } : existing
+                )));
+              }
+            } catch (playbackErr) {
+              await reportUploadFailure({
+                phase: "media_library_playback_upload",
+                route: "/api/media/playback-upload",
+                uploadPath: uploadPathForSize(file),
+                folder: "media-library",
+                workspaceId,
+                fileName: file.name,
+                mimeType,
+                fileSize: file.size,
+                errorMessage: uploadErrorMessage(playbackErr),
+                errorDetail: playbackErr instanceof Error ? playbackErr.stack : undefined,
+              });
+              addToast(`Uploaded ${file.name}, but fast video playback was skipped.`, "warning");
+            }
+          });
+        }
+
+        setMedia((prev) => upsertMediaAsset(prev, asset));
         addToast(`${file.name} uploaded`, "success");
+      }
+      if (mediaAssetSyncs.length > 0) {
+        void Promise.allSettled(mediaAssetSyncs.map((run) => run()));
+      }
+      if (playbackOptimizations.length > 0) {
+        void Promise.allSettled(playbackOptimizations.map((run) => run()));
       }
     } catch (err) {
       addToast(`Upload failed: ${uploadErrorMessage(err)}. If this keeps happening, refresh the page.`, "error");

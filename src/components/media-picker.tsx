@@ -393,27 +393,36 @@ export function MediaPicker({
         const successes = items.filter((item) => item.result);
         const selections: MediaPickerSelection[] = [];
         const mediaAssetSyncs: Array<() => Promise<void>> = [];
-        // Load the playback-optimization module ONCE up front. If its code-split
-        // chunk fails to load, videos still upload (they just skip playback
-        // optimization) instead of the failure throwing mid-loop and dropping
-        // already-uploaded selections that the user expects attached.
-        let playbackModule: typeof import("@/lib/media-playback") | null = null;
-        try {
-          playbackModule = await import("@/lib/media-playback");
-        } catch {
-          playbackModule = null;
-        }
+        const playbackOptimizations: Array<() => Promise<void>> = [];
         for (const item of successes) {
           const result = item.result!;
           const mimeType = result.mimeType || normalizeDriveMimeType(item.file.type, item.file.name);
-          let playbackUrl: string | undefined;
-          let playbackStorageKey: string | undefined;
-          if (mimeType.startsWith("video/") && playbackModule) {
-            if (playbackModule.canUploadPlaybackCopy(item.file, mimeType)) {
+          const publishUrl = result.publishUrl || getPublicDriveDownloadUrl(result.fileId);
+          const driveProxyUrl = result.driveProxyUrl || result.url;
+          if (mimeType.startsWith("video/")) {
+            playbackOptimizations.push(async () => {
               try {
+                const playbackModule = await import("@/lib/media-playback");
+                if (!playbackModule.canUploadPlaybackCopy(item.file, mimeType)) return;
                 const playback = await playbackModule.uploadVideoPlaybackCopy(item.file, cardId, workspaceId);
-                playbackUrl = playback.playbackUrl;
-                playbackStorageKey = playback.playbackStorageKey;
+                if (isDrivePublishableMediaMime(mimeType, item.file.name)) {
+                  await ensureMediaAsset({
+                    name: item.file.name,
+                    url: playback.playbackUrl,
+                    fileId: result.fileId,
+                    publishUrl,
+                    driveProxyUrl,
+                    playbackUrl: playback.playbackUrl,
+                    playbackStorageKey: playback.playbackStorageKey,
+                    mimeType,
+                    size: result.size || item.file.size,
+                    fileType: "video",
+                    folder: "Content Engine Uploads",
+                    addedBy: currentUser.name,
+                    workspaceId,
+                    usedIn: cardId,
+                  });
+                }
               } catch (err) {
                 const errorMessage = uploadErrorMessage(err);
                 await reportUploadFailure({
@@ -431,14 +440,12 @@ export function MediaPicker({
                 });
                 addToast(`Uploaded ${item.file.name}, but fast video playback was skipped.`, "warning");
               }
-            }
+            });
           }
           selections.push({
-            url: playbackUrl || result.url,
-            publishUrl: result.publishUrl || getPublicDriveDownloadUrl(result.fileId),
-            driveProxyUrl: result.driveProxyUrl || result.url,
-            playbackUrl,
-            playbackStorageKey,
+            url: driveProxyUrl,
+            publishUrl,
+            driveProxyUrl,
             fileId: result.fileId,
             name: item.file.name,
             mimeType,
@@ -449,12 +456,10 @@ export function MediaPicker({
               try {
                 await ensureMediaAsset({
                   name: item.file.name,
-                  url: playbackUrl || result.driveProxyUrl || result.url,
+                  url: driveProxyUrl,
                   fileId: result.fileId,
-                  publishUrl: result.publishUrl || getPublicDriveDownloadUrl(result.fileId),
-                  driveProxyUrl: result.driveProxyUrl || result.url,
-                  playbackUrl,
-                  playbackStorageKey,
+                  publishUrl,
+                  driveProxyUrl,
                   mimeType,
                   size: result.size || item.file.size,
                   fileType: mimeType.startsWith("video/") ? "video" : "image",
@@ -487,7 +492,7 @@ export function MediaPicker({
               }
             });
           }
-          warmBrowserImagePreview(result.driveProxyUrl || result.url, { mimeType, fileName: item.file.name });
+          warmBrowserImagePreview(driveProxyUrl, { mimeType, fileName: item.file.name });
         }
         if (selections.length > 0) {
           if (onSelectMany) onSelectMany(selections);
@@ -506,6 +511,9 @@ export function MediaPicker({
                 );
               }
             });
+          }
+          if (playbackOptimizations.length > 0) {
+            void Promise.allSettled(playbackOptimizations.map((run) => run()));
           }
         }
       } catch (err) {

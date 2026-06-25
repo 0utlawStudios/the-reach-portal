@@ -147,28 +147,32 @@ describe("Drive upload surfaces", () => {
 
   it("keeps Drive video uploads when optional playback optimization fails", () => {
     const createPost = source("src/components/create-post-modal.tsx");
-    expect(createPost).toContain("let playbackModule: typeof import(\"@/lib/media-playback\") | null = null");
-    expect(createPost).toContain("Uploaded ${f.name}, but fast video playback was skipped.");
+    expect(createPost).toContain("const playbackOptimizations");
+    expect(createPost).toContain('phase: "create_post_playback_upload"');
+    expect(createPost).toContain("Uploaded ${rawFile.name}, but fast video playback was skipped.");
+    expect(createPost).toContain("Promise.allSettled(playbackOptimizations.map((run) => run()))");
     expect(createPost).not.toContain("Retry this upload before creating the post.");
 
     const mediaPicker = source("src/components/media-picker.tsx");
-    expect(mediaPicker).toMatch(
-      /phase: "media_picker_playback_upload"[\s\S]*?Uploaded \$\{item\.file\.name\}, but fast video playback was skipped\.[\s\S]*?selections\.push/,
-    );
+    expect(mediaPicker).toContain("const playbackOptimizations");
+    expect(mediaPicker).toContain('phase: "media_picker_playback_upload"');
+    expect(mediaPicker).toContain("Uploaded ${item.file.name}, but fast video playback was skipped.");
+    expect(mediaPicker).toContain("Promise.allSettled(playbackOptimizations.map((run) => run()))");
     expect(mediaPicker).not.toContain("Playback optimization failed for ${item.file.name}");
 
     const drawer = source("src/components/asset-review-drawer.tsx");
-    expect(drawer).toContain("let playbackModule: typeof import(\"@/lib/media-playback\") | null = null");
-    expect(drawer).toMatch(
-      /phase: "drawer_playback_upload"[\s\S]*?Uploaded \$\{file\.name\}, but fast video playback was skipped\.[\s\S]*?const publishUrl/,
-    );
+    expect(drawer).toContain("const playbackOptimizations");
+    expect(drawer).toContain('phase: "drawer_playback_upload"');
+    expect(drawer).toContain("Uploaded ${file.name}, but fast video playback was skipped.");
+    expect(drawer).toContain("Promise.allSettled(playbackOptimizations.map((run) => run()))");
     expect(drawer).not.toContain("Playback optimization failed for ${file.name}");
 
     const mediaPage = source("src/components/pages/media-page.tsx");
-    expect(mediaPage).toContain("let playbackModule: typeof import(\"@/lib/media-playback\") | null = null");
+    expect(mediaPage).toContain("const playbackOptimizations");
     expect(mediaPage).toContain('phase: "media_library_playback_upload"');
     expect(mediaPage).toContain("Uploaded ${file.name}, but fast video playback was skipped.");
-    expect(mediaPage).toContain("playback_storage_key: asset.playbackStorageKey");
+    expect(mediaPage).toContain("playbackStorageKey: playback.playbackStorageKey");
+    expect(mediaPage).toContain("Promise.allSettled(playbackOptimizations.map((run) => run()))");
   });
 
   it("keeps optimized playback copies behind the app workspace gate, not public storage URLs", () => {
@@ -329,6 +333,8 @@ describe("Drive upload surfaces", () => {
     expect(route).toContain("verifyAiAssetToken");
     expect(route).toContain("userHasWorkspaceAccess");
     expect(route).toContain(".eq(\"workspace_id\", workspaceId)");
+    expect(route).toContain("streamWithInactivityTimeout");
+    expect(route).toContain("Supabase AI asset stream");
 
     const assetUrl = source("src/lib/ai/asset-url.ts");
     expect(assetUrl).toContain("/api/ai/asset?key=");
@@ -349,7 +355,9 @@ describe("Drive upload surfaces", () => {
 
   it("renders media-library videos with source fallback instead of a permanent black preview", () => {
     const mediaVideo = source("src/components/media-video.tsx");
-    expect(mediaVideo).toContain("DEFAULT_VIDEO_LOAD_TIMEOUT_MS");
+    expect(mediaVideo).toContain("DEFAULT_VIDEO_LOAD_TIMEOUT_MS = 4_000");
+    expect(mediaVideo).toContain("attemptedSource");
+    expect(mediaVideo).toContain('preload !== "none" || attempted');
     expect(mediaVideo).toContain("advanceSource");
     expect(mediaVideo).toContain("retrySources");
     expect(mediaVideo).toContain("Video preview unavailable");
@@ -369,6 +377,24 @@ describe("Drive upload surfaces", () => {
     expect(source("src/components/media-picker.tsx")).toContain("mediaVideoSources");
     expect(source("src/components/card-thumbnail-media.tsx")).toContain("videoPreviewFrameUrl");
     expect(source("src/components/asset-review-drawer.tsx")).toContain("resolvedVideoSources");
+  });
+
+  it("does not block completed uploads on optional video playback optimization", () => {
+    for (const file of [
+      "src/components/create-post-modal.tsx",
+      "src/components/asset-review-drawer.tsx",
+      "src/components/media-picker.tsx",
+      "src/components/pages/media-page.tsx",
+    ]) {
+      const contents = source(file);
+      expect(contents, file).not.toContain("Optimizing playback");
+      expect(contents, file).toContain("Promise.allSettled(playbackOptimizations.map((run) => run()))");
+    }
+
+    const mediaPage = source("src/components/pages/media-page.tsx");
+    expect(mediaPage).toContain("Show results as soon as the primary Drive upload succeeds");
+    expect(mediaPage).not.toContain('.from("media_assets")\n            .insert');
+    expect(mediaPage).toContain("upsertMediaAsset");
   });
 
   it("keeps full Drive metadata when mirroring uploaded videos into Media Library", () => {

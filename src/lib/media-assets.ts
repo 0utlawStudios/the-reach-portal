@@ -47,11 +47,11 @@ async function withMediaAssetTimeout<T>(operation: PromiseLike<T>, label: string
  * If a row already exists and a valid post UUID is provided, appends the
  * post ID to the `used_in` array. Safe to call multiple times — idempotent.
  */
-export async function ensureMediaAsset(params: EnsureMediaAssetParams): Promise<void> {
+export async function ensureMediaAsset(params: EnsureMediaAssetParams): Promise<string> {
   return withMediaAssetTimeout(ensureMediaAssetInner(params), "Media asset sync");
 }
 
-async function ensureMediaAssetInner(params: EnsureMediaAssetParams): Promise<void> {
+async function ensureMediaAssetInner(params: EnsureMediaAssetParams): Promise<string> {
   const { name, url, fileId, publishUrl, driveProxyUrl, playbackUrl, playbackStorageKey, mimeType, size, fileType, folder, addedBy, workspaceId, usedIn } = params;
   const wsId = workspaceId || "00000000-0000-0000-0000-000000000001";
   const metadataUpdate: Record<string, unknown> = {
@@ -104,7 +104,7 @@ async function ensureMediaAssetInner(params: EnsureMediaAssetParams): Promise<vo
     if (!updated) {
       throw new Error("Media asset update failed: no matching workspace row was updated.");
     }
-    return;
+    return updated.id;
   }
 
   // 2. Insert new row
@@ -125,4 +125,5 @@ async function ensureMediaAssetInner(params: EnsureMediaAssetParams): Promise<vo
   if (!inserted) {
     throw new Error("Media asset insert failed: no row was created.");
   }
+  return inserted.id;
 }
