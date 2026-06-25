@@ -211,7 +211,8 @@ describe("POST /api/drive/upload-chunk", () => {
       route: "/api/drive/upload-chunk",
       errorMessage: "Storage is busy. Retrying automatically.",
       errorStatus: 403,
-      errorDetail: expect.stringContaining("raw quota detail"),
+      errorDetail: expect.stringContaining("reason=driveRateLimited"),
     }));
+    expect(alertMocks.notifyUploadFailure.mock.calls[0]?.[0]?.errorDetail).not.toContain("raw quota detail");
   });
 });

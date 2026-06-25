@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { ensureSubfolder, getAccessToken, getFileMetadata, getRootFolderId, verifyDriveStreamToken } from "@/lib/google-drive";
 import { ALLOWED_DRIVE_ROLES, VALID_DRIVE_FOLDERS } from "@/lib/drive-policy";
-import { sanitizeUnknownUploadError, statusForSanitizedDriveError } from "@/lib/drive-errors";
+import { sanitizedDriveErrorDetail, sanitizeUnknownUploadError, statusForSanitizedDriveError } from "@/lib/drive-errors";
 import { requireBearerTeamRole, requireRole, requireUser, type WorkspaceRole } from "@/lib/auth/require";
 import { STREAM_INACTIVITY_TIMEOUT_MS, streamWithInactivityTimeout } from "@/lib/stream-inactivity-timeout";
 
@@ -316,11 +316,11 @@ export async function GET(request: NextRequest) {
       },
     );
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Unknown error";
     const sanitized = sanitizeUnknownUploadError(err);
-    console.error("[drive/stream]", message);
+    const status = statusForSanitizedDriveError(sanitized);
+    console.error("[drive/stream]", sanitizedDriveErrorDetail(sanitized, status));
     return new Response(JSON.stringify(sanitized), {
-      status: statusForSanitizedDriveError(sanitized),
+      status,
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
   }

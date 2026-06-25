@@ -14,6 +14,7 @@ import { scheduleUploadFailureAlert } from "../upload-alert-scheduler";
 import {
   appRateLimitError,
   sanitizeGoogleDriveError,
+  sanitizedDriveErrorDetail,
   sanitizeUnknownUploadError,
   statusForSanitizedDriveError,
 } from "@/lib/drive-errors";
@@ -143,7 +144,8 @@ export async function POST(request: NextRequest) {
     if (!uploadRes.ok) {
       const rawErr = await uploadRes.text();
       const sanitized = sanitizeGoogleDriveError(uploadRes.status, rawErr);
-      console.error("[drive/upload-chunk] Google Drive error:", uploadRes.status, rawErr);
+      const detail = sanitizedDriveErrorDetail(sanitized, uploadRes.status);
+      console.error("[drive/upload-chunk] Google Drive error:", detail);
       const auth = authContext;
       scheduleUploadFailureAlert("drive/upload-chunk", {
         source: "server",
@@ -160,7 +162,7 @@ export async function POST(request: NextRequest) {
         fileSize,
         errorStatus: uploadRes.status,
         errorMessage: sanitized.error,
-        errorDetail: rawErr,
+        errorDetail: detail,
         userAgent: request.headers.get("user-agent"),
         ip: getClientIp(request),
         requestUrl: request.url,
@@ -180,9 +182,9 @@ export async function POST(request: NextRequest) {
       size: Number(driveFile.size || fileSize),
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Unknown server error";
     const sanitized = sanitizeUnknownUploadError(err);
-    console.error("[drive/upload-chunk]", message);
+    const detail = sanitizedDriveErrorDetail(sanitized);
+    console.error("[drive/upload-chunk]", detail);
     if (authContext) {
       const auth = authContext;
       scheduleUploadFailureAlert("drive/upload-chunk", {
@@ -200,7 +202,7 @@ export async function POST(request: NextRequest) {
         fileSize,
         errorMessage: sanitized.error,
         errorStatus: statusForSanitizedDriveError(sanitized),
-        errorDetail: message,
+        errorDetail: detail,
         userAgent: request.headers.get("user-agent"),
         ip: getClientIp(request),
         requestUrl: request.url,

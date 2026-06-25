@@ -13,6 +13,7 @@ import {
 import { scheduleUploadFailureAlert } from "../upload-alert-scheduler";
 import {
   appRateLimitError,
+  sanitizedDriveErrorDetail,
   sanitizeUnknownUploadError,
   statusForSanitizedDriveError,
 } from "@/lib/drive-errors";
@@ -114,9 +115,10 @@ export async function POST(request: NextRequest) {
       size: meta.size,
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Unknown error";
     const sanitized = sanitizeUnknownUploadError(err);
-    console.error("[drive/finalize]", message);
+    const status = statusForSanitizedDriveError(sanitized);
+    const detail = sanitizedDriveErrorDetail(sanitized, status);
+    console.error("[drive/finalize]", detail);
     if (authContext) {
       const auth = authContext;
       scheduleUploadFailureAlert("drive/finalize", {
@@ -131,13 +133,13 @@ export async function POST(request: NextRequest) {
         folder,
         fileName: fileId,
         errorMessage: sanitized.error,
-        errorStatus: statusForSanitizedDriveError(sanitized),
-        errorDetail: message,
+        errorStatus: status,
+        errorDetail: detail,
         userAgent: request.headers.get("user-agent"),
         ip: getClientIp(request),
         requestUrl: request.url,
       });
     }
-    return NextResponse.json(sanitized, { status: statusForSanitizedDriveError(sanitized) });
+    return NextResponse.json(sanitized, { status });
   }
 }

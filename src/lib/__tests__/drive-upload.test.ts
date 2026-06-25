@@ -394,6 +394,44 @@ describe("uploadManyToDrive", () => {
     expect(run.finalizeRequests).toEqual([]);
   });
 
+  it("times out a resumable session response body that stalls after headers", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const sessionRequests: string[] = [];
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url !== "/api/drive/upload") throw new Error(`Unexpected fetch ${url}`);
+      const body = JSON.parse(String(init?.body || "{}")) as { fileName?: string };
+      sessionRequests.push(body.fileName || "upload.bin");
+      const signal = init?.signal;
+      return {
+        ok: true,
+        status: 200,
+        json: () => new Promise((_resolve, reject) => {
+          signal?.addEventListener("abort", () => reject(new Error("aborted")));
+        }),
+        text: () => Promise.resolve(""),
+      } as Response;
+    }) as unknown as typeof fetch;
+    const largeVideo = new Uint8Array(4 * 1024 * 1024 + 1);
+
+    const pending = uploadManyToDrive([
+      new File([largeVideo], "session-body-stall.mp4", { type: "video/mp4" }),
+    ], "raw-files");
+
+    await vi.advanceTimersByTimeAsync(45_001);
+    await flushPromises();
+    await vi.advanceTimersByTimeAsync(1);
+    await flushPromises();
+    await vi.advanceTimersByTimeAsync(45_001);
+    const results = await pending;
+
+    expect(results).toHaveLength(1);
+    expect(results[0].result).toBeUndefined();
+    expect(results[0].error?.message).toBe("Upload timed out");
+    expect(sessionRequests).toEqual(["session-body-stall.mp4", "session-body-stall.mp4"]);
+  });
+
   it("isolates a hostile unsupported file without blocking valid siblings", async () => {
     const run: MockUploadRun = {
       sends: [],

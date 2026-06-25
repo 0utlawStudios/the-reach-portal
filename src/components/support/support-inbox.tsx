@@ -234,8 +234,8 @@ export function SupportInbox() {
             viewerRole="admin"
             onBack={deselect}
             onError={(m) => addToast(m, "error")}
-            onSend={async (body, files) => {
-              await sendMessage(activeThread.id, body, files);
+            onSend={async (body, files, onUploadProgress) => {
+              await sendMessage(activeThread.id, body, files, onUploadProgress);
             }}
             headerExtra={
               <select

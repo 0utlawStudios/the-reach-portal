@@ -2,7 +2,7 @@
 //                                       ?scope=all → superadmin: every workspace thread
 // POST /api/support/threads          — create a support ticket (JSON body)
 
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { requireBearerUser, requireBearerTeamRole } from "@/lib/auth/require";
 import { consume } from "@/lib/rate-limit";
@@ -27,6 +27,16 @@ import {
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
+
+function afterSupportResponse(label: string, run: () => Promise<void>): void {
+  after(async () => {
+    try {
+      await run();
+    } catch (err) {
+      console.error(`[support/threads] ${label} failed:`, err instanceof Error ? err.message : err);
+    }
+  });
+}
 
 export async function GET(request: NextRequest) {
   const scope = new URL(request.url).searchParams.get("scope");
@@ -172,15 +182,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Could not create your ticket. Please try again." }, { status: 500 });
   }
 
-  await recordSupportAudit({
-    admin,
-    action: "ticket_created",
-    threadId,
-    workspaceId,
-    actorName: name,
-    details: `Ticket created: ${subject}`,
+  afterSupportResponse("ticket side effects", async () => {
+    await recordSupportAudit({
+      admin,
+      action: "ticket_created",
+      threadId,
+      workspaceId,
+      actorName: name,
+      details: `Ticket created: ${subject}`,
+    });
+    await notifyAdminOfTicket({ admin, thread: threadRow as SupportThreadRow, body, attachments });
   });
-  await notifyAdminOfTicket({ admin, thread: threadRow as SupportThreadRow, body, attachments });
 
   return NextResponse.json({
     thread: rowToThread(threadRow as SupportThreadRow),

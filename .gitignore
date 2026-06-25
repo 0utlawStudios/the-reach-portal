@@ -15,6 +15,7 @@
 test-results/
 playwright-report/
 e2e/.auth/
+perf/drag-evidence/playwright-results/
 
 # next.js
 /.next/

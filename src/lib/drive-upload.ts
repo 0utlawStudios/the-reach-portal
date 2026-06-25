@@ -175,8 +175,15 @@ function errorFromPayload(status: number, payload: unknown): DriveUploadError {
   return toDriveUploadError(sanitizeGoogleDriveError(status, payload), status);
 }
 
-async function errorFromResponse(res: Response): Promise<DriveUploadError> {
-  const text = await res.text();
+type TimedFetchResponse = {
+  res: Response;
+  readText: () => Promise<string>;
+  readJson: () => Promise<unknown>;
+};
+
+async function errorFromResponse(response: TimedFetchResponse): Promise<DriveUploadError> {
+  const text = await response.readText();
+  const res = response.res;
   return errorFromPayload(res.status, parseJson(text));
 }
 
@@ -232,16 +239,31 @@ function makeStallWatchdog(xhr: XMLHttpRequest, onStall: () => void) {
 // The AbortController bounds it; withRetry treats the resulting error as
 // retryable, and the message stays honest for the user.
 const FETCH_TIMEOUT_MS = 45000;
-async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = FETCH_TIMEOUT_MS): Promise<TimedFetchResponse> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const clearTimer = () => clearTimeout(timer);
+  const readWithTimeout = async <T>(read: () => Promise<T>): Promise<T> => {
+    try {
+      return await read();
+    } catch (err) {
+      if (controller.signal.aborted) throw new Error("Upload timed out");
+      throw err;
+    } finally {
+      clearTimer();
+    }
+  };
   try {
-    return await fetch(url, { ...init, signal: controller.signal });
+    const res = await fetch(url, { ...init, signal: controller.signal });
+    return {
+      res,
+      readText: () => readWithTimeout(() => res.text()),
+      readJson: () => readWithTimeout(() => res.json()),
+    };
   } catch (err) {
+    clearTimer();
     if (controller.signal.aborted) throw new Error("Upload timed out");
     throw err;
-  } finally {
-    clearTimeout(timer);
   }
 }
 
@@ -421,11 +443,11 @@ async function getUploadSession(
     }),
   });
 
-  if (!res.ok) {
+  if (!res.res.ok) {
     throw await errorFromResponse(res);
   }
 
-	  const data = await res.json();
+	  const data = await res.readJson() as { uploadUri?: string; uploadToken?: string };
 	  if (!data.uploadUri) throw new Error("No uploadUri returned from session endpoint");
 	  if (!data.uploadToken) throw new Error("No upload token returned from session endpoint");
 	  return { uploadUri: data.uploadUri, uploadToken: data.uploadToken };
@@ -588,11 +610,13 @@ async function finalizeUpload(fileId: string, folder: string, workspaceId?: stri
     body: JSON.stringify({ fileId, folder }),
   });
 
-  if (!res.ok) {
+  if (!res.res.ok) {
     throw await errorFromResponse(res);
   }
 
-  const data = await res.json();
+  const data = await res.readJson() as Partial<DriveUploadResult>;
+  if (!data.fileId) throw new Error("Finalize endpoint did not return a file ID");
+  if (!data.url) throw new Error("Finalize endpoint did not return a media URL");
   return {
     fileId: data.fileId,
     url: data.url,
@@ -722,6 +746,7 @@ export async function uploadManyToDrive(
   const { cardId, workspaceId, concurrency = 3, onProgress, onSettled } = opts;
   const total = files.length;
   if (total === 0) return [];
+  const workerCount = Math.max(1, Math.min(total, Math.floor(Number.isFinite(concurrency) ? concurrency : 3)));
 
   const totalBytes = files.reduce((sum, f) => sum + (f.size || 1), 0);
   const filePercent = new Array<number>(total).fill(0);
@@ -760,6 +785,6 @@ export async function uploadManyToDrive(
     }
   };
 
-  await Promise.all(Array.from({ length: Math.min(concurrency, total) }, worker));
+  await Promise.all(Array.from({ length: workerCount }, worker));
   return settled.filter((x): x is BatchItemResult => x !== undefined);
 }

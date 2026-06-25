@@ -133,8 +133,8 @@ export function SupportPanel({ support, initialThreadId, onClose }: SupportPanel
             viewerRole="user"
             onBack={backToHome}
             onError={(m) => addToast(m, "error")}
-            onSend={async (body, files) => {
-              if (support.activeThread) await sendMessage(support.activeThread.id, body, files);
+            onSend={async (body, files, onUploadProgress) => {
+              if (support.activeThread) await sendMessage(support.activeThread.id, body, files, onUploadProgress);
             }}
           />
         </div>
@@ -171,8 +171,8 @@ export function SupportPanel({ support, initialThreadId, onClose }: SupportPanel
                 hideSubHeader
                 emptyLabel="Start a conversation — our tech team will reply right here."
                 onError={(m) => addToast(m, "error")}
-                onSend={async (body, files) => {
-                  await sendChatMessage(body, files);
+                onSend={async (body, files, onUploadProgress) => {
+                  await sendChatMessage(body, files, onUploadProgress);
                 }}
               />
             ) : view === "form" ? (

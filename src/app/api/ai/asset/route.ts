@@ -127,6 +127,7 @@ export async function GET(request: NextRequest) {
       storageRes.body,
       STREAM_INACTIVITY_TIMEOUT_MS,
       "Supabase AI asset stream",
+      () => controller.abort(),
     ),
     {
     status: storageRes.status,

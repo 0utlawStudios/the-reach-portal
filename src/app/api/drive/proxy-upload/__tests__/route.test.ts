@@ -156,8 +156,9 @@ describe("POST /api/drive/proxy-upload", () => {
     expect(alertMocks.notifyUploadFailure).toHaveBeenCalledWith(expect.objectContaining({
       errorMessage: "Storage is busy. Retrying automatically.",
       errorStatus: 403,
-      errorDetail: expect.stringContaining("raw quota details"),
+      errorDetail: expect.stringContaining("reason=driveRateLimited"),
     }));
+    expect(alertMocks.notifyUploadFailure.mock.calls[0]?.[0]?.errorDetail).not.toContain("raw quota details");
   });
 
   it("tags proxy-uploaded Drive files with the caller workspace and signs the stream URL for that workspace", async () => {

@@ -202,25 +202,10 @@ async function runTextGeneration(
   };
 }
 
-async function generateImagesForCaption(
-  ctx: BuildPromptContext,
-  caption: GeneratedCaption,
-  resolved: ResolvedAspect,
-) {
-  const prompts = buildImagePrompts(ctx, caption.scene_outline);
-  const out: Array<{ bytes: Buffer; mime: "image/png" }> = [];
-  for (const prompt of prompts) {
-    const img = await callImage({ model: imageModel(), prompt, size: resolved.openaiSize, quality: "high" });
-    const processed = await processImage(img.base64, resolved);
-    out.push({ bytes: processed.bytes, mime: "image/png" });
-  }
-  return out;
-}
-
 /**
- * Same as generateImagesForCaption but with cap enforcement between each
- * image. If a mid-job cap is hit, throws immediately so the worker fails
- * the job cleanly rather than continuing to spend.
+ * Generates images with cap enforcement between each image. If a mid-job cap
+ * is hit, throws immediately so the worker fails cleanly rather than
+ * continuing to spend.
  */
 async function generateImagesForCaptionWithCapChecks(args: {
   ctx: BuildPromptContext;

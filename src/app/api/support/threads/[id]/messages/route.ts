@@ -2,7 +2,7 @@
 // The sender is the thread owner (a "user" message) or the superadmin (an
 // "admin" reply); anyone else gets a 404 so thread existence is not leaked.
 
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { isValidUuid } from "@/lib/utils";
 import { requireBearerUser } from "@/lib/auth/require";
@@ -32,6 +32,16 @@ import { SUPPORT_MAX_BODY } from "@/lib/support/format";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
+
+function afterSupportResponse(label: string, run: () => Promise<void>): void {
+  after(async () => {
+    try {
+      await run();
+    } catch (err) {
+      console.error(`[support/messages] ${label} failed:`, err instanceof Error ? err.message : err);
+    }
+  });
+}
 
 export async function POST(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireBearerUser(request);
@@ -154,24 +164,28 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
   // Notifications read the debounce timestamps from the pre-update thread row.
   const freshThread: SupportThreadRow = { ...thread, status: nextStatus };
   if (senderType === "user") {
-    await notifyAdminOfMessage({ admin, thread: freshThread, body: body || null });
-    await recordSupportAudit({
-      admin,
-      action: "support_message",
-      threadId: id,
-      workspaceId: thread.workspace_id,
-      actorName: senderName,
-      details: "User replied",
+    afterSupportResponse("user reply side effects", async () => {
+      await notifyAdminOfMessage({ admin, thread: freshThread, body: body || null });
+      await recordSupportAudit({
+        admin,
+        action: "support_message",
+        threadId: id,
+        workspaceId: thread.workspace_id,
+        actorName: senderName,
+        details: "User replied",
+      });
     });
   } else {
-    await notifyUserOfReply({ admin, thread: freshThread, body: body || null });
-    await recordSupportAudit({
-      admin,
-      action: "support_reply",
-      threadId: id,
-      workspaceId: thread.workspace_id,
-      actorName: senderName,
-      details: "Team replied",
+    afterSupportResponse("team reply side effects", async () => {
+      await notifyUserOfReply({ admin, thread: freshThread, body: body || null });
+      await recordSupportAudit({
+        admin,
+        action: "support_reply",
+        threadId: id,
+        workspaceId: thread.workspace_id,
+        actorName: senderName,
+        details: "Team replied",
+      });
     });
   }
 

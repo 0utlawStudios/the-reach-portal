@@ -90,6 +90,27 @@ describe("uploadVideoPlaybackCopy", () => {
     expect(mockUploadToSignedUrl).not.toHaveBeenCalled();
   });
 
+  it("fails closed instead of hanging when playback target response body stalls", async () => {
+    vi.useFakeTimers();
+    globalThis.fetch = vi.fn(async (_input, init) => {
+      const signal = (init as RequestInit | undefined)?.signal;
+      return {
+        ok: true,
+        status: 200,
+        json: () => new Promise((_resolve, reject) => {
+          signal?.addEventListener("abort", () => reject(new Error("aborted")));
+        }),
+        text: () => Promise.resolve(""),
+      } as Response;
+    }) as unknown as typeof fetch;
+
+    const pending = uploadVideoPlaybackCopy(makeVideo("target-body-stalled.mp4", 10));
+    const assertion = expect(pending).rejects.toThrow(/target timed out/i);
+    await vi.advanceTimersByTimeAsync(15_010);
+    await assertion;
+    expect(mockUploadToSignedUrl).not.toHaveBeenCalled();
+  });
+
   it("fails closed instead of hanging when playback auth lookup never settles", async () => {
     vi.useFakeTimers();
     mockGetSession.mockReturnValue(new Promise(() => {}));

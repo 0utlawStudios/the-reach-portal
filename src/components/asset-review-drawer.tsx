@@ -355,43 +355,45 @@ export function AssetReviewDrawer() {
           thumbnailMimeType: resultMimeType,
         },
       });
-      try {
-        await ensureMediaAsset({
-          name: file.name,
-          url: result.url,
-          fileId: result.fileId,
-          publishUrl: result.publishUrl,
-          driveProxyUrl: result.driveProxyUrl || result.url,
-          mimeType: resultMimeType,
-          size: result.size || file.size,
-          fileType: resultMimeType.startsWith("video") ? "video" : "image",
-          folder: "Content Engine Uploads",
-          addedBy: currentUser.name,
-          workspaceId,
-          usedIn: selectedCard.id,
-        });
-      } catch (err) {
-        console.error("[drawer] media_assets sync failed:", err);
-        addToast("Cover uploaded, but saving it to Media Library failed.", "warning");
+      void (async () => {
         try {
-          await driveModule?.reportUploadFailure({
-            phase: "drawer_media_asset_sync",
-            route: "/api/drive/upload-failure",
-            uploadPath: uploadPathForSize(file),
-            cardId: selectedCard.id,
-            workspaceId,
-            postTitle: selectedCard.title,
-            folder: "thumbnails",
-            fileName: file.name,
+          await ensureMediaAsset({
+            name: file.name,
+            url: result.url,
+            fileId: result.fileId,
+            publishUrl: result.publishUrl,
+            driveProxyUrl: result.driveProxyUrl || result.url,
             mimeType: resultMimeType,
-            fileSize: file.size,
-            errorMessage: uploadErrorMessage(err),
-            errorDetail: err instanceof Error ? err.stack : undefined,
+            size: result.size || file.size,
+            fileType: resultMimeType.startsWith("video") ? "video" : "image",
+            folder: "Content Engine Uploads",
+            addedBy: currentUser.name,
+            workspaceId,
+            usedIn: selectedCard.id,
           });
-        } catch (reportErr) {
-          console.error("[drawer] media_assets sync telemetry failed:", reportErr);
+        } catch (err) {
+          console.error("[drawer] media_assets sync failed:", err);
+          addToast("Cover uploaded, but saving it to Media Library failed.", "warning");
+          try {
+            await driveModule?.reportUploadFailure({
+              phase: "drawer_media_asset_sync",
+              route: "/api/drive/upload-failure",
+              uploadPath: uploadPathForSize(file),
+              cardId: selectedCard.id,
+              workspaceId,
+              postTitle: selectedCard.title,
+              folder: "thumbnails",
+              fileName: file.name,
+              mimeType: resultMimeType,
+              fileSize: file.size,
+              errorMessage: uploadErrorMessage(err),
+              errorDetail: err instanceof Error ? err.stack : undefined,
+            });
+          } catch (reportErr) {
+            console.error("[drawer] media_assets sync telemetry failed:", reportErr);
+          }
         }
-      }
+      })();
       logAudit(selectedCard.id, currentUser.name, "asset_replaced", `Replaced cover with ${file.name}`);
       addToast("Cover image uploaded", "success");
     } catch (err) {
@@ -896,7 +898,7 @@ export function AssetReviewDrawer() {
                   return (
                     <div key={`${idx}-${url}`} className="shrink-0 w-24" title={scene?.shot || `Slide ${idx + 1}`}>
                       <div className={`w-24 ${selectedCard.aspectRatio === "9:16" ? "aspect-[9/16]" : "aspect-[4/5]"} rounded-lg overflow-hidden border-2 ${idx === 0 ? "border-violet-500" : "border-gray-200 dark:border-white/[0.06]"}`}>
-                        <RawImage src={url} alt={`Slide ${idx + 1}`} className="w-full h-full object-cover" />
+                        <PreviewImage src={url} alt={`Slide ${idx + 1}`} className="w-full h-full object-cover" />
                       </div>
                       <p className="mt-1 text-[9px] text-gray-500 dark:text-gray-400 line-clamp-2">
                         <span className="font-semibold text-gray-600 dark:text-gray-300">{idx + 1}.</span> {scene?.on_screen_text || scene?.shot || `Slide ${idx + 1}`}

@@ -151,3 +151,12 @@ export function statusForSanitizedDriveError(error: SanitizedDriveError, fallbac
       return fallback;
   }
 }
+
+export function sanitizedDriveErrorDetail(error: SanitizedDriveError, status?: number): string {
+  return [
+    typeof status === "number" ? `status=${status}` : null,
+    `reason=${error.errorReason}`,
+    `retryable=${error.retryable}`,
+    typeof error.retryAfterMs === "number" ? `retryAfterMs=${error.retryAfterMs}` : null,
+  ].filter(Boolean).join(" ");
+}

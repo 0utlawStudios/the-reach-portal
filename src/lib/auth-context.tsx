@@ -52,9 +52,24 @@ const DEFAULT_USER: UserProfile = {
   initials: "G",
 };
 const ACCESS_REVALIDATE_MS = 10 * 60 * 1000;
+const AUTH_SESSION_TIMEOUT_MS = 5_000;
 const SERVER_SESSION_COOKIE_TIMEOUT_MS = 5_000;
 const WORKSPACE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 type AuthSession = NonNullable<Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"]>;
+
+async function withAuthSessionTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timed out`)), AUTH_SESSION_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 
 /** Build a profile from auth metadata, with proper capitalization */
 function buildProfile(email: string, meta: Record<string, unknown>): UserProfile {
@@ -231,7 +246,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     async function init() {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session } } = await withAuthSessionTimeout(supabase.auth.getSession(), "Session check");
         if (session?.user) {
           await applyAccessState(session);
         }
@@ -296,7 +311,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!hydrated || !isAuthenticated) return;
     const refreshIfVisible = () => {
       if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
-      supabase.auth.getSession()
+      withAuthSessionTimeout(supabase.auth.getSession(), "Session refresh")
         .then(({ data: { session } }) => {
           if (!session?.user) return;
           const email = session.user.email || "";

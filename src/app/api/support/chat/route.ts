@@ -4,7 +4,7 @@
 // Each user has at most one kind='chat' thread. The first message creates it.
 // The superadmin answers chat threads from the same Support Inbox as tickets.
 
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { requireBearerUser } from "@/lib/auth/require";
 import { consume } from "@/lib/rate-limit";
@@ -33,6 +33,16 @@ import { SUPPORT_MAX_BODY } from "@/lib/support/format";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
+
+function afterSupportResponse(label: string, run: () => Promise<void>): void {
+  after(async () => {
+    try {
+      await run();
+    } catch (err) {
+      console.error(`[support/chat] ${label} failed:`, err instanceof Error ? err.message : err);
+    }
+  });
+}
 
 export async function GET(request: NextRequest) {
   const auth = await requireBearerUser(request);
@@ -157,14 +167,16 @@ export async function POST(request: NextRequest) {
     })
     .eq("id", thread.id);
 
-  await notifyAdminOfMessage({ admin, thread: { ...thread, status: nextStatus }, body: body || null });
-  await recordSupportAudit({
-    admin,
-    action: "support_message",
-    threadId: thread.id,
-    workspaceId,
-    actorName: name,
-    details: "Chat message",
+  afterSupportResponse("chat side effects", async () => {
+    await notifyAdminOfMessage({ admin, thread: { ...thread, status: nextStatus }, body: body || null });
+    await recordSupportAudit({
+      admin,
+      action: "support_message",
+      threadId: thread.id,
+      workspaceId,
+      actorName: name,
+      details: "Chat message",
+    });
   });
 
   return NextResponse.json({

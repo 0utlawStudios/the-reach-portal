@@ -20,6 +20,7 @@ import { scheduleUploadFailureAlert } from "../upload-alert-scheduler";
 import {
   appRateLimitError,
   sanitizeGoogleDriveError,
+  sanitizedDriveErrorDetail,
   sanitizeUnknownUploadError,
   statusForSanitizedDriveError,
 } from "@/lib/drive-errors";
@@ -140,10 +141,10 @@ export async function POST(request: NextRequest) {
     }
 
     if (!uploadRes.ok) {
-      // Log the full error server-side, return clean message to client
       const rawErr = await uploadRes.text();
       const sanitized = sanitizeGoogleDriveError(uploadRes.status, rawErr);
-      console.error("[proxy-upload] Google Drive error:", uploadRes.status, rawErr);
+      const detail = sanitizedDriveErrorDetail(sanitized, uploadRes.status);
+      console.error("[proxy-upload] Google Drive error:", detail);
       const auth = authContext;
       scheduleUploadFailureAlert("proxy-upload", {
         source: "server",
@@ -160,7 +161,7 @@ export async function POST(request: NextRequest) {
         fileSize,
         errorStatus: uploadRes.status,
         errorMessage: sanitized.error,
-        errorDetail: rawErr,
+        errorDetail: detail,
         userAgent: request.headers.get("user-agent"),
         ip: getClientIp(request),
         requestUrl: request.url,
@@ -189,9 +190,9 @@ export async function POST(request: NextRequest) {
       driveFileName,
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Unknown server error";
     const sanitized = sanitizeUnknownUploadError(err);
-    console.error("[proxy-upload] Error:", message);
+    const detail = sanitizedDriveErrorDetail(sanitized);
+    console.error("[proxy-upload] Error:", detail);
     if (authContext) {
       const auth = authContext;
       scheduleUploadFailureAlert("proxy-upload", {
@@ -209,7 +210,7 @@ export async function POST(request: NextRequest) {
         fileSize,
         errorMessage: sanitized.error,
         errorStatus: statusForSanitizedDriveError(sanitized),
-        errorDetail: message,
+        errorDetail: detail,
         userAgent: request.headers.get("user-agent"),
         ip: getClientIp(request),
         requestUrl: request.url,

@@ -10,7 +10,7 @@
 
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { withStorageUploadTimeout } from "@/lib/storage-upload-timeout";
+import { storageUploadBudgetMs } from "@/lib/storage-upload-timeout";
 import { useAuth } from "@/lib/auth-context";
 import { refreshSupportAlert } from "./use-support-alert";
 import { rowToThread, rowToMessage } from "./types";
@@ -24,6 +24,18 @@ import type {
 
 const BUCKET = "support-attachments";
 const SUPPORT_API_TIMEOUT_MS = 15_000;
+const SUPPORT_UPLOAD_STALL_TIMEOUT_MS = 30_000;
+const SUPPORT_UPLOAD_RESPONSE_WAIT_MS = 60_000;
+
+export interface SupportAttachmentUploadProgress {
+  totalFiles: number;
+  completedFiles: number;
+  currentFileName: string | null;
+  currentFilePercent: number;
+  overallPercent: number;
+}
+
+export type SupportAttachmentUploadProgressCallback = (progress: SupportAttachmentUploadProgress) => void;
 
 export interface AttachmentClaim {
   storageKey: string;
@@ -34,6 +46,7 @@ export interface NewTicketInput {
   body: string;
   category: string | null;
   files: File[];
+  onUploadProgress?: SupportAttachmentUploadProgressCallback;
 }
 
 async function apiFetch<T>(
@@ -44,6 +57,17 @@ async function apiFetch<T>(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), SUPPORT_API_TIMEOUT_MS);
   let res: Response;
+  const timedOutMessage = "Support request timed out. Check your connection and try again.";
+  const readJson = async (): Promise<unknown> => {
+    try {
+      return await res.json();
+    } catch {
+      if (controller.signal.aborted) throw new Error(timedOutMessage);
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
   try {
     res = await fetch(path, {
       method: options.method || "GET",
@@ -56,19 +80,13 @@ async function apiFetch<T>(
       signal: controller.signal,
     });
   } catch (err) {
+    clearTimeout(timer);
     if (controller.signal.aborted) {
-      throw new Error("Support request timed out. Check your connection and try again.");
+      throw new Error(timedOutMessage);
     }
     throw err;
-  } finally {
-    clearTimeout(timer);
   }
-  let json: unknown = null;
-  try {
-    json = await res.json();
-  } catch {
-    json = null;
-  }
+  const json = await readJson();
   if (!res.ok) {
     const message =
       (json as { error?: string } | null)?.error || "Something went wrong. Please try again.";
@@ -100,7 +118,109 @@ function onIdle(cb: () => void): () => void {
  * return the storage keys to attach. Keeps large files off the 4.5 MB Vercel
  * function body limit.
  */
-async function uploadFiles(files: File[], token: string, workspaceId?: string | null): Promise<AttachmentClaim[]> {
+function supportSignedUploadUrl(storageKey: string, uploadToken: string): string {
+  const base = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/+$/, "");
+  if (!base) throw new Error("Attachment storage is not configured.");
+  const encodedKey = storageKey.split("/").map(encodeURIComponent).join("/");
+  const url = new URL(`${base}/storage/v1/object/upload/sign/${BUCKET}/${encodedKey}`);
+  url.searchParams.set("token", uploadToken);
+  return url.toString();
+}
+
+function uploadSupportAttachment(args: {
+  target: { storageKey: string; token: string; name: string };
+  file: File;
+  accessToken: string;
+  onProgress?: (percent: number) => void;
+}): Promise<void> {
+  const { target, file, accessToken, onProgress } = args;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    let settled = false;
+    let stallTimer: ReturnType<typeof setTimeout> | null = null;
+    let responseTimer: ReturnType<typeof setTimeout> | null = null;
+    let budgetTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const clearTimers = () => {
+      if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; }
+      if (responseTimer) { clearTimeout(responseTimer); responseTimer = null; }
+      if (budgetTimer) { clearTimeout(budgetTimer); budgetTimer = null; }
+    };
+    const fail = (err: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimers();
+      try { xhr.abort(); } catch { /* already settled */ }
+      reject(err);
+    };
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      clearTimers();
+      onProgress?.(100);
+      resolve();
+    };
+    const kick = () => {
+      if (stallTimer) clearTimeout(stallTimer);
+      stallTimer = setTimeout(() => {
+        fail(new Error(`Attachment upload stalled for "${file.name}". Check your connection and try again.`));
+      }, SUPPORT_UPLOAD_STALL_TIMEOUT_MS);
+    };
+    const armResponseTimer = () => {
+      if (responseTimer) clearTimeout(responseTimer);
+      responseTimer = setTimeout(() => {
+        fail(new Error(`Attachment upload reached storage but did not finish for "${file.name}". Try again before sending.`));
+      }, SUPPORT_UPLOAD_RESPONSE_WAIT_MS);
+    };
+
+    const form = new FormData();
+    form.append("cacheControl", "3600");
+    form.append("", file);
+
+    xhr.open("PUT", supportSignedUploadUrl(target.storageKey, target.token), true);
+    if (anonKey) xhr.setRequestHeader("apikey", anonKey);
+    xhr.setRequestHeader("Authorization", `Bearer ${accessToken}`);
+    xhr.setRequestHeader("x-upsert", "false");
+
+    xhr.upload.onprogress = (event) => {
+      kick();
+      if (!event.lengthComputable) return;
+      const percent = Math.max(1, Math.min(95, Math.round((event.loaded / event.total) * 95)));
+      onProgress?.(percent);
+      if (event.loaded >= event.total) {
+        if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; }
+        armResponseTimer();
+      }
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        done();
+        return;
+      }
+      fail(new Error(`Could not upload "${file.name}". Please try a smaller file.`));
+    };
+    xhr.onerror = () => fail(new Error(`Network error while uploading "${file.name}".`));
+    xhr.ontimeout = () => fail(new Error(`Attachment upload timed out for "${file.name}".`));
+    xhr.onabort = () => {
+      if (!settled) fail(new Error(`Attachment upload was cancelled for "${file.name}".`));
+    };
+
+    onProgress?.(1);
+    kick();
+    budgetTimer = setTimeout(() => {
+      fail(new Error(`Attachment upload timed out for "${file.name}". Check your connection and try again.`));
+    }, storageUploadBudgetMs(file.size));
+    xhr.send(form);
+  });
+}
+
+async function uploadFiles(
+  files: File[],
+  token: string,
+  workspaceId?: string | null,
+  onUploadProgress?: SupportAttachmentUploadProgressCallback,
+): Promise<AttachmentClaim[]> {
   if (files.length === 0) return [];
   const { uploads } = await apiFetch<{
     uploads: Array<{ storageKey: string; token: string; name: string }>;
@@ -109,21 +229,45 @@ async function uploadFiles(files: File[], token: string, workspaceId?: string | 
     workspaceId,
     body: { files: files.map((f) => ({ name: f.name, mime: f.type, size: f.size })) },
   });
-  // Upload every file in parallel — each goes straight to storage and none
-  // depends on another.
+  const filePercent = new Array<number>(uploads.length).fill(0);
+  const emitProgress = (currentIndex: number) => {
+    if (!onUploadProgress || uploads.length === 0) return;
+    const completedFiles = filePercent.filter((percent) => percent >= 100).length;
+    const overallPercent = Math.round(filePercent.reduce((sum, percent) => sum + percent, 0) / uploads.length);
+    onUploadProgress({
+      totalFiles: uploads.length,
+      completedFiles,
+      currentFileName: files[currentIndex]?.name || uploads[currentIndex]?.name || null,
+      currentFilePercent: filePercent[currentIndex] || 0,
+      overallPercent,
+    });
+  };
+
+  onUploadProgress?.({
+    totalFiles: uploads.length,
+    completedFiles: 0,
+    currentFileName: uploads[0]?.name || null,
+    currentFilePercent: 0,
+    overallPercent: 0,
+  });
+
+  // Upload every file in parallel. Each request goes straight to Supabase
+  // Storage, but uses XHR so support uploads have real progress and a stall
+  // watchdog instead of an opaque never-ending storage promise.
   await Promise.all(
     uploads.map(async (target, i) => {
       const file = files[i];
-      const { error } = await withStorageUploadTimeout(
-        supabase.storage
-          .from(BUCKET)
-          .uploadToSignedUrl(target.storageKey, target.token, file),
-        file.size,
-        `Support attachment "${file.name}"`,
-      );
-      if (error) {
-        throw new Error(`Could not upload "${file.name}". Please try a smaller file.`);
-      }
+      await uploadSupportAttachment({
+        target,
+        file,
+        accessToken: token,
+        onProgress: (percent) => {
+          filePercent[i] = percent;
+          emitProgress(i);
+        },
+      });
+      filePercent[i] = 100;
+      emitProgress(i);
     }),
   );
   return uploads.map((u) => ({ storageKey: u.storageKey, name: u.name }));
@@ -151,11 +295,11 @@ export interface UseSupport {
   createTicket: (input: NewTicketInput) => Promise<SupportThread>;
   openThread: (threadId: string) => Promise<void>;
   closeThread: () => void;
-  sendMessage: (threadId: string, body: string, files: File[]) => Promise<void>;
+  sendMessage: (threadId: string, body: string, files: File[], onUploadProgress?: SupportAttachmentUploadProgressCallback) => Promise<void>;
   markRead: (threadId: string) => Promise<void>;
   setStatus: (threadId: string, status: SupportThreadStatus) => Promise<void>;
   loadChat: () => Promise<void>;
-  sendChatMessage: (body: string, files: File[]) => Promise<void>;
+  sendChatMessage: (body: string, files: File[], onUploadProgress?: SupportAttachmentUploadProgressCallback) => Promise<void>;
   startChatWith: (email: string) => Promise<SupportThread>;
 }
 
@@ -203,7 +347,7 @@ export function useSupport(scope: SupportScope = "own", options: UseSupportOptio
   const createTicket = useCallback(
     async (input: NewTicketInput): Promise<SupportThread> => {
       if (!accessToken) throw new Error("Please sign in again.");
-      const claims = await uploadFiles(input.files, accessToken, workspaceId);
+      const claims = await uploadFiles(input.files, accessToken, workspaceId, input.onUploadProgress);
       const { thread } = await apiFetch<{ thread: SupportThread }>(
         "/api/support/threads",
         accessToken,
@@ -244,9 +388,9 @@ export function useSupport(scope: SupportScope = "own", options: UseSupportOptio
   }, []);
 
   const sendMessage = useCallback(
-    async (threadId: string, body: string, files: File[]) => {
+    async (threadId: string, body: string, files: File[], onUploadProgress?: SupportAttachmentUploadProgressCallback) => {
       if (!accessToken) throw new Error("Please sign in again.");
-      const claims = await uploadFiles(files, accessToken, workspaceId);
+      const claims = await uploadFiles(files, accessToken, workspaceId, onUploadProgress);
       const { message } = await apiFetch<{ message: SupportMessage }>(
         `/api/support/threads/${threadId}/messages`,
         accessToken,
@@ -313,9 +457,9 @@ export function useSupport(scope: SupportScope = "own", options: UseSupportOptio
 
   // Send a chat message; the server lazily creates the chat thread.
   const sendChatMessage = useCallback(
-    async (body: string, files: File[]) => {
+    async (body: string, files: File[], onUploadProgress?: SupportAttachmentUploadProgressCallback) => {
       if (!accessToken) throw new Error("Please sign in again.");
-      const claims = await uploadFiles(files, accessToken, workspaceId);
+      const claims = await uploadFiles(files, accessToken, workspaceId, onUploadProgress);
       const { thread, message } = await apiFetch<{
         thread: SupportThread;
         message: SupportMessage;

@@ -1,5 +1,6 @@
 import { GoogleAuth } from "google-auth-library";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { sanitizeGoogleDriveError, sanitizedDriveErrorDetail } from "@/lib/drive-errors";
 import { getPublicDriveDownloadUrl } from "@/lib/drive-url-utils";
 
 // ─── Drive API base URLs ───
@@ -13,6 +14,7 @@ let cachedAccessToken: { token: string; expiresAt: number } | null = null;
 let accessTokenInFlight: Promise<string> | null = null;
 const ACCESS_TOKEN_CACHE_TTL_MS = 50 * 60 * 1000;
 const ACCESS_TOKEN_MINT_TIMEOUT_MS = 10_000;
+const DRIVE_FETCH_TIMEOUT_MS = 45_000;
 
 function getCredentials() {
   const b64 = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
@@ -68,11 +70,31 @@ async function driveFetch(url: string, init?: RequestInit): Promise<Response> {
   const headers = new Headers(init?.headers);
   headers.set("Authorization", `Bearer ${token}`);
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 45000);
+  const timer = setTimeout(() => controller.abort(), DRIVE_FETCH_TIMEOUT_MS);
+  const clear = () => clearTimeout(timer);
+  const readWithTimeout = async <T>(read: () => Promise<T>): Promise<T> => {
+    try {
+      return await read();
+    } catch (err) {
+      if (controller.signal.aborted) throw new Error("Google Drive request timed out");
+      throw err;
+    } finally {
+      clear();
+    }
+  };
   try {
-    return await fetch(url, { ...init, headers, signal: controller.signal });
-  } finally {
-    clearTimeout(timer);
+    const res = await fetch(url, { ...init, headers, signal: controller.signal });
+    const readText = res.text.bind(res);
+    const readJson = res.json.bind(res);
+    Object.defineProperties(res, {
+      text: { value: () => readWithTimeout(readText) },
+      json: { value: () => readWithTimeout(readJson) },
+    });
+    return res;
+  } catch (err) {
+    clear();
+    if (controller.signal.aborted) throw new Error("Google Drive request timed out");
+    throw err;
   }
 }
 
@@ -116,7 +138,7 @@ export async function ensureSubfolder(name: string, parentId: string): Promise<s
     const listRes = await driveFetch(`${DRIVE_API}/files?q=${q}&fields=files(id)&spaces=drive&supportsAllDrives=true&includeItemsFromAllDrives=true`);
     if (!listRes.ok) {
       const err = await listRes.text();
-      throw new Error(`Failed to list folders: ${listRes.status} ${err}`);
+      throw new Error(`Failed to list folders: ${sanitizedDriveErrorDetail(sanitizeGoogleDriveError(listRes.status, err), listRes.status)}`);
     }
     const listData = await listRes.json();
 
@@ -138,7 +160,7 @@ export async function ensureSubfolder(name: string, parentId: string): Promise<s
     });
     if (!createRes.ok) {
       const err = await createRes.text();
-      throw new Error(`Failed to create folder: ${createRes.status} ${err}`);
+      throw new Error(`Failed to create folder: ${sanitizedDriveErrorDetail(sanitizeGoogleDriveError(createRes.status, err), createRes.status)}`);
     }
     const createData = await createRes.json();
     const id = createData.id;
@@ -185,8 +207,9 @@ export async function createResumableUploadSession(
   );
 
   if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Failed to create resumable session: ${res.status} ${err}`);
+    const rawErr = await res.text();
+    const sanitized = sanitizeGoogleDriveError(res.status, rawErr);
+    throw new Error(`Failed to create resumable session: ${sanitizedDriveErrorDetail(sanitized, res.status)}`);
   }
 
   const uploadUri = res.headers.get("location");
@@ -205,7 +228,7 @@ export async function setPublicPermission(fileId: string): Promise<void> {
   });
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`Failed to set permission: ${res.status} ${err}`);
+    throw new Error(`Failed to set permission: ${sanitizedDriveErrorDetail(sanitizeGoogleDriveError(res.status, err), res.status)}`);
   }
 }
 
@@ -293,7 +316,7 @@ export async function getFileMetadata(fileId: string) {
   const res = await driveFetch(`${DRIVE_API}/files/${fileId}?fields=id,name,mimeType,size,parents,appProperties,thumbnailLink&supportsAllDrives=true`);
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`Failed to get file metadata: ${res.status} ${err}`);
+    throw new Error(`Failed to get file metadata: ${sanitizedDriveErrorDetail(sanitizeGoogleDriveError(res.status, err), res.status)}`);
   }
   const data = await res.json();
   return {

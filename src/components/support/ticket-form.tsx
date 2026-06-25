@@ -10,11 +10,17 @@ import {
   SUPPORT_MAX_BODY,
   spliceAtSelection,
 } from "@/lib/support/format";
+import type { SupportAttachmentUploadProgress } from "@/lib/support/use-support";
 import { AttachmentBar } from "./attachment-bar";
 import { EmojiPicker } from "./emoji-picker";
 
 interface TicketFormProps {
-  onSubmit: (input: { body: string; category: string | null; files: File[] }) => Promise<void>;
+  onSubmit: (input: {
+    body: string;
+    category: string | null;
+    files: File[];
+    onUploadProgress?: (progress: SupportAttachmentUploadProgress) => void;
+  }) => Promise<void>;
   onError?: (message: string) => void;
 }
 
@@ -23,6 +29,7 @@ export function TicketForm({ onSubmit, onError }: TicketFormProps) {
   const [body, setBody] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<SupportAttachmentUploadProgress | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const insertEmoji = useCallback(
@@ -50,14 +57,28 @@ export function TicketForm({ onSubmit, onError }: TicketFormProps) {
   async function handleSubmit() {
     if (!canSubmit) return;
     setSubmitting(true);
+    setUploadProgress(files.length > 0 ? {
+      totalFiles: files.length,
+      completedFiles: 0,
+      currentFileName: files[0]?.name || null,
+      currentFilePercent: 0,
+      overallPercent: 0,
+    } : null);
     try {
-      await onSubmit({ body: trimmed, category, files });
+      await onSubmit({ body: trimmed, category, files, onUploadProgress: setUploadProgress });
       // On success the parent switches view and unmounts this form.
     } catch (err) {
       onError?.(err instanceof Error ? err.message : "Could not submit your ticket.");
       setSubmitting(false);
+      setUploadProgress(null);
     }
   }
+
+  const submitLabel = submitting
+    ? uploadProgress
+      ? `Uploading ${Math.min(uploadProgress.completedFiles + 1, uploadProgress.totalFiles)}/${uploadProgress.totalFiles}`
+      : "Sending…"
+    : "Send ticket";
 
   return (
     <div className="flex h-full flex-col">
@@ -121,8 +142,19 @@ export function TicketForm({ onSubmit, onError }: TicketFormProps) {
           disabled={!canSubmit}
           className="reach-action-button h-11 w-full rounded-lg bg-orange-500 text-[13px] font-semibold text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {submitting ? "Sending…" : "Send ticket"}
+          {submitLabel}
         </button>
+        {uploadProgress && (
+          <div className="mt-2">
+            <div className="flex items-center justify-between gap-2 text-[10px] text-gray-400">
+              <span className="min-w-0 truncate">{uploadProgress.currentFileName || "Attachment"}</span>
+              <span className="tabular-nums">{uploadProgress.overallPercent}%</span>
+            </div>
+            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-white/[0.06]">
+              <div className="h-full rounded-full bg-orange-500 transition-all duration-200" style={{ width: `${uploadProgress.overallPercent}%` }} />
+            </div>
+          </div>
+        )}
         <p className="mt-2 text-center text-[11px] text-gray-400">
           Our tech team replies within 24-48 hours.
         </p>

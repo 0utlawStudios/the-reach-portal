@@ -5,8 +5,14 @@ import { requireBearerTeamRole } from "@/lib/auth/require";
 import { ALLOWED_DRIVE_UPLOAD_ROLES, normalizeDriveMimeType } from "@/lib/drive-policy";
 import { MAX_PLAYBACK_VIDEO_FILE_SIZE, PLAYBACK_VIDEO_MIME_TYPES } from "@/lib/media-playback-policy";
 import { consume, getClientIp } from "@/lib/rate-limit";
-import { appRateLimitError } from "@/lib/drive-errors";
+import {
+  appRateLimitError,
+  sanitizedDriveErrorDetail,
+  sanitizeUnknownUploadError,
+  statusForSanitizedDriveError,
+} from "@/lib/drive-errors";
 import { withStorageControlTimeout } from "@/lib/storage-upload-timeout";
+import { scheduleUploadFailureAlert } from "@/app/api/drive/upload-alert-scheduler";
 
 export const maxDuration = 10;
 export const dynamic = "force-dynamic";
@@ -96,9 +102,15 @@ async function ensurePlaybackBucket(admin: SupabaseClient): Promise<void> {
 }
 
 export async function POST(request: NextRequest) {
+  let authContext: { user: { id: string }; email: string; role: string; workspaceId: string } | null = null;
+  let fileName = "";
+  let mimeType = "application/octet-stream";
+  let fileSize = 0;
+  let cardId = "pending";
   try {
     const auth = await requireBearerTeamRole(request, ALLOWED_DRIVE_UPLOAD_ROLES);
     if (auth instanceof NextResponse) return auth;
+    authContext = auth;
 
     const rlKey = `user:${auth.user.id}|ip:${getClientIp(request)}`;
     const rl = await consume("media-playback-upload:create", rlKey, 60, 60);
@@ -107,12 +119,12 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json() as PlaybackUploadRequest;
-    const fileName = typeof body.fileName === "string" && body.fileName.trim()
+    fileName = typeof body.fileName === "string" && body.fileName.trim()
       ? body.fileName.trim()
       : "video";
-    const mimeType = normalizeDriveMimeType(body.mimeType, fileName);
-    const fileSize = Number(body.fileSize);
-    const cardId = typeof body.cardId === "string" && body.cardId.trim()
+    mimeType = normalizeDriveMimeType(body.mimeType, fileName);
+    fileSize = Number(body.fileSize);
+    cardId = typeof body.cardId === "string" && body.cardId.trim()
       ? safeSegment(body.cardId.trim())
       : "pending";
 
@@ -154,7 +166,32 @@ export async function POST(request: NextRequest) {
       size: fileSize,
     });
   } catch (err: unknown) {
-    console.error("[media/playback-upload]", err instanceof Error ? err.message : err);
+    const sanitized = sanitizeUnknownUploadError(err);
+    const detail = sanitizedDriveErrorDetail(sanitized, statusForSanitizedDriveError(sanitized));
+    console.error("[media/playback-upload]", detail);
+    if (authContext) {
+      scheduleUploadFailureAlert("media/playback-upload", {
+        source: "server",
+        phase: "playback_upload_target",
+        route: "/api/media/playback-upload",
+        uploadPath: fileSize >= 4 * 1024 * 1024 ? "resumable" : "proxy",
+        workspaceId: authContext.workspaceId,
+        userId: authContext.user.id,
+        userEmail: authContext.email,
+        userRole: authContext.role,
+        folder: "media-playback",
+        cardId,
+        fileName,
+        mimeType,
+        fileSize,
+        errorMessage: sanitized.error,
+        errorStatus: statusForSanitizedDriveError(sanitized),
+        errorDetail: detail,
+        userAgent: request.headers.get("user-agent"),
+        ip: getClientIp(request),
+        requestUrl: request.url,
+      });
+    }
     return NextResponse.json({ error: "Failed to prepare playback upload" }, { status: 500 });
   }
 }

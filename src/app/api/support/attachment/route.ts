@@ -52,12 +52,7 @@ function copyHeader(source: Headers, target: Headers, name: string) {
   if (value) target.set(name, value);
 }
 
-async function userSupportAttachmentAccess(userId: string, email: string | undefined, workspaceId: string, ownerUserId: string): Promise<boolean> {
-  // Attachment URLs are only rendered after a user can already read the
-  // support thread or post note containing the unguessable storage key. The
-  // proxy still enforces same-workspace active membership so copied URLs do
-  // not cross tenant boundaries, while allowing intended non-uploader viewers
-  // to open admin replies and revision attachments.
+async function userSupportAttachmentAccess(userId: string, email: string | undefined, workspaceId: string, ownerUserId: string, storageKey: string): Promise<boolean> {
   const admin = adminClient();
   const { data, error } = await admin
     .from("workspace_members")
@@ -71,12 +66,35 @@ async function userSupportAttachmentAccess(userId: string, email: string | undef
   if (!lowerEmail) return false;
   const { data: teamMember, error: teamError } = await admin
     .from("team_members")
-    .select("status")
+    .select("role, status")
     .eq("workspace_id", workspaceId)
     .eq("email", lowerEmail)
     .maybeSingle();
   if (teamError || teamMember?.status !== "active") return false;
-  return userId === ownerUserId || Boolean(data);
+  if (userId === ownerUserId) return true;
+  if (String(teamMember?.role || "").toLowerCase() === "superadmin") return true;
+
+  // Non-admin users may view attachments sent by the team only when that exact
+  // storage key is attached to one of their readable support threads.
+  const { data: messages, error: messageError } = await admin
+    .from("support_messages")
+    .select("thread_id")
+    .eq("workspace_id", workspaceId)
+    .contains("attachments", [{ storageKey }])
+    .limit(20);
+  if (messageError || !messages || messages.length === 0) return false;
+
+  const threadIds = [...new Set(messages.map((row) => row.thread_id).filter(Boolean))];
+  if (threadIds.length === 0) return false;
+  const { data: readableThread, error: threadError } = await admin
+    .from("support_threads")
+    .select("id")
+    .eq("workspace_id", workspaceId)
+    .eq("created_by", userId)
+    .in("id", threadIds)
+    .limit(1)
+    .maybeSingle();
+  return !threadError && Boolean(readableThread);
 }
 
 export async function GET(request: NextRequest) {
@@ -87,8 +105,8 @@ export async function GET(request: NextRequest) {
 
   const userResult = await requireUser(request);
   if (userResult instanceof NextResponse) return userResult;
-  if (!(await userSupportAttachmentAccess(userResult.user.id, userResult.user.email, parsed.workspaceId, parsed.ownerUserId))) {
-    return NextResponse.json({ error: "Attachment does not belong to this workspace" }, { status: 403 });
+  if (!(await userSupportAttachmentAccess(userResult.user.id, userResult.user.email, parsed.workspaceId, parsed.ownerUserId, parsed.key))) {
+    return NextResponse.json({ error: "Attachment is not available to this user" }, { status: 403 });
   }
 
   const headers: HeadersInit = {

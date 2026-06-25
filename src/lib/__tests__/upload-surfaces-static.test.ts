@@ -102,6 +102,13 @@ describe("Drive upload surfaces", () => {
     }
   });
 
+  it("bounds the initial auth session check so the app cannot hang forever on Checking session", () => {
+    const authContext = source("src/lib/auth-context.tsx");
+    expect(authContext).toContain("AUTH_SESSION_TIMEOUT_MS");
+    expect(authContext).toContain('withAuthSessionTimeout(supabase.auth.getSession(), "Session check")');
+    expect(authContext).toContain("setHydrated(true)");
+  });
+
   it("renders preview-safe media URLs without changing publish-safe raw URLs", () => {
     const mediaPicker = source("src/components/media-picker.tsx");
     expect(mediaPicker).toContain('function mediaDisplayUrl(asset: Pick<MediaEntry, "url" | "driveProxyUrl" | "playbackUrl">): string');
@@ -128,7 +135,6 @@ describe("Drive upload surfaces", () => {
 
   it("bounds direct Supabase Storage uploads outside the Drive media path", () => {
     for (const file of [
-      "src/lib/support/use-support.ts",
       "src/components/pages/settings-page.tsx",
       "src/app/auth/setup/page.tsx",
       "src/components/kickback-modal.tsx",
@@ -143,6 +149,14 @@ describe("Drive upload surfaces", () => {
 
     const setup = source("src/app/auth/setup/page.tsx");
     expect(setup).toMatch(/catch \(err\) \{[\s\S]*?setLoading\(false\)/);
+
+    const support = source("src/lib/support/use-support.ts");
+    expect(support).toContain("storageUploadBudgetMs");
+    expect(support).toContain("SUPPORT_UPLOAD_STALL_TIMEOUT_MS");
+    expect(support).toContain("SUPPORT_UPLOAD_RESPONSE_WAIT_MS");
+    expect(support).toContain("new XMLHttpRequest()");
+    expect(support).toContain("xhr.upload.onprogress");
+    expect(support).toContain('xhr.open("PUT", supportSignedUploadUrl');
   });
 
   it("keeps Drive video uploads when optional playback optimization fails", () => {
@@ -180,6 +194,8 @@ describe("Drive upload surfaces", () => {
     expect(playbackUploadRoute).toContain("public: false");
     expect(playbackUploadRoute).not.toContain("getPublicUrl");
     expect(playbackUploadRoute).toContain('const playbackUrl = `/api/media/playback?key=${encodeURIComponent(storageKey)}`');
+    expect(playbackUploadRoute).toContain("scheduleUploadFailureAlert");
+    expect(playbackUploadRoute).toContain('phase: "playback_upload_target"');
 
     const playbackRoute = source("src/app/api/media/playback/route.ts");
     expect(playbackRoute).toContain("requireUser(request)");
@@ -428,6 +444,9 @@ describe("Drive upload surfaces", () => {
   it("does not clear a completed create-post upload until the post insert is confirmed", () => {
     const pipeline = source("src/lib/pipeline-context.tsx");
     expect(pipeline).toContain("Promise<ContentCard | null>");
+    expect(pipeline).toContain("POST_CREATE_TIMEOUT_MS");
+    expect(pipeline).toContain(".abortSignal(controller.signal)");
+    expect(pipeline).toContain("Save timed out before the database confirmed the post.");
     expect(pipeline).toContain("No post row was created. Check workspace access and retry.");
     expect(pipeline).toContain("return savedCard");
 
@@ -510,9 +529,13 @@ describe("Drive upload surfaces", () => {
     expect(route).toContain('.eq("workspace_id", workspaceId)');
     expect(route).toContain('.eq("status", "active")');
     expect(route).toContain('from("team_members")');
+    expect(route).toContain('=== "superadmin"');
+    expect(route).toContain('from("support_messages")');
+    expect(route).toContain('from("support_threads")');
+    expect(route).toContain('.eq("created_by", userId)');
     expect(route).toContain("streamWithInactivityTimeout");
     expect(route).toContain("Supabase support attachment stream");
-    expect(route).toContain("not cross tenant boundaries");
+    expect(route).toContain("not available to this user");
   });
 
   it("keeps same-origin media tags authenticated with a server-readable session cookie", () => {

@@ -10,7 +10,7 @@ import {
   verifyDriveStreamToken,
 } from "@/lib/google-drive";
 import { ALLOWED_DRIVE_ROLES, normalizeDriveMimeType, VALID_DRIVE_FOLDERS } from "@/lib/drive-policy";
-import { sanitizeUnknownUploadError, statusForSanitizedDriveError } from "@/lib/drive-errors";
+import { sanitizedDriveErrorDetail, sanitizeUnknownUploadError, statusForSanitizedDriveError } from "@/lib/drive-errors";
 import { requireBearerTeamRole, requireRole, requireUser, type WorkspaceRole } from "@/lib/auth/require";
 import { withStorageControlTimeout } from "@/lib/storage-upload-timeout";
 
@@ -38,7 +38,11 @@ const PREVIEW_CONVERSION_TIMEOUT_MS = {
 const HEIC_FALLBACK_MAX_PIXELS = 50_000_000;
 const DRIVE_MEDIA_TIMEOUT_MS = 45_000;
 const DRIVE_THUMBNAIL_TIMEOUT_MS = 2_500;
-const PREVIEW_FAST_THUMBNAIL_LOOKUP_TIMEOUT_MS = 1_200;
+// Drive often has a browser-safe thumbnail for iPhone HEICs, but it can take
+// longer than one RTT to return. Waiting through the thumbnail fetch budget is
+// still far cheaper than falling back to full HEIC decode, which is the source
+// of the several-second black preview users see on cold files.
+const PREVIEW_FAST_THUMBNAIL_LOOKUP_TIMEOUT_MS = 3_000;
 const MAX_DRIVE_THUMBNAIL_BYTES = 5 * 1024 * 1024;
 const inFlightPreviewBuilds = new Map<string, Promise<Buffer>>();
 
@@ -598,7 +602,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: err.message }, { status: err.status });
     }
     const sanitized = sanitizeUnknownUploadError(err);
-    console.error("[media/image-preview]", err instanceof Error ? err.message : err);
-    return NextResponse.json(sanitized, { status: statusForSanitizedDriveError(sanitized) });
+    const status = statusForSanitizedDriveError(sanitized);
+    console.error("[media/image-preview]", sanitizedDriveErrorDetail(sanitized, status));
+    return NextResponse.json(sanitized, { status });
   }
 }

@@ -70,6 +70,27 @@ async function getPlaybackUploadTarget(file: File, cardId?: string, workspaceId?
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PLAYBACK_TARGET_TIMEOUT_MS);
   let res: Response;
+  const targetTimeoutMessage = "Playback upload target timed out. The original video uploaded fine; playback optimization can be retried.";
+  const readText = async (): Promise<string> => {
+    try {
+      return await res.text();
+    } catch (err) {
+      if (controller.signal.aborted) throw new Error(targetTimeoutMessage);
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+  const readJson = async (): Promise<unknown> => {
+    try {
+      return await res.json();
+    } catch (err) {
+      if (controller.signal.aborted) throw new Error(targetTimeoutMessage);
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
   try {
     res = await fetch("/api/media/playback-upload", {
       method: "POST",
@@ -83,20 +104,19 @@ async function getPlaybackUploadTarget(file: File, cardId?: string, workspaceId?
       signal: controller.signal,
     });
   } catch (err) {
+    clearTimeout(timer);
     if (controller.signal.aborted) {
-      throw new Error("Playback upload target timed out. The original video uploaded fine; playback optimization can be retried.");
+      throw new Error(targetTimeoutMessage);
     }
     throw err;
-  } finally {
-    clearTimeout(timer);
   }
 
   if (!res.ok) {
-    const detail = await res.text().catch(() => "");
+    const detail = await readText().catch(() => "");
     throw new Error(`Playback upload target failed with HTTP ${res.status}${detail ? `: ${detail.slice(0, 160)}` : ""}`);
   }
 
-  const data = await res.json() as Partial<PlaybackUploadTarget> & { error?: string };
+  const data = await readJson() as Partial<PlaybackUploadTarget> & { error?: string };
   if (data.error) throw new Error(data.error);
   if (!data.bucket || !data.storageKey || !data.token || !data.playbackUrl) {
     throw new Error("Playback upload target response was incomplete");

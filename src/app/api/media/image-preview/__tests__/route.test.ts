@@ -214,6 +214,39 @@ describe("GET /api/media/image-preview", () => {
     expect(heicDecodeMocks.decode.all).not.toHaveBeenCalled();
   });
 
+  it("waits for a slightly delayed Drive thumbnail instead of falling back to cold HEIC decode", async () => {
+    vi.useFakeTimers();
+    driveMocks.getFileMetadata.mockResolvedValueOnce({
+      id: FILE_ID,
+      name: "source.heic",
+      mimeType: "image/heic",
+      size: 2 * 1024 * 1024,
+      parents: ["raw-files-folder"],
+      appProperties: { workspaceId: "00000000-0000-0000-0000-000000000001" },
+      thumbnailLink: "https://drive.example/slow-thumbnail",
+    });
+    globalThis.fetch = vi.fn(() => new Promise<Response>((resolve) => {
+      setTimeout(() => {
+        resolve(new Response(new Uint8Array([0xff, 0xd8, 0x78]), {
+          status: 200,
+          headers: { "content-type": "image/jpeg" },
+        }));
+      }, 2_200);
+    })) as unknown as typeof fetch;
+
+    const pending = GET(makeRequest(`/api/media/image-preview?id=${FILE_ID}&token=signed&size=thumb`));
+    await vi.advanceTimersByTimeAsync(2_200);
+    const res = await pending;
+    const body = new Uint8Array(await res.arrayBuffer());
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("x-preview-size")).toBe("thumb");
+    expect(Array.from(body)).toEqual([0xff, 0xd8, 0x78]);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    expect(sharpMocks.sharp).not.toHaveBeenCalled();
+    expect(heicDecodeMocks.decode.all).not.toHaveBeenCalled();
+  });
+
   it("normalizes Drive's browser-safe thumbnail formats instead of decoding the original HEIC for first paint", async () => {
     driveMocks.getFileMetadata.mockResolvedValueOnce({
       id: FILE_ID,

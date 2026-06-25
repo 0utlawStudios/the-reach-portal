@@ -17,6 +17,7 @@ import {
 import { scheduleUploadFailureAlert } from "../upload-alert-scheduler";
 import {
   appRateLimitError,
+  sanitizedDriveErrorDetail,
   sanitizeUnknownUploadError,
   statusForSanitizedDriveError,
 } from "@/lib/drive-errors";
@@ -127,9 +128,9 @@ export async function POST(request: NextRequest) {
       driveFileName,
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Unknown error";
     const sanitized = sanitizeUnknownUploadError(err);
-    console.error("[drive/upload]", message);
+    const detail = sanitizedDriveErrorDetail(sanitized, statusForSanitizedDriveError(sanitized));
+    console.error("[drive/upload]", detail);
     if (authContext) {
       const auth = authContext;
       scheduleUploadFailureAlert("drive/upload", {
@@ -147,7 +148,7 @@ export async function POST(request: NextRequest) {
         fileSize,
         errorMessage: sanitized.error,
         errorStatus: statusForSanitizedDriveError(sanitized),
-        errorDetail: message,
+        errorDetail: detail,
         userAgent: request.headers.get("user-agent"),
         ip: getClientIp(request),
         requestUrl: request.url,

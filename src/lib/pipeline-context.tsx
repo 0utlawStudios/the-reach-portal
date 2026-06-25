@@ -24,6 +24,7 @@ const POSTS_SELECT_BASIC = "*";
 const POSTS_SELECT_STORAGE_KEY = "reach_posts_select_shape";
 const WORKSPACE_PROVISION_TIMEOUT_MS = 8_000;
 const POST_UPDATE_TIMEOUT_MS = 15_000;
+const POST_CREATE_TIMEOUT_MS = 20_000;
 
 // ─── Supabase <-> ContentCard mappers ───
 
@@ -1115,9 +1116,27 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
       dbRow.checklist = newCard.checklist;
       const insertRow: Record<string, unknown> = { ...dbRow };
       insertRow.workspace_id = workspaceIdRef.current || "00000000-0000-0000-0000-000000000001";
-      const { data, error } = await supabase.from("posts").insert(insertRow).select().single();
+      const controller = new AbortController();
+      let timedOut = false;
+      const timer = setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+      }, POST_CREATE_TIMEOUT_MS);
+      const query = supabase
+        .from("posts")
+        .insert(insertRow)
+        .select()
+        .abortSignal(controller.signal)
+        .single();
+      let response: Awaited<typeof query>;
+      try {
+        response = await query;
+      } finally {
+        clearTimeout(timer);
+      }
+      const { data, error } = response;
       if (error) {
-        rollback(error.message);
+        rollback(timedOut ? "Save timed out before the database confirmed the post. Check your connection and retry." : error.message);
         return null;
       }
       if (!data) {

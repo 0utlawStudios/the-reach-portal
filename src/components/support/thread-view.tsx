@@ -6,7 +6,10 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { ArrowLeft, Send, CheckCheck } from "lucide-react";
+import { MediaVideo } from "@/components/media-video";
+import { PreviewImage } from "@/components/preview-image";
 import type { SupportThread, SupportMessage, SupportThreadStatus } from "@/lib/support/types";
+import type { SupportAttachmentUploadProgress } from "@/lib/support/use-support";
 import {
   threadShortCode,
   SUPPORT_STATUS_LABEL,
@@ -41,7 +44,7 @@ interface ThreadViewProps {
   thread: SupportThread | null;
   messages: SupportMessage[];
   viewerRole: "user" | "admin";
-  onSend: (body: string, files: File[]) => Promise<void>;
+  onSend: (body: string, files: File[], onUploadProgress?: (progress: SupportAttachmentUploadProgress) => void) => Promise<void>;
   onBack?: () => void;
   onError?: (message: string) => void;
   headerExtra?: React.ReactNode;
@@ -63,6 +66,7 @@ export function ThreadView({
   const [body, setBody] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [sending, setSending] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<SupportAttachmentUploadProgress | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -93,14 +97,22 @@ export function ThreadView({
     const trimmed = body.trim();
     if ((trimmed.length === 0 && files.length === 0) || sending) return;
     setSending(true);
+    setUploadProgress(files.length > 0 ? {
+      totalFiles: files.length,
+      completedFiles: 0,
+      currentFileName: files[0]?.name || null,
+      currentFilePercent: 0,
+      overallPercent: 0,
+    } : null);
     try {
-      await onSend(trimmed, files);
+      await onSend(trimmed, files, setUploadProgress);
       setBody("");
       setFiles([]);
     } catch (err) {
       onError?.(err instanceof Error ? err.message : "Could not send your message.");
     } finally {
       setSending(false);
+      setUploadProgress(null);
     }
   }
 
@@ -190,20 +202,22 @@ export function ThreadView({
                           rel="noopener noreferrer"
                           className="block"
                         >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
+                          <PreviewImage
                             src={attachmentUrl}
                             alt={a.name}
-                            className="max-h-44 rounded-lg border border-black/5"
+                            mimeType={a.mime}
+                            fileName={a.name}
+                            className="max-h-44 min-h-24 w-full max-w-72 rounded-lg border border-black/5 object-contain"
                           />
                         </a>
                       ) : (
-                        <video
+                        <MediaVideo
                           key={`${a.storageKey}-${i}`}
-                          src={attachmentUrl}
+                          sources={[attachmentUrl]}
                           controls
                           preload="metadata"
                           className="max-h-52 w-full rounded-lg bg-black"
+                          label={a.name}
                         />
                       );
                     })}
@@ -253,9 +267,20 @@ export function ThreadView({
             className="reach-action-button inline-flex h-11 shrink-0 items-center gap-1.5 rounded-lg bg-orange-500 px-4 text-[13px] font-semibold text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Send className="h-3.5 w-3.5" />
-            {sending ? "Sending…" : "Send"}
+            {sending ? uploadProgress ? `Uploading ${Math.min(uploadProgress.completedFiles + 1, uploadProgress.totalFiles)}/${uploadProgress.totalFiles}` : "Sending…" : "Send"}
           </button>
         </div>
+        {uploadProgress && (
+          <div className="mt-2">
+            <div className="flex items-center justify-between gap-2 text-[10px] text-gray-400">
+              <span className="min-w-0 truncate">{uploadProgress.currentFileName || "Attachment"}</span>
+              <span className="tabular-nums">{uploadProgress.overallPercent}%</span>
+            </div>
+            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-white/[0.06]">
+              <div className="h-full rounded-full bg-orange-500 transition-all duration-200" style={{ width: `${uploadProgress.overallPercent}%` }} />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
