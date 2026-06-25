@@ -2,6 +2,7 @@ import { supabase } from "./supabaseClient";
 
 const PRIVATE_MEDIA_PATHS = new Set(["/api/drive/stream", "/api/media/image-preview"]);
 const SIGNED_VIEW_URL_CACHE_MS = 12 * 60 * 1000;
+const SIGNED_VIEW_URL_TIMEOUT_MS = 8_000;
 
 type CachedViewUrl = {
   url: string;
@@ -39,9 +40,19 @@ export async function signedMediaViewUrl(url: string): Promise<string | null> {
   const token = data.session?.access_token;
   if (!token) return null;
 
-  const response = await fetch(`/api/media/view-url?${new URLSearchParams({ url }).toString()}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const controller = typeof AbortController === "function" ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), SIGNED_VIEW_URL_TIMEOUT_MS) : undefined;
+  let response: Response;
+  try {
+    response = await fetch(`/api/media/view-url?${new URLSearchParams({ url }).toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: controller?.signal,
+    });
+  } catch {
+    return null;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
   if (!response.ok) return null;
   const body = await response.json().catch(() => null) as { url?: unknown } | null;
   if (typeof body?.url !== "string" || !isPrivateMediaRouteUrl(body.url) || !hasMediaViewToken(body.url)) return null;
