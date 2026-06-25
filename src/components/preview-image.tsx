@@ -1,7 +1,7 @@
 "use client";
 
 import type { ImgHTMLAttributes, SyntheticEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ImageOff } from "lucide-react";
 import { RawImage } from "@/components/raw-image";
 import { browserImagePreviewUrl, isHeicLikeImage } from "@/lib/image-preview";
@@ -45,6 +45,8 @@ export function PreviewImage({
   const [signingSrcs, setSigningSrcs] = useState<Record<string, true>>({});
   const [loadedSrc, setLoadedSrc] = useState<string | undefined>(undefined);
   const [loadedFallbackSrc, setLoadedFallbackSrc] = useState<string | undefined>(undefined);
+  const proactiveSignAttemptsRef = useRef<Set<string>>(new Set());
+  const failAfterSigningRef = useRef<Set<string>>(new Set());
 
   const fitClass =
     typeof className === "string" && className.includes("object-contain")
@@ -72,21 +74,34 @@ export function PreviewImage({
   const renderedPrimarySrc = typeof primarySrc === "string" ? signedSrcs[primarySrc] || primarySrc : primarySrc;
   const renderedFallbackSrc = typeof fallbackSrc === "string" ? signedSrcs[fallbackSrc] || fallbackSrc : fallbackSrc;
 
-  const signAndRetry = (source: string): boolean => {
-    if (!isPrivateMediaRouteUrl(source) || signedSrcs[source] || signingSrcs[source]) return false;
+  const requestSignedSrc = useCallback((source: string, failOnMiss: boolean): boolean => {
+    if (!isPrivateMediaRouteUrl(source)) return false;
+    if (signingSrcs[source]) {
+      if (failOnMiss) failAfterSigningRef.current.add(source);
+      return true;
+    }
+    if (signedSrcs[source]) return !failOnMiss;
     setSigningSrcs((prev) => ({ ...prev, [source]: true }));
     void signedMediaViewUrl(source)
       .then((signedUrl) => {
+        const shouldFailOnMiss = failOnMiss || failAfterSigningRef.current.has(source);
         if (!signedUrl) {
-          setFailedSrcs((prev) => ({ ...prev, [source]: true }));
+          if (shouldFailOnMiss) setFailedSrcs((prev) => ({ ...prev, [source]: true }));
           return;
         }
         setSignedSrcs((prev) => ({ ...prev, [source]: signedUrl }));
+        setFailedSrcs((prev) => {
+          if (!prev[source]) return prev;
+          const next = { ...prev };
+          delete next[source];
+          return next;
+        });
       })
       .catch(() => {
-        setFailedSrcs((prev) => ({ ...prev, [source]: true }));
+        if (failOnMiss || failAfterSigningRef.current.has(source)) setFailedSrcs((prev) => ({ ...prev, [source]: true }));
       })
       .finally(() => {
+        failAfterSigningRef.current.delete(source);
         setSigningSrcs((prev) => {
           const next = { ...prev };
           delete next[source];
@@ -94,7 +109,26 @@ export function PreviewImage({
         });
       });
     return true;
-  };
+  }, [signedSrcs, signingSrcs]);
+
+  const signAndRetry = useCallback((source: string): boolean => {
+    return requestSignedSrc(source, true);
+  }, [requestSignedSrc]);
+
+  useEffect(() => {
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      for (const source of [fallbackSrc, primarySrc]) {
+        if (typeof source !== "string" || proactiveSignAttemptsRef.current.has(source)) continue;
+        proactiveSignAttemptsRef.current.add(source);
+        requestSignedSrc(source, false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [fallbackSrc, primarySrc, requestSignedSrc]);
 
   useEffect(() => {
     if (!primaryDelayKey || primaryDelayElapsed) return;

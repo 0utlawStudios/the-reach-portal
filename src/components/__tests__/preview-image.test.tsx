@@ -96,7 +96,7 @@ describe("PreviewImage", () => {
   });
 
   it("signs and retries a private image URL before showing the broken icon", async () => {
-    mockSignedMediaViewUrl.mockResolvedValueOnce(`/api/drive/stream?id=${FILE_ID}&token=signed`);
+    mockSignedMediaViewUrl.mockResolvedValue(`/api/drive/stream?id=${FILE_ID}&token=signed`);
 
     const { container } = render(
       <PreviewImage
@@ -118,6 +118,26 @@ describe("PreviewImage", () => {
     expect(mockSignedMediaViewUrl).toHaveBeenCalledWith(`/api/drive/stream?id=${FILE_ID}`);
     await waitFor(() => {
       expect(container.querySelector("svg")).toBeNull();
+      expect(container.querySelector("img")).toHaveAttribute("src", `/api/drive/stream?id=${FILE_ID}&token=signed`);
+    });
+  });
+
+  it("starts signing private image URLs before the browser reports a load error", async () => {
+    mockSignedMediaViewUrl.mockResolvedValue(`/api/drive/stream?id=${FILE_ID}&token=signed`);
+
+    const { container } = render(
+      <PreviewImage
+        src={`/api/drive/stream?id=${FILE_ID}`}
+        mimeType="image/png"
+        fileName="8.png"
+        alt="8.png"
+        className="w-full h-full object-cover"
+      />,
+    );
+
+    expect(container.querySelector("img")).toHaveAttribute("src", `/api/drive/stream?id=${FILE_ID}`);
+    await waitFor(() => {
+      expect(mockSignedMediaViewUrl).toHaveBeenCalledWith(`/api/drive/stream?id=${FILE_ID}`);
       expect(container.querySelector("img")).toHaveAttribute("src", `/api/drive/stream?id=${FILE_ID}&token=signed`);
     });
   });

@@ -1,7 +1,7 @@
 "use client";
 
 import type { SyntheticEvent, VideoHTMLAttributes } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Film, RotateCcw } from "lucide-react";
 import { isPrivateMediaRouteUrl, signedMediaViewUrl } from "@/lib/media-view-url";
 
@@ -50,6 +50,8 @@ export function MediaVideo({
   const sourceKey = usableSources.join("\n");
   const [signedSources, setSignedSources] = useState<Record<string, string>>({});
   const [signingSources, setSigningSources] = useState<Record<string, true>>({});
+  const proactiveSignAttemptsRef = useRef<Set<string>>(new Set());
+  const signingIntentRef = useRef<Record<string, { failOnMiss: boolean; markAttemptedOnSuccess: boolean }>>({});
   const [playbackState, setPlaybackState] = useState<PlaybackState>({
     sourceKey: "",
     failedSources: {},
@@ -71,12 +73,30 @@ export function MediaVideo({
     setPlaybackState({ sourceKey, failedSources: {}, loadedSource: null, attemptedSource: null });
   }, [sourceKey]);
 
-  const signAndRetryCurrentSource = useCallback((source: string): boolean => {
-    if (!isPrivateMediaRouteUrl(source) || signedSources[source] || signingSources[source]) return false;
+  const requestSignedSource = useCallback((
+    source: string,
+    opts: { failOnMiss: boolean; markAttemptedOnSuccess: boolean },
+  ): boolean => {
+    if (!isPrivateMediaRouteUrl(source)) return false;
+    if (signingSources[source]) {
+      if (opts.failOnMiss || opts.markAttemptedOnSuccess) {
+        const existing = signingIntentRef.current[source];
+        signingIntentRef.current[source] = {
+          failOnMiss: Boolean(existing?.failOnMiss || opts.failOnMiss),
+          markAttemptedOnSuccess: Boolean(existing?.markAttemptedOnSuccess || opts.markAttemptedOnSuccess),
+        };
+      }
+      return true;
+    }
+    if (signedSources[source]) return !opts.failOnMiss;
     setSigningSources((prev) => ({ ...prev, [source]: true }));
     void signedMediaViewUrl(source)
       .then((signedUrl) => {
+        const intent = signingIntentRef.current[source];
+        const failOnMiss = Boolean(opts.failOnMiss || intent?.failOnMiss);
+        const markAttemptedOnSuccess = Boolean(opts.markAttemptedOnSuccess || intent?.markAttemptedOnSuccess);
         if (!signedUrl) {
+          if (!failOnMiss) return;
           setPlaybackState((prev) => {
             const base =
               prev.sourceKey === sourceKey
@@ -92,14 +112,20 @@ export function MediaVideo({
           return;
         }
         setSignedSources((prev) => ({ ...prev, [source]: signedUrl }));
-        setPlaybackState((prev) => ({
-          sourceKey,
-          failedSources: prev.sourceKey === sourceKey ? prev.failedSources : {},
-          loadedSource: prev.sourceKey === sourceKey ? prev.loadedSource : null,
-          attemptedSource: source,
-        }));
+        if (markAttemptedOnSuccess) {
+          setPlaybackState((prev) => ({
+            sourceKey,
+            failedSources: prev.sourceKey === sourceKey
+              ? Object.fromEntries(Object.entries(prev.failedSources).filter(([key]) => key !== source))
+              : {},
+            loadedSource: prev.sourceKey === sourceKey ? prev.loadedSource : null,
+            attemptedSource: source,
+          }));
+        }
       })
       .catch(() => {
+        const intent = signingIntentRef.current[source];
+        if (!opts.failOnMiss && !intent?.failOnMiss) return;
         setPlaybackState((prev) => {
           const base =
             prev.sourceKey === sourceKey
@@ -114,6 +140,7 @@ export function MediaVideo({
         });
       })
       .finally(() => {
+        delete signingIntentRef.current[source];
         setSigningSources((prev) => {
           const next = { ...prev };
           delete next[source];
@@ -122,6 +149,22 @@ export function MediaVideo({
       });
     return true;
   }, [signedSources, signingSources, sourceKey]);
+
+  const signAndRetryCurrentSource = useCallback((source: string): boolean => {
+    return requestSignedSource(source, { failOnMiss: true, markAttemptedOnSuccess: true });
+  }, [requestSignedSource]);
+
+  useEffect(() => {
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled || !currentSource || proactiveSignAttemptsRef.current.has(currentSource)) return;
+      proactiveSignAttemptsRef.current.add(currentSource);
+      requestSignedSource(currentSource, { failOnMiss: false, markAttemptedOnSuccess: false });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentSource, requestSignedSource]);
 
   const advanceSource = useCallback(() => {
     if (!currentSource) return;

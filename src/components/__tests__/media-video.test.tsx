@@ -43,12 +43,38 @@ describe("MediaVideo", () => {
     expect(screen.getByLabelText("Launch video")).toHaveAttribute("src", "/api/drive/stream?id=video");
   });
 
+  it("pre-signs a private preload-none video without starting the fallback watchdog", async () => {
+    vi.useFakeTimers();
+    mockSignedMediaViewUrl.mockResolvedValue("/api/drive/stream?id=video&token=signed");
+
+    render(
+      <MediaVideo
+        sources={["/api/drive/stream?id=video"]}
+        poster="/api/media/image-preview?id=video&size=thumb"
+        preload="none"
+        label="Launch signed video"
+      />,
+    );
+
+    await act(async () => {});
+
+    expect(mockSignedMediaViewUrl).toHaveBeenCalledWith("/api/drive/stream?id=video");
+    expect(screen.getByLabelText("Launch signed video")).toHaveAttribute("src", "/api/drive/stream?id=video&token=signed");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(45_001);
+    });
+
+    expect(screen.queryByText("Video preview unavailable")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Launch signed video")).toHaveAttribute("src", "/api/drive/stream?id=video&token=signed");
+  });
+
   it("starts the fallback watchdog once a preload-none video is attempted", async () => {
     vi.useFakeTimers();
     render(
       <MediaVideo
-        sources={["/api/drive/stream?id=primary", "/api/drive/stream?id=fallback"]}
-        poster="/api/media/image-preview?id=primary&size=thumb"
+        sources={["/media/primary.mp4", "/media/fallback.mp4"]}
+        poster="/media/poster.jpg"
         preload="none"
         label="Fallback video"
       />,
@@ -60,15 +86,16 @@ describe("MediaVideo", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(45_001);
     });
+    await act(async () => {});
 
-    expect(screen.getByLabelText("Fallback video")).toHaveAttribute("src", "/api/drive/stream?id=fallback");
+    expect(screen.getByLabelText("Fallback video")).toHaveAttribute("src", "/media/fallback.mp4");
   });
 
   it("waits for a decoded frame instead of treating metadata-only black video as loaded", async () => {
     vi.useFakeTimers();
     render(
       <MediaVideo
-        sources={["/api/drive/stream?id=primary", "/api/drive/stream?id=fallback"]}
+        sources={["/media/primary.mp4", "/media/fallback.mp4"]}
         preload="metadata"
         label="Cold video"
       />,
@@ -81,8 +108,28 @@ describe("MediaVideo", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(45_001);
     });
+    await act(async () => {});
 
-    expect(screen.getByLabelText("Cold video")).toHaveAttribute("src", "/api/drive/stream?id=fallback");
+    expect(screen.getByLabelText("Cold video")).toHaveAttribute("src", "/media/fallback.mp4");
+  });
+
+  it("falls back when private signed recovery returns no URL", async () => {
+    mockSignedMediaViewUrl.mockResolvedValue(null);
+
+    render(
+      <MediaVideo
+        sources={["/api/drive/stream?id=primary", "/api/drive/stream?id=fallback"]}
+        preload="metadata"
+        label="Private recovery miss"
+        loadTimeoutMs={1}
+      />,
+    );
+
+    fireEvent.loadStart(screen.getByLabelText("Private recovery miss"));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Private recovery miss")).toHaveAttribute("src", "/api/drive/stream?id=fallback");
+    });
   });
 
   it("stops the fallback watchdog once a frame is decoded", async () => {
