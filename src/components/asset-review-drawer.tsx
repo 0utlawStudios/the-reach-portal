@@ -1119,7 +1119,9 @@ export function AssetReviewDrawer() {
                       </div>
                     ) : (
                       <button
+                        disabled={uploading}
                         onClick={async () => {
+                          if (uploading) return;
                           const input = document.createElement("input");
                           input.type = "file";
                           input.accept = "image/*,.pdf,.txt,.doc,.docx";
@@ -1128,9 +1130,17 @@ export function AssetReviewDrawer() {
                             if (!file) return;
                             addToast("Uploading license...", "info");
                             let driveModule: typeof import("@/lib/drive-upload") | null = null;
+                            setUploading(true);
+                            setUploadingFileName(`Uploading license: ${file.name}`);
+                            setUploadProgress(0);
                             try {
                               driveModule = await import("@/lib/drive-upload");
-                              const [item] = await driveModule.uploadManyToDrive([file], "raw-files", { cardId: selectedCard.id, workspaceId, concurrency: 1 });
+                              const [item] = await driveModule.uploadManyToDrive([file], "raw-files", {
+                                cardId: selectedCard.id,
+                                workspaceId,
+                                concurrency: 1,
+                                onProgress: setUploadProgress,
+                              });
                               if (!item?.result) throw item?.error || new Error("License upload failed");
                               const result = item.result;
                               updateCard(selectedCard.id, { licenseFileId: result.fileId });
@@ -1155,14 +1165,18 @@ export function AssetReviewDrawer() {
                                   errorDetail: err instanceof Error ? err.stack : undefined,
                                 });
                               } catch { /* ignore */ }
+                            } finally {
+                              setUploading(false);
+                              setUploadProgress(0);
+                              setUploadingFileName("");
                             }
                           };
                           input.click();
                         }}
-                        className="w-full border border-dashed border-gray-200 dark:border-white/[0.08] rounded-lg py-3 flex items-center justify-center gap-2 text-gray-400 dark:text-gray-500 hover:text-orange-500 hover:border-orange-300 dark:hover:border-orange-500/30 hover:bg-orange-50/30 dark:hover:bg-orange-500/[0.02] transition-all cursor-pointer"
+                        className="w-full border border-dashed border-gray-200 dark:border-white/[0.08] rounded-lg py-3 flex items-center justify-center gap-2 text-gray-400 dark:text-gray-500 hover:text-orange-500 hover:border-orange-300 dark:hover:border-orange-500/30 hover:bg-orange-50/30 dark:hover:bg-orange-500/[0.02] transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         <Upload className="w-3.5 h-3.5" />
-                        <span className="text-[11px]">Upload license (PDF, TXT, or screenshot)</span>
+                        <span className="text-[11px]">{uploading ? "Uploading license..." : "Upload license (PDF, TXT, or screenshot)"}</span>
                       </button>
                     )}
                   </div>

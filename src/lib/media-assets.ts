@@ -69,17 +69,46 @@ async function ensureMediaAssetInner(params: EnsureMediaAssetParams): Promise<st
   if (mimeType) metadataUpdate.mime_type = mimeType;
   if (typeof size === "number" && Number.isFinite(size)) metadataUpdate.size_bytes = size;
 
-  // 1. Check if a row with this URL already exists IN THIS WORKSPACE.
+  // 1. Check if this asset already exists IN THIS WORKSPACE. Prefer stable
+  // identifiers before URL aliases so a playback-copy update cannot race the
+  // primary Drive row and insert a duplicate.
   // RLS already gates this at the DB level, but the explicit workspace_id
   // filter is belt-and-suspenders against a future code path that mistakenly
   // uses the admin client here.
   const aliases = Array.from(mediaUrlAliases({ url, fileId, publishUrl, driveProxyUrl, playbackUrl }));
-  const { data: existingRows, error: lookupError } = await supabase
-    .from("media_assets")
-    .select("id, used_in")
-    .in("url", aliases.length > 0 ? aliases : [url])
-    .eq("workspace_id", wsId)
-    .limit(1);
+  let existingRows: Array<{ id: string; used_in: string[] | null }> | null = null;
+  let lookupError: { message: string } | null = null;
+
+  if (fileId) {
+    const result = await supabase
+      .from("media_assets")
+      .select("id, used_in")
+      .eq("file_id", fileId)
+      .eq("workspace_id", wsId)
+      .limit(1);
+    existingRows = result.data;
+    lookupError = result.error;
+  }
+  if (!lookupError && (!existingRows || existingRows.length === 0) && playbackStorageKey) {
+    const result = await supabase
+      .from("media_assets")
+      .select("id, used_in")
+      .eq("playback_storage_key", playbackStorageKey)
+      .eq("workspace_id", wsId)
+      .limit(1);
+    existingRows = result.data;
+    lookupError = result.error;
+  }
+  if (!lookupError && (!existingRows || existingRows.length === 0)) {
+    const result = await supabase
+      .from("media_assets")
+      .select("id, used_in")
+      .in("url", aliases.length > 0 ? aliases : [url])
+      .eq("workspace_id", wsId)
+      .limit(1);
+    existingRows = result.data;
+    lookupError = result.error;
+  }
   if (lookupError) {
     throw new Error(`Media asset lookup failed: ${lookupError.message}`);
   }

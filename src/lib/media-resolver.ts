@@ -1,6 +1,8 @@
 import type { ContentCard, ContentType, RawFile } from "./types";
+import { isValidUuid } from "./utils";
 
 const IMAGE_EXT_RE = /\.(avif|gif|jpe?g|png|webp)(?:[?#].*)?$/i;
+const DRIVE_FILE_ID_RE = /^[a-zA-Z0-9_-]{20,80}$/;
 
 export function isVideoContentType(contentType: ContentType): boolean {
   return contentType === "video" || contentType === "reel" || contentType === "story";
@@ -12,6 +14,10 @@ export function driveFileIdFromUrl(url: string | null | undefined): string | nul
   if (queryMatch?.[1]) return decodeURIComponent(queryMatch[1]);
   const filePathMatch = url.match(/\/file\/d\/([^/]+)/);
   return filePathMatch?.[1] ? decodeURIComponent(filePathMatch[1]) : null;
+}
+
+function isLikelyDriveFileId(value: string | null | undefined): value is string {
+  return Boolean(value && DRIVE_FILE_ID_RE.test(value) && !isValidUuid(value));
 }
 
 export function firstVideoRawFile(card: Pick<ContentCard, "sourceVault">): RawFile | null {
@@ -50,7 +56,7 @@ export function resolveCardVideoUrl(card: Pick<ContentCard, "contentType" | "thu
   if (rawVideo?.url) return rawVideo.url;
 
   const thumbFileId = driveFileIdFromUrl(card.thumbnailUrl);
-  const videoId = card.mediaIds?.find((id) => id !== thumbFileId);
+  const videoId = card.mediaIds?.find((id) => id !== thumbFileId && isLikelyDriveFileId(id));
   if (videoId) return `/api/drive/stream?id=${encodeURIComponent(videoId)}`;
 
   return card.thumbnailUrl || null;

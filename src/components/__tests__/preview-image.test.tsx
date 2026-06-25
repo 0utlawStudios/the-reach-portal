@@ -23,7 +23,7 @@ describe("PreviewImage", () => {
 
     let images = Array.from(container.querySelectorAll("img"));
     expect(images).toHaveLength(1);
-    expect(images[0]).toHaveAttribute("src", `/api/media/image-preview?id=${FILE_ID}&token=signed&size=thumb`);
+    expect(images[0]).toHaveAttribute("src", `/api/media/image-preview?id=${FILE_ID}&size=thumb`);
 
     await act(async () => {
       fireEvent.load(images[0]);
@@ -31,8 +31,8 @@ describe("PreviewImage", () => {
 
     images = Array.from(container.querySelectorAll("img"));
     expect(images).toHaveLength(2);
-    expect(images[0]).toHaveAttribute("src", `/api/media/image-preview?id=${FILE_ID}&token=signed&size=thumb`);
-    expect(images[1]).toHaveAttribute("src", `/api/media/image-preview?id=${FILE_ID}&token=signed&size=full`);
+    expect(images[0]).toHaveAttribute("src", `/api/media/image-preview?id=${FILE_ID}&size=thumb`);
+    expect(images[1]).toHaveAttribute("src", `/api/media/image-preview?id=${FILE_ID}&size=full`);
     expect(images[0].className).toContain("opacity-100");
     expect(images[1].className).toContain("opacity-0");
   });
@@ -63,6 +63,21 @@ describe("PreviewImage", () => {
 
     const images = Array.from(container.querySelectorAll("img"));
     expect(images).toHaveLength(2);
-    expect(images[1]).toHaveAttribute("src", `/api/media/image-preview?id=${FILE_ID}&token=signed&size=full`);
+    expect(images[1]).toHaveAttribute("src", `/api/media/image-preview?id=${FILE_ID}&size=full`);
+  });
+
+  it("does not render local HEIC blobs as broken raw browser images", () => {
+    const { container } = render(
+      <PreviewImage
+        src="blob:local-heic"
+        mimeType="image/heic"
+        fileName="IMG_3748.HEIC"
+        alt="IMG_3748.HEIC"
+        className="w-full h-full object-cover"
+      />,
+    );
+
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.querySelector("svg")).not.toBeNull();
   });
 });

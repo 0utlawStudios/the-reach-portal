@@ -484,7 +484,7 @@ async function checkAuth(req: NextRequest, fileId: string): Promise<{
 }> {
   const signedToken = req.nextUrl.searchParams.get("token");
   const signedClaims = verifyDriveStreamToken(fileId, signedToken);
-  if (signedClaims) return { ok: true, signed: true, workspaceId: signedClaims.workspaceId };
+  if (signedClaims?.purpose === "publish") return { ok: true, signed: true, workspaceId: signedClaims.workspaceId };
 
   const auth = await workspaceAuth(req);
   if (auth?.workspaceId) {

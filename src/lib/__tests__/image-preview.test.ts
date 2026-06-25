@@ -25,11 +25,11 @@ describe("image preview routing", () => {
     };
 
     expect(heicImagePreviewUrl(`/api/drive/stream?id=${FILE_ID}&token=signed`, opts))
-      .toBe(`/api/media/image-preview?id=${FILE_ID}&token=signed`);
+      .toBe(`/api/media/image-preview?id=${FILE_ID}`);
     expect(browserImagePreviewUrl(`/api/drive/stream?id=${FILE_ID}&token=signed`, opts))
-      .toBe(`/api/media/image-preview?id=${FILE_ID}&token=signed`);
+      .toBe(`/api/media/image-preview?id=${FILE_ID}`);
     expect(browserImagePreviewUrl(`/api/drive/stream?id=${FILE_ID}&token=signed`, { ...opts, size: "thumb" }))
-      .toBe(`/api/media/image-preview?id=${FILE_ID}&token=signed&size=thumb`);
+      .toBe(`/api/media/image-preview?id=${FILE_ID}&size=thumb`);
   });
 
   it("warms browser and server HEIC preview caches after upload", async () => {
@@ -42,7 +42,7 @@ describe("image preview routing", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      `/api/media/image-preview?id=${FILE_ID}&token=signed&size=thumb`,
+      `/api/media/image-preview?id=${FILE_ID}&size=thumb`,
       expect.objectContaining({
         method: "GET",
         credentials: "same-origin",
@@ -52,7 +52,7 @@ describe("image preview routing", () => {
     await Promise.resolve();
     await Promise.resolve();
     expect(fetchMock).toHaveBeenCalledWith(
-      `/api/media/image-preview?id=${FILE_ID}&token=signed`,
+      `/api/media/image-preview?id=${FILE_ID}`,
       expect.objectContaining({
         method: "GET",
         credentials: "same-origin",
@@ -73,7 +73,7 @@ describe("image preview routing", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      `/api/media/image-preview?id=${FILE_ID}&token=signed&size=thumb`,
+      `/api/media/image-preview?id=${FILE_ID}&size=thumb`,
       expect.objectContaining({
         method: "GET",
         credentials: "same-origin",

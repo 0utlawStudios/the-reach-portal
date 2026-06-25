@@ -13,7 +13,7 @@ import { useAuth } from "@/lib/auth-context";
 import { ensureMediaAsset } from "@/lib/media-assets";
 import { isDrivePublishableMediaMime, normalizeDriveMimeType } from "@/lib/drive-policy";
 import { getPublicDriveDownloadUrl } from "@/lib/drive-url-utils";
-import { warmBrowserImagePreview } from "@/lib/image-preview";
+import { isHeicLikeImage, warmBrowserImagePreview } from "@/lib/image-preview";
 import { driveFileIdFromUrl } from "@/lib/media-resolver";
 import { MentionTextarea } from "./mention-textarea";
 import { formatDateTimeCompact } from "@/lib/utils";
@@ -75,6 +75,10 @@ function uploadPathForSize(file: File): "proxy" | "resumable" {
   return file.size >= 4 * 1024 * 1024 ? "resumable" : "proxy";
 }
 
+function isLocalHeicPreview(file: Pick<UploadedFile, "preview" | "mimeType" | "name">): boolean {
+  return file.preview.startsWith("blob:") && isHeicLikeImage(file.mimeType, file.name);
+}
+
 type PlaybackOptimizationResult = {
   fileId?: string;
   name: string;
@@ -100,6 +104,7 @@ export function CreatePostModal({ open, onClose }: Props) {
   const [driveFolder, setDriveFolder] = useState("");
   const [notes, setNotes] = useState("");
   const [licenseFileId, setLicenseFileId] = useState("");
+  const [licenseUploading, setLicenseUploading] = useState(false);
   const [activeTab, setActiveTab] = useState<ModalTab>("content");
   const [checklist, setChecklist] = useState(() => DEFAULT_CHECKLIST.map((c) => ({ ...c })));
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -570,8 +575,13 @@ export function CreatePostModal({ open, onClose }: Props) {
                     <div className="grid grid-cols-3 gap-2 mb-2">
                       {files.map((file) => (
                         <div key={file.id} className="relative group rounded-lg overflow-hidden border border-gray-200 dark:border-white/[0.08] bg-gray-50 dark:bg-white/[0.03]">
-                          {file.type === "image" ? (
+                          {file.type === "image" && !isLocalHeicPreview(file) ? (
                             <PreviewImage src={file.preview} alt={file.name} mimeType={file.mimeType} fileName={file.name} className="w-full aspect-square object-cover" />
+                          ) : file.type === "image" ? (
+                            <div className="w-full aspect-square flex flex-col items-center justify-center bg-gray-100 dark:bg-white/[0.04]">
+                              <ImageIcon className="w-6 h-6 text-gray-400 dark:text-gray-500" />
+                              <p className="text-[8px] text-gray-400 dark:text-gray-500 mt-1 truncate max-w-full px-1">HEIC preview after upload</p>
+                            </div>
                           ) : (
                             <div className="w-full aspect-square flex flex-col items-center justify-center bg-gray-100 dark:bg-white/[0.04]">
                               <FileVideo className="w-6 h-6 text-gray-400 dark:text-gray-500" />
@@ -718,7 +728,8 @@ export function CreatePostModal({ open, onClose }: Props) {
                       <button type="button" onClick={() => setLicenseFileId("")} className="text-[10px] text-gray-400 hover:text-red-500 cursor-pointer">Remove</button>
                     </div>
                   ) : (
-                    <button type="button" onClick={async () => {
+                    <button type="button" disabled={licenseUploading || submitting} onClick={async () => {
+                      if (licenseUploading || submitting) return;
                       const input = document.createElement("input");
                       input.type = "file";
                       input.accept = "image/*,.pdf,.txt,.doc,.docx";
@@ -727,9 +738,16 @@ export function CreatePostModal({ open, onClose }: Props) {
                         if (!file) return;
                         addToast("Uploading license...", "info");
                         let driveModule: typeof import("@/lib/drive-upload") | null = null;
+                        setLicenseUploading(true);
+                        setUploadingFileName(`Uploading license: ${file.name}`);
+                        setUploadProgress(0);
                         try {
                           driveModule = await import("@/lib/drive-upload");
-                          const [item] = await driveModule.uploadManyToDrive([file], "raw-files", { workspaceId, concurrency: 1 });
+                          const [item] = await driveModule.uploadManyToDrive([file], "raw-files", {
+                            workspaceId,
+                            concurrency: 1,
+                            onProgress: setUploadProgress,
+                          });
                           if (!item?.result) throw item?.error || new Error("License upload failed");
                           const result = item.result;
                           setLicenseFileId(result.fileId);
@@ -752,11 +770,15 @@ export function CreatePostModal({ open, onClose }: Props) {
                               errorDetail: err instanceof Error ? err.stack : undefined,
                             });
                           } catch { /* ignore */ }
+                        } finally {
+                          setLicenseUploading(false);
+                          setUploadProgress(0);
+                          setUploadingFileName("");
                         }
                       };
                       input.click();
-                    }} className="w-full border border-dashed border-gray-200 dark:border-white/[0.08] rounded-lg py-2.5 flex items-center justify-center gap-2 text-gray-400 dark:text-gray-500 hover:text-orange-500 hover:border-orange-300 dark:hover:border-orange-500/30 transition-all cursor-pointer text-[11px]">
-                      <Upload className="w-3.5 h-3.5" />Upload license (PDF or screenshot)
+                    }} className="w-full border border-dashed border-gray-200 dark:border-white/[0.08] rounded-lg py-2.5 flex items-center justify-center gap-2 text-gray-400 dark:text-gray-500 hover:text-orange-500 hover:border-orange-300 dark:hover:border-orange-500/30 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed text-[11px]">
+                      <Upload className="w-3.5 h-3.5" />{licenseUploading ? "Uploading license..." : "Upload license (PDF or screenshot)"}
                     </button>
                   )}
                 </div>
@@ -807,7 +829,7 @@ export function CreatePostModal({ open, onClose }: Props) {
             )}
 
             {/* Upload progress */}
-            {submitting && uploadingFileName && (
+            {(submitting || licenseUploading) && uploadingFileName && (
               <div className="bg-white dark:bg-white/[0.03] rounded-xl border border-gray-200/60 dark:border-white/[0.06] p-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-medium text-gray-600 dark:text-gray-300 truncate flex-1">{uploadingFileName}</span>

@@ -15,6 +15,7 @@ import {
   MEDIA_MANUAL_USED_TAG,
   mediaAssetAliases,
   sameUsedIn,
+  stripPrivateMediaToken,
   syncedUsedInValue,
   videoPreviewFrameUrl,
 } from "@/lib/media-usage";
@@ -106,11 +107,13 @@ function uploadPathForSize(file: File): "proxy" | "resumable" {
 }
 
 function mediaDisplayUrl(asset: Pick<MediaAsset, "url" | "driveProxyUrl" | "playbackUrl">): string {
-  return asset.playbackUrl || asset.driveProxyUrl || asset.url;
+  return stripPrivateMediaToken(asset.playbackUrl || asset.driveProxyUrl || asset.url);
 }
 
 function mediaVideoSources(asset: Pick<MediaAsset, "url" | "driveProxyUrl" | "playbackUrl">, previewFrame = false): string[] {
-  const sources = [asset.playbackUrl, asset.driveProxyUrl, asset.url].filter((url): url is string => Boolean(url));
+  const sources = [asset.playbackUrl, asset.driveProxyUrl, asset.url]
+    .map((url) => stripPrivateMediaToken(url))
+    .filter((url): url is string => Boolean(url));
   return previewFrame ? sources.map(videoPreviewFrameUrl) : sources;
 }
 
@@ -326,12 +329,10 @@ export function MediaPage() {
         });
       }
 
-      const mediaAssetSyncs: Array<() => Promise<void>> = [];
       const playbackOptimizations: Array<() => Promise<void>> = [];
 
-      // Show results as soon as the primary Drive upload succeeds. Media
-      // Library persistence and optional video playback copies are bounded
-      // background work, so they cannot make a completed upload feel stuck.
+      // A direct Media Library upload is not complete until the DB row exists.
+      // Optional video playback copies stay best-effort after that durable row.
       for (const it of items) {
         const file = it.file;
         if (it.error || !it.result) {
@@ -358,41 +359,37 @@ export function MediaPage() {
         warmBrowserImagePreview(asset.driveProxyUrl || asset.url, { mimeType: asset.mimeType, fileName: asset.name });
 
         if (useDb) {
-          mediaAssetSyncs.push(async () => {
-            try {
-              const id = await ensureMediaAsset({
-                name: asset.name,
-                url: asset.url,
-                fileId: asset.fileId,
-                publishUrl: asset.publishUrl,
-                driveProxyUrl: asset.driveProxyUrl,
-                mimeType: asset.mimeType,
-                size: asset.size,
-                fileType: asset.type,
-                folder: asset.folder,
-                addedBy: asset.addedBy || currentUser.name,
-                workspaceId: workspaceId || BASELINE_WORKSPACE_ID,
-              });
-              setMedia((prev) => prev.map((existing) => (
-                mediaAssetsOverlap(existing, asset) ? { ...existing, id } : existing
-              )));
-            } catch (err) {
-              console.error("[media] upload library insert failed:", err);
-              addToast(`Uploaded ${file.name}, but saving to the library failed. Try again.`, "error");
-              await reportUploadFailure({
-                phase: "media_library_media_asset_sync",
-                route: "/api/drive/upload-failure",
-                uploadPath: uploadPathForSize(file),
-                folder: "media-library",
-                workspaceId,
-                fileName: file.name,
-                mimeType,
-                fileSize: file.size,
-                errorMessage: uploadErrorMessage(err),
-                errorDetail: err instanceof Error ? err.stack : undefined,
-              });
-            }
-          });
+          try {
+            asset.id = await ensureMediaAsset({
+              name: asset.name,
+              url: asset.url,
+              fileId: asset.fileId,
+              publishUrl: asset.publishUrl,
+              driveProxyUrl: asset.driveProxyUrl,
+              mimeType: asset.mimeType,
+              size: asset.size,
+              fileType: asset.type,
+              folder: asset.folder,
+              addedBy: asset.addedBy || currentUser.name,
+              workspaceId: workspaceId || BASELINE_WORKSPACE_ID,
+            });
+          } catch (err) {
+            console.error("[media] upload library insert failed:", err);
+            addToast(`Uploaded ${file.name}, but saving to Media Library failed. Try again before closing this page.`, "error");
+            await reportUploadFailure({
+              phase: "media_library_media_asset_sync",
+              route: "/api/drive/upload-failure",
+              uploadPath: uploadPathForSize(file),
+              folder: "media-library",
+              workspaceId,
+              fileName: file.name,
+              mimeType,
+              fileSize: file.size,
+              errorMessage: uploadErrorMessage(err),
+              errorDetail: err instanceof Error ? err.stack : undefined,
+            });
+            continue;
+          }
         }
 
         if (mimeType.startsWith("video/")) {
@@ -449,10 +446,7 @@ export function MediaPage() {
         }
 
         setMedia((prev) => upsertMediaAsset(prev, asset));
-        addToast(`${file.name} uploaded`, "success");
-      }
-      if (mediaAssetSyncs.length > 0) {
-        void Promise.allSettled(mediaAssetSyncs.map((run) => run()));
+        addToast(`${file.name} saved to Media Library`, "success");
       }
       if (playbackOptimizations.length > 0) {
         void Promise.allSettled(playbackOptimizations.map((run) => run()));

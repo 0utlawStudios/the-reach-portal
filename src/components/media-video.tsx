@@ -10,7 +10,7 @@ type MediaVideoProps = Omit<VideoHTMLAttributes<HTMLVideoElement>, "src"> & {
   loadTimeoutMs?: number;
 };
 
-const DEFAULT_VIDEO_LOAD_TIMEOUT_MS = 4_000;
+const DEFAULT_VIDEO_LOAD_TIMEOUT_MS = 45_000;
 
 type PlaybackState = {
   sourceKey: string;
@@ -37,6 +37,7 @@ export function MediaVideo({
   loadTimeoutMs = DEFAULT_VIDEO_LOAD_TIMEOUT_MS,
   onError,
   onLoadStart,
+  onLoadedData,
   onLoadedMetadata,
   onCanPlay,
   onPlay,
@@ -140,8 +141,11 @@ export function MediaVideo({
         onLoadStart?.(event);
       }}
       onLoadedMetadata={(event: SyntheticEvent<HTMLVideoElement, Event>) => {
-        markLoaded();
         onLoadedMetadata?.(event);
+      }}
+      onLoadedData={(event: SyntheticEvent<HTMLVideoElement, Event>) => {
+        markLoaded();
+        onLoadedData?.(event);
       }}
       onCanPlay={(event: SyntheticEvent<HTMLVideoElement, Event>) => {
         markLoaded();

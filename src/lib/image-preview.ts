@@ -12,16 +12,6 @@ export function isHeicLikeImage(mimeType?: unknown, fileNameOrUrl?: unknown): bo
   return typeof fileNameOrUrl === "string" && HEIC_EXT_RE.test(fileNameOrUrl);
 }
 
-function driveStreamTokenFromUrl(url: string): string | null {
-  try {
-    const parsed = new URL(url, "http://local.invalid");
-    return parsed.searchParams.get("token");
-  } catch {
-    const match = url.match(/[?&]token=([^&]+)/);
-    return match?.[1] ? decodeURIComponent(match[1]) : null;
-  }
-}
-
 export function heicImagePreviewUrl(
   url: string,
   opts: { mimeType?: unknown; fileName?: unknown; size?: BrowserImagePreviewSize } = {},
@@ -32,8 +22,6 @@ export function heicImagePreviewUrl(
   if (!fileId) return null;
 
   const params = new URLSearchParams({ id: fileId });
-  const token = driveStreamTokenFromUrl(url);
-  if (token) params.set("token", token);
   if (opts.size) params.set("size", opts.size);
   return `/api/media/image-preview?${params.toString()}`;
 }

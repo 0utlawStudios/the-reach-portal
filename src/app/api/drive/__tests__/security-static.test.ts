@@ -28,6 +28,7 @@ describe("Drive route security contracts", () => {
     expect(DRIVE_STREAM_SRC).toContain("mutable");
     expect(DRIVE_STREAM_SRC).toContain("VALID_DRIVE_FOLDERS.map");
     expect(DRIVE_STREAM_SRC).toContain("verifyDriveStreamToken(fileId, signedToken)");
+    expect(DRIVE_STREAM_SRC).toContain('signedClaims?.purpose === "publish"');
     expect(GOOGLE_DRIVE_SRC).toContain("signDriveStreamToken");
   });
 
@@ -70,10 +71,13 @@ describe("Drive route security contracts", () => {
     expect(DRIVE_PROXY_UPLOAD_SRC).toContain("Use resumable upload");
   });
 
-  it("returns signed app stream URLs from both Drive upload paths", () => {
+  it("returns same-origin tokenless private app stream URLs and separately signed publish URLs", () => {
     expect(DRIVE_PROXY_UPLOAD_SRC).toContain("getStreamUrl(fileId, authContext.workspaceId)");
     expect(DRIVE_FINALIZE_SRC).toContain("getStreamUrl(fileId, authContext.workspaceId)");
-    expect(GOOGLE_DRIVE_SRC).toContain("token: signDriveStreamToken(fileId, workspaceId, expiresAt)");
+    expect(GOOGLE_DRIVE_SRC).toContain("const params = new URLSearchParams({ id: fileId })");
+    expect(GOOGLE_DRIVE_SRC).toContain("return `/api/drive/stream?${params.toString()}`");
+    expect(GOOGLE_DRIVE_SRC).toContain('purpose: DriveStreamTokenPurpose = "private"');
+    expect(GOOGLE_DRIVE_SRC).toContain('signDriveStreamToken(fileId, workspaceId, expiresAt, "publish")');
     expect(GOOGLE_DRIVE_SRC).toContain("workspaceId: string");
     expect(GOOGLE_DRIVE_SRC).toContain("expiresAt <= Date.now()");
   });

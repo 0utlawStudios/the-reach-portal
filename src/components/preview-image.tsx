@@ -4,7 +4,7 @@ import type { ImgHTMLAttributes, SyntheticEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { ImageOff } from "lucide-react";
 import { RawImage } from "@/components/raw-image";
-import { browserImagePreviewUrl } from "@/lib/image-preview";
+import { browserImagePreviewUrl, isHeicLikeImage } from "@/lib/image-preview";
 
 type PreviewImageProps = ImgHTMLAttributes<HTMLImageElement> & {
   mimeType?: unknown;
@@ -62,6 +62,10 @@ export function PreviewImage({
   const missingOrFailed = !primarySrc || (primaryFailed && !canShowFallback);
   const showSpinner = !isLoaded && !canShowFallback;
   const effectiveLoading = loading || (wantsFullPreview ? "eager" : undefined);
+  const localHeicUnsupported =
+    typeof primarySrc === "string" &&
+    primarySrc.startsWith("blob:") &&
+    isHeicLikeImage(mimeType, fileName || primarySrc);
 
   useEffect(() => {
     if (!primaryDelayKey || primaryDelayElapsed) return;
@@ -90,7 +94,7 @@ export function PreviewImage({
     return () => clearTimeout(timer);
   }, [primarySrc, isLoaded, missingOrFailed, canShowFallback, shouldLoadPrimary, onError]);
 
-  if (missingOrFailed) {
+  if (missingOrFailed || localHeicUnsupported) {
     return (
       <div className={`${className || ""} flex items-center justify-center bg-[#6C655A]/15 text-[#6C655A]/55 dark:bg-white/[0.04] dark:text-gray-500`}>
         <ImageOff className="h-[45%] max-h-5 min-h-3 w-[45%] max-w-5 min-w-3" aria-hidden="true" />

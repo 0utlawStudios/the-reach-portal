@@ -64,6 +64,7 @@ const cleanupEvidence: Record<string, unknown> = {};
 test.describe.configure({ mode: "serial" });
 
 test.beforeAll(async () => {
+  guardRuntimeTarget();
   mkdirSync(EVIDENCE_DIR, { recursive: true });
   mkdirSync(AUTH_DIR, { recursive: true });
   state = await seedFixture();
@@ -680,9 +681,42 @@ function requireEnv(key: string): string {
   return value;
 }
 
+function guardRuntimeTarget() {
+  const url = new URL(BASE_URL);
+  const local = ["localhost", "127.0.0.1", "::1"].includes(url.hostname);
+  const stagingLike = /(^|\.)((staging|stage|preview|qa|dev)[.-]|vercel\.app$)/i.test(url.hostname);
+  const allowProd = process.env.QA_ALLOW_PROD_DRAG === "1" || process.env.QA_ALLOW_PROD_E2E === "1";
+  const supabaseHost = new URL(SUPABASE_URL).hostname;
+  const productionSupabaseHosts = new Set(["gxmpmdhmxyfqusdzcemt.supabase.co"]);
+  const productionSiteHosts = new Set(["thereach.ten80ten.com"]);
+
+  if (!local && !stagingLike && !allowProd) {
+    throw new Error(`Refusing drag e2e against ${BASE_URL}. Use localhost/staging or set QA_ALLOW_PROD_DRAG=1 for an intentional production QA run.`);
+  }
+  if ((productionSupabaseHosts.has(supabaseHost) || productionSiteHosts.has(url.hostname)) && !allowProd) {
+    throw new Error("Refusing drag e2e against production backend/site without QA_ALLOW_PROD_DRAG=1.");
+  }
+}
+
+function redactTokenizedUrl(value: string): string {
+  return value
+    .replace(/([?&](?:token|access_token|refresh_token|apikey|key)=)[^&#]+/gi, "$1REDACTED")
+    .replace(/((?:%3F|%26)(?:token|access_token|refresh_token|apikey|key)%3D)[^%&,\])]+/gi, "$1REDACTED")
+    .replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]+/gi, "$1REDACTED");
+}
+
+function redactEvidence(value: unknown): unknown {
+  if (typeof value === "string") return redactTokenizedUrl(value);
+  if (Array.isArray(value)) return value.map((item) => redactEvidence(item));
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, redactEvidence(item)]),
+  );
+}
+
 function writeJson(fileName: string, data: unknown) {
   mkdirSync(EVIDENCE_DIR, { recursive: true });
-  writeFileSync(path.join(EVIDENCE_DIR, fileName), `${JSON.stringify(data, null, 2)}\n`);
+  writeFileSync(path.join(EVIDENCE_DIR, fileName), `${JSON.stringify(redactEvidence(data), null, 2)}\n`);
 }
 
 function formatError(error: unknown): string {

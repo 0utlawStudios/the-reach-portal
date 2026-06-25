@@ -4,6 +4,7 @@ import {
   hasManualUsedTag,
   MEDIA_MANUAL_USED_TAG,
   sameUsedIn,
+  stripPrivateMediaToken,
   syncedUsedInValue,
   videoPreviewFrameUrl,
 } from "../media-usage";
@@ -97,5 +98,14 @@ describe("media usage detection", () => {
   it("requests a real video frame for thumbnail previews without changing playback URLs elsewhere", () => {
     expect(videoPreviewFrameUrl("/api/drive/stream?id=abc")).toBe("/api/drive/stream?id=abc#t=0.1");
     expect(videoPreviewFrameUrl("/api/drive/stream?id=abc#t=0.1")).toBe("/api/drive/stream?id=abc#t=0.1");
+  });
+
+  it("strips copied private Drive stream tokens while leaving playback keys intact", () => {
+    expect(stripPrivateMediaToken("/api/drive/stream?id=abc&token=secret#t=0.1"))
+      .toBe("/api/drive/stream?id=abc#t=0.1");
+    expect(stripPrivateMediaToken("https://thereach.ten80ten.com/api/media/image-preview?id=abc&token=secret&size=thumb"))
+      .toBe("https://thereach.ten80ten.com/api/media/image-preview?id=abc&size=thumb");
+    expect(stripPrivateMediaToken("/api/media/playback?key=workspace%2Fclip.mp4"))
+      .toBe("/api/media/playback?key=workspace%2Fclip.mp4");
   });
 });

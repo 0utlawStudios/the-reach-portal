@@ -112,7 +112,7 @@ describe("Drive upload surfaces", () => {
   it("renders preview-safe media URLs without changing publish-safe raw URLs", () => {
     const mediaPicker = source("src/components/media-picker.tsx");
     expect(mediaPicker).toContain('function mediaDisplayUrl(asset: Pick<MediaEntry, "url" | "driveProxyUrl" | "playbackUrl">): string');
-    expect(mediaPicker).toContain("return asset.playbackUrl || asset.driveProxyUrl || asset.url");
+    expect(mediaPicker).toContain("return stripPrivateMediaToken(asset.playbackUrl || asset.driveProxyUrl || asset.url)");
     expect(mediaPicker).toContain("mediaAssetId: asset.assetId");
     expect(mediaPicker).toContain("mediaVideoSources(asset, true)");
     expect(mediaPicker).toContain('preload="metadata"');
@@ -371,10 +371,11 @@ describe("Drive upload surfaces", () => {
 
   it("renders media-library videos with source fallback instead of a permanent black preview", () => {
     const mediaVideo = source("src/components/media-video.tsx");
-    expect(mediaVideo).toContain("DEFAULT_VIDEO_LOAD_TIMEOUT_MS = 4_000");
+    expect(mediaVideo).toContain("DEFAULT_VIDEO_LOAD_TIMEOUT_MS = 45_000");
     expect(mediaVideo).toContain("attemptedSource");
     expect(mediaVideo).toContain('preload !== "none" || attempted');
     expect(mediaVideo).toContain("advanceSource");
+    expect(mediaVideo).toContain("onLoadedData");
     expect(mediaVideo).toContain("retrySources");
     expect(mediaVideo).toContain("Video preview unavailable");
     expect(mediaVideo).toContain("Retry");
@@ -408,9 +409,10 @@ describe("Drive upload surfaces", () => {
     }
 
     const mediaPage = source("src/components/pages/media-page.tsx");
-    expect(mediaPage).toContain("Show results as soon as the primary Drive upload succeeds");
+    expect(mediaPage).toContain("A direct Media Library upload is not complete until the DB row exists.");
     expect(mediaPage).not.toContain('.from("media_assets")\n            .insert');
     expect(mediaPage).toContain("upsertMediaAsset");
+    expect(mediaPage).toContain("saved to Media Library");
   });
 
   it("keeps full Drive metadata when mirroring uploaded videos into Media Library", () => {
@@ -419,6 +421,8 @@ describe("Drive upload surfaces", () => {
       expect(helper, field).toContain(field);
     }
     expect(helper).toContain("mediaUrlAliases({ url, fileId, publishUrl, driveProxyUrl, playbackUrl })");
+    expect(helper).toContain('.eq("file_id", fileId)');
+    expect(helper).toContain('.eq("playback_storage_key", playbackStorageKey)');
     expect(helper).toContain("lookupError");
     expect(helper).toContain("updateError");
     expect(helper).toContain("MEDIA_ASSET_SYNC_TIMEOUT_MS");
@@ -513,6 +517,42 @@ describe("Drive upload surfaces", () => {
     const client = source("src/lib/drive-upload.ts");
     expect(client).toContain("uploadToken");
     expect(client).toContain('xhr.setRequestHeader("X-Upload-Token", session.uploadToken)');
+  });
+
+  it("does not expose private Drive stream tokens through app media copy or preview helpers", () => {
+    const googleDrive = source("src/lib/google-drive.ts");
+    expect(googleDrive).toContain("const params = new URLSearchParams({ id: fileId })");
+    expect(googleDrive).toContain('signDriveStreamToken(fileId, workspaceId, expiresAt, "publish")');
+
+    const imagePreview = source("src/lib/image-preview.ts");
+    expect(imagePreview).not.toContain('params.set("token"');
+
+    const mediaPage = source("src/components/pages/media-page.tsx");
+    const mediaPicker = source("src/components/media-picker.tsx");
+    expect(mediaPage).toContain("stripPrivateMediaToken(asset.playbackUrl || asset.driveProxyUrl || asset.url)");
+    expect(mediaPicker).toContain("stripPrivateMediaToken(asset.playbackUrl || asset.driveProxyUrl || asset.url)");
+  });
+
+  it("guards production-mutating e2e specs and ignores generated evidence", () => {
+    const dragSpec = source("e2e/drag.spec.ts");
+    expect(dragSpec).toContain("guardRuntimeTarget()");
+    expect(dragSpec).toContain("QA_ALLOW_PROD_DRAG");
+    expect(dragSpec).toContain("Refusing drag e2e against production backend/site");
+
+    const gitignore = source(".gitignore");
+    expect(gitignore).toContain("perf/drag-evidence/drag-*/");
+  });
+
+  it("guards license uploads against double submission and shows progress", () => {
+    const createPost = source("src/components/create-post-modal.tsx");
+    expect(createPost).toContain("licenseUploading");
+    expect(createPost).toContain("disabled={licenseUploading || submitting}");
+    expect(createPost).toContain("onProgress: setUploadProgress");
+
+    const drawer = source("src/components/asset-review-drawer.tsx");
+    expect(drawer).toContain("if (uploading) return;");
+    expect(drawer).toContain("disabled={uploading}");
+    expect(drawer).toContain("onProgress: setUploadProgress");
   });
 
   it("renders support attachments through the authenticated proxy, not stored signed URLs", () => {

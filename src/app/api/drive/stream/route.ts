@@ -171,7 +171,7 @@ async function checkAuth(req: NextRequest, fileId: string): Promise<{
 }> {
   const signedToken = req.nextUrl.searchParams.get("token");
   const signedClaims = verifyDriveStreamToken(fileId, signedToken);
-  if (signedClaims) {
+  if (signedClaims?.purpose === "publish") {
     return { ok: true, authed: true, signed: true, workspaceId: signedClaims.workspaceId };
   }
 

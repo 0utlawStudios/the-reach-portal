@@ -73,6 +73,15 @@ describe("media resolver", () => {
     expect(resolveCardVideoUrl(c)).toBe("/api/drive/stream?id=legacy-video");
   });
 
+  it("does not treat Media Library row UUIDs as Drive file IDs", () => {
+    const c = card({
+      thumbnailUrl: "",
+      mediaIds: ["22222222-2222-4222-8222-222222222222"],
+    });
+
+    expect(resolveCardVideoUrl(c)).toBeNull();
+  });
+
   it("treats stored image thumbnail metadata as a reliable poster", () => {
     const c = card({
       thumbnailUrl: "/api/drive/stream?id=poster",

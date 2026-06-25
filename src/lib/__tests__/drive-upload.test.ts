@@ -33,6 +33,7 @@ interface MixedUploadRun {
   active: number;
   maxActive: number;
   failDirectNames: Set<string>;
+  directFinalResponsesByName?: Map<string, Array<{ status: number; body: Record<string, unknown> }>>;
 }
 
 interface StallingChunkRun {
@@ -133,7 +134,14 @@ function installMixedUploadMocks(run: MixedUploadRun, onSend?: (timeout: number)
       setTimeout(() => {
         const uploadTotal = body instanceof Blob ? body.size || 10 : 10;
         this.upload.onprogress?.({ lengthComputable: true, loaded: uploadTotal, total: uploadTotal });
-        if (!isProxy && run.failDirectNames.has(fileName)) {
+        const range = this.headers["content-range"]?.match(/^bytes \d+-(\d+)\/(\d+)$/);
+        const isFinalChunk = !range || Number(range[1]) + 1 >= Number(range[2]);
+        const queuedDirectFinal = !isProxy && isFinalChunk ? run.directFinalResponsesByName?.get(fileName) : undefined;
+        const nextDirectFinal = queuedDirectFinal?.shift();
+        if (nextDirectFinal) {
+          this.status = nextDirectFinal.status;
+          this.responseText = JSON.stringify(nextDirectFinal.body);
+        } else if (!isProxy && run.failDirectNames.has(fileName)) {
           this.status = 403;
           this.responseText = JSON.stringify({
             error: {
@@ -144,8 +152,6 @@ function installMixedUploadMocks(run: MixedUploadRun, onSend?: (timeout: number)
           });
         } else {
           this.status = 200;
-          const range = this.headers["content-range"]?.match(/^bytes \d+-(\d+)\/(\d+)$/);
-          const isFinalChunk = !range || Number(range[1]) + 1 >= Number(range[2]);
           this.responseText = JSON.stringify(isProxy ? {
             fileId: `drive-${fileName}`,
             url: `/api/drive/stream?id=drive-${fileName}`,
@@ -482,6 +488,36 @@ describe("uploadManyToDrive", () => {
     expect(run.sends).toEqual(["quota.jpg", "quota.jpg"]);
   });
 
+  it("does not auto-retry a retryable proxy HTTP failure after the browser sent every byte", async () => {
+    const run: MockUploadRun = {
+      sends: [],
+      active: 0,
+      maxActive: 0,
+      failNames: new Set(),
+      responsesByName: new Map([[
+        "post-send-500.jpg",
+        [
+          {
+            status: 500,
+            body: {
+              error: "Upload service failed. Please try again.",
+              errorReason: "serverError",
+              retryable: true,
+            },
+          },
+        ],
+      ]]),
+    };
+    installProxyUploadXhrMock(run);
+
+    const results = await uploadManyToDrive([makeImage("post-send-500.jpg")], "raw-files");
+
+    expect(results).toHaveLength(1);
+    expect(results[0].result).toBeUndefined();
+    expect(results[0].error?.message).toContain("Check the media library before retrying");
+    expect(run.sends).toEqual(["post-send-500.jpg"]);
+  });
+
   it("does not hammer this app's own upload limiter 429", async () => {
     const run: MockUploadRun = {
       sends: [],
@@ -581,6 +617,43 @@ describe("uploadManyToDrive", () => {
     expect(run.sessionRequests.filter((name) => name === "video-fail.mp4")).toHaveLength(2);
     expect(run.finalizeRequests).toEqual(["drive-video-ok.mp4:raw-files"]);
     expect(run.maxActive).toBeLessThanOrEqual(3);
+  });
+
+  it("does not restart a resumable upload after an ambiguous final-chunk HTTP failure", async () => {
+    const run: MixedUploadRun = {
+      proxySends: [],
+      directSends: [],
+      sessionRequests: [],
+      finalizeRequests: [],
+      active: 0,
+      maxActive: 0,
+      failDirectNames: new Set(),
+      directFinalResponsesByName: new Map([[
+        "final-ambiguous.mp4",
+        [
+          {
+            status: 500,
+            body: {
+              error: "Upload service failed. Please try again.",
+              errorReason: "serverError",
+              retryable: true,
+            },
+          },
+        ],
+      ]]),
+    };
+    installMixedUploadMocks(run);
+    const largeVideo = new Uint8Array(4 * 1024 * 1024 + 1);
+
+    const results = await uploadManyToDrive([
+      new File([largeVideo], "final-ambiguous.mp4", { type: "video/mp4" }),
+    ], "raw-files");
+
+    expect(results).toHaveLength(1);
+    expect(results[0].result).toBeUndefined();
+    expect(results[0].error?.message).toContain("Check the media library before retrying");
+    expect(run.sessionRequests).toEqual(["final-ambiguous.mp4"]);
+    expect(run.finalizeRequests).toEqual([]);
   });
 
   it("returns an empty result for an empty batch", async () => {

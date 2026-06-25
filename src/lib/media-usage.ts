@@ -34,6 +34,24 @@ function addUrlAlias(aliases: Set<string>, url: string | null | undefined) {
   addDriveFileAliases(aliases, driveFileIdFromUrl(url));
 }
 
+export function stripPrivateMediaToken(url: string | null | undefined): string {
+  if (!url) return "";
+  try {
+    const isRelative = url.startsWith("/");
+    const parsed = new URL(url, "https://thereach.ten80ten.com");
+    if (parsed.pathname === "/api/drive/stream" || parsed.pathname === "/api/media/image-preview") {
+      parsed.searchParams.delete("token");
+    }
+    return isRelative ? `${parsed.pathname}${parsed.search}${parsed.hash}` : parsed.toString();
+  } catch {
+    return url.replace(/([?&])token=[^&#]*(&?)/i, (_match, prefix: string, suffix: string) => {
+      if (prefix === "?" && suffix) return "?";
+      if (prefix === "?" && !suffix) return "";
+      return suffix ? prefix : "";
+    }).replace(/[?&]$/, "");
+  }
+}
+
 export function mediaUrlAliases(parts: UrlParts): Set<string> {
   const aliases = new Set<string>();
   addUrlAlias(aliases, parts.url);

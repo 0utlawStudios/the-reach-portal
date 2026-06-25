@@ -13,7 +13,7 @@ import { getPublicDriveDownloadUrl } from "@/lib/drive-url-utils";
 import { browserImagePreviewUrl, warmBrowserImagePreview } from "@/lib/image-preview";
 import { driveFileIdFromUrl } from "@/lib/media-resolver";
 import { ensureMediaAsset } from "@/lib/media-assets";
-import { videoPreviewFrameUrl } from "@/lib/media-usage";
+import { stripPrivateMediaToken, videoPreviewFrameUrl } from "@/lib/media-usage";
 import { X, Upload, FolderOpen, Image as ImageIcon, Search, CheckCircle, Clock, Link2, ExternalLink } from "lucide-react";
 import { PLACEHOLDER_MEDIA } from "@/lib/placeholder-data";
 import { useFocusTrap } from "./use-focus-trap";
@@ -108,9 +108,9 @@ function selectionFromAsset(asset: MediaEntry): MediaPickerSelection {
   const fileId = asset.fileId || driveFileIdFromUrl(asset.driveProxyUrl || asset.url) || undefined;
   const publishUrl = asset.publishUrl || (fileId ? getPublicDriveDownloadUrl(fileId) : undefined);
   return {
-    url: asset.url,
+    url: stripPrivateMediaToken(asset.url),
     publishUrl,
-    driveProxyUrl: asset.driveProxyUrl || (driveFileIdFromUrl(asset.url) ? asset.url : undefined),
+    driveProxyUrl: stripPrivateMediaToken(asset.driveProxyUrl || (driveFileIdFromUrl(asset.url) ? asset.url : undefined)),
     playbackUrl: asset.playbackUrl,
     playbackStorageKey: asset.playbackStorageKey,
     fileId,
@@ -122,11 +122,13 @@ function selectionFromAsset(asset: MediaEntry): MediaPickerSelection {
 }
 
 function mediaDisplayUrl(asset: Pick<MediaEntry, "url" | "driveProxyUrl" | "playbackUrl">): string {
-  return asset.playbackUrl || asset.driveProxyUrl || asset.url;
+  return stripPrivateMediaToken(asset.playbackUrl || asset.driveProxyUrl || asset.url);
 }
 
 function mediaVideoSources(asset: Pick<MediaEntry, "url" | "driveProxyUrl" | "playbackUrl">, previewFrame = false): string[] {
-  const sources = [asset.playbackUrl, asset.driveProxyUrl, asset.url].filter((url): url is string => Boolean(url));
+  const sources = [asset.playbackUrl, asset.driveProxyUrl, asset.url]
+    .map((url) => stripPrivateMediaToken(url))
+    .filter((url): url is string => Boolean(url));
   return previewFrame ? sources.map(videoPreviewFrameUrl) : sources;
 }
 

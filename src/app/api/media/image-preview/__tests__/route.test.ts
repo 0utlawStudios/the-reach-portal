@@ -102,6 +102,7 @@ beforeEach(() => {
   driveMocks.verifyDriveStreamToken.mockReturnValue({
     workspaceId: "00000000-0000-0000-0000-000000000001",
     expiresAt: Date.now() + 60_000,
+    purpose: "publish",
   });
   driveMocks.getFileMetadata.mockResolvedValue({
     id: FILE_ID,

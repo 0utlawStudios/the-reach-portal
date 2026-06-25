@@ -249,8 +249,10 @@ function streamSigningSecret(): string {
 }
 
 const DRIVE_STREAM_TOKEN_VERSION = "v1";
+const DRIVE_STREAM_TOKEN_VERSION_WITH_PURPOSE = "v2";
 const DRIVE_STREAM_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 const DRIVE_PUBLISH_STREAM_TOKEN_TTL_MS = 365 * 24 * 60 * 60 * 1000;
+type DriveStreamTokenPurpose = "private" | "publish";
 
 function appUrlOrigin(): string {
   const configured = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL || "http://localhost:3000";
@@ -268,30 +270,57 @@ function signDriveStreamPayload(fileId: string, workspaceId: string, expiresAt: 
     .digest("base64url");
 }
 
+function signDriveStreamPayloadV2(fileId: string, workspaceId: string, expiresAt: number, purpose: DriveStreamTokenPurpose): string {
+  return createHmac("sha256", streamSigningSecret())
+    .update(`${fileId}.${workspaceId}.${expiresAt}.${purpose}`)
+    .digest("base64url");
+}
+
 export function signDriveStreamToken(
   fileId: string,
   workspaceId: string,
   expiresAt = Date.now() + DRIVE_STREAM_TOKEN_TTL_MS,
+  purpose: DriveStreamTokenPurpose = "private",
 ): string {
-  const signature = signDriveStreamPayload(fileId, workspaceId, expiresAt);
-  return `${DRIVE_STREAM_TOKEN_VERSION}.${expiresAt}.${workspaceId}.${signature}`;
+  const signature = signDriveStreamPayloadV2(fileId, workspaceId, expiresAt, purpose);
+  return `${DRIVE_STREAM_TOKEN_VERSION_WITH_PURPOSE}.${expiresAt}.${workspaceId}.${purpose}.${signature}`;
 }
 
 export function verifyDriveStreamToken(
   fileId: string,
   token: string | null | undefined,
-): { workspaceId: string; expiresAt: number } | null {
+): { workspaceId: string; expiresAt: number; purpose: DriveStreamTokenPurpose } | null {
   if (!token) return null;
   try {
-    const [version, expiresAtRaw, workspaceId, signature] = token.split(".");
-    if (version !== DRIVE_STREAM_TOKEN_VERSION || !expiresAtRaw || !workspaceId || !signature) return null;
+    const [version, expiresAtRaw, workspaceId, maybePurpose, maybeSignature] = token.split(".");
+    if (!expiresAtRaw || !workspaceId || !maybePurpose) return null;
     const expiresAt = Number(expiresAtRaw);
     if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) return null;
+    if (version === DRIVE_STREAM_TOKEN_VERSION_WITH_PURPOSE) {
+      const purpose = maybePurpose as DriveStreamTokenPurpose;
+      const signature = maybeSignature;
+      if ((purpose !== "private" && purpose !== "publish") || !signature) return null;
+      const expectedV2 = signDriveStreamPayloadV2(fileId, workspaceId, expiresAt, purpose);
+      const aV2 = Buffer.from(expectedV2);
+      const bV2 = Buffer.from(signature);
+      if (aV2.length !== bV2.length || !timingSafeEqual(aV2, bV2)) return null;
+      return { workspaceId, expiresAt, purpose };
+    }
+
+    if (version !== DRIVE_STREAM_TOKEN_VERSION) return null;
+    const signature = maybePurpose;
     const expected = signDriveStreamPayload(fileId, workspaceId, expiresAt);
     const a = Buffer.from(expected);
     const b = Buffer.from(signature);
     if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
-    return { workspaceId, expiresAt };
+    // Legacy v1 tokens did not encode purpose. Private app URLs were minted for
+    // 24h, while publish URLs were minted for one year. Keep long-lived legacy
+    // publish links working, but reject the short private tokens if copied.
+    return {
+      workspaceId,
+      expiresAt,
+      purpose: expiresAt - Date.now() > DRIVE_STREAM_TOKEN_TTL_MS ? "publish" : "private",
+    };
   } catch {
     return null;
   }
@@ -300,14 +329,19 @@ export function verifyDriveStreamToken(
 export function getStreamUrl(
   fileId: string,
   workspaceId: string,
-  expiresAt = Date.now() + DRIVE_STREAM_TOKEN_TTL_MS,
 ): string {
-  const params = new URLSearchParams({ id: fileId, token: signDriveStreamToken(fileId, workspaceId, expiresAt) });
-  return `${appUrlOrigin()}/api/drive/stream?${params.toString()}`;
+  void workspaceId;
+  const params = new URLSearchParams({ id: fileId });
+  return `/api/drive/stream?${params.toString()}`;
 }
 
 export function getPublishStreamUrl(fileId: string, workspaceId: string): string {
-  return getStreamUrl(fileId, workspaceId, Date.now() + DRIVE_PUBLISH_STREAM_TOKEN_TTL_MS);
+  const expiresAt = Date.now() + DRIVE_PUBLISH_STREAM_TOKEN_TTL_MS;
+  const params = new URLSearchParams({
+    id: fileId,
+    token: signDriveStreamToken(fileId, workspaceId, expiresAt, "publish"),
+  });
+  return `${appUrlOrigin()}/api/drive/stream?${params.toString()}`;
 }
 
 // ─── File metadata ───

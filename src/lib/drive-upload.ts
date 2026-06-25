@@ -175,6 +175,25 @@ function errorFromPayload(status: number, payload: unknown): DriveUploadError {
   return toDriveUploadError(sanitizeGoogleDriveError(status, payload), status);
 }
 
+function maybePostSendNonRetryable(error: Error, fallbackStatus?: number): Error {
+  if (!(error instanceof DriveUploadError)) return error;
+  const status = error.status ?? fallbackStatus;
+  const completionAmbiguous =
+    typeof status === "number" && status >= 500 ||
+    error.reason === "timeout" ||
+    error.reason === "network" ||
+    error.reason === "serverError";
+  if (!completionAmbiguous || !error.retryable) return error;
+  return new DriveUploadError(
+    "The upload reached the server but failed while finishing. Check the media library before retrying to avoid duplicates.",
+    {
+      status,
+      reason: error.reason,
+      retryable: false,
+    },
+  );
+}
+
 type TimedFetchResponse = {
   res: Response;
   readText: () => Promise<string>;
@@ -328,6 +347,13 @@ async function uploadViaProxy(
       const clearResponseTimer = () => {
         if (responseTimer) { clearTimeout(responseTimer); responseTimer = null; }
       };
+      const markFullySent = () => {
+        if (fullySent) return;
+        fullySent = true;
+        watchdog.clear();
+        armResponseTimer();
+        onProgress?.(92);
+      };
       // Once every byte is sent, upload-progress events stop and the stall
       // watchdog can no longer help, so bound the wait for the server response.
       // A post-send timeout is non-retryable: the server may have already
@@ -352,13 +378,11 @@ async function uploadViaProxy(
         if (e.lengthComputable) {
           onProgress?.(Math.round((e.loaded / e.total) * 90));
           if (e.loaded >= e.total) {
-            fullySent = true;
-            watchdog.clear();
-            armResponseTimer();
-            onProgress?.(92);
+            markFullySent();
           }
         }
       };
+      xhr.upload.onload = markFullySent;
 
       xhr.onload = () => {
         watchdog.clear();
@@ -367,7 +391,8 @@ async function uploadViaProxy(
           try {
             const data = JSON.parse(xhr.responseText);
             if (data.error) {
-              fail(errorFromPayload(xhr.status || 500, data));
+              const error = errorFromPayload(xhr.status || 500, data);
+              fail(fullySent ? maybePostSendNonRetryable(error, xhr.status || 500) : error);
             } else {
               onProgress?.(100);
               done({
@@ -383,12 +408,14 @@ async function uploadViaProxy(
             fail(new Error("Invalid response from upload server"));
           }
         } else {
+          let error: DriveUploadError;
           try {
             const data = JSON.parse(xhr.responseText);
-            fail(errorFromPayload(xhr.status, data));
+            error = errorFromPayload(xhr.status, data);
           } catch {
-            fail(errorFromPayload(xhr.status, xhr.responseText));
+            error = errorFromPayload(xhr.status, xhr.responseText);
           }
+          fail(fullySent ? maybePostSendNonRetryable(error, xhr.status) : error);
         }
       };
 
@@ -404,7 +431,12 @@ async function uploadViaProxy(
           : "Upload timed out.",
         { reason: "timeout", retryable: !fullySent },
       ));
-      xhr.onabort = () => fail(new Error("Upload aborted"));
+      xhr.onabort = () => fail(fullySent
+        ? new DriveUploadError(
+          "The upload reached the server but the response was interrupted. Check the media library before retrying.",
+          { reason: "network", retryable: false },
+        )
+        : new Error("Upload aborted"));
       watchdog.kick();
       onProgress?.(5);
       xhr.send(formData);
@@ -469,15 +501,33 @@ async function uploadResumableChunk(
   return new Promise<{ done: boolean; fileId?: string }>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     let settled = false;
+    let fullySent = false;
+    const isFinalChunk = end + 1 >= total;
     let responseTimer: ReturnType<typeof setTimeout> | null = null;
     const clearResponseTimer = () => {
       if (responseTimer) { clearTimeout(responseTimer); responseTimer = null; }
     };
+    const postSendChunkError = (message: string, reason: DriveErrorReason, status?: number) => new DriveUploadError(message, {
+      status,
+      reason,
+      retryable: !isFinalChunk,
+    });
     const armResponseTimer = () => {
       clearResponseTimer();
       responseTimer = setTimeout(() => {
-        fail(new Error("Upload finished sending but storage did not respond"));
+        fail(postSendChunkError(
+          isFinalChunk
+            ? "The upload reached storage but the final response was lost. Check the media library before retrying."
+            : "Upload finished sending but storage did not respond",
+          "timeout",
+        ));
       }, DIRECT_RESPONSE_WAIT_MS);
+    };
+    const markFullySent = () => {
+      if (fullySent) return;
+      fullySent = true;
+      watchdog.clear();
+      armResponseTimer();
     };
     const fail = (err: Error) => { if (settled) return; settled = true; watchdog.clear(); clearResponseTimer(); reject(err); };
     const done = (value: { done: boolean; fileId?: string }) => { if (settled) return; settled = true; watchdog.clear(); clearResponseTimer(); resolve(value); };
@@ -499,11 +549,11 @@ async function uploadResumableChunk(
         const loaded = Math.min(e.loaded, end - start + 1);
         onProgress?.(5 + Math.round(((start + loaded) / total) * 85));
         if (e.loaded >= e.total) {
-          watchdog.clear();
-          armResponseTimer();
+          markFullySent();
         }
       }
     };
+    xhr.upload.onload = markFullySent;
 
     xhr.onload = () => {
       watchdog.clear();
@@ -523,13 +573,35 @@ async function uploadResumableChunk(
           fail(new Error("Invalid response from upload server"));
         }
       } else {
-        fail(errorFromPayload(xhr.status, parseJson(xhr.responseText || "")));
+        const error = errorFromPayload(xhr.status, parseJson(xhr.responseText || ""));
+        fail(fullySent && isFinalChunk ? maybePostSendNonRetryable(error, xhr.status) : error);
       }
     };
 
-    xhr.onerror = () => fail(new DriveUploadError("Network error during upload.", { reason: "network", retryable: true }));
-    xhr.ontimeout = () => fail(new DriveUploadError("Upload timed out.", { reason: "timeout", retryable: true }));
-    xhr.onabort = () => fail(new Error("Upload aborted"));
+    xhr.onerror = () => fail(fullySent
+      ? postSendChunkError(
+        isFinalChunk
+          ? "The upload reached storage but the final response was lost. Check the media library before retrying."
+          : "Network error while storage was acknowledging the chunk.",
+        "network",
+      )
+      : new DriveUploadError("Network error during upload.", { reason: "network", retryable: true }));
+    xhr.ontimeout = () => fail(fullySent
+      ? postSendChunkError(
+        isFinalChunk
+          ? "The upload reached storage but timed out waiting for the final response. Check the media library before retrying."
+          : "Upload timed out while storage was acknowledging the chunk.",
+        "timeout",
+      )
+      : new DriveUploadError("Upload timed out.", { reason: "timeout", retryable: true }));
+    xhr.onabort = () => fail(fullySent
+      ? postSendChunkError(
+        isFinalChunk
+          ? "The upload reached storage but the final response was interrupted. Check the media library before retrying."
+          : "Upload was interrupted while storage was acknowledging the chunk.",
+        "network",
+      )
+      : new Error("Upload aborted"));
     watchdog.kick();
     xhr.send(chunk);
   });
@@ -550,7 +622,7 @@ const CHUNK_RETRY_DELAYS = process.env.NODE_ENV === "test" ? [1, 3] : [2000, 500
 // correct recovery for a poisoned/expired session.
 function isResumableChunkRetryableInPlace(error: Error): boolean {
   if (error instanceof DriveUploadError) {
-    return error.reason === "network" || error.reason === "timeout";
+    return error.retryable && (error.reason === "network" || error.reason === "timeout");
   }
   // Generic client-side stall/no-response conditions from the xhr watchdog/timers.
   return /no progress for 30s|did not respond/i.test(error.message);
