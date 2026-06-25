@@ -680,11 +680,12 @@ export async function GET(req: Request) {
     const issues: string[] = [];
     if (noUrl.length > 0) issues.push(`${noUrl.length} asset(s) with no URL or Drive file`);
     if (noOwner.length > 0) issues.push(`${noOwner.length} asset(s) with no owner`);
-    if (noUsage.length > 0) issues.push(`${noUsage.length} unlinked asset(s) (no used_in)`);
+    // Library-only assets are valid inventory. They should remain visible in
+    // the app's "unused" filter, but they are not broken media.
 
     checks["18_media_health"] = issues.length > 0
       ? warn(issues.join("; "), { total: count, noUrl: noUrl.length, noOwner: noOwner.length, noUsage: noUsage.length })
-      : pass(`${count || 0} media assets — all linked and intact`);
+      : pass(`${count || 0} media assets — all have URLs/owners`, { total: count, unused: noUsage.length });
   } catch (e: unknown) {
     checks["18_media_health"] = fail(`Media check error: ${errorMessage(e)}`);
   }
