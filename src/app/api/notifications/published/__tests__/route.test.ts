@@ -119,16 +119,20 @@ describe("POST /api/notifications/published", () => {
     expect(sendMail).not.toHaveBeenCalled();
   });
 
-  it("rejects the Supabase service-role key as a webhook secret", async () => {
+  it("temporarily accepts the Supabase service-role key for the deployed legacy n8n publisher", async () => {
+    delete process.env.PUBLISHER_WEBHOOK_SECRET;
     const res = await POST(makeRequest(
       { Authorization: "Bearer service-role-secret" },
       {
         postId: "11111111-1111-4111-8111-111111111111",
         jobId: "22222222-2222-4222-8222-222222222222",
+        jobState: "succeeded",
+        publishedCount: 1,
+        platforms: [{ platform: "facebook", state: "succeeded", postUrl: "https://facebook.example/post" }],
       },
     ));
-    expect(res.status).toBe(401);
-    expect(sendMail).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    expect(sendMail).toHaveBeenCalledTimes(1);
   });
 
   it("emails admin/director recipients and sends Telegram when a platform published", async () => {

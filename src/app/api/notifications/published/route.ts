@@ -76,7 +76,14 @@ async function authorize(request: NextRequest, rawBody: string): Promise<boolean
   if (hmacSecret && verifyWebhookSignature(request.headers, rawBody, hmacSecret, "publisher-published")) {
     return reserveDurableWebhookNonce(request.headers, "publisher-published");
   }
-  const expected = (process.env.PUBLISHER_WEBHOOK_SECRET || process.env.AUTO_PUBLISHER_WEBHOOK_SECRET || "").trim();
+  const expected = (
+    process.env.PUBLISHER_WEBHOOK_SECRET ||
+    process.env.AUTO_PUBLISHER_WEBHOOK_SECRET ||
+    // Temporary rollout fallback for the currently deployed n8n publisher.
+    // New workflow exports use PUBLISHER_WEBHOOK_HMAC_SECRET instead.
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    ""
+  ).trim();
   return verifyStaticWebhookSecret(request.headers, expected);
 }
 
