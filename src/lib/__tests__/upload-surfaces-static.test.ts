@@ -591,6 +591,38 @@ describe("Drive upload surfaces", () => {
     expect(sessionCookieRoute).toContain("admin.auth.getUser(token)");
   });
 
+  it("falls back to short-lived signed media view URLs when the server cookie is stale", () => {
+    const viewUrlRoute = source("src/app/api/media/view-url/route.ts");
+    expect(viewUrlRoute).toContain("PRIVATE_VIEW_TOKEN_TTL_MS = 15 * 60 * 1000");
+    expect(viewUrlRoute).toContain("requireBearerTeamRole");
+    expect(viewUrlRoute).toContain("isKnownAppDriveFile");
+    expect(viewUrlRoute).toContain('signDriveStreamToken(target.fileId, auth.workspaceId');
+    expect(viewUrlRoute).toContain('"private"');
+    expect(viewUrlRoute).toContain('"Cache-Control": "no-store"');
+
+    const mediaViewUrl = source("src/lib/media-view-url.ts");
+    expect(mediaViewUrl).toContain("signedMediaViewUrl");
+    expect(mediaViewUrl).toContain("supabase.auth.getSession()");
+    expect(mediaViewUrl).toContain("/api/media/view-url?");
+    expect(mediaViewUrl).toContain("Authorization: `Bearer ${token}`");
+
+    const previewImage = source("src/components/preview-image.tsx");
+    expect(previewImage).toContain("signAndRetry");
+    expect(previewImage).toContain("signedMediaViewUrl(source)");
+
+    const mediaVideo = source("src/components/media-video.tsx");
+    expect(mediaVideo).toContain("signAndRetryCurrentSource");
+    expect(mediaVideo).toContain("signedMediaViewUrl(source)");
+
+    const driveStream = source("src/app/api/drive/stream/route.ts");
+    expect(driveStream).toContain('signedPurpose === "publish"');
+    expect(driveStream).toContain('"private, max-age=86400');
+
+    const imagePreview = source("src/app/api/media/image-preview/route.ts");
+    expect(imagePreview).toContain('signedPurpose === "publish" ? "publish" : "private"');
+    expect(imagePreview).toContain('cacheScope === "publish"');
+  });
+
   it("does not authorize Drive media or HEIC previews from Referer alone", () => {
     for (const file of [
       "src/app/api/drive/stream/route.ts",

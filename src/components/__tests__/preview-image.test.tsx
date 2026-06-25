@@ -1,12 +1,26 @@
-import { act, fireEvent, render } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PreviewImage } from "../preview-image";
 
 const FILE_ID = "abcdefghijklmnopqrst";
+const mockSignedMediaViewUrl = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/media-view-url", () => ({
+  isPrivateMediaRouteUrl: (url: string | null | undefined) => (
+    typeof url === "string" &&
+    (url.startsWith("/api/drive/stream") || url.startsWith("/api/media/image-preview"))
+  ),
+  signedMediaViewUrl: mockSignedMediaViewUrl,
+}));
 
 describe("PreviewImage", () => {
+  beforeEach(() => {
+    mockSignedMediaViewUrl.mockResolvedValue(null);
+  });
+
   afterEach(() => {
     vi.useRealTimers();
+    mockSignedMediaViewUrl.mockReset();
   });
 
   it("shows the HEIC thumbnail before starting the full preview conversion", async () => {
@@ -79,5 +93,32 @@ describe("PreviewImage", () => {
 
     expect(container.querySelector("img")).toBeNull();
     expect(container.querySelector("svg")).not.toBeNull();
+  });
+
+  it("signs and retries a private image URL before showing the broken icon", async () => {
+    mockSignedMediaViewUrl.mockResolvedValueOnce(`/api/drive/stream?id=${FILE_ID}&token=signed`);
+
+    const { container } = render(
+      <PreviewImage
+        src={`/api/drive/stream?id=${FILE_ID}`}
+        mimeType="image/png"
+        fileName="8.png"
+        alt="8.png"
+        className="w-full h-full object-cover"
+      />,
+    );
+
+    const img = container.querySelector("img");
+    expect(img).toHaveAttribute("src", `/api/drive/stream?id=${FILE_ID}`);
+
+    await act(async () => {
+      fireEvent.error(img!);
+    });
+
+    expect(mockSignedMediaViewUrl).toHaveBeenCalledWith(`/api/drive/stream?id=${FILE_ID}`);
+    await waitFor(() => {
+      expect(container.querySelector("svg")).toBeNull();
+      expect(container.querySelector("img")).toHaveAttribute("src", `/api/drive/stream?id=${FILE_ID}&token=signed`);
+    });
   });
 });

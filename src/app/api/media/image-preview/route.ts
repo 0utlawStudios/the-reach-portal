@@ -72,12 +72,12 @@ class ImagePreviewHttpError extends Error {
 
 function browserSafeJpegResponse(
   preview: Buffer,
-  signed: boolean,
+  cacheScope: "private" | "publish",
   size: PreviewSize,
   cacheState: "HIT" | "MISS" | "BYPASS" = "BYPASS",
 ) {
   const responseBody = preview.buffer.slice(preview.byteOffset, preview.byteOffset + preview.byteLength) as ArrayBuffer;
-  const cacheControl = signed
+  const cacheControl = cacheScope === "publish"
     ? "public, max-age=86400, immutable"
     : "private, max-age=86400, immutable";
 
@@ -477,6 +477,7 @@ async function workspaceAuth(req: NextRequest): Promise<{ workspaceId?: string; 
 async function checkAuth(req: NextRequest, fileId: string): Promise<{
   ok: boolean;
   signed: boolean;
+  signedPurpose?: "private" | "publish";
   workspaceId?: string;
   userId?: string;
   knownInWorkspace?: boolean;
@@ -484,7 +485,9 @@ async function checkAuth(req: NextRequest, fileId: string): Promise<{
 }> {
   const signedToken = req.nextUrl.searchParams.get("token");
   const signedClaims = verifyDriveStreamToken(fileId, signedToken);
-  if (signedClaims?.purpose === "publish") return { ok: true, signed: true, workspaceId: signedClaims.workspaceId };
+  if (signedClaims?.purpose === "publish" || signedClaims?.purpose === "private") {
+    return { ok: true, signed: true, signedPurpose: signedClaims.purpose, workspaceId: signedClaims.workspaceId };
+  }
 
   const auth = await workspaceAuth(req);
   if (auth?.workspaceId) {
@@ -579,7 +582,7 @@ export async function GET(request: NextRequest) {
       );
       if (fastThumbnail) {
         if (fastThumbnail.writeCacheKey) schedulePreviewCacheWrite(admin, fastThumbnail.writeCacheKey, fastThumbnail.preview);
-        return browserSafeJpegResponse(fastThumbnail.preview, auth.signed, previewSize, fastThumbnail.cacheState);
+        return browserSafeJpegResponse(fastThumbnail.preview, auth.signedPurpose === "publish" ? "publish" : "private", previewSize, fastThumbnail.cacheState);
       }
     } else {
       const cachedFull = await firstAvailablePreview([
@@ -587,7 +590,7 @@ export async function GET(request: NextRequest) {
         readCachedPreview(admin, legacyPreviewCacheKey(fileId, cacheWorkspaceId))
           .then((preview) => preview ? { preview, cacheState: "HIT" } : null),
       ]);
-      if (cachedFull) return browserSafeJpegResponse(cachedFull.preview, auth.signed, previewSize, cachedFull.cacheState);
+      if (cachedFull) return browserSafeJpegResponse(cachedFull.preview, auth.signedPurpose === "publish" ? "publish" : "private", previewSize, cachedFull.cacheState);
     }
 
     const preview = await buildPreviewOnce(cacheKey, async () => {
@@ -596,7 +599,7 @@ export async function GET(request: NextRequest) {
       schedulePreviewCacheWrite(admin, cacheKey, converted);
       return converted;
     });
-    return browserSafeJpegResponse(preview, auth.signed, previewSize, "MISS");
+    return browserSafeJpegResponse(preview, auth.signedPurpose === "publish" ? "publish" : "private", previewSize, "MISS");
   } catch (err) {
     if (err instanceof ImagePreviewHttpError) {
       return NextResponse.json({ error: err.message }, { status: err.status });

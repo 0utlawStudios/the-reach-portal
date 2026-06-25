@@ -1,10 +1,25 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MediaVideo } from "../media-video";
 
+const mockSignedMediaViewUrl = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/media-view-url", () => ({
+  isPrivateMediaRouteUrl: (url: string | null | undefined) => (
+    typeof url === "string" &&
+    (url.startsWith("/api/drive/stream") || url.startsWith("/api/media/image-preview"))
+  ),
+  signedMediaViewUrl: mockSignedMediaViewUrl,
+}));
+
 describe("MediaVideo", () => {
+  beforeEach(() => {
+    mockSignedMediaViewUrl.mockResolvedValue(null);
+  });
+
   afterEach(() => {
     vi.useRealTimers();
+    mockSignedMediaViewUrl.mockReset();
   });
 
   it("does not fail a poster-backed preload-none video before the user starts it", async () => {
@@ -89,5 +104,25 @@ describe("MediaVideo", () => {
     });
 
     expect(screen.getByLabelText("Decoded video")).toHaveAttribute("src", "/api/drive/stream?id=primary");
+  });
+
+  it("signs and retries a private video URL before skipping to the next source", async () => {
+    mockSignedMediaViewUrl.mockResolvedValueOnce("/api/drive/stream?id=primary&token=signed");
+
+    render(
+      <MediaVideo
+        sources={["/api/drive/stream?id=primary", "/api/drive/stream?id=fallback"]}
+        preload="metadata"
+        label="Signed retry video"
+      />,
+    );
+
+    const video = screen.getByLabelText("Signed retry video");
+    fireEvent.error(video);
+
+    expect(mockSignedMediaViewUrl).toHaveBeenCalledWith("/api/drive/stream?id=primary");
+    await waitFor(() => {
+      expect(screen.getByLabelText("Signed retry video")).toHaveAttribute("src", "/api/drive/stream?id=primary&token=signed");
+    });
   });
 });

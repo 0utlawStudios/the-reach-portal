@@ -164,6 +164,7 @@ async function checkAuth(req: NextRequest, fileId: string): Promise<{
   ok: boolean;
   authed: boolean;
   signed: boolean;
+  signedPurpose?: "private" | "publish";
   workspaceId?: string;
   userId?: string;
   knownInWorkspace?: boolean;
@@ -171,8 +172,8 @@ async function checkAuth(req: NextRequest, fileId: string): Promise<{
 }> {
   const signedToken = req.nextUrl.searchParams.get("token");
   const signedClaims = verifyDriveStreamToken(fileId, signedToken);
-  if (signedClaims?.purpose === "publish") {
-    return { ok: true, authed: true, signed: true, workspaceId: signedClaims.workspaceId };
+  if (signedClaims?.purpose === "publish" || signedClaims?.purpose === "private") {
+    return { ok: true, authed: true, signed: true, signedPurpose: signedClaims.purpose, workspaceId: signedClaims.workspaceId };
   }
 
   const auth = await workspaceAuth(req);
@@ -280,7 +281,7 @@ export async function GET(request: NextRequest) {
     }
 
     // SEC-003: Cache policy mirrors the auth path used.
-    const cacheControl = auth.signed
+    const cacheControl = auth.signed && auth.signedPurpose === "publish"
       ? "public, max-age=86400, immutable"
       : auth.authed
       ? "private, max-age=86400, immutable"

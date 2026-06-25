@@ -3,6 +3,7 @@
 import type { SyntheticEvent, VideoHTMLAttributes } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Film, RotateCcw } from "lucide-react";
+import { isPrivateMediaRouteUrl, signedMediaViewUrl } from "@/lib/media-view-url";
 
 type MediaVideoProps = Omit<VideoHTMLAttributes<HTMLVideoElement>, "src"> & {
   sources: Array<string | null | undefined>;
@@ -47,6 +48,8 @@ export function MediaVideo({
 }: MediaVideoProps) {
   const usableSources = useMemo(() => uniqueSources(sources), [sources]);
   const sourceKey = usableSources.join("\n");
+  const [signedSources, setSignedSources] = useState<Record<string, string>>({});
+  const [signingSources, setSigningSources] = useState<Record<string, true>>({});
   const [playbackState, setPlaybackState] = useState<PlaybackState>({
     sourceKey: "",
     failedSources: {},
@@ -59,6 +62,7 @@ export function MediaVideo({
       : { sourceKey, failedSources: {}, loadedSource: null, attemptedSource: null };
   const { failedSources, loadedSource } = activeState;
   const currentSource = usableSources.find((source) => !failedSources[source]);
+  const renderedSource = currentSource ? signedSources[currentSource] || currentSource : undefined;
   const loaded = Boolean(currentSource && loadedSource === currentSource);
   const attempted = Boolean(currentSource && activeState.attemptedSource === currentSource);
   const shouldWatchLoad = Boolean(currentSource && !loaded && (preload !== "none" || attempted));
@@ -67,8 +71,61 @@ export function MediaVideo({
     setPlaybackState({ sourceKey, failedSources: {}, loadedSource: null, attemptedSource: null });
   }, [sourceKey]);
 
+  const signAndRetryCurrentSource = useCallback((source: string): boolean => {
+    if (!isPrivateMediaRouteUrl(source) || signedSources[source] || signingSources[source]) return false;
+    setSigningSources((prev) => ({ ...prev, [source]: true }));
+    void signedMediaViewUrl(source)
+      .then((signedUrl) => {
+        if (!signedUrl) {
+          setPlaybackState((prev) => {
+            const base =
+              prev.sourceKey === sourceKey
+                ? prev
+                : { sourceKey, failedSources: {}, loadedSource: null, attemptedSource: null };
+            return {
+              sourceKey,
+              failedSources: { ...base.failedSources, [source]: true },
+              loadedSource: base.loadedSource === source ? null : base.loadedSource,
+              attemptedSource: base.attemptedSource === source ? null : base.attemptedSource,
+            };
+          });
+          return;
+        }
+        setSignedSources((prev) => ({ ...prev, [source]: signedUrl }));
+        setPlaybackState((prev) => ({
+          sourceKey,
+          failedSources: prev.sourceKey === sourceKey ? prev.failedSources : {},
+          loadedSource: prev.sourceKey === sourceKey ? prev.loadedSource : null,
+          attemptedSource: source,
+        }));
+      })
+      .catch(() => {
+        setPlaybackState((prev) => {
+          const base =
+            prev.sourceKey === sourceKey
+              ? prev
+              : { sourceKey, failedSources: {}, loadedSource: null, attemptedSource: null };
+          return {
+            sourceKey,
+            failedSources: { ...base.failedSources, [source]: true },
+            loadedSource: base.loadedSource === source ? null : base.loadedSource,
+            attemptedSource: base.attemptedSource === source ? null : base.attemptedSource,
+          };
+        });
+      })
+      .finally(() => {
+        setSigningSources((prev) => {
+          const next = { ...prev };
+          delete next[source];
+          return next;
+        });
+      });
+    return true;
+  }, [signedSources, signingSources, sourceKey]);
+
   const advanceSource = useCallback(() => {
     if (!currentSource) return;
+    if (signAndRetryCurrentSource(currentSource)) return;
     setPlaybackState((prev) => {
       const base =
         prev.sourceKey === sourceKey
@@ -81,7 +138,7 @@ export function MediaVideo({
         attemptedSource: base.attemptedSource === currentSource ? null : base.attemptedSource,
       };
     });
-  }, [currentSource, sourceKey]);
+  }, [currentSource, signAndRetryCurrentSource, sourceKey]);
 
   const markAttempted = useCallback(() => {
     if (!currentSource) return;
@@ -131,7 +188,7 @@ export function MediaVideo({
   return (
     <video
       {...props}
-      src={currentSource}
+      src={renderedSource}
       className={className}
       preload={preload}
       style={{ backgroundColor: "#18181b", ...style }}

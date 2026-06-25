@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ImageOff } from "lucide-react";
 import { RawImage } from "@/components/raw-image";
 import { browserImagePreviewUrl, isHeicLikeImage } from "@/lib/image-preview";
+import { isPrivateMediaRouteUrl, signedMediaViewUrl } from "@/lib/media-view-url";
 
 type PreviewImageProps = ImgHTMLAttributes<HTMLImageElement> & {
   mimeType?: unknown;
@@ -40,6 +41,8 @@ export function PreviewImage({
   const [failedSrcs, setFailedSrcs] = useState<Record<string, true>>({});
   const [timedOutFallbackSrcs, setTimedOutFallbackSrcs] = useState<Record<string, true>>({});
   const [delayedPrimarySrcs, setDelayedPrimarySrcs] = useState<Record<string, true>>({});
+  const [signedSrcs, setSignedSrcs] = useState<Record<string, string>>({});
+  const [signingSrcs, setSigningSrcs] = useState<Record<string, true>>({});
   const [loadedSrc, setLoadedSrc] = useState<string | undefined>(undefined);
   const [loadedFallbackSrc, setLoadedFallbackSrc] = useState<string | undefined>(undefined);
 
@@ -66,6 +69,32 @@ export function PreviewImage({
     typeof primarySrc === "string" &&
     primarySrc.startsWith("blob:") &&
     isHeicLikeImage(mimeType, fileName || primarySrc);
+  const renderedPrimarySrc = typeof primarySrc === "string" ? signedSrcs[primarySrc] || primarySrc : primarySrc;
+  const renderedFallbackSrc = typeof fallbackSrc === "string" ? signedSrcs[fallbackSrc] || fallbackSrc : fallbackSrc;
+
+  const signAndRetry = (source: string): boolean => {
+    if (!isPrivateMediaRouteUrl(source) || signedSrcs[source] || signingSrcs[source]) return false;
+    setSigningSrcs((prev) => ({ ...prev, [source]: true }));
+    void signedMediaViewUrl(source)
+      .then((signedUrl) => {
+        if (!signedUrl) {
+          setFailedSrcs((prev) => ({ ...prev, [source]: true }));
+          return;
+        }
+        setSignedSrcs((prev) => ({ ...prev, [source]: signedUrl }));
+      })
+      .catch(() => {
+        setFailedSrcs((prev) => ({ ...prev, [source]: true }));
+      })
+      .finally(() => {
+        setSigningSrcs((prev) => {
+          const next = { ...prev };
+          delete next[source];
+          return next;
+        });
+      });
+    return true;
+  };
 
   useEffect(() => {
     if (!primaryDelayKey || primaryDelayElapsed) return;
@@ -114,13 +143,14 @@ export function PreviewImage({
           {...props}
           alt=""
           aria-hidden="true"
-          src={fallbackSrc}
+          src={renderedFallbackSrc}
           loading={effectiveLoading}
           className={`absolute inset-0 h-full w-full ${fitClass} transition-opacity duration-150 ${canShowFallback && !isLoaded ? "opacity-100" : "opacity-0"}`}
           onLoad={() => {
             setLoadedFallbackSrc(fallbackSrc);
           }}
           onError={() => {
+            if (signAndRetry(fallbackSrc)) return;
             setFailedSrcs((prev) => ({ ...prev, [fallbackSrc]: true }));
           }}
         />
@@ -128,7 +158,7 @@ export function PreviewImage({
       {shouldLoadPrimary && (
         <RawImage
           {...props}
-          src={primarySrc}
+          src={renderedPrimarySrc}
           loading={effectiveLoading}
           className={`absolute inset-0 h-full w-full ${fitClass} transition-opacity duration-150 ${isLoaded ? "opacity-100" : "opacity-0"}`}
           onLoad={(event: SyntheticEvent<HTMLImageElement, Event>) => {
@@ -136,10 +166,13 @@ export function PreviewImage({
             onLoad?.(event);
           }}
           onError={(event: SyntheticEvent<HTMLImageElement, Event>) => {
-            onError?.(event);
             if (typeof primarySrc === "string") {
+              if (signAndRetry(primarySrc)) return;
+              onError?.(event);
               setFailedSrcs((prev) => ({ ...prev, [primarySrc]: true }));
+              return;
             }
+            onError?.(event);
           }}
         />
       )}
