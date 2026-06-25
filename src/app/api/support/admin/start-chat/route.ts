@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
   const adminAuth = await requireBearerTeamRole(request, ["superadmin"]);
   if (adminAuth instanceof NextResponse) return adminAuth;
 
-  const rl = await consume("support:start-chat", adminAuth.user.id, 30, 3600);
+  const rl = await consume("support:start-chat", adminAuth.user.id, 30, 3600, { onError: "deny" });
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "You're starting chats too quickly. Please wait a moment." },

@@ -3,6 +3,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { CardThumbnailMedia } from "../card-thumbnail-media";
 import type { ContentCard } from "@/lib/types";
 
+vi.mock("@/lib/media-view-url", () => ({
+  isPrivateMediaRouteUrl: () => false,
+  signedMediaViewUrl: vi.fn(),
+}));
+
 function card(overrides: Partial<ContentCard>): Pick<ContentCard, "title" | "contentType" | "thumbnailUrl" | "mediaIds" | "sourceVault"> {
   return {
     title: "Greece, quietly.",

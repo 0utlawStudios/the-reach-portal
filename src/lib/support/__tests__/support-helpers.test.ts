@@ -146,15 +146,16 @@ describe("parseAttachmentClaims", () => {
 });
 
 describe("resignAttachments", () => {
-  it("refreshes signed URLs for attachments in the expected workspace", async () => {
+  it("keeps valid attachment metadata but strips durable signed URLs", async () => {
     const { admin, signedKeys } = makeStorageAdmin();
     const attachments = await resignAttachments(admin, [
       { storageKey: "w1/u1/a.png", signedUrl: "old", mime: "image/png", name: "a.png", size: 10, kind: "image" },
     ], "w1");
 
     expect(attachments).toHaveLength(1);
-    expect(attachments[0].signedUrl).toBe("https://signed/w1/u1/a.png");
-    expect(signedKeys).toEqual(["w1/u1/a.png"]);
+    expect(attachments[0].storageKey).toBe("w1/u1/a.png");
+    expect(attachments[0].signedUrl).toBe("");
+    expect(signedKeys).toEqual([]);
   });
 
   it("drops stored attachments that do not belong to the expected workspace", async () => {

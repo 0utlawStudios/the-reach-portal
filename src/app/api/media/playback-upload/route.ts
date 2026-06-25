@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
     authContext = auth;
 
     const rlKey = `user:${auth.user.id}|ip:${getClientIp(request)}`;
-    const rl = await consume("media-playback-upload:create", rlKey, 60, 60);
+    const rl = await consume("media-playback-upload:create", rlKey, 60, 60, { onError: "deny" });
     if (!rl.allowed) {
       return NextResponse.json(appRateLimitError(rl.resetAt), { status: 429 });
     }

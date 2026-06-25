@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
 
     // Rate-limit: 60 upload-session creations per minute per user.
     const rlKey = `user:${user.id}|ip:${getClientIp(request)}`;
-    const rl = await consume("drive-upload:create", rlKey, 60, 60);
+    const rl = await consume("drive-upload:create", rlKey, 60, 60, { onError: "deny" });
     if (!rl.allowed) {
       const limited = appRateLimitError(rl.resetAt);
       return NextResponse.json(

@@ -17,20 +17,8 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { timingSafeEqual } from "node:crypto";
 import { studioEnabled } from "@/lib/ai/feature-flag";
-
-// SEC-007: Constant-time string compare for shared-secret auth. A raw `===`
-// comparison leaks information about the secret one byte at a time via
-// response timing. timingSafeEqual is the standard mitigation.
-function safeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  try {
-    return timingSafeEqual(Buffer.from(a), Buffer.from(b));
-  } catch {
-    return false;
-  }
-}
+import { reserveDurableWebhookNonce, signWebhookBody, verifyStaticWebhookSecret, verifyWebhookSignature } from "@/lib/webhook-signature";
 
 function adminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -72,10 +60,13 @@ type PostsWebhookPayload = {
 };
 
 export async function POST(req: NextRequest) {
-  const secret = process.env.SUPABASE_WEBHOOK_SECRET || "";
-  const authHeader = req.headers.get("authorization") || req.headers.get("Authorization") || "";
-  const provided = authHeader.replace(/^Bearer\s+/i, "");
-  if (!secret || !safeEqual(provided, secret)) {
+  const rawBody = await req.text();
+  const hmacSecret = process.env.SUPABASE_WEBHOOK_HMAC_SECRET || "";
+  const staticSecret = process.env.SUPABASE_WEBHOOK_SECRET || "";
+  const authed =
+    (hmacSecret && verifyWebhookSignature(req.headers, rawBody, hmacSecret, "auto-revise-webhook") && await reserveDurableWebhookNonce(req.headers, "auto-revise-webhook")) ||
+    verifyStaticWebhookSecret(req.headers, staticSecret);
+  if (!authed) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   // Feature kill switch — silently drop webhooks when disabled so Supabase
@@ -86,7 +77,7 @@ export async function POST(req: NextRequest) {
 
   let payload: PostsWebhookPayload;
   try {
-    payload = (await req.json()) as PostsWebhookPayload;
+    payload = JSON.parse(rawBody) as PostsWebhookPayload;
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
@@ -133,10 +124,25 @@ export async function POST(req: NextRequest) {
 
   // Kick the worker so the user sees the revision within ~30s instead of waiting for cron.
   const triggerSecret = process.env.AI_WORKER_TRIGGER_SECRET || process.env.CRON_SECRET;
-  if (triggerSecret) {
+  const triggerHmacSecret = process.env.AI_WORKER_HMAC_SECRET || "";
+  if (triggerHmacSecret || triggerSecret) {
+    const headers: Record<string, string> = {};
+    if (triggerSecret) headers["x-trigger-secret"] = triggerSecret;
+    if (triggerHmacSecret) {
+      const timestamp = String(Date.now());
+      const nonce = `auto-revise-${postId}-${Date.now()}`;
+      headers["x-webhook-timestamp"] = timestamp;
+      headers["x-webhook-nonce"] = nonce;
+      headers["x-webhook-signature"] = signWebhookBody({
+        secret: triggerHmacSecret,
+        timestamp,
+        nonce,
+        body: "",
+      });
+    }
     void fetch(`${req.nextUrl.origin}/api/ai/auto-revise/process`, {
       method: "POST",
-      headers: { "x-trigger-secret": triggerSecret },
+      headers,
     }).catch(() => {});
   }
 

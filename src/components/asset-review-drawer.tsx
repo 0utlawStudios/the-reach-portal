@@ -33,6 +33,7 @@ import { ensureMediaAsset } from "@/lib/media-assets";
 import { isDrivePublishableMediaMime, normalizeDriveMimeType } from "@/lib/drive-policy";
 import { getPublicDriveDownloadUrl } from "@/lib/drive-url-utils";
 import { browserImagePreviewUrl, warmBrowserImagePreview } from "@/lib/image-preview";
+import { resolveViewableMediaUrl } from "@/lib/media-view-url";
 import { driveFileIdFromUrl, isVideoContentType, resolveCardVideoUrl, thumbnailIsDefinitelyImage } from "@/lib/media-resolver";
 import { formatDate, formatDateTime, formatDateShort, formatDateTimeCompact } from "@/lib/utils";
 import { useFocusTrap } from "./use-focus-trap";
@@ -67,6 +68,22 @@ export function AssetReviewDrawer() {
   const { addToast } = useToast();
   const { currentUser, accessToken } = useAuth();
   const { members } = useTeam();
+  const openViewableUrl = async (url: string, label = "file") => {
+    const popup = window.open("about:blank", "_blank", "noopener,noreferrer");
+    try {
+      const resolved = await resolveViewableMediaUrl(url);
+      const absolute = resolved.startsWith("/") ? `${window.location.origin}${resolved}` : resolved;
+      if (popup) {
+        popup.location.href = absolute;
+        return;
+      }
+      const opened = window.open(absolute, "_blank", "noopener,noreferrer");
+      if (!opened) addToast("Your browser blocked the new tab.", "error");
+    } catch {
+      if (popup) popup.close();
+      addToast(`Could not open ${label}.`, "error");
+    }
+  };
   const currentMember = useMemo(
     () => members.find((m) => m.email === currentUser.email),
     [members, currentUser.email],
@@ -1003,7 +1020,9 @@ export function AssetReviewDrawer() {
                   const isImage = file.mimeType?.startsWith("image/") || /\.(heic|heif|jpg|jpeg|png|gif|webp|svg)$/i.test(file.name);
                   const isVideo = /\.(mp4|mov|avi|webm|mkv)$/i.test(file.name);
                   const displayUrl = file.playbackUrl || file.driveProxyUrl || file.url;
-                  const openUrl = browserImagePreviewUrl(file.driveProxyUrl || file.url, { mimeType: file.mimeType, fileName: file.name, size: "full" });
+                  const openUrl = isImage
+                    ? browserImagePreviewUrl(file.driveProxyUrl || file.url, { mimeType: file.mimeType, fileName: file.name, size: "full" })
+                    : displayUrl;
                   return (
                     <div key={i} className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-white dark:bg-white/[0.02] border border-gray-100 dark:border-white/[0.05] hover:border-orange-200 dark:hover:border-orange-500/20 transition-colors group">
                       {isImage ? (
@@ -1017,9 +1036,9 @@ export function AssetReviewDrawer() {
                         <p className="text-[11px] font-medium text-gray-700 dark:text-gray-300 truncate">{file.name}</p>
                         <p className="text-[9px] text-gray-400">{formatDateShort(file.uploadedAt)}</p>
                       </div>
-                      <a href={openUrl} target="_blank" rel="noopener noreferrer" className="p-1 rounded hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-300 hover:text-blue-500 transition-colors cursor-pointer" title="Open file">
+                      <button type="button" onClick={() => void openViewableUrl(openUrl, file.name)} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-300 hover:text-blue-500 transition-colors cursor-pointer" title="Open file">
                         <ExternalLink className="w-3 h-3" />
-                      </a>
+                      </button>
                       <button
                         onClick={() => {
                           const updated = (selectedCard.sourceVault?.rawFiles || []).filter((_, idx) => idx !== i);
@@ -1312,7 +1331,10 @@ export function AssetReviewDrawer() {
                   {(selectedCard.sourceVault?.rawFiles || []).length > 0 && (
                     <div className="space-y-1.5">
                       {selectedCard.sourceVault!.rawFiles!.map((file, i) => {
-                        const openUrl = browserImagePreviewUrl(file.driveProxyUrl || file.url, { mimeType: file.mimeType, fileName: file.name, size: "full" });
+                        const isImage = file.mimeType?.startsWith("image/") || /\.(heic|heif|jpg|jpeg|png|gif|webp|svg)$/i.test(file.name);
+                        const openUrl = isImage
+                          ? browserImagePreviewUrl(file.driveProxyUrl || file.url, { mimeType: file.mimeType, fileName: file.name, size: "full" })
+                          : file.playbackUrl || file.driveProxyUrl || file.url;
                         return (
                           <div key={i} className="flex items-center gap-3 px-3 py-2.5 bg-gray-50 dark:bg-white/[0.03] rounded-xl border border-gray-200 dark:border-white/[0.06]">
                             <FileText className="w-4 h-4 text-violet-500 shrink-0" />
@@ -1320,7 +1342,7 @@ export function AssetReviewDrawer() {
                               <p className="text-[12px] font-medium text-gray-700 dark:text-gray-300 truncate">{file.name}</p>
                               <p className="text-[9px] text-gray-400">{formatDateTimeCompact(file.uploadedAt)}</p>
                             </div>
-                            <a href={openUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-500/10 text-gray-400 hover:text-blue-500 transition-colors"><ExternalLink className="w-3.5 h-3.5" /></a>
+                            <button type="button" onClick={() => void openViewableUrl(openUrl, file.name)} className="p-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-500/10 text-gray-400 hover:text-blue-500 transition-colors"><ExternalLink className="w-3.5 h-3.5" /></button>
                           </div>
                         );
                       })}

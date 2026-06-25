@@ -16,6 +16,16 @@ export const ACTIVE_NOTIFICATION_ROLES = [
   "viewer",
 ] as const;
 
+export const CONTENT_NOTIFICATION_ROLES = ACTIVE_NOTIFICATION_ROLES.filter((role) => role !== "viewer");
+
+export const APPROVAL_NOTIFICATION_ROLES = [
+  "superadmin",
+  "admin",
+  "owner",
+  "approver",
+  "creative_director",
+] as const;
+
 export type NotificationContext = {
   user: { id: string; email?: string | null };
   email: string;
@@ -23,8 +33,11 @@ export type NotificationContext = {
   workspaceId: string;
 };
 
-export async function requireNotificationContext(request: NextRequest): Promise<NotificationContext | NextResponse> {
-  const ctx = await requireBearerTeamRole(request, ACTIVE_NOTIFICATION_ROLES);
+export async function requireNotificationContext(
+  request: NextRequest,
+  roles: readonly string[] = ACTIVE_NOTIFICATION_ROLES,
+): Promise<NotificationContext | NextResponse> {
+  const ctx = await requireBearerTeamRole(request, roles);
   if (ctx instanceof NextResponse) return ctx;
   return ctx as NotificationContext;
 }

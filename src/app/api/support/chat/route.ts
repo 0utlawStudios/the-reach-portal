@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
   const auth = await requireBearerUser(request);
   if (auth instanceof NextResponse) return auth;
 
-  const rl = await consume("support:msg", auth.user.id, 60, 60);
+  const rl = await consume("support:msg", auth.user.id, 60, 60, { onError: "deny" });
   if (!rl.allowed) {
     return NextResponse.json({ error: "You're sending messages too quickly." }, { status: 429 });
   }

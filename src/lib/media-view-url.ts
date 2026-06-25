@@ -1,8 +1,9 @@
 import { supabase } from "./supabaseClient";
 
-const PRIVATE_MEDIA_PATHS = new Set(["/api/drive/stream", "/api/media/image-preview"]);
+const PRIVATE_MEDIA_PATHS = new Set(["/api/drive/stream", "/api/media/image-preview", "/api/media/playback"]);
 const SIGNED_VIEW_URL_CACHE_MS = 12 * 60 * 1000;
 const SIGNED_VIEW_URL_TIMEOUT_MS = 8_000;
+const SIGNED_VIEW_SESSION_TIMEOUT_MS = 3_000;
 
 type CachedViewUrl = {
   url: string;
@@ -11,11 +12,18 @@ type CachedViewUrl = {
 
 const signedViewUrlCache = new Map<string, CachedViewUrl>();
 
+export function clearSignedMediaViewUrlCache(): void {
+  signedViewUrlCache.clear();
+}
+
 export function isPrivateMediaRouteUrl(url: string | null | undefined): url is string {
   if (!url) return false;
   try {
     const parsed = new URL(url, "https://thereach.ten80ten.com");
-    return PRIVATE_MEDIA_PATHS.has(parsed.pathname) && parsed.searchParams.has("id");
+    if (!PRIVATE_MEDIA_PATHS.has(parsed.pathname)) return false;
+    return parsed.pathname === "/api/media/playback"
+      ? parsed.searchParams.has("key")
+      : parsed.searchParams.has("id");
   } catch {
     return false;
   }
@@ -30,15 +38,33 @@ export function hasMediaViewToken(url: string | null | undefined): boolean {
   }
 }
 
+async function getSessionAccessToken(): Promise<string | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const result = await Promise.race([
+      supabase.auth.getSession(),
+      new Promise<"timeout">((resolve) => {
+        timer = setTimeout(() => resolve("timeout"), SIGNED_VIEW_SESSION_TIMEOUT_MS);
+      }),
+    ]);
+    if (result === "timeout") return null;
+    return result.data.session?.access_token || null;
+  } catch {
+    return null;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 export async function signedMediaViewUrl(url: string): Promise<string | null> {
   if (!isPrivateMediaRouteUrl(url) || hasMediaViewToken(url)) return null;
 
-  const cached = signedViewUrlCache.get(url);
-  if (cached && cached.expiresAt > Date.now()) return cached.url;
-
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
+  const token = await getSessionAccessToken();
   if (!token) return null;
+
+  const cacheKey = `${url}\n${token}`;
+  const cached = signedViewUrlCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.url;
 
   const controller = typeof AbortController === "function" ? new AbortController() : null;
   const timer = controller ? setTimeout(() => controller.abort(), SIGNED_VIEW_URL_TIMEOUT_MS) : undefined;
@@ -57,6 +83,13 @@ export async function signedMediaViewUrl(url: string): Promise<string | null> {
   const body = await response.json().catch(() => null) as { url?: unknown } | null;
   if (typeof body?.url !== "string" || !isPrivateMediaRouteUrl(body.url) || !hasMediaViewToken(body.url)) return null;
 
-  signedViewUrlCache.set(url, { url: body.url, expiresAt: Date.now() + SIGNED_VIEW_URL_CACHE_MS });
+  signedViewUrlCache.set(cacheKey, { url: body.url, expiresAt: Date.now() + SIGNED_VIEW_URL_CACHE_MS });
   return body.url;
+}
+
+export async function resolveViewableMediaUrl(url: string): Promise<string> {
+  if (!isPrivateMediaRouteUrl(url) || hasMediaViewToken(url)) return url;
+  const signedUrl = await signedMediaViewUrl(url);
+  if (!signedUrl) throw new Error("Could not create a short-lived media link");
+  return signedUrl;
 }

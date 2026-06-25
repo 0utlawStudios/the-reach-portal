@@ -6,8 +6,9 @@ const AI_ASSET_PUBLISH_TOKEN_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 function signingSecret(): string {
   const secret =
     process.env.AI_ASSET_SIGNING_SECRET ||
-    process.env.DRIVE_STREAM_SIGNING_SECRET ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY;
+    (process.env.NODE_ENV === "production"
+      ? ""
+      : process.env.DRIVE_STREAM_SIGNING_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY);
   if (!secret) throw new Error("AI asset signing secret is not configured");
   return secret;
 }

@@ -32,17 +32,19 @@ describe("buildSupportTicketEmailHtml", () => {
     expect(html).toContain("&lt;script&gt;");
   });
 
-  it("renders an image attachment preview", () => {
+  it("lists attachments without embedding durable storage links", () => {
     const html = buildSupportTicketEmailHtml({
       shortCode: "A1B2",
       userName: "Ann",
       userEmail: "x@y.com",
       category: "Bug",
       body: "see screenshot",
-      attachments: [{ name: "shot.png", signedUrl: "https://store/shot.png", kind: "image" }],
+      attachments: [{ name: "shot.png", kind: "image" }],
       threadUrl: "https://reach.example.com/",
     });
-    expect(html).toContain("https://store/shot.png");
+    expect(html).toContain("shot.png");
+    expect(html).toContain("Open the Support Inbox to view attachments securely.");
+    expect(html).not.toContain("<img");
   });
 });
 

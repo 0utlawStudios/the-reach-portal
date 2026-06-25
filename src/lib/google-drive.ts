@@ -243,7 +243,8 @@ export function getDriveDownloadUrl(fileId: string): string {
 }
 
 function streamSigningSecret(): string {
-  const secret = process.env.DRIVE_STREAM_SIGNING_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  const secret = process.env.DRIVE_STREAM_SIGNING_SECRET ||
+    (process.env.NODE_ENV === "production" ? "" : process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
   if (!secret) throw new Error("Drive stream signing secret is not configured");
   return secret;
 }

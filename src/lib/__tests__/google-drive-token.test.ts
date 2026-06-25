@@ -2,11 +2,13 @@ import { createHmac } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getPublishStreamUrl, getStreamUrl, signDriveStreamToken, verifyDriveStreamToken } from "@/lib/google-drive";
 
-const OLD_ENV = process.env.DRIVE_STREAM_SIGNING_SECRET;
-const OLD_SITE_URL = process.env.NEXT_PUBLIC_SITE_URL;
-const OLD_VERCEL_URL = process.env.VERCEL_URL;
+const OLD_ENV = { ...process.env };
 const FILE_ID = "abcdefghijklmnopqrst";
 const WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
+
+function setNodeEnv(value: "production" | "development" | "test") {
+  Object.defineProperty(process.env, "NODE_ENV", { value, configurable: true, enumerable: true, writable: true });
+}
 
 beforeEach(() => {
   process.env.DRIVE_STREAM_SIGNING_SECRET = "test-drive-stream-secret";
@@ -15,16 +17,20 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  if (OLD_ENV === undefined) delete process.env.DRIVE_STREAM_SIGNING_SECRET;
-  else process.env.DRIVE_STREAM_SIGNING_SECRET = OLD_ENV;
-  if (OLD_SITE_URL === undefined) delete process.env.NEXT_PUBLIC_SITE_URL;
-  else process.env.NEXT_PUBLIC_SITE_URL = OLD_SITE_URL;
-  if (OLD_VERCEL_URL === undefined) delete process.env.VERCEL_URL;
-  else process.env.VERCEL_URL = OLD_VERCEL_URL;
+  process.env = { ...OLD_ENV };
   vi.useRealTimers();
 });
 
 describe("Drive stream tokens", () => {
+  it("fails closed in production without a dedicated Drive stream signing secret", () => {
+    setNodeEnv("production");
+    delete process.env.DRIVE_STREAM_SIGNING_SECRET;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-secret";
+    process.env.GOOGLE_SERVICE_ACCOUNT_JSON = "service-account-json";
+
+    expect(() => signDriveStreamToken(FILE_ID, WORKSPACE_ID)).toThrow("Drive stream signing secret is not configured");
+  });
+
   it("signs Drive stream tokens with workspace and expiry claims", () => {
     const expiresAt = Date.now() + 60_000;
     const token = signDriveStreamToken(FILE_ID, WORKSPACE_ID, expiresAt, "publish");

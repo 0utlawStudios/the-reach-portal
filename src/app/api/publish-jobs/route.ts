@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
     // Rate-limit: 30 publish-job creations per minute per user. Anti-abuse
     // against repeated clicks or scripted hammering of the approve workflow.
     const rlKey = `user:${userData.user.id}|ip:${getClientIp(request)}`;
-    const rl = await consume("publish-jobs:create", rlKey, 30, 60);
+    const rl = await consume("publish-jobs:create", rlKey, 30, 60, { onError: "deny" });
     if (!rl.allowed) {
       return NextResponse.json(
         { error: "Too many publish requests. Please slow down." },

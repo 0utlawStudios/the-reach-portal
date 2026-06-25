@@ -130,7 +130,9 @@ describe("Drive upload surfaces", () => {
     const drawer = source("src/components/asset-review-drawer.tsx");
     expect(drawer).toContain("const displayUrl = file.playbackUrl || file.driveProxyUrl || file.url");
     expect(drawer).toContain("browserImagePreviewUrl(file.driveProxyUrl || file.url");
-    expect(drawer).toContain("href={openUrl}");
+    expect(drawer).toContain("openViewableUrl");
+    expect(drawer).toContain("resolveViewableMediaUrl(url)");
+    expect(drawer).toContain("onClick={() => void openViewableUrl(openUrl, file.name)}");
   });
 
   it("bounds direct Supabase Storage uploads outside the Drive media path", () => {
@@ -321,7 +323,9 @@ describe("Drive upload surfaces", () => {
     expect(previewImage).toContain("!fallbackSrc || fallbackLoaded || fallbackFailed || fallbackTimedOut || primaryDelayElapsed");
 
     const mediaPage = source("src/components/pages/media-page.tsx");
-    expect(mediaPage).toContain('warmBrowserImagePreview(currentUrl, { mimeType: lightboxAsset.mimeType, fileName: lightboxAsset.name, size: "thumb" })');
+    expect(mediaPage).toContain("const currentUrl = mediaDisplayUrl(lightboxAsset)");
+    expect(mediaPage).toContain("warmBrowserImagePreview(currentUrl, { mimeType: lightboxAsset.mimeType, fileName: lightboxAsset.name })");
+    expect(mediaPage).toContain('warmBrowserImagePreview(mediaDisplayUrl(neighbor), { mimeType: neighbor.mimeType, fileName: neighbor.name, size: "thumb" })');
 
     for (const file of [
       "src/components/pages/media-page.tsx",

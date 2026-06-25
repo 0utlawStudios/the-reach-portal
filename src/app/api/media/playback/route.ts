@@ -3,6 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 import { requireUser } from "@/lib/auth/require";
 import { ALLOWED_DRIVE_ROLES } from "@/lib/drive-policy";
 import { streamWithInactivityTimeout } from "@/lib/stream-inactivity-timeout";
+import { parsePlaybackStorageKey } from "@/lib/media-access";
+import { verifyPlaybackViewToken } from "@/lib/media-playback-token";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,28 +12,11 @@ export const maxDuration = 60;
 
 const BUCKET = "media-playback";
 const STORAGE_RESPONSE_TIMEOUT_MS = 45_000;
-const WORKSPACE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function assertEnv(name: string): string {
   const value = process.env[name];
   if (!value) throw new Error(`${name} is not set`);
   return value;
-}
-
-function parsePlaybackStorageKey(value: string | null): { key: string; workspaceId: string } | null {
-  const key = (value || "").trim();
-  if (
-    !key ||
-    key.length > 700 ||
-    key.startsWith("/") ||
-    key.includes("\\") ||
-    key.split("/").some((segment) => !segment || segment === "." || segment === "..")
-  ) {
-    return null;
-  }
-  const workspaceId = key.split("/")[0] || "";
-  if (!WORKSPACE_ID_RE.test(workspaceId)) return null;
-  return { key, workspaceId };
 }
 
 function storageObjectUrl(key: string): string {
@@ -66,10 +51,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Invalid or missing playback key" }, { status: 400 });
   }
 
-  const userResult = await requireUser(request);
-  if (userResult instanceof NextResponse) return userResult;
-  if (!(await userCanReadPlaybackWorkspace(userResult.user.id, parsed.workspaceId))) {
-    return NextResponse.json({ error: "Playback object does not belong to this workspace" }, { status: 403 });
+  const signedClaims = verifyPlaybackViewToken(parsed.key, request.nextUrl.searchParams.get("token"));
+  if (signedClaims?.workspaceId !== parsed.workspaceId) {
+    const userResult = await requireUser(request);
+    if (userResult instanceof NextResponse) return userResult;
+    if (!(await userCanReadPlaybackWorkspace(userResult.user.id, parsed.workspaceId))) {
+      return NextResponse.json({ error: "Playback object does not belong to this workspace" }, { status: 403 });
+    }
   }
 
   const headers: HeadersInit = {

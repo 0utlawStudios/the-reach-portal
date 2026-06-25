@@ -21,6 +21,7 @@ import {
 } from "@/lib/media-usage";
 import { isDrivePublishableMediaMime, normalizeDriveMimeType } from "@/lib/drive-policy";
 import { browserImagePreviewUrl, warmBrowserImagePreview } from "@/lib/image-preview";
+import { resolveViewableMediaUrl } from "@/lib/media-view-url";
 import { formatDateShort, formatDateTimeCompact } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -567,13 +568,32 @@ export function MediaPage() {
       });
   }, [addToast, useDb, usageByAssetId, workspaceId]);
 
-  const copyShareLink = (asset: MediaAsset) => {
-    const shareUrl = absoluteAppUrl(asset.type === "image" ? browserViewUrl(asset) : mediaDisplayUrl(asset));
-    navigator.clipboard.writeText(shareUrl).then(() => addToast(`Link copied for "${asset.name}"`, "success"));
+  const copyShareLink = async (asset: MediaAsset) => {
+    try {
+      const sourceUrl = asset.type === "image" ? browserViewUrl(asset) : mediaDisplayUrl(asset);
+      const shareUrl = absoluteAppUrl(await resolveViewableMediaUrl(sourceUrl));
+      await navigator.clipboard.writeText(shareUrl);
+      addToast(`Link copied for "${asset.name}"`, "success");
+    } catch {
+      addToast(`Could not copy a viewable link for "${asset.name}". Try opening it first.`, "error");
+    }
   };
 
-  const openInNewTab = (asset: MediaAsset) => {
-    window.open(absoluteAppUrl(asset.type === "image" ? browserViewUrl(asset) : mediaDisplayUrl(asset)), "_blank");
+  const openInNewTab = async (asset: MediaAsset) => {
+    const popup = window.open("about:blank", "_blank", "noopener,noreferrer");
+    try {
+      const sourceUrl = asset.type === "image" ? browserViewUrl(asset) : mediaDisplayUrl(asset);
+      const viewableUrl = absoluteAppUrl(await resolveViewableMediaUrl(sourceUrl));
+      if (popup) {
+        popup.location.href = viewableUrl;
+        return;
+      }
+      const opened = window.open(viewableUrl, "_blank", "noopener,noreferrer");
+      if (!opened) addToast("Your browser blocked the new tab.", "error");
+    } catch {
+      if (popup) popup.close();
+      addToast(`Could not open "${asset.name}".`, "error");
+    }
   };
 
   // ─── Lightbox navigation ───
@@ -584,7 +604,7 @@ export function MediaPage() {
   useEffect(() => {
     if (!lightboxAsset || lightboxAsset.type !== "image") return;
     const currentUrl = mediaDisplayUrl(lightboxAsset);
-    warmBrowserImagePreview(currentUrl, { mimeType: lightboxAsset.mimeType, fileName: lightboxAsset.name, size: "thumb" });
+    warmBrowserImagePreview(currentUrl, { mimeType: lightboxAsset.mimeType, fileName: lightboxAsset.name });
 
     for (const neighbor of [filteredMedia[lightboxIndex - 1], filteredMedia[lightboxIndex + 1]]) {
       if (!neighbor || neighbor.type !== "image") continue;
@@ -755,7 +775,7 @@ export function MediaPage() {
                           <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded-md bg-gray-500/70 text-[8px] text-white font-medium flex items-center gap-0.5"><Clock className="w-2.5 h-2.5" />Unused</div>
                         )}
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-200 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-                          <button onClick={(e) => { e.stopPropagation(); copyShareLink(asset); }} className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow-lg hover:bg-white transition-colors" title="Copy link"><Link2 className="w-3.5 h-3.5 text-gray-700" /></button>
+                          <button onClick={(e) => { e.stopPropagation(); void copyShareLink(asset); }} className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow-lg hover:bg-white transition-colors" title="Copy link"><Link2 className="w-3.5 h-3.5 text-gray-700" /></button>
                           <div className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow-lg"><Eye className="w-3.5 h-3.5 text-gray-700" /></div>
                           {(!usage?.used || usage.source === "manual") && (
                             <button
@@ -766,7 +786,7 @@ export function MediaPage() {
                               <Tag className="w-3.5 h-3.5 text-gray-700" />
                             </button>
                           )}
-                          <button onClick={(e) => { e.stopPropagation(); openInNewTab(asset); }} className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow-lg hover:bg-white transition-colors" title="Open"><ExternalLink className="w-3.5 h-3.5 text-gray-700" /></button>
+                          <button onClick={(e) => { e.stopPropagation(); void openInNewTab(asset); }} className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow-lg hover:bg-white transition-colors" title="Open"><ExternalLink className="w-3.5 h-3.5 text-gray-700" /></button>
                         </div>
                       </div>
                       <button onClick={(e) => { e.stopPropagation(); toggleSelect(asset.id); }} className={`absolute top-2 right-2 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-200 ${selected ? "bg-blue-500 border-blue-500" : "border-white/80 bg-black/20 opacity-0 group-hover:opacity-100"}`}>
@@ -881,8 +901,8 @@ export function MediaPage() {
                   {filteredMedia.length > 1 && <p className="text-[9px] text-gray-400 tabular-nums mt-0.5">{lightboxIndex + 1} of {filteredMedia.length}</p>}
                 </div>
                 <div className="flex items-center gap-1">
-                  <button onClick={() => copyShareLink(lightboxAsset)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-400 hover:text-orange-500 cursor-pointer transition-colors" title="Copy shareable link"><Link2 className="w-4 h-4" /></button>
-                  <button onClick={() => openInNewTab(lightboxAsset)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-400 hover:text-blue-500 cursor-pointer transition-colors" title="Open in new tab"><ExternalLink className="w-4 h-4" /></button>
+                  <button onClick={() => void copyShareLink(lightboxAsset)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-400 hover:text-orange-500 cursor-pointer transition-colors" title="Copy shareable link"><Link2 className="w-4 h-4" /></button>
+                  <button onClick={() => void openInNewTab(lightboxAsset)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-400 hover:text-blue-500 cursor-pointer transition-colors" title="Open in new tab"><ExternalLink className="w-4 h-4" /></button>
                   <button onClick={() => setLightboxAsset(null)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-400 cursor-pointer transition-colors"><X className="w-5 h-5" /></button>
                 </div>
               </div>

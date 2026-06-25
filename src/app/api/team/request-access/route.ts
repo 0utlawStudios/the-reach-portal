@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
   try {
     // Rate limit: 5 per minute per IP. Anti-spam for the public signup form.
     const ip = getClientIp(request);
-    const ipCheck = await consume("request-access:ip", ip, 5, 60);
+    const ipCheck = await consume("request-access:ip", ip, 5, 60, { onError: "deny" });
     if (!ipCheck.allowed) {
       return NextResponse.json(
         { error: "Too many requests. Please try again later." },
@@ -204,6 +204,13 @@ export async function POST(request: NextRequest) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[request-access]", message);
     const status = /workspace/i.test(message) ? 400 : 500;
-    return NextResponse.json({ error: message.slice(0, 200) }, { status });
+    return NextResponse.json(
+      {
+        error: status === 400
+          ? "We could not submit this request for that workspace."
+          : "Your request could not be submitted. Please try again.",
+      },
+      { status },
+    );
   }
 }

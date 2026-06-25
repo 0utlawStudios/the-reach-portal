@@ -310,7 +310,7 @@ export function buildSupportTicketEmailHtml(params: {
   userEmail: string;
   category: string;
   body: string;
-  attachments: ReadonlyArray<{ name: string; signedUrl: string; kind: "image" | "video" }>;
+  attachments: ReadonlyArray<{ name: string; kind: "image" | "video" }>;
   threadUrl: string;
 }): string {
   const { shortCode, userName, userEmail, category, body, attachments, threadUrl } = params;
@@ -319,12 +319,9 @@ export function buildSupportTicketEmailHtml(params: {
     ? `<div style="margin:0 0 24px;">
          <p style="color:#9ca3af;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 10px;">Attachments (${attachments.length})</p>
          ${attachments
-           .map((a) =>
-             a.kind === "image"
-               ? `<a href="${esc(a.signedUrl)}" style="display:block;margin:0 0 8px;"><img src="${esc(a.signedUrl)}" alt="${esc(a.name)}" style="max-width:100%;border-radius:8px;border:1px solid #eee;" /></a>`
-               : `<a href="${esc(a.signedUrl)}" style="display:inline-block;margin:0 8px 8px 0;background:#f3f4f6;color:#374151;text-decoration:none;padding:9px 14px;border-radius:8px;font-size:12px;font-weight:600;">&#9658; ${esc(a.name)}</a>`,
-           )
+           .map((a) => `<div style="margin:0 0 8px;background:#f3f4f6;color:#374151;padding:9px 14px;border-radius:8px;font-size:12px;font-weight:600;">${a.kind === "video" ? "&#9658;" : "&#9632;"} ${esc(a.name)}</div>`)
            .join("")}
+         <p style="color:#6b7280;font-size:12px;line-height:1.5;margin:10px 0 0;">Open the Support Inbox to view attachments securely.</p>
        </div>`
     : "";
 

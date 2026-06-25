@@ -1,10 +1,11 @@
 // Tests for src/lib/rate-limit.ts.
 //
 // Two behaviors are load-bearing:
-//   1. consume() must FAIL OPEN. A rate-limit backend outage must NOT take
-//      down the endpoint it protects — every infra error path returns
-//      allowed:true.
-//   2. getClientIp() header precedence: cf-connecting-ip > x-forwarded-for
+//   1. consume() defaults to FAIL OPEN so normal authenticated UX does not go
+//      down during a rate-limit backend outage.
+//   2. consume(..., { onError: "deny" }) must FAIL CLOSED for public or
+//      abuse-prone endpoints such as auth and upload-session minting.
+//   3. getClientIp() header precedence: cf-connecting-ip > x-forwarded-for
 //      (first entry) > x-real-ip > "unknown".
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -97,6 +98,30 @@ describe("consume — FAIL OPEN on infrastructure failure", () => {
     const before = Date.now();
     const result = await consume("test-scope", "1.2.3.4", 5, 120);
     expect(result.resetAt.getTime()).toBeGreaterThanOrEqual(before + 120_000 - 5_000);
+  });
+});
+
+describe("consume — FAIL CLOSED on protected infrastructure failure", () => {
+  it("returns allowed:false when the RPC returns an error and onError=deny", async () => {
+    rpcImpl.mockResolvedValue({ data: null, error: { message: "relation does not exist" } });
+    const result = await consume("test-scope", "1.2.3.4", 5, 60, { onError: "deny" });
+    expect(result.allowed).toBe(false);
+    expect(result.remaining).toBe(0);
+  });
+
+  it("returns allowed:false when the RPC throws and onError=deny", async () => {
+    rpcImpl.mockRejectedValue(new Error("network down"));
+    const result = await consume("test-scope", "1.2.3.4", 7, 60, { onError: "deny" });
+    expect(result.allowed).toBe(false);
+    expect(result.remaining).toBe(0);
+  });
+
+  it("returns allowed:false when admin credentials are missing and onError=deny", async () => {
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const result = await consume("test-scope", "1.2.3.4", 4, 60, { onError: "deny" });
+    expect(result.allowed).toBe(false);
+    expect(result.remaining).toBe(0);
   });
 });
 

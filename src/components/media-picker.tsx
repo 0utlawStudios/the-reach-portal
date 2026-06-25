@@ -14,6 +14,7 @@ import { browserImagePreviewUrl, warmBrowserImagePreview } from "@/lib/image-pre
 import { driveFileIdFromUrl } from "@/lib/media-resolver";
 import { ensureMediaAsset } from "@/lib/media-assets";
 import { stripPrivateMediaToken, videoPreviewFrameUrl } from "@/lib/media-usage";
+import { resolveViewableMediaUrl } from "@/lib/media-view-url";
 import { X, Upload, FolderOpen, Image as ImageIcon, Search, CheckCircle, Clock, Link2, ExternalLink } from "lucide-react";
 import { PLACEHOLDER_MEDIA } from "@/lib/placeholder-data";
 import { useFocusTrap } from "./use-focus-trap";
@@ -151,7 +152,7 @@ export function MediaPicker({
   defaultTab = "upload",
   allowMultipleUpload = true,
 }: MediaPickerProps) {
-  const { cards, workspaceId } = usePipeline();
+  const { cards, workspaceId, updateCard } = usePipeline();
   const { currentUser } = useAuth();
   const { addToast } = useToast();
   const [mediaAssets, setMediaAssets] = useState<MediaAssetRow[]>([]);
@@ -167,6 +168,38 @@ export function MediaPicker({
   const [selectedAsset, setSelectedAsset] = useState<MediaEntry | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const warmedPreviewKeysRef = useRef<Set<string>>(new Set());
+  const cardsRef = useRef(cards);
+
+  useEffect(() => {
+    cardsRef.current = cards;
+  }, [cards]);
+
+  const patchPostPlaybackMetadata = async (params: {
+    fileId: string;
+    name: string;
+    playbackUrl: string;
+    playbackStorageKey: string;
+  }) => {
+    if (!cardId) return;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const card = cardsRef.current.find((item) => item.id === cardId);
+      const rawFiles = card?.sourceVault?.rawFiles || [];
+      const index = rawFiles.findIndex((file) => (
+        file.fileId === params.fileId ||
+        (file.name === params.name && !file.playbackStorageKey)
+      ));
+      if (card && index >= 0) {
+        const nextRawFiles = rawFiles.map((file, idx) => (
+          idx === index
+            ? { ...file, playbackUrl: params.playbackUrl, playbackStorageKey: params.playbackStorageKey }
+            : file
+        ));
+        updateCard(cardId, { sourceVault: { ...(card.sourceVault || {}), rawFiles: nextRawFiles } });
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 750));
+    }
+  };
 
   // Reset tab to defaultTab when picker opens
   useEffect(() => {
@@ -345,7 +378,6 @@ export function MediaPicker({
     warmBrowserImagePreview(mediaDisplayUrl(selectedAsset), {
       mimeType: selectedAsset.mimeType,
       fileName: selectedAsset.name,
-      size: "thumb",
     });
   }, [open, selectedAsset]);
 
@@ -407,6 +439,12 @@ export function MediaPicker({
                 const playbackModule = await import("@/lib/media-playback");
                 if (!playbackModule.canUploadPlaybackCopy(item.file, mimeType)) return;
                 const playback = await playbackModule.uploadVideoPlaybackCopy(item.file, cardId, workspaceId);
+                await patchPostPlaybackMetadata({
+                  fileId: result.fileId,
+                  name: item.file.name,
+                  playbackUrl: playback.playbackUrl,
+                  playbackStorageKey: playback.playbackStorageKey,
+                });
                 if (isDrivePublishableMediaMime(mimeType, item.file.name)) {
                   await ensureMediaAsset({
                     name: item.file.name,
@@ -545,9 +583,15 @@ export function MediaPicker({
     input.click();
   };
 
-  const copyShareLink = (asset: MediaEntry) => {
-    const shareUrl = absoluteAppUrl(asset.type === "image" ? browserViewUrl(asset) : mediaDisplayUrl(asset));
-    navigator.clipboard.writeText(shareUrl).then(() => addToast("Link copied. Share with your team.", "success"));
+  const copyShareLink = async (asset: MediaEntry) => {
+    try {
+      const sourceUrl = asset.type === "image" ? browserViewUrl(asset) : mediaDisplayUrl(asset);
+      const shareUrl = absoluteAppUrl(await resolveViewableMediaUrl(sourceUrl));
+      await navigator.clipboard.writeText(shareUrl);
+      addToast("Link copied. Share with your team.", "success");
+    } catch {
+      addToast("Could not copy a viewable link. Try opening the asset first.", "error");
+    }
   };
 
   return (
@@ -716,7 +760,7 @@ export function MediaPicker({
                   </div>
 
                   {/* Share link */}
-                  <button onClick={() => copyShareLink(selectedAsset)}
+                  <button onClick={() => void copyShareLink(selectedAsset)}
                     className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-white dark:bg-white/[0.03] border border-gray-200 dark:border-white/[0.06] hover:border-orange-300 dark:hover:border-orange-500/20 transition-colors cursor-pointer text-left">
                     <Link2 className="w-3.5 h-3.5 text-orange-500 shrink-0" />
                     <span className="text-[11px] text-gray-600 dark:text-gray-400 font-medium">Copy shareable link</span>

@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
   const auth = await requireBearerUser(request);
   if (auth instanceof NextResponse) return auth;
 
-  const rl = await consume("support:upload", auth.user.id, 40, 300);
+  const rl = await consume("support:upload", auth.user.id, 40, 300, { onError: "deny" });
   if (!rl.allowed) {
     return NextResponse.json({ error: "Too many uploads. Please wait a moment." }, { status: 429 });
   }

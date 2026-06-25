@@ -5,15 +5,28 @@ import type { GeneratedCaption, PlanRow, ResolvedAspect } from "../types";
 
 const OLD_ENV = { ...process.env };
 
+function setNodeEnv(value: "production" | "development" | "test") {
+  Object.defineProperty(process.env, "NODE_ENV", { value, configurable: true, enumerable: true, writable: true });
+}
+
 afterEach(() => {
   vi.useRealTimers();
   process.env = { ...OLD_ENV };
 });
 
 describe("AI asset publish URLs", () => {
+  it("fails closed in production without a dedicated AI asset signing secret", () => {
+    setNodeEnv("production");
+    delete process.env.AI_ASSET_SIGNING_SECRET;
+    process.env.DRIVE_STREAM_SIGNING_SECRET = "drive-secret";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-secret";
+
+    expect(() => signAiAssetToken("workspace/post/image.jpg")).toThrow("AI asset signing secret is not configured");
+  });
+
   it("signs storage keys without exposing the bucket as a public file", () => {
     vi.setSystemTime(new Date("2026-06-25T00:00:00.000Z"));
-    process.env.SUPABASE_SERVICE_ROLE_KEY = "test-secret";
+    process.env.AI_ASSET_SIGNING_SECRET = "test-secret";
     process.env.NEXT_PUBLIC_SITE_URL = "https://thereach.ten80ten.com/";
 
     const key = "00000000-0000-0000-0000-000000000001/post-1/slide-1.jpg";
@@ -33,7 +46,7 @@ describe("AI asset publish URLs", () => {
 
   it("stores publisher-fetchable asset_urls while keeping UI thumbnail and storage keys", () => {
     vi.setSystemTime(new Date("2026-06-25T00:00:00.000Z"));
-    process.env.SUPABASE_SERVICE_ROLE_KEY = "test-secret";
+    process.env.AI_ASSET_SIGNING_SECRET = "test-secret";
     process.env.NEXT_PUBLIC_SITE_URL = "https://thereach.ten80ten.com";
 
     const row = buildPostInsertRow({

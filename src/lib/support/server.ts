@@ -34,7 +34,6 @@ import type { SupportAttachment, SupportThreadRow } from "./types";
 
 const BASELINE_WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 const BUCKET = "support-attachments";
-const SIGNED_URL_TTL = 7 * 24 * 60 * 60; // 7 days
 const ADMIN_PING_DEBOUNCE_MS = 5 * 60 * 1000;
 const USER_EMAIL_DEBOUNCE_MS = 10 * 60 * 1000;
 const WORKSPACE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -326,7 +325,8 @@ export function parseAttachmentClaims(raw: unknown): AttachmentClaim[] {
  * MUST sit under the caller's own {workspaceId}/{userId}/ prefix, so one user
  * cannot attach another user's file. The object must actually exist — its
  * real size and mime are read back from storage, never trusted from the
- * client. Returns read-signed metadata ready to persist.
+ * client. Returns storage-key metadata ready to persist; read access is always
+ * served later through /api/support/attachment, never stored signed URLs.
  */
 export async function buildAttachmentsFromClaims(args: {
   admin: SupabaseClient;
@@ -369,18 +369,9 @@ export async function buildAttachmentsFromClaims(args: {
       if (size > SUPPORT_MAX_FILE_BYTES) {
         throw new SupportValidationError("That attachment is larger than 25 MB.");
       }
-      const { data: signed, error: signErr } = await withStorageControlTimeout(
-        admin.storage
-          .from(BUCKET)
-          .createSignedUrl(key, SIGNED_URL_TTL),
-        "Support attachment URL signing",
-      );
-      if (signErr || !signed?.signedUrl) {
-        throw new Error(`Attachment URL failed: ${signErr?.message || "unknown"}`);
-      }
       return {
         storageKey: key,
-        signedUrl: signed.signedUrl,
+        signedUrl: "",
         mime,
         name: sanitizeFileName(claim.name || fileName),
         size,
@@ -391,19 +382,17 @@ export async function buildAttachmentsFromClaims(args: {
 }
 
 /**
- * Refresh signed URLs for stored attachments. Stored URLs expire after 7
- * days; routes call this on every read so the client always renders a live
- * URL. A failed re-sign keeps the (possibly stale) stored URL rather than
- * dropping the attachment.
+ * Validate stored attachments and strip any legacy signed URLs. The client
+ * renders through /api/support/attachment using storageKey, so durable support
+ * rows and emails never carry bearer-style storage URLs.
  */
 export async function resignAttachments(
-  admin: SupabaseClient,
+  _admin: SupabaseClient,
   attachments: SupportAttachment[] | null | undefined,
   workspaceId?: string,
 ): Promise<SupportAttachment[]> {
   if (!attachments || attachments.length === 0) return [];
   const workspacePrefix = workspaceId ? `${workspaceId}/` : null;
-  // Re-sign every attachment in parallel.
   const refreshed = await Promise.all(
     attachments
       .filter((a) => Boolean(a?.storageKey))
@@ -419,17 +408,7 @@ export async function resignAttachments(
           console.error("[support] skipped attachment with invalid workspace prefix");
           return null;
         }
-        try {
-          const { data, error } = await withStorageControlTimeout(
-            admin.storage
-              .from(BUCKET)
-              .createSignedUrl(a.storageKey, SIGNED_URL_TTL),
-            "Support attachment URL refresh",
-          );
-          return { ...a, signedUrl: error || !data?.signedUrl ? a.signedUrl : data.signedUrl };
-        } catch {
-          return { ...a, signedUrl: a.signedUrl };
-        }
+        return { ...a, signedUrl: "" };
       }),
   );
   return refreshed.filter((a): a is SupportAttachment => Boolean(a));
@@ -510,7 +489,7 @@ export async function notifyAdminOfTicket(args: {
         userEmail: thread.created_by_email,
         category,
         body,
-        attachments: attachments.map((a) => ({ name: a.name, signedUrl: a.signedUrl, kind: a.kind })),
+        attachments: attachments.map((a) => ({ name: a.name, kind: a.kind })),
         threadUrl: url,
       });
       await getTransporter().sendMail({

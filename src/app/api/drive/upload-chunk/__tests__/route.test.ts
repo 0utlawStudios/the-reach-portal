@@ -33,6 +33,7 @@ import { POST } from "../route";
 
 const originalFetch = global.fetch;
 const originalServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const originalUploadSecret = process.env.DRIVE_UPLOAD_SESSION_SECRET;
 const uploadUri = "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&upload_id=test-upload";
 const workspaceId = "00000000-0000-0000-0000-000000000001";
 const userId = "user-1";
@@ -82,6 +83,7 @@ beforeEach(() => {
     workspaceId,
   });
   process.env.SUPABASE_SERVICE_ROLE_KEY = "test-upload-session-secret";
+  process.env.DRIVE_UPLOAD_SESSION_SECRET = "test-upload-session-secret";
   rateLimitMocks.getClientIp.mockReturnValue("1.2.3.4");
   rateLimitMocks.consume.mockResolvedValue({ allowed: true, remaining: 240, resetAt: new Date() });
   alertMocks.notifyUploadFailure.mockResolvedValue({ emailSent: false, telegramSent: false });
@@ -96,6 +98,8 @@ afterEach(() => {
   global.fetch = originalFetch;
   if (originalServiceKey === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
   else process.env.SUPABASE_SERVICE_ROLE_KEY = originalServiceKey;
+  if (originalUploadSecret === undefined) delete process.env.DRIVE_UPLOAD_SESSION_SECRET;
+  else process.env.DRIVE_UPLOAD_SESSION_SECRET = originalUploadSecret;
 });
 
 describe("POST /api/drive/upload-chunk", () => {

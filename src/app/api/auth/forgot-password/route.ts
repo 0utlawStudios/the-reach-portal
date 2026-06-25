@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
     // Rate limit: 5 requests per minute per IP. Fails open on infrastructure
     // errors so an outage in the rate limiter does not block legitimate users.
     const ip = getClientIp(request);
-    const ipCheck = await consume("forgot-password:ip", ip, 5, 60);
+    const ipCheck = await consume("forgot-password:ip", ip, 5, 60, { onError: "deny" });
     if (!ipCheck.allowed) {
       console.warn(`[forgot-password] rate-limited IP ${ip}`);
       // Anti-enumeration: still return success so the attacker cannot

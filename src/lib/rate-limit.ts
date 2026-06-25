@@ -6,6 +6,10 @@ export type RateLimitResult = {
   resetAt: Date;
 };
 
+type RateLimitOptions = {
+  onError?: "allow" | "deny";
+};
+
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -29,16 +33,21 @@ type RpcRow = {
  * caller (usually an IP address or a user id). Backed by the rate_limit_buckets
  * table and the rate_limit_consume RPC.
  *
- * Fails open on any infrastructure error: returns allowed=true so an outage in
- * the rate limit system does not take down the endpoint it protects.
+ * Defaults to fail-open so a rate-limit backend outage does not take down
+ * normal authenticated UX. Public abuse-prone routes and upload/session
+ * minting should pass `{ onError: "deny" }` so protection fails closed.
  */
 export async function consume(
   scope: string,
   key: string,
   limit: number,
   windowSeconds: number,
+  options: RateLimitOptions = {},
 ): Promise<RateLimitResult> {
   const fallbackReset = new Date(Date.now() + windowSeconds * 1000);
+  const fallback = options.onError === "deny"
+    ? { allowed: false, remaining: 0, resetAt: fallbackReset }
+    : { allowed: true, remaining: limit, resetAt: fallbackReset };
   try {
     const admin = getAdminClient();
     const { data, error } = await admin.rpc("rate_limit_consume", {
@@ -49,11 +58,11 @@ export async function consume(
     });
     if (error) {
       console.error("[rate-limit] rpc error", { scope, key, message: error.message });
-      return { allowed: true, remaining: limit, resetAt: fallbackReset };
+      return fallback;
     }
     const row: RpcRow | undefined = Array.isArray(data) ? data[0] : (data as RpcRow | undefined);
     if (!row) {
-      return { allowed: true, remaining: limit, resetAt: fallbackReset };
+      return fallback;
     }
     return {
       allowed: !!row.allowed,
@@ -63,7 +72,7 @@ export async function consume(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[rate-limit] exception", { scope, key, message });
-    return { allowed: true, remaining: limit, resetAt: fallbackReset };
+    return fallback;
   }
 }
 

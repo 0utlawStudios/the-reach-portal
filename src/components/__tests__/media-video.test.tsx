@@ -7,7 +7,7 @@ const mockSignedMediaViewUrl = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/media-view-url", () => ({
   isPrivateMediaRouteUrl: (url: string | null | undefined) => (
     typeof url === "string" &&
-    (url.startsWith("/api/drive/stream") || url.startsWith("/api/media/image-preview"))
+    (url.startsWith("/api/drive/stream") || url.startsWith("/api/media/image-preview") || url.startsWith("/api/media/playback"))
   ),
   signedMediaViewUrl: mockSignedMediaViewUrl,
 }));

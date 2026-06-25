@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
   const auth = await requireBearerUser(request);
   if (auth instanceof NextResponse) return auth;
 
-  const rl = await consume("support:create", auth.user.id, 5, 3600);
+  const rl = await consume("support:create", auth.user.id, 5, 3600, { onError: "deny" });
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "You're submitting tickets too quickly. Please wait a few minutes." },

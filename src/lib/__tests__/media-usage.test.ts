@@ -100,12 +100,12 @@ describe("media usage detection", () => {
     expect(videoPreviewFrameUrl("/api/drive/stream?id=abc#t=0.1")).toBe("/api/drive/stream?id=abc#t=0.1");
   });
 
-  it("strips copied private Drive stream tokens while leaving playback keys intact", () => {
+  it("strips copied private media tokens while leaving playback keys intact", () => {
     expect(stripPrivateMediaToken("/api/drive/stream?id=abc&token=secret#t=0.1"))
       .toBe("/api/drive/stream?id=abc#t=0.1");
     expect(stripPrivateMediaToken("https://thereach.ten80ten.com/api/media/image-preview?id=abc&token=secret&size=thumb"))
       .toBe("https://thereach.ten80ten.com/api/media/image-preview?id=abc&size=thumb");
-    expect(stripPrivateMediaToken("/api/media/playback?key=workspace%2Fclip.mp4"))
+    expect(stripPrivateMediaToken("/api/media/playback?key=workspace%2Fclip.mp4&token=secret"))
       .toBe("/api/media/playback?key=workspace%2Fclip.mp4");
   });
 });

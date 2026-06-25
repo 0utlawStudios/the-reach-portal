@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     // bursty action when a creator uploads several files in a row but
     // shouldn't be hammered.
     const rlKey = `user:${user.id}|ip:${getClientIp(request)}`;
-    const rl = await consume("drive-finalize:user", rlKey, 60, 60);
+    const rl = await consume("drive-finalize:user", rlKey, 60, 60, { onError: "deny" });
     if (!rl.allowed) {
       const limited = appRateLimitError(rl.resetAt);
       return NextResponse.json(

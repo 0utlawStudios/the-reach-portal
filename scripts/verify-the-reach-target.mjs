@@ -19,7 +19,7 @@ const forbiddenPatterns = [
 const scanRoots = [
   "package.json",
   "playwright.config.ts",
-  ".vercel/project.json",
+  "vercel.json",
   ".github",
   "src",
   "e2e",
@@ -36,9 +36,21 @@ function readJson(path) {
   return JSON.parse(readFileSync(join(root, path), "utf8"));
 }
 
+function readJsonIfExists(path) {
+  try {
+    return readJson(path);
+  } catch {
+    return null;
+  }
+}
+
 function fail(message) {
   console.error(`[verify-the-reach-target] ${message}`);
   process.exitCode = 1;
+}
+
+function warn(message) {
+  console.warn(`[verify-the-reach-target] ${message}`);
 }
 
 function walk(path, files = []) {
@@ -68,9 +80,16 @@ if (!pkg.scripts?.["e2e:prod"]?.includes(expected.productionHost)) {
   fail(`package.json e2e:prod must target ${expected.productionHost}`);
 }
 
-const vercel = readJson(".vercel/project.json");
-if (vercel.projectName !== expected.vercelProject) {
-  fail(`.vercel/project.json must be linked to ${expected.vercelProject}, got ${vercel.projectName || "(missing)"}`);
+const vercel = readJsonIfExists(".vercel/project.json");
+const vercelProjectName = vercel?.projectName || process.env.VERCEL_PROJECT_NAME || "";
+if (vercelProjectName) {
+  if (vercelProjectName !== expected.vercelProject) {
+    fail(`Vercel project must be ${expected.vercelProject}, got ${vercelProjectName}`);
+  }
+} else if (process.env.CI) {
+  fail(`VERCEL_PROJECT_NAME must be set to ${expected.vercelProject} in clean CI checkouts`);
+} else {
+  warn(`Skipping Vercel project link check because .vercel/project.json and VERCEL_PROJECT_NAME are absent`);
 }
 
 const files = scanRoots.flatMap((path) => walk(path));

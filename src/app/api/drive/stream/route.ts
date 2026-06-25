@@ -5,6 +5,7 @@ import { ALLOWED_DRIVE_ROLES, VALID_DRIVE_FOLDERS } from "@/lib/drive-policy";
 import { sanitizedDriveErrorDetail, sanitizeUnknownUploadError, statusForSanitizedDriveError } from "@/lib/drive-errors";
 import { requireBearerTeamRole, requireRole, requireUser, type WorkspaceRole } from "@/lib/auth/require";
 import { STREAM_INACTIVITY_TIMEOUT_MS, streamWithInactivityTimeout } from "@/lib/stream-inactivity-timeout";
+import { isKnownAppDriveFile } from "@/lib/media-access";
 
 export const maxDuration = 60; // Fluid Compute — stays alive while streaming
 
@@ -49,49 +50,6 @@ function serviceRoleClient() {
   return createClient(url, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
-}
-
-function sourceReferencesDriveFile(value: unknown, fileId: string): boolean {
-  if (typeof value === "string") return value.includes(fileId);
-  if (Array.isArray(value)) return value.some((item) => sourceReferencesDriveFile(item, fileId));
-  if (value && typeof value === "object") {
-    return Object.values(value as Record<string, unknown>).some((item) => sourceReferencesDriveFile(item, fileId));
-  }
-  return false;
-}
-
-async function isKnownAppDriveFile(fileId: string, workspaceId?: string): Promise<boolean> {
-  const admin = serviceRoleClient();
-  if (!admin) return false;
-
-  let mediaQuery = admin
-      .from("media_assets")
-      .select("id")
-      .ilike("url", `%${fileId}%`)
-      .limit(1);
-  let postsQuery = admin
-      .from("posts")
-      .select("id, thumbnail_url, source_vault")
-      .or(`thumbnail_url.ilike.%${fileId}%`)
-      .limit(1);
-  if (workspaceId) {
-    mediaQuery = mediaQuery.eq("workspace_id", workspaceId);
-    postsQuery = postsQuery.eq("workspace_id", workspaceId);
-  }
-
-  const [media, posts] = await Promise.all([mediaQuery, postsQuery]);
-  if (!media.error && media.data && media.data.length > 0) return true;
-  if (!posts.error && posts.data && posts.data.length > 0) return true;
-
-  let sourceQuery = admin
-    .from("posts")
-    .select("id, source_vault")
-    .not("source_vault", "is", null)
-    .limit(1000);
-  if (workspaceId) sourceQuery = sourceQuery.eq("workspace_id", workspaceId);
-  const { data: sourceRows, error: sourceError } = await sourceQuery;
-  if (sourceError || !sourceRows) return false;
-  return sourceRows.some((row) => sourceReferencesDriveFile(row.source_vault, fileId));
 }
 
 async function isInAppManagedDriveFolder(fileId: string): Promise<boolean> {
@@ -178,7 +136,7 @@ async function checkAuth(req: NextRequest, fileId: string): Promise<{
 
   const auth = await workspaceAuth(req);
   if (auth?.workspaceId) {
-    const knownInWorkspace = await isKnownAppDriveFile(fileId, auth.workspaceId);
+    const knownInWorkspace = await isKnownAppDriveFile(serviceRoleClient(), fileId, auth.workspaceId);
     const appManaged = knownInWorkspace ? false : await isInAppManagedDriveFolder(fileId);
     if (knownInWorkspace) {
       return { ok: true, authed: true, signed: false, workspaceId: auth.workspaceId, knownInWorkspace: true };

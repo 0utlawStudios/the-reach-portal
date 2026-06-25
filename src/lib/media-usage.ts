@@ -39,7 +39,11 @@ export function stripPrivateMediaToken(url: string | null | undefined): string {
   try {
     const isRelative = url.startsWith("/");
     const parsed = new URL(url, "https://thereach.ten80ten.com");
-    if (parsed.pathname === "/api/drive/stream" || parsed.pathname === "/api/media/image-preview") {
+    if (
+      parsed.pathname === "/api/drive/stream" ||
+      parsed.pathname === "/api/media/image-preview" ||
+      parsed.pathname === "/api/media/playback"
+    ) {
       parsed.searchParams.delete("token");
     }
     return isRelative ? `${parsed.pathname}${parsed.search}${parsed.hash}` : parsed.toString();

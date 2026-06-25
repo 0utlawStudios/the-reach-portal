@@ -14,6 +14,7 @@ import { createClient } from "@supabase/supabase-js";
 import { timingSafeEqual } from "node:crypto";
 import { runGenerateJob, runReviseJob } from "@/lib/ai/worker";
 import { studioEnabled } from "@/lib/ai/feature-flag";
+import { reserveDurableWebhookNonce, verifyWebhookSignature } from "@/lib/webhook-signature";
 
 // SEC-008: Constant-time string compare. Prevents leaking secret length and
 // bytes through response-time side channels on each authentication path.
@@ -32,12 +33,16 @@ function adminClient() {
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
-function isAuthorized(req: NextRequest): boolean {
+async function isAuthorized(req: NextRequest): Promise<boolean> {
   const auth = (req.headers.get("authorization") || req.headers.get("Authorization") || "").trim();
   const bearer = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
   const trigger = (req.headers.get("x-trigger-secret") || "").trim();
   const cronSecret = (process.env.CRON_SECRET || "").trim();
   const triggerSecret = (process.env.AI_WORKER_TRIGGER_SECRET || cronSecret).trim();
+  const hmacSecret = (process.env.AI_WORKER_HMAC_SECRET || "").trim();
+  if (hmacSecret && verifyWebhookSignature(req.headers, "", hmacSecret, "ai-worker-process")) {
+    return reserveDurableWebhookNonce(req.headers, "ai-worker-process");
+  }
   // Vercel cron sends Authorization: Bearer <CRON_SECRET>.
   if (bearer && cronSecret && safeEqual(bearer, cronSecret)) return true;
   // Internal trigger from generate-row / webhook routes.
@@ -46,7 +51,7 @@ function isAuthorized(req: NextRequest): boolean {
 }
 
 export async function POST(req: NextRequest) {
-  if (!isAuthorized(req)) {
+  if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   // Feature kill switch — when off, the worker drains nothing. Queued

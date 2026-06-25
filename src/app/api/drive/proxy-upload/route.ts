@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     // (one round-trip per file), so a multi-file batch — e.g. a 26-photo upload —
     // must not trip the limit. Matches drive/upload's 60/min envelope.
     const rlKey = `user:${user.id}|ip:${getClientIp(request)}`;
-    const rl = await consume("drive-proxy-upload:user", rlKey, 60, 60);
+    const rl = await consume("drive-proxy-upload:user", rlKey, 60, 60, { onError: "deny" });
     if (!rl.allowed) {
       return jsonResponse(appRateLimitError(rl.resetAt), 429);
     }

@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
     // large file. 240/min supports several 20MB videos without letting a tab
     // hammer this route indefinitely.
     const rlKey = `user:${user.id}|ip:${getClientIp(request)}`;
-    const rl = await consume("drive-upload-chunk:user", rlKey, 240, 60);
+    const rl = await consume("drive-upload-chunk:user", rlKey, 240, 60, { onError: "deny" });
     if (!rl.allowed) {
       return jsonResponse(appRateLimitError(rl.resetAt), 429);
     }

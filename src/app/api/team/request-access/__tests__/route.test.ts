@@ -183,7 +183,7 @@ describe("POST /api/team/request-access", () => {
 
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toContain("Workspace context required");
+    expect(body.error).toBe("We could not submit this request for that workspace.");
     expect(operations.some((op) => op.table === "signup_requests" && op.method === "insert")).toBe(false);
   });
 

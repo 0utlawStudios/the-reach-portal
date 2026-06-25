@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
   if (ctx instanceof NextResponse) return ctx;
 
   const ip = getClientIp(request);
-  const rl = await consume("drive-upload-failure:user", `user:${ctx.user.id}|ip:${ip}`, 30, 300);
+  const rl = await consume("drive-upload-failure:user", `user:${ctx.user.id}|ip:${ip}`, 30, 300, { onError: "deny" });
   if (!rl.allowed) {
     return NextResponse.json({ error: "Too many upload failure reports." }, { status: 429 });
   }

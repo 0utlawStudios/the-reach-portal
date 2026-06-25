@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getTransporter, getFromAddress, safeSubject, buildRevisionEmailHtml } from "@/lib/email-utils";
 import { consume, getClientIp } from "@/lib/rate-limit";
-import { loadCallerProfile, loadMemberByCreatorKey, loadWorkspacePost, requireNotificationContext } from "../_shared";
+import { APPROVAL_NOTIFICATION_ROLES, loadCallerProfile, loadMemberByCreatorKey, loadWorkspacePost, requireNotificationContext } from "../_shared";
 
 export const maxDuration = 10;
 
@@ -25,12 +25,12 @@ interface RevisionRequest {
 export async function POST(request: NextRequest) {
   try {
     // SEC-012: Authenticate the caller and derive `requestedBy` server-side.
-    const ctx = await requireNotificationContext(request);
+    const ctx = await requireNotificationContext(request, APPROVAL_NOTIFICATION_ROLES);
     if (ctx instanceof NextResponse) return ctx;
 
     // Rate limit: 10 per minute per IP.
     const ip = getClientIp(request);
-    const ipCheck = await consume("notifications:revision:ip", ip, 10, 60);
+    const ipCheck = await consume("notifications:revision:ip", ip, 10, 60, { onError: "deny" });
     if (!ipCheck.allowed) {
       return NextResponse.json({ error: "Rate limited" }, { status: 429 });
     }
@@ -113,10 +113,10 @@ export async function POST(request: NextRequest) {
       p_action: "revision_requested",
       p_entity_id: body.postId,
       p_workspace_id: ctx.workspaceId,
-      p_metadata: { user_name: requestedBy, details: `Notified: ${recipients.join(", ")}. Note: ${body.revisionNote.slice(0, 100)}` },
+      p_metadata: { user_name: requestedBy, notified_count: recipients.length, details: `Revision note: ${body.revisionNote.slice(0, 100)}` },
     });
 
-    return NextResponse.json({ sent, recipients });
+    return NextResponse.json({ sent, recipientCount: recipients.length });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[notifications/revision]", message);

@@ -408,10 +408,11 @@ describe("iron-law guards in pipeline-context.tsx", () => {
   });
 
   it("notification APIs require active workspace access and verify the post belongs to that workspace", () => {
-    expect(NOTIFICATIONS_SHARED_SRC).toContain("requireBearerTeamRole(request, ACTIVE_NOTIFICATION_ROLES)");
+    expect(NOTIFICATIONS_SHARED_SRC).toContain("roles: readonly string[] = ACTIVE_NOTIFICATION_ROLES");
+    expect(NOTIFICATIONS_SHARED_SRC).toContain("requireBearerTeamRole(request, roles)");
     expect(NOTIFICATIONS_SHARED_SRC).toContain(".eq(\"workspace_id\", workspaceId)");
     for (const src of NOTIFICATION_ROUTE_SRCS) {
-      expect(src).toContain("requireNotificationContext(request)");
+      expect(src).toContain("requireNotificationContext(request");
       expect(src).toContain("loadWorkspacePost");
       expect(src).toContain("p_workspace_id: ctx.workspaceId");
     }

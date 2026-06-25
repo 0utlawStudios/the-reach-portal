@@ -6,6 +6,7 @@ import { fetchWithTimeout } from "@/lib/fetch-timeout";
 // ─── Auth ───
 
 const HEALTH_SECRET = process.env.HEALTH_CHECK_SECRET;
+const HEALTH_DETAIL_SECRET = process.env.HEALTH_DETAIL_SECRET;
 const HEALTH_EXTERNAL_FETCH_TIMEOUT_MS = 8_000;
 
 // SEC-002: Constant-time secret comparison. A plain `!==` leaks the secret
@@ -137,17 +138,22 @@ async function timedFetch(url: string, opts?: RequestInit & { timeout?: number }
 export async function GET(req: Request) {
   const token = req.headers.get("authorization")?.replace("Bearer ", "");
   if (!HEALTH_SECRET || !safeEqual(token ?? "", HEALTH_SECRET)) return unauthorized();
+  const detailToken = req.headers.get("x-health-detail-secret") || "";
+  const includeDetails = Boolean(HEALTH_DETAIL_SECRET && safeEqual(detailToken, HEALTH_DETAIL_SECRET));
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!url || !serviceKey) {
-    return NextResponse.json({
-      timestamp: new Date().toISOString(),
-      checks: { environment: fail("Missing SUPABASE_URL or SERVICE_ROLE_KEY") },
-      summary: { total: 1, passed: 0, warnings: 0, failures: 1 },
-    });
+    const timestamp = new Date().toISOString();
+    const summary = { total: 1, passed: 0, warnings: 0, failures: 1, grade: "CRITICAL" };
+    return NextResponse.json(
+      includeDetails
+        ? { timestamp, checks: { environment: fail("Missing SUPABASE_URL or SERVICE_ROLE_KEY") }, summary }
+        : { timestamp, checks: { environment: { status: "fail" } }, summary },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   }
 
   const admin = createClient(url, serviceKey);
@@ -185,9 +191,20 @@ export async function GET(req: Request) {
 
   // ═══ 1. ENVIRONMENT VARIABLES ═══
   const envVars: Record<string, string[]> = {
-    critical: ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY"],
+    critical: [
+      "NEXT_PUBLIC_SUPABASE_URL",
+      "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+      "SUPABASE_SERVICE_ROLE_KEY",
+      "PUBLISHER_WEBHOOK_HMAC_SECRET",
+      "SUPABASE_WEBHOOK_HMAC_SECRET",
+      "AI_WORKER_HMAC_SECRET",
+      "DRIVE_STREAM_SIGNING_SECRET",
+      "MEDIA_PLAYBACK_SIGNING_SECRET",
+      "DRIVE_UPLOAD_SESSION_SECRET",
+      "AI_ASSET_SIGNING_SECRET",
+    ],
     integrations: ["GOOGLE_SERVICE_ACCOUNT_JSON", "GOOGLE_DRIVE_ROOT_FOLDER_ID"],
-    monitoring: ["HEALTH_CHECK_SECRET"],
+    monitoring: ["HEALTH_CHECK_SECRET", "HEALTH_DETAIL_SECRET"],
   };
   const allVars = Object.values(envVars).flat();
   const missing = allVars.filter((v) => !process.env[v]);
@@ -1101,5 +1118,18 @@ export async function GET(req: Request) {
   };
   summary.grade = summary.failures > 0 ? "CRITICAL" : summary.warnings > 3 ? "NEEDS ATTENTION" : summary.warnings > 0 ? "MOSTLY HEALTHY" : "ALL CLEAR";
 
-  return NextResponse.json({ timestamp: now.toISOString(), grade: summary.grade, checks, summary });
+  if (includeDetails) {
+    return NextResponse.json(
+      { timestamp: now.toISOString(), grade: summary.grade, checks, summary },
+      { headers: { "Cache-Control": "no-store" } },
+    );
+  }
+
+  const publicChecks = Object.fromEntries(
+    Object.entries(checks).map(([key, check]) => [key, { status: check.status }]),
+  );
+  return NextResponse.json(
+    { timestamp: now.toISOString(), grade: summary.grade, checks: publicChecks, summary },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }

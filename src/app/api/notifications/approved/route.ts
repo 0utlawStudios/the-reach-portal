@@ -9,7 +9,7 @@ import {
 } from "@/lib/email-utils";
 import { APP_TIMEZONE } from "@/lib/utils";
 import { consume, getClientIp } from "@/lib/rate-limit";
-import { loadCallerProfile, loadMemberByCreatorKey, loadWorkspacePost, requireNotificationContext } from "../_shared";
+import { APPROVAL_NOTIFICATION_ROLES, loadCallerProfile, loadMemberByCreatorKey, loadWorkspacePost, requireNotificationContext } from "../_shared";
 
 export const maxDuration = 10;
 
@@ -60,11 +60,11 @@ export async function POST(request: NextRequest) {
     // SEC-012: Authenticate the caller. `approvedBy` is now derived from
     // the bearer-token user's team_members row — clients cannot forge the
     // approver name.
-    const ctx = await requireNotificationContext(request);
+    const ctx = await requireNotificationContext(request, APPROVAL_NOTIFICATION_ROLES);
     if (ctx instanceof NextResponse) return ctx;
 
     const ip = getClientIp(request);
-    const ipCheck = await consume("notifications:approved:ip", ip, 10, 60);
+    const ipCheck = await consume("notifications:approved:ip", ip, 10, 60, { onError: "deny" });
     if (!ipCheck.allowed) {
       return NextResponse.json({ error: "Rate limited" }, { status: 429 });
     }
@@ -157,10 +157,10 @@ export async function POST(request: NextRequest) {
       p_action: "post_approved_notified",
       p_entity_id: body.postId,
       p_workspace_id: ctx.workspaceId,
-      p_metadata: { approvedBy, notified: creator.email, sent },
+      p_metadata: { approvedBy, notified_count: creator.email ? 1 : 0, sent },
     });
 
-    return NextResponse.json({ sent, recipient: creator.email });
+    return NextResponse.json({ sent, recipientCount: creator.email ? 1 : 0 });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[notifications/approved]", message);

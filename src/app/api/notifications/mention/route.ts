@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
 
     // Rate limit: 10 per minute per IP.
     const ip = getClientIp(request);
-    const ipCheck = await consume("notifications:mention:ip", ip, 10, 60);
+    const ipCheck = await consume("notifications:mention:ip", ip, 10, 60, { onError: "deny" });
     if (!ipCheck.allowed) {
       return NextResponse.json({ error: "Rate limited" }, { status: 429 });
     }

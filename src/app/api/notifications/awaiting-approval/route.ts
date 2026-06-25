@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getTransporter, getFromAddress, esc, safeSubject } from "@/lib/email-utils";
 import { APP_TIMEZONE } from "@/lib/utils";
 import { consume, getClientIp } from "@/lib/rate-limit";
-import { loadCallerProfile, loadWorkspacePost, requireNotificationContext } from "../_shared";
+import { CONTENT_NOTIFICATION_ROLES, loadCallerProfile, loadWorkspacePost, requireNotificationContext } from "../_shared";
 
 export const maxDuration = 10;
 
@@ -62,11 +62,11 @@ export async function POST(request: NextRequest) {
   try {
     // SEC-012: Require an authenticated caller and trust the server's
     // resolution of `movedBy` over whatever the body claims.
-    const ctx = await requireNotificationContext(request);
+    const ctx = await requireNotificationContext(request, CONTENT_NOTIFICATION_ROLES);
     if (ctx instanceof NextResponse) return ctx;
 
     const ip = getClientIp(request);
-    const ipCheck = await consume("notifications:awaiting-approval:ip", ip, 10, 60);
+    const ipCheck = await consume("notifications:awaiting-approval:ip", ip, 10, 60, { onError: "deny" });
     if (!ipCheck.allowed) {
       return NextResponse.json({ error: "Rate limited" }, { status: 429 });
     }
@@ -250,10 +250,10 @@ export async function POST(request: NextRequest) {
       p_action: "awaiting_approval_notified",
       p_entity_id: body.postId,
       p_workspace_id: ctx.workspaceId,
-      p_metadata: { movedBy, notified: recipients },
+      p_metadata: { movedBy, notified_count: recipients.length, sent },
     });
 
-    return NextResponse.json({ sent, recipients });
+    return NextResponse.json({ sent, recipientCount: recipients.length });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[notifications/awaiting-approval]", message);

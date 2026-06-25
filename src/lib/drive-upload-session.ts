@@ -14,7 +14,8 @@ type UploadSessionParts = {
 };
 
 function uploadSessionSecret(): string {
-  return process.env.DRIVE_STREAM_TOKEN_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+  return process.env.DRIVE_UPLOAD_SESSION_SECRET ||
+    (process.env.NODE_ENV === "production" ? "" : process.env.DRIVE_STREAM_TOKEN_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || "");
 }
 
 function uploadSessionPayload(parts: UploadSessionParts & { expiresAt: number }): string {

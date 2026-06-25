@@ -9,6 +9,7 @@ import {
   safeSubject,
 } from "@/lib/email-utils";
 import { APP_TIMEZONE, isValidUuid } from "@/lib/utils";
+import { reserveDurableWebhookNonce, verifyStaticWebhookSecret, verifyWebhookSignature } from "@/lib/webhook-signature";
 
 export const runtime = "nodejs";
 export const maxDuration = 15;
@@ -70,13 +71,13 @@ function getAdminClient() {
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
 }
 
-function authorize(request: NextRequest): boolean {
-  const expected = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!expected) return false;
-  const auth = request.headers.get("authorization") || "";
-  const bearer = auth.replace(/^Bearer\s+/i, "").trim();
-  const headerSecret = request.headers.get("x-publisher-secret") || "";
-  return bearer === expected || headerSecret === expected;
+async function authorize(request: NextRequest, rawBody: string): Promise<boolean> {
+  const hmacSecret = (process.env.PUBLISHER_WEBHOOK_HMAC_SECRET || "").trim();
+  if (hmacSecret && verifyWebhookSignature(request.headers, rawBody, hmacSecret, "publisher-published")) {
+    return reserveDurableWebhookNonce(request.headers, "publisher-published");
+  }
+  const expected = (process.env.PUBLISHER_WEBHOOK_SECRET || process.env.AUTO_PUBLISHER_WEBHOOK_SECRET || "").trim();
+  return verifyStaticWebhookSecret(request.headers, expected);
 }
 
 function normalizePlatforms(body: PublishedRequest, post: PostRow): NormalizedPlatformResult[] {
@@ -192,11 +193,17 @@ async function sendTelegram(params: {
 
 export async function POST(request: NextRequest) {
   try {
-    if (!authorize(request)) {
+    const rawBody = await request.text();
+    if (!(await authorize(request, rawBody))) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await request.json() as PublishedRequest;
+    let body: PublishedRequest;
+    try {
+      body = JSON.parse(rawBody) as PublishedRequest;
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    }
     const postId = String(body.postId || "").trim();
     if (!isValidUuid(postId)) {
       return NextResponse.json({ error: "Invalid post id" }, { status: 400 });
@@ -289,7 +296,7 @@ export async function POST(request: NextRequest) {
         user_name: EXECUTOR,
         job_id: jobId,
         job_state: jobState,
-        email_recipients: recipients,
+        email_recipient_count: recipients.length,
         email_sent: emailSent,
         telegram_sent: telegram.sent || 0,
       },
@@ -299,7 +306,7 @@ export async function POST(request: NextRequest) {
       ok: true,
       published,
       emailSent,
-      recipients,
+      recipientCount: recipients.length,
       telegramSent: telegram.sent || 0,
       telegramSkipped: telegram.skipped || null,
     });

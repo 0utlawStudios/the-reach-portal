@@ -33,6 +33,7 @@ vi.mock("@/lib/google-drive", () => ({
 import { POST } from "../route";
 
 const originalServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const originalUploadSecret = process.env.DRIVE_UPLOAD_SESSION_SECRET;
 
 function makeRequest(body: Record<string, unknown>) {
   return {
@@ -44,6 +45,7 @@ function makeRequest(body: Record<string, unknown>) {
 beforeEach(() => {
   vi.clearAllMocks();
   process.env.SUPABASE_SERVICE_ROLE_KEY = "test-upload-session-secret";
+  process.env.DRIVE_UPLOAD_SESSION_SECRET = "test-upload-session-secret";
   authMocks.requireBearerTeamRole.mockResolvedValue({
     user: { id: "user-1" },
     email: "creator@example.com",
@@ -60,6 +62,8 @@ beforeEach(() => {
 afterEach(() => {
   if (originalServiceKey === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
   else process.env.SUPABASE_SERVICE_ROLE_KEY = originalServiceKey;
+  if (originalUploadSecret === undefined) delete process.env.DRIVE_UPLOAD_SESSION_SECRET;
+  else process.env.DRIVE_UPLOAD_SESSION_SECRET = originalUploadSecret;
 });
 
 describe("POST /api/drive/upload", () => {
