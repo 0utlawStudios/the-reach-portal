@@ -2,10 +2,12 @@
 
 import { PreviewImage } from "@/components/preview-image";
 import { MediaVideo } from "@/components/media-video";
+import { OptimizedAvatar } from "@/components/optimized-avatar";
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { ContentCard, MediaAsset } from "@/lib/types";
 import { usePipeline } from "@/lib/pipeline-context";
 import { useAuth } from "@/lib/auth-context";
+import { useTeam } from "@/lib/team-context";
 import { useToast } from "@/lib/toast-context";
 import { supabase } from "@/lib/supabaseClient";
 import { ensureMediaAsset } from "@/lib/media-assets";
@@ -111,6 +113,15 @@ function mediaDisplayUrl(asset: Pick<MediaAsset, "url" | "driveProxyUrl" | "play
   return stripPrivateMediaToken(asset.playbackUrl || asset.driveProxyUrl || asset.url);
 }
 
+// Human-readable file size. Returns null for missing/zero so legacy rows render nothing
+// instead of "0 MB" (size_bytes only exists from migration 0052 and is null on old rows).
+function formatFileSize(bytes?: number): string | null {
+  if (!bytes || !Number.isFinite(bytes) || bytes <= 0) return null;
+  if (bytes >= 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
 function mediaVideoSources(asset: Pick<MediaAsset, "url" | "driveProxyUrl" | "playbackUrl">, previewFrame = false): string[] {
   const sources = [asset.playbackUrl, asset.driveProxyUrl, asset.url]
     .map((url) => stripPrivateMediaToken(url))
@@ -130,6 +141,21 @@ function absoluteAppUrl(url: string): string {
 export function MediaPage() {
   const { cards, workspaceId } = usePipeline();
   const { currentUser } = useAuth();
+  const { members } = useTeam();
+  // Map an asset's free-text "added by" name to that member's real profile photo.
+  // Best-effort: new uploads store currentUser.name, which matches a member exactly;
+  // legacy/seed names that don't match fall back to initials via OptimizedAvatar.
+  const memberAvatarByName = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const member of members) {
+      if (member.name && member.avatar) map.set(member.name.trim().toLowerCase(), member.avatar);
+    }
+    return map;
+  }, [members]);
+  const avatarForAddedBy = useCallback(
+    (addedBy?: string) => (addedBy ? memberAvatarByName.get(addedBy.trim().toLowerCase()) : undefined),
+    [memberAvatarByName],
+  );
   const { addToast } = useToast();
   const [media, setMedia] = useState<MediaAsset[]>([]);
   const [mediaLoadError, setMediaLoadError] = useState<string | null>(null);
@@ -831,12 +857,24 @@ export function MediaPage() {
                       </button>
                       <div className="p-2.5">
                         <p className="text-[11px] font-medium text-gray-700 dark:text-gray-300 truncate">{asset.name}</p>
+                        {formatFileSize(asset.size) && (
+                          <p className="text-[9px] text-gray-400 dark:text-gray-500 tabular-nums mt-0.5">{formatFileSize(asset.size)}</p>
+                        )}
                         <div className="flex items-center justify-between mt-1">
-                          <span className="text-[9px] text-gray-400 flex items-center gap-1">
-                            {asset.addedBy && <span className="w-4 h-4 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-[6px] font-bold text-white">{asset.addedBy[0]}</span>}
-                            {asset.addedBy}
+                          <span className="text-[9px] text-gray-400 flex items-center gap-1 min-w-0">
+                            {asset.addedBy && (
+                              <OptimizedAvatar
+                                src={avatarForAddedBy(asset.addedBy)}
+                                name={asset.addedBy}
+                                width={16}
+                                height={16}
+                                className="w-4 h-4 rounded-full object-cover shrink-0"
+                                fallbackClassName="w-4 h-4 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-[6px] font-bold text-white shrink-0"
+                              />
+                            )}
+                            <span className="truncate">{asset.addedBy}</span>
                           </span>
-                          <span className="text-[9px] text-gray-400">{formatDateShort(asset.uploadedAt)}</span>
+                          <span className="text-[9px] text-gray-400 shrink-0">{formatDateShort(asset.uploadedAt)}</span>
                         </div>
                       </div>
                     </div>
@@ -874,7 +912,12 @@ export function MediaPage() {
                               />
                             )}
                           </div>
-                          <p className="text-[11px] font-medium text-gray-700 dark:text-gray-300 min-w-0 break-words">{asset.name}</p>
+                          <div className="min-w-0">
+                            <p className="text-[11px] font-medium text-gray-700 dark:text-gray-300 break-words">{asset.name}</p>
+                            {formatFileSize(asset.size) && (
+                              <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5 tabular-nums">{formatFileSize(asset.size)}</p>
+                            )}
+                          </div>
                         </div>
                         <div className="flex items-center">
                           <Badge variant="outline" className={`text-[9px] h-[18px] px-1.5 ${asset.type === "video" ? "text-purple-600 border-purple-200 bg-purple-50 dark:bg-purple-500/10 dark:text-purple-400 dark:border-purple-500/20" : "text-blue-600 border-blue-200 bg-blue-50 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20"}`}>
@@ -903,7 +946,14 @@ export function MediaPage() {
                         <div className="flex items-center gap-1.5">
                           {asset.addedBy && (
                             <>
-                              <span className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-[7px] font-bold text-white shrink-0">{asset.addedBy[0]}</span>
+                              <OptimizedAvatar
+                                src={avatarForAddedBy(asset.addedBy)}
+                                name={asset.addedBy}
+                                width={20}
+                                height={20}
+                                className="w-5 h-5 rounded-full object-cover shrink-0"
+                                fallbackClassName="w-5 h-5 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-[7px] font-bold text-white shrink-0"
+                              />
                               <span className="text-[10px] text-gray-600 dark:text-gray-400 font-medium truncate">{asset.addedBy}</span>
                             </>
                           )}
