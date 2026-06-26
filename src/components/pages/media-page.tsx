@@ -174,6 +174,9 @@ export function MediaPage() {
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [lightboxAsset, setLightboxAsset] = useState<MediaAsset | null>(null);
+  // Videos in the lightbox start as a poster (click to play) so a large iPhone .mov no longer
+  // auto-spins a black box on open; the bytes load only when the user actually hits play.
+  const [lightboxVideoPlaying, setLightboxVideoPlaying] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadingFileName, setUploadingFileName] = useState("");
@@ -682,6 +685,11 @@ export function MediaPage() {
     }
   }, [filteredMedia, lightboxAsset, lightboxIndex]);
 
+  // Reset to the poster whenever the lightbox opens a different asset (open, prev/next, swipe).
+  useEffect(() => {
+    setLightboxVideoPlaying(false);
+  }, [lightboxAsset?.id]);
+
   useEffect(() => {
     if (!lightboxAsset) return;
     const idx = filteredMedia.findIndex((m) => m.id === lightboxAsset.id);
@@ -1010,8 +1018,22 @@ export function MediaPage() {
               <div className="flex-1 overflow-hidden bg-gray-50 dark:bg-black flex items-center justify-center p-4 relative group/lb" onTouchStart={onSwipeStart} onTouchEnd={onSwipeEnd}>
                 {lightboxAsset.type === "image" ? (
                   <PreviewImage src={mediaDisplayUrl(lightboxAsset)} alt={lightboxAsset.name} mimeType={lightboxAsset.mimeType} fileName={lightboxAsset.name} className="w-full h-[60vh] max-w-full max-h-[60vh] object-contain rounded-lg select-none" draggable={false} />
+                ) : lightboxVideoPlaying ? (
+                  <MediaVideo sources={mediaVideoSources(lightboxAsset)} controls autoPlay playsInline preload="auto" loadTimeoutMs={15000} className="max-w-full max-h-[60vh] object-contain rounded-lg bg-black" label={`${lightboxAsset.name} video preview`} />
                 ) : (
-                  <MediaVideo sources={mediaVideoSources(lightboxAsset)} controls playsInline preload="metadata" className="max-w-full max-h-[60vh] object-contain rounded-lg bg-black" label={`${lightboxAsset.name} video preview`} />
+                  <button
+                    type="button"
+                    onClick={() => setLightboxVideoPlaying(true)}
+                    aria-label={`Play ${lightboxAsset.name}`}
+                    className="relative w-full h-[60vh] max-w-full max-h-[60vh] flex items-center justify-center rounded-lg overflow-hidden bg-black cursor-pointer"
+                  >
+                    <PreviewImage src={videoPosterUrl(lightboxAsset)} alt={lightboxAsset.name} mimeType={lightboxAsset.mimeType} fileName={lightboxAsset.name} fallbackIcon="video" className="w-full h-full object-cover" />
+                    <span className="absolute inset-0 flex items-center justify-center">
+                      <span className="flex h-16 w-16 items-center justify-center rounded-full bg-black/55 backdrop-blur-sm ring-1 ring-white/20">
+                        <Play className="h-7 w-7 text-white fill-white translate-x-0.5" />
+                      </span>
+                    </span>
+                  </button>
                 )}
                 {hasPrev && (
                   <button onClick={() => setLightboxAsset(filteredMedia[lightboxIndex - 1])} className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/60 transition-all cursor-pointer shadow-lg opacity-70 md:opacity-0 md:group-hover/lb:opacity-100">
