@@ -747,6 +747,9 @@ export function MediaPage() {
         <button disabled={uploading} onClick={() => fileInputRef.current?.click()} className="reach-action-button hidden md:flex mt-2 w-full items-center justify-center gap-2 h-9 rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white text-[11px] font-medium cursor-pointer shadow-sm transition-all duration-200 disabled:opacity-40">
           <Upload className="w-3.5 h-3.5" />{uploading ? "Uploading..." : "Upload Files"}
         </button>
+        <p className="hidden md:block mt-1.5 px-0.5 text-[10px] leading-snug text-gray-400 dark:text-gray-500">
+          Filming on iPhone? Set Camera → Formats to <span className="font-medium text-gray-500 dark:text-gray-300">Most Compatible</span> so clips play instantly here.
+        </p>
       </div>
 
       {/* Main */}
