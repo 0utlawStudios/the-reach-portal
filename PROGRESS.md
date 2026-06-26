@@ -2,7 +2,7 @@
 
 updated-at: 2026-06-26T00:00:00+08:00
 
-phase: Slice A DONE; Slice B (session-token robustness) — NEXT
+phase: Slices A+B DONE; Slice C (500MB cap + rate-limit + zero-byte) — NEXT
 
 ## Root cause (live-proven, do not re-derive)
 - `GOOGLE_DRIVE_ROOT_FOLDER_ID=0ADZtEpKEV-CTUk9PVA` is a **Shared Drive** ("The Reach Portal
@@ -24,7 +24,7 @@ phase: Slice A DONE; Slice B (session-token robustness) — NEXT
 
 ## Slices (each: implement → test → build → commit → push to main)
 - [x] A. Truthful error taxonomy: `sessionInvalid` reason; chunk route returns it (logged+alerted); 403 no longer auto-"storageRejected". Tests: drive-errors.test.ts (new), drive-upload.test.ts regression, upload-chunk route.test.ts, upload-surfaces-static.test.ts. 514/514 pass, build OK.
-- [ ] B. Session-token robustness: TTL scoped to large/slow uploads; one-secret assertion.
+- [x] B. Session-token robustness: TTL 60min→12h (covers 500MB on a slow uplink); dropped fragile fileName/mimeType from the HMAC (non-ASCII filename header mangling can no longer cause a self-inflicted 403); workspace/user/uploadUri/folder/fileSize binding preserved + tested. 515/515 pass, build OK.
 - [ ] C. 500 MB cap (single constant) + chunk rate-limit lockstep + proxy zero-byte guard.
 - [ ] D. Persist real `status=…reason=…` + failing guard to `audit_log_v2`; success counter.
 - [ ] E. Remove broken impersonation no-op; switch Shared-Drive deletes to trash.

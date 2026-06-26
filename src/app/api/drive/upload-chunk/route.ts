@@ -102,8 +102,6 @@ export async function POST(request: NextRequest) {
       workspaceId: authContext.workspaceId,
       userId: user.id,
       folder,
-      fileName,
-      mimeType,
       fileSize,
     })) {
       // ROOT-CAUSE FIX: this is the 403 that production has been mislabeling as

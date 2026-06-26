@@ -1,15 +1,27 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { DriveFolderName } from "@/lib/drive-policy";
 
-const UPLOAD_SESSION_TOKEN_TTL_MS = 60 * 60 * 1000;
+// A resumable upload of the 500 MB ceiling on a slow uplink (~1 Mbps ≈ 67 min, worse
+// on hotel/mobile wifi) must not outlive its session token mid-stream — that expiry
+// surfaced as the chunk route's 403, which used to be mislabeled "Storage rejected the
+// upload." 12h comfortably covers the largest file on a pathological connection. The
+// token is tightly scoped (one Google session URI + one workspace/user/folder/size), so
+// the longer lifetime carries negligible risk. Google resumable sessions live ~1 week.
+const UPLOAD_SESSION_TOKEN_TTL_MS = 12 * 60 * 60 * 1000;
 
+// Signed fields are limited to values that CANNOT diverge between sign-time and
+// verify-time: workspaceId/userId come from the server auth context, uploadUri is
+// validated + URL-normalized identically on both sides, folder is a fixed enum, and
+// fileSize is an integer from the Content-Range total. fileName and mimeType are
+// deliberately NOT signed: they travel as the X-File-Name / Content-Type request
+// headers, and a non-ASCII filename (emoji, accents) mangles in transit so the HMAC
+// would never match — a self-inflicted, mislabeled 403. They add no security here
+// because the token is already bound to one specific Google session URI.
 type UploadSessionParts = {
   uploadUri: string;
   workspaceId: string;
   userId: string;
   folder: DriveFolderName;
-  fileName: string;
-  mimeType: string;
   fileSize: number;
 };
 
@@ -24,8 +36,6 @@ function uploadSessionPayload(parts: UploadSessionParts & { expiresAt: number })
     parts.workspaceId,
     parts.userId,
     parts.folder,
-    parts.fileName,
-    parts.mimeType,
     String(parts.fileSize),
     String(parts.expiresAt),
   ].join("\n");

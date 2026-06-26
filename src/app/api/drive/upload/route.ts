@@ -120,8 +120,6 @@ export async function POST(request: NextRequest) {
         workspaceId: authContext.workspaceId,
         userId: user.id,
         folder,
-        fileName,
-        mimeType,
         fileSize,
       }),
       isImage,

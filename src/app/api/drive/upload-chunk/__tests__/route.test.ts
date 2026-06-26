@@ -44,8 +44,6 @@ function uploadToken(overrides: Partial<Parameters<typeof signDriveUploadSession
     workspaceId,
     userId,
     folder: "media-library",
-    fileName: "hero.png",
-    mimeType: "image/png",
     fileSize: 4,
     ...overrides,
   });
