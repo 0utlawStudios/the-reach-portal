@@ -1,35 +1,29 @@
 # The Reach — Drive upload/delete hardening
 
-updated-at: 2026-06-27T02:54:00+08:00
+updated-at: 2026-06-27T03:00:00+08:00
 
 ## ▶ RESUME HERE (exact return point — read this first)
-**Active task:** "Quick wins now, decide transcode after" (user's chosen path for the video
-playback complaint). Two quick wins: (1) instant lightbox poster + click-to-play — SHIPPED
-`edd0200`; (2) honest Download/Open fallback on the unplayable video — **IN PROGRESS, code
-done + test green (8/8 in media-video.test.tsx), NOT yet committed.**
+**"Quick wins now, decide transcode after" — ALL THREE QUICK WINS SHIPPED + LIVE.** The video
+playback complaint's cheap fixes are done. Nothing in this lane is in-progress or uncommitted.
 
-**What is on disk right now, uncommitted:**
-- `src/components/media-video.tsx` — added `unavailableAction?: {label; onClick}` prop; the
-  "Video preview unavailable" fallback now renders an ExternalLink action button beside Retry.
-- `src/components/pages/media-page.tsx` — lightbox playing-branch MediaVideo passes
-  `unavailableAction={{ label: "Open in new tab", onClick: () => void openInNewTab(lightboxAsset) }}`.
-- `src/components/__tests__/media-video.test.tsx` — new test "offers the unavailable action…".
+Shipped this lane:
+1. Instant lightbox poster + click-to-play — `edd0200`.
+2. Honest "Open in new tab" fallback on an unplayable video (MediaVideo `unavailableAction`
+   prop + ExternalLink button beside Retry; lightbox wires it to `openInNewTab`) — `cf8be01`.
+   Test: media-video.test.tsx "offers the unavailable action…" (8/8 green).
+3. Jargon-free "record in iPhone Most Compatible" hint under the upload button — `129e075`.
 
-**Immediate next steps in order:**
-1. `npm run build` (load-bearing gate) + full `npx vitest run` → must be green.
-2. Commit + push to main (unavailableAction honest fallback). Solo repo, push straight to main.
-3. Then quick win #3: communicate "record in iPhone Most Compatible (H.264)" guidance (user
-   chose this); optional small UI hint. Then update Obsidian
-   `reference_reach_free_storage_architecture.md` + this PROGRESS with the new SHAs.
+**ONLY remaining item in the video saga is DEFERRED — do NOT build without an explicit user
+opt-in:** browser-side transcode pipeline (WebCodecs/ffmpeg.wasm → H.264+AAC faststart MP4 at
+upload) so big HEVC `.mov`s get a playable Supabase-CDN copy. Existing library `.mov`s can't be
+fixed free without re-upload. Constraints LOCKED: stay free (no GCS, no premium Supabase, no
+ffmpeg on Vercel), 500MB upload cap stays. If the user says go, that's the next build.
 
-**Deferred (awaits a later explicit user opt-in, do NOT build now):** browser-side transcode
-pipeline (WebCodecs/ffmpeg.wasm → H.264+AAC faststart MP4 at upload). Existing library `.mov`s
-can't be fixed free without re-upload. Constraints LOCKED: stay free (no GCS, no premium
-Supabase, no ffmpeg on Vercel), 500MB upload cap stays.
+If the user brings something NEW, start fresh from their message — this lane is closed.
 
 **This session's shipped SHAs (media/perf):** e44d0d5 batch-sign · 9a583ee column align+wrap ·
 08d6d35 file size + real avatars · 78231ad video poster thumbnails · edd0200 lightbox poster
-click-to-play. (unavailableAction = the next commit.)
+click-to-play · cf8be01 honest unavailable-action fallback · 129e075 Most-Compatible upload hint.
 
 phase: Session 3 IN PROGRESS — FREE-stack performance (Drive 60TB + Supabase free tier; GCS
 cancelled). Shipped: 4MB chunks + per-chunk auth hoist (44fe5f0); media-playback 700MB LRU cap
