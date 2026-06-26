@@ -128,7 +128,7 @@ describe("POST /api/drive/upload", () => {
       fileName: "huge.mp4",
       mimeType: "video/mp4",
       folder: "raw-files",
-      fileSize: 251 * 1024 * 1024,
+      fileSize: 501 * 1024 * 1024,
     }));
 
     expect(res.status).toBe(413);

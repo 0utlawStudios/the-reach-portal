@@ -123,6 +123,20 @@ describe("POST /api/drive/proxy-upload", () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
+  it("rejects a zero-byte upload before it can create a silent empty Drive file", async () => {
+    const empty = new File([], "empty.jpg", { type: "image/jpeg" });
+    const form = new FormData();
+    form.append("file", empty);
+    form.append("folder", "media-library");
+    form.append("fileName", "empty.jpg");
+    form.append("mimeType", "image/jpeg");
+
+    const res = await POST(makeRequest({ Authorization: "Bearer token" }, form));
+
+    expect(res.status).toBe(400);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
   it("marks this app's 60/min limiter as appRateLimited and does not call Drive", async () => {
     rateLimitMocks.consume.mockResolvedValueOnce({
       allowed: false,

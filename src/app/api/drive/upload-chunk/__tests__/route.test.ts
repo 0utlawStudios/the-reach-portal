@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DRIVE_RESUMABLE_CHUNK_SIZE } from "@/lib/drive-policy";
+import { DRIVE_RESUMABLE_CHUNK_SIZE, DRIVE_UPLOAD_CHUNK_RATE_LIMIT } from "@/lib/drive-policy";
 import { signDriveUploadSession } from "@/lib/drive-upload-session";
 
 const authMocks = vi.hoisted(() => ({
@@ -162,6 +162,19 @@ describe("POST /api/drive/upload-chunk", () => {
 
     expect(res.status).toBe(413);
     expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("sizes the chunk rate limit off the upload cap so a large file does not self-throttle", async () => {
+    await POST(makeRequest({ headers: { "x-upload-token": uploadToken({ fileSize: 8 }), "content-range": "bytes 0-3/8" } }));
+
+    expect(rateLimitMocks.consume).toHaveBeenCalledWith(
+      "drive-upload-chunk:user",
+      expect.any(String),
+      DRIVE_UPLOAD_CHUNK_RATE_LIMIT,
+      60,
+      expect.objectContaining({ onError: "deny" }),
+    );
+    expect(DRIVE_UPLOAD_CHUNK_RATE_LIMIT).toBeGreaterThanOrEqual(250);
   });
 
   it("forwards a chunk to Google and maps 308 to a same-origin incomplete response", async () => {

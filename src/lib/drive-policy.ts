@@ -54,7 +54,12 @@ export const ALLOWED_MEDIA_MIME_TYPES = new Set<string>([
   "application/x-figma",
 ]);
 
-export const MAX_DRIVE_MEDIA_FILE_SIZE = 250 * 1024 * 1024;
+// The ONE enforced upload ceiling. Every guard (client `uploadToDrive`, /api/drive/upload
+// session, /api/drive/upload-chunk, /api/drive/finalize, /api/drive/proxy-upload) reads
+// this single constant — do not introduce a second max-size number. Raised 250MB -> 500MB
+// to cover long iPhone/ProRes .mov clips. A 500MB file is 250 chunks of 2MB, which is why
+// the chunk-route rate limit is sized off this value (see DRIVE_UPLOAD_CHUNK_RATE_LIMIT).
+export const MAX_DRIVE_MEDIA_FILE_SIZE = 500 * 1024 * 1024;
 // The proxy path sends the whole file in one same-origin POST, so it MUST stay
 // under Vercel's ~4.5 MB serverless request-body limit. Files at or above this
 // route through the resumable (upload/upload-chunk) path instead. Do NOT raise
@@ -63,6 +68,19 @@ export const MAX_DRIVE_MEDIA_FILE_SIZE = 250 * 1024 * 1024;
 // can run (which the client cannot map to a friendly errorReason).
 export const MAX_DRIVE_PROXY_FILE_SIZE = 4 * 1024 * 1024;
 export const DRIVE_RESUMABLE_CHUNK_SIZE = 2 * 1024 * 1024;
+
+// Bounded-concurrency batch uploads run at most this many files at once
+// (uploadManyToDrive default). Kept here so the chunk rate limit can be derived
+// from it and never drift below what a real batch needs.
+export const DRIVE_BATCH_CONCURRENCY = 3;
+
+// A 500MB file is 250 sequential 2MB chunks, each a separate /api/drive/upload-chunk
+// request. The chunk-route rate limit MUST stay above what a legitimate batch can emit
+// in one window, or a large upload self-throttles into a 429 that the client (now)
+// reports as a session/storage failure. Sized as: one max-size file's chunks ×
+// (batch concurrency + 1 for in-place retry headroom) = 250 × 4 = 1000/min/user.
+export const DRIVE_UPLOAD_CHUNK_RATE_LIMIT =
+  Math.ceil(MAX_DRIVE_MEDIA_FILE_SIZE / DRIVE_RESUMABLE_CHUNK_SIZE) * (DRIVE_BATCH_CONCURRENCY + 1);
 
 const MIME_BY_EXTENSION: Record<string, string> = {
   jpg: "image/jpeg",

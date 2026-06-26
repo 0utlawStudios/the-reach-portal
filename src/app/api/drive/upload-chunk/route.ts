@@ -4,6 +4,7 @@ import { consume, getClientIp } from "@/lib/rate-limit";
 import {
   ALLOWED_DRIVE_UPLOAD_ROLES,
   DRIVE_RESUMABLE_CHUNK_SIZE,
+  DRIVE_UPLOAD_CHUNK_RATE_LIMIT,
   isAllowedDriveUploadForFolder,
   MAX_DRIVE_MEDIA_FILE_SIZE,
   normalizeDriveMimeType,
@@ -68,11 +69,13 @@ export async function POST(request: NextRequest) {
     authContext = auth;
     const { user } = auth;
 
-    // Chunked resumable uploads can legitimately create many requests per
-    // large file. 240/min supports several 20MB videos without letting a tab
-    // hammer this route indefinitely.
+    // Chunked resumable uploads legitimately create one request per 2MB chunk: a
+    // single 500MB file is 250 chunks, and a 3-file batch many more. The limit is
+    // derived from the size cap (DRIVE_UPLOAD_CHUNK_RATE_LIMIT) so a real large-file
+    // batch never self-throttles into a 429 — the bug the old fixed 240/min would
+    // reintroduce the moment the cap grew past ~480MB of concurrent chunks.
     const rlKey = `user:${user.id}|ip:${getClientIp(request)}`;
-    const rl = await consume("drive-upload-chunk:user", rlKey, 240, 60, { onError: "deny" });
+    const rl = await consume("drive-upload-chunk:user", rlKey, DRIVE_UPLOAD_CHUNK_RATE_LIMIT, 60, { onError: "deny" });
     if (!rl.allowed) {
       return jsonResponse(appRateLimitError(rl.resetAt), 429);
     }

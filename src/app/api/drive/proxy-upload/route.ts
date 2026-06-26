@@ -70,6 +70,13 @@ export async function POST(request: NextRequest) {
     if (!file || !(file instanceof File)) {
       return jsonResponse({ error: "No file provided" }, 400);
     }
+    // Reject zero-byte uploads here too. The client guards this, but a direct API
+    // call (e.g. a QA harness) could otherwise create a silent 0-byte "success"
+    // file in Drive — exactly the orphan seen in media-library. /api/drive/upload
+    // (resumable session) and /api/drive/finalize already reject size <= 0.
+    if (file.size === 0) {
+      return jsonResponse({ error: "Cannot upload an empty file." }, 400);
+    }
     if (!VALID_DRIVE_FOLDERS.includes(folder as typeof VALID_DRIVE_FOLDERS[number])) {
       return jsonResponse({ error: "Invalid folder" }, 400);
     }
