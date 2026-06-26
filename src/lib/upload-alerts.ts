@@ -147,6 +147,111 @@ function buildTelegramText(alert: UploadFailureAlert): string {
   return lines.filter(Boolean).join("\n");
 }
 
+// ─── Success notifications ───────────────────────────────────────────────────
+// The owner wants visibility into EVERY upload in the app, not just failures, so a
+// completed upload pings the same email + Telegram targets. This is opt-OUT: set
+// UPLOAD_SUCCESS_NOTIFY=false to silence successes (e.g. if a large batch is too noisy)
+// while keeping failure alerts. Failures are unaffected by this flag.
+export interface UploadSuccessNotice {
+  workspaceId?: string | null;
+  fileName?: string | null;
+  folder?: string | null;
+  mimeType?: string | null;
+  fileSize?: number | null;
+  uploadPath?: UploadAlertPath | null;
+  userId?: string | null;
+  userName?: string | null;
+  userEmail?: string | null;
+  occurredAt?: string | null;
+}
+
+function successNotifyEnabled(): boolean {
+  return process.env.UPLOAD_SUCCESS_NOTIFY !== "false";
+}
+
+function buildSuccessEmailHtml(n: UploadSuccessNotice): string {
+  const siteUrl = getSiteUrl();
+  const rows: Array<[string, unknown]> = [
+    ["When", n.occurredAt || new Date().toISOString()],
+    ["User", [n.userName, n.userEmail].filter(Boolean).join(" / ")],
+    ["Folder", n.folder || ""],
+    ["File", n.fileName || ""],
+    ["Type", n.mimeType || ""],
+    ["Size", formatBytes(n.fileSize)],
+    ["Path", n.uploadPath || "unknown"],
+    ["Workspace", n.workspaceId || ""],
+  ];
+  const rowsHtml = rows
+    .filter(([, v]) => v !== null && v !== undefined && String(v).trim() !== "")
+    .map(([label, v]) => `
+      <tr>
+        <td style="padding:7px 14px 7px 0;color:#6b7280;font-size:12px;font-weight:700;white-space:nowrap;vertical-align:top;">${esc(label)}</td>
+        <td style="padding:7px 0;color:#111827;font-size:12px;line-height:1.45;word-break:break-word;">${esc(truncate(v))}</td>
+      </tr>`)
+    .join("");
+  return `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:32px 16px;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <div style="max-width:680px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;">
+    <div style="background:#065f46;padding:22px 28px;">
+      <p style="margin:0;color:#a7f3d0;font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;">The Reach Upload Succeeded</p>
+      <h1 style="margin:6px 0 0;color:#fff;font-size:20px;line-height:1.25;">${esc(n.fileName || "Upload complete")}</h1>
+    </div>
+    <div style="padding:26px 28px;">
+      <p style="margin:0 0 18px;color:#111827;font-size:14px;line-height:1.6;">A file was uploaded to the Content Engine.</p>
+      <table style="border-collapse:collapse;width:100%;margin:0 0 22px;">${rowsHtml}</table>
+      <p style="margin:0;"><a href="${esc(siteUrl)}" style="display:inline-block;background:#065f46;color:#fff;text-decoration:none;padding:11px 18px;border-radius:8px;font-size:13px;font-weight:800;">Open The Reach</a></p>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+function buildSuccessTelegramText(n: UploadSuccessNotice): string {
+  const lines = [
+    "<b>The Reach upload succeeded</b>",
+    `File: ${tgEscape(n.fileName || "unknown")}`,
+    `User: ${tgEscape([n.userName, n.userEmail].filter(Boolean).join(" / ") || "unknown")}`,
+    `Folder: ${tgEscape(n.folder || "unknown")} (${tgEscape(n.uploadPath || "unknown")})`,
+    `Size: ${tgEscape(formatBytes(n.fileSize))}`,
+  ];
+  return lines.filter(Boolean).join("\n");
+}
+
+export async function notifyUploadSuccess(notice: UploadSuccessNotice): Promise<{ emailSent: boolean; telegramSent: boolean; skipped: boolean }> {
+  if (!successNotifyEnabled()) return { emailSent: false, telegramSent: false, skipped: true };
+  const n: UploadSuccessNotice = { ...notice, occurredAt: notice.occurredAt || new Date().toISOString() };
+
+  let emailSent = false;
+  const to = ownerEmail();
+  if (to && smtpReady()) {
+    try {
+      const result = await withTimeout(
+        getTransporter().sendMail({
+          from: getFromAddress(),
+          to,
+          subject: safeSubject(`The Reach upload: ${n.fileName || "complete"}`),
+          html: buildSuccessEmailHtml(n),
+        }),
+        10000,
+      );
+      emailSent = Boolean(result);
+    } catch (err) {
+      console.error("[upload-alerts] success email failed:", err instanceof Error ? err.message : err);
+    }
+  }
+
+  const telegramSent = await pingTelegram({
+    text: buildSuccessTelegramText(n),
+    threadUrl: getSiteUrl(),
+    buttonLabel: "Open The Reach",
+    chatId: process.env.UPLOAD_ALERT_TELEGRAM_CHAT_ID,
+  });
+
+  return { emailSent, telegramSent, skipped: false };
+}
+
 async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {

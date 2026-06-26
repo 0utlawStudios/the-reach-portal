@@ -11,10 +11,11 @@ vi.mock("@/lib/support/telegram", () => ({
   tgEscape: telegramMocks.tgEscape,
 }));
 
-import { notifyUploadFailure } from "@/lib/upload-alerts";
+import { notifyUploadFailure, notifyUploadSuccess } from "@/lib/upload-alerts";
 
 const SMTP_USER = process.env.SMTP_USER;
 const SMTP_PASS = process.env.SMTP_PASS;
+const SUCCESS_NOTIFY = process.env.UPLOAD_SUCCESS_NOTIFY;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -28,6 +29,7 @@ beforeEach(() => {
 afterEach(() => {
   if (SMTP_USER === undefined) delete process.env.SMTP_USER; else process.env.SMTP_USER = SMTP_USER;
   if (SMTP_PASS === undefined) delete process.env.SMTP_PASS; else process.env.SMTP_PASS = SMTP_PASS;
+  if (SUCCESS_NOTIFY === undefined) delete process.env.UPLOAD_SUCCESS_NOTIFY; else process.env.UPLOAD_SUCCESS_NOTIFY = SUCCESS_NOTIFY;
 });
 
 describe("notifyUploadFailure persistence", () => {
@@ -61,5 +63,34 @@ describe("notifyUploadFailure persistence", () => {
 
     expect(result.persisted).toBe(false);
     expect(auditMocks.recordServerUploadFailure).not.toHaveBeenCalled();
+  });
+});
+
+describe("notifyUploadSuccess (every-upload visibility)", () => {
+  it("pings Telegram with the uploader + file on a successful upload (default on)", async () => {
+    const result = await notifyUploadSuccess({
+      workspaceId: "00000000-0000-0000-0000-000000000001",
+      fileName: "Sunset Drone 4K.mov",
+      folder: "raw-files",
+      mimeType: "video/quicktime",
+      fileSize: 250 * 1024 * 1024,
+      uploadPath: "resumable",
+      userEmail: "creator@thereach.com",
+    });
+
+    expect(result.skipped).toBe(false);
+    expect(telegramMocks.pingTelegram).toHaveBeenCalledTimes(1);
+    const text = telegramMocks.pingTelegram.mock.calls[0][0].text as string;
+    expect(text).toContain("succeeded");
+    expect(text).toContain("Sunset Drone 4K.mov");
+    expect(text).toContain("creator@thereach.com");
+  });
+
+  it("is opt-out: UPLOAD_SUCCESS_NOTIFY=false silences successes (failures unaffected)", async () => {
+    process.env.UPLOAD_SUCCESS_NOTIFY = "false";
+    const result = await notifyUploadSuccess({ workspaceId: "00000000-0000-0000-0000-000000000001", fileName: "x.jpg" });
+
+    expect(result.skipped).toBe(true);
+    expect(telegramMocks.pingTelegram).not.toHaveBeenCalled();
   });
 });

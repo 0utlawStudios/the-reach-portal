@@ -1,5 +1,5 @@
 import { after } from "next/server";
-import { notifyUploadFailure, type UploadFailureAlert } from "@/lib/upload-alerts";
+import { notifyUploadFailure, notifyUploadSuccess, type UploadFailureAlert } from "@/lib/upload-alerts";
 import { recordUploadSuccess, type UploadSuccessAudit } from "@/lib/upload-audit";
 
 export function scheduleUploadFailureAlert(label: string, alert: UploadFailureAlert): void {
@@ -20,15 +20,16 @@ export function scheduleUploadFailureAlert(label: string, alert: UploadFailureAl
   }
 }
 
-// Records a completed upload to audit_log_v2 (parity counter for the failure events),
-// off the request's critical path so it never adds latency to the upload response.
+// Records a completed upload to audit_log_v2 (parity counter for the failure events) AND
+// pings the owner's email + Telegram so every upload in the app is visible, not just
+// failures (notifyUploadSuccess is opt-out via UPLOAD_SUCCESS_NOTIFY=false). Both run off
+// the request's critical path so they never add latency to the upload response.
 export function scheduleUploadSuccess(success: UploadSuccessAudit): void {
   const run = async () => {
-    try {
-      await recordUploadSuccess(success);
-    } catch (err) {
-      console.error("[upload-success] audit failed:", err);
-    }
+    await Promise.allSettled([
+      recordUploadSuccess(success).catch((err) => console.error("[upload-success] audit failed:", err)),
+      notifyUploadSuccess(success).catch((err) => console.error("[upload-success] notify failed:", err)),
+    ]);
   };
 
   try {

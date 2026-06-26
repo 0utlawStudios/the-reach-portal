@@ -19,6 +19,7 @@ const driveMocks = vi.hoisted(() => ({
 
 const alertMocks = vi.hoisted(() => ({
   notifyUploadFailure: vi.fn(),
+  notifyUploadSuccess: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/require", () => ({
@@ -40,6 +41,7 @@ vi.mock("@/lib/google-drive", () => ({
 
 vi.mock("@/lib/upload-alerts", () => ({
   notifyUploadFailure: alertMocks.notifyUploadFailure,
+  notifyUploadSuccess: alertMocks.notifyUploadSuccess,
 }));
 
 import { POST } from "../route";
@@ -77,6 +79,7 @@ beforeEach(() => {
     appProperties: { workspaceId: "00000000-0000-0000-0000-000000000001" },
   });
   alertMocks.notifyUploadFailure.mockResolvedValue({ emailSent: false, telegramSent: false });
+  alertMocks.notifyUploadSuccess.mockResolvedValue({ emailSent: false, telegramSent: false, skipped: false });
 });
 
 describe("POST /api/drive/finalize", () => {

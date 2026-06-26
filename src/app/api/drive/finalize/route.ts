@@ -114,6 +114,7 @@ export async function POST(request: NextRequest) {
       fileSize: meta.size,
       uploadPath: "resumable",
       userId: user.id,
+      userEmail: authContext.email,
     });
 
     return NextResponse.json({

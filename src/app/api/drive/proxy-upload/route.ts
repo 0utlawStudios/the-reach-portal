@@ -197,6 +197,7 @@ export async function POST(request: NextRequest) {
       fileSize: Number(driveFile.size || file.size),
       uploadPath: "proxy",
       userId: user.id,
+      userEmail: authContext.email,
     });
 
     return jsonResponse({

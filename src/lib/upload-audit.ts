@@ -111,6 +111,8 @@ export interface UploadSuccessAudit {
   fileSize?: number | null;
   uploadPath?: UploadAlertPath | null;
   userId?: string | null;
+  userName?: string | null;
+  userEmail?: string | null;
 }
 
 /** Persist a successful upload so failure rate has a denominator (parity counter). */
@@ -123,5 +125,6 @@ export async function recordUploadSuccess(input: UploadSuccessAudit): Promise<bo
     file_size: input.fileSize ?? null,
     upload_path: input.uploadPath || "unknown",
     user_id: input.userId || null,
+    user_email: input.userEmail || null,
   });
 }

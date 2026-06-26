@@ -22,6 +22,7 @@ const driveMocks = vi.hoisted(() => ({
 
 const alertMocks = vi.hoisted(() => ({
   notifyUploadFailure: vi.fn(),
+  notifyUploadSuccess: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/require", () => ({
@@ -43,6 +44,7 @@ vi.mock("@/lib/google-drive", () => ({
 
 vi.mock("@/lib/upload-alerts", () => ({
   notifyUploadFailure: alertMocks.notifyUploadFailure,
+  notifyUploadSuccess: alertMocks.notifyUploadSuccess,
 }));
 
 import { POST } from "../route";
@@ -93,6 +95,7 @@ beforeEach(() => {
   driveMocks.getStreamUrl.mockReturnValue("/api/drive/stream?id=file-1");
   driveMocks.getPublishStreamUrl.mockReturnValue("/api/drive/stream?id=file-1&token=publish");
   alertMocks.notifyUploadFailure.mockResolvedValue({ emailSent: false, telegramSent: false });
+  alertMocks.notifyUploadSuccess.mockResolvedValue({ emailSent: false, telegramSent: false, skipped: false });
   global.fetch = vi.fn(() => Promise.resolve(new Response(JSON.stringify({
     id: "file-1",
     mimeType: "image/jpeg",
