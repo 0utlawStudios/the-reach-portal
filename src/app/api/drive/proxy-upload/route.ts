@@ -16,7 +16,7 @@ import {
   normalizeDriveMimeType,
   VALID_DRIVE_FOLDERS,
 } from "@/lib/drive-policy";
-import { scheduleUploadFailureAlert } from "../upload-alert-scheduler";
+import { scheduleUploadFailureAlert, scheduleUploadSuccess } from "../upload-alert-scheduler";
 import {
   appRateLimitError,
   sanitizeGoogleDriveError,
@@ -186,6 +186,18 @@ export async function POST(request: NextRequest) {
 
     const driveProxyUrl = getStreamUrl(fileId, authContext.workspaceId);
     const publishUrl = getPublishStreamUrl(fileId, authContext.workspaceId);
+
+    // Parity counter: record the completed proxy upload (off the critical path).
+    scheduleUploadSuccess({
+      workspaceId: authContext.workspaceId,
+      fileId,
+      fileName: driveFileName,
+      folder,
+      mimeType,
+      fileSize: Number(driveFile.size || file.size),
+      uploadPath: "proxy",
+      userId: user.id,
+    });
 
     return jsonResponse({
       fileId,

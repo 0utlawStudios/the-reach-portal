@@ -10,7 +10,7 @@ import {
   normalizeDriveMimeType,
   VALID_DRIVE_FOLDERS,
 } from "@/lib/drive-policy";
-import { scheduleUploadFailureAlert } from "../upload-alert-scheduler";
+import { scheduleUploadFailureAlert, scheduleUploadSuccess } from "../upload-alert-scheduler";
 import {
   appRateLimitError,
   sanitizedDriveErrorDetail,
@@ -103,6 +103,18 @@ export async function POST(request: NextRequest) {
     // and works immediately without making the Drive file public.
     const proxyUrl = getStreamUrl(fileId, authContext.workspaceId);
     const publishUrl = getPublishStreamUrl(fileId, authContext.workspaceId);
+
+    // Parity counter: record the completed resumable upload (off the critical path).
+    scheduleUploadSuccess({
+      workspaceId: authContext.workspaceId,
+      fileId,
+      fileName: meta.name,
+      folder,
+      mimeType,
+      fileSize: meta.size,
+      uploadPath: "resumable",
+      userId: user.id,
+    });
 
     return NextResponse.json({
       fileId,

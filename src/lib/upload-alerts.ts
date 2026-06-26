@@ -7,6 +7,7 @@ import {
   safeSubject,
 } from "@/lib/email-utils";
 import { pingTelegram, tgEscape } from "@/lib/support/telegram";
+import { recordServerUploadFailure } from "@/lib/upload-audit";
 
 export type UploadAlertSource = "client" | "server";
 export type UploadAlertPath = "proxy" | "resumable" | "unknown";
@@ -157,7 +158,7 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null
   }
 }
 
-export async function notifyUploadFailure(alert: UploadFailureAlert): Promise<{ emailSent: boolean; telegramSent: boolean }> {
+export async function notifyUploadFailure(alert: UploadFailureAlert): Promise<{ emailSent: boolean; telegramSent: boolean; persisted: boolean }> {
   const normalized: UploadFailureAlert = {
     ...alert,
     occurredAt: alert.occurredAt || new Date().toISOString(),
@@ -191,5 +192,26 @@ export async function notifyUploadFailure(alert: UploadFailureAlert): Promise<{ 
     chatId: process.env.UPLOAD_ALERT_TELEGRAM_CHAT_ID,
   });
 
-  return { emailSent, telegramSent };
+  // Persist server-side failures to audit_log_v2 with the REAL status/reason detail so
+  // the cause is queryable later (email/Telegram are ephemeral). Client-reported
+  // failures are already audited by /api/drive/upload-failure, so skip those here to
+  // avoid double-logging. Best-effort: never let telemetry fail an alert.
+  let persisted = false;
+  if (alert.source === "server") {
+    persisted = await recordServerUploadFailure({
+      workspaceId: alert.workspaceId,
+      phase: alert.phase,
+      route: alert.route,
+      uploadPath: alert.uploadPath,
+      fileName: alert.fileName,
+      mimeType: alert.mimeType,
+      fileSize: alert.fileSize,
+      errorStatus: alert.errorStatus,
+      errorDetail: alert.errorDetail,
+      errorMessage: alert.errorMessage,
+      userId: alert.userId,
+    });
+  }
+
+  return { emailSent, telegramSent, persisted };
 }

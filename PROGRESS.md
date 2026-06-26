@@ -2,7 +2,7 @@
 
 updated-at: 2026-06-26T00:00:00+08:00
 
-phase: Slices A+B+C DONE; Slice D (telemetry persistence) — NEXT
+phase: Slices A-D DONE; Slice E (impersonation cleanup + delete-sync) — NEXT
 
 ## Root cause (live-proven, do not re-derive)
 - `GOOGLE_DRIVE_ROOT_FOLDER_ID=0ADZtEpKEV-CTUk9PVA` is a **Shared Drive** ("The Reach Portal
@@ -26,7 +26,7 @@ phase: Slices A+B+C DONE; Slice D (telemetry persistence) — NEXT
 - [x] A. Truthful error taxonomy: `sessionInvalid` reason; chunk route returns it (logged+alerted); 403 no longer auto-"storageRejected". Tests: drive-errors.test.ts (new), drive-upload.test.ts regression, upload-chunk route.test.ts, upload-surfaces-static.test.ts. 514/514 pass, build OK.
 - [x] B. Session-token robustness: TTL 60min→12h (covers 500MB on a slow uplink); dropped fragile fileName/mimeType from the HMAC (non-ASCII filename header mangling can no longer cause a self-inflicted 403); workspace/user/uploadUri/folder/fileSize binding preserved + tested. 515/515 pass, build OK.
 - [x] C. 500 MB cap (single constant); chunk rate limit now DERIVED from cap (DRIVE_UPLOAD_CHUNK_RATE_LIMIT=1000/min, was fixed 240 → a 500MB/250-chunk file would self-throttle); proxy zero-byte guard. Lockstep invariants tested. 518/518 pass, build OK.
-- [ ] D. Persist real `status=…reason=…` + failing guard to `audit_log_v2`; success counter.
+- [x] D. New src/lib/upload-audit.ts persists server failures (real status=…reason=… detail) + success parity events to audit_log_v2; wired via notifyUploadFailure (server-source only, no client double-log) + scheduleUploadSuccess in finalize & proxy. Caught+fixed a baseline-UUID guard bug (isValidUuid rejects the all-zeros workspace → would've dropped ALL telemetry). 524/524 pass, build OK.
 - [ ] E. Remove broken impersonation no-op; switch Shared-Drive deletes to trash.
 - [ ] F. AUDIT-thereach-upload.md + CHANGES-thereach-upload.md + final QA swarm.
 
