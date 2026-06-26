@@ -1,8 +1,8 @@
 # The Reach — Drive resumable upload hardening (true root cause)
 
-updated-at: 2026-06-26T15:05:00+08:00
+updated-at: 2026-06-26T15:13:00+08:00
 
-phase: Slices A-E DONE; Slice F (QA swarm + live verification + hardening pass) DONE; AUDIT doc — NEXT
+phase: COMPLETE. Slices A-E + F (QA swarm + hardening pass) + AUDIT gate DONE. Production-ready.
 
 ## Root cause (live-proven, do not re-derive)
 - `GOOGLE_DRIVE_ROOT_FOLDER_ID=0ADZtEpKEV-CTUk9PVA` is a **Shared Drive** ("The Reach Portal
@@ -42,7 +42,9 @@ phase: Slices A-E DONE; Slice F (QA swarm + live verification + hardening pass) 
   - P3 upload-audit: module-cached admin client + `clearTimeout` in `finally`.
   - P3 read-only folder lookup: new `getSubfolderId` replaces folder-creating `ensureSubfolder` in delete path.
   - Gap: added expired-token regression test (signs past expiry → verify false). 544/544 pass, build OK.
-- [ ] AUDIT-thereach-upload.md (read-only adversarial gate, P0-P3, file+line). Final commit = audit + PROGRESS only.
+- [x] AUDIT-thereach-upload.md (read-only adversarial gate): PASS, 0 unaddressed P0/P1; the
+  one P2 + all P3 resolved in b94d81f; 2 residual low-risk items accepted + documented.
+  Final live e2e on deployed b94d81f: PASS (2/2). Final commit = AUDIT + PROGRESS only.
 
 ## Deliverables
 - PLAN-thereach-upload.md, CHANGES-thereach-upload.md (committed), AUDIT-thereach-upload.md (next).
@@ -53,7 +55,9 @@ phase: Slices A-E DONE; Slice F (QA swarm + live verification + hardening pass) 
 - `npm run build` is the load-bearing gate (Next.js route-export checks) before every push.
 
 ## last commit SHA
-- baseline: 4583762 (before this task); A-E + docs: e3c8b24
+- baseline: 4583762 (before this task); A-E + docs: e3c8b24; hardening pass: b94d81f
+  (deployed READY to prod, live e2e PASS); AUDIT gate: this commit.
 
 ## next step
-- Commit + push the hardening pass (code + tests + this PROGRESS). Then write AUDIT-thereach-upload.md.
+- DONE. Production-ready. No open P0/P1. Residual (non-blocking): remove the no-op
+  GOOGLE_DRIVE_IMPERSONATE_EMAIL env from Vercel/.env.local (console chore).
