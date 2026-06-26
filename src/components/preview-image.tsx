@@ -74,6 +74,11 @@ export function PreviewImage({
   const missingOrFailed = !primarySrc || (primaryFailed && !canShowFallback);
   const showSpinner = !isLoaded && !canShowFallback;
   const effectiveLoading = loading || (wantsFullPreview ? "eager" : undefined);
+  // While the blurry thumbnail stands in for a still-loading full-resolution image, show a
+  // very light indeterminate bar at the TOP so the user reads it as "loading full resolution",
+  // not as permanently blurry media. Only on the expanded/full view (object-contain), never on
+  // grid thumbnails (object-cover load no separate full image).
+  const showFullResLoading = wantsFullPreview && canShowFallback && !isLoaded && !primaryFailed;
   const localHeicUnsupported =
     typeof primarySrc === "string" &&
     primarySrc.startsWith("blob:") &&
@@ -225,6 +230,19 @@ export function PreviewImage({
 
   return (
     <div className={`${className || ""} relative overflow-hidden bg-[#6C655A]/10 dark:bg-white/[0.03]`}>
+      {showFullResLoading && (
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 z-10 h-0.5 overflow-hidden bg-black/[0.06] dark:bg-white/10"
+          role="progressbar"
+          aria-label="Loading full resolution"
+          aria-busy="true"
+        >
+          <div
+            className="h-full w-1/4 rounded-full bg-[#975428]/80 dark:bg-white/70"
+            style={{ animation: "loadingbar 1.1s ease-in-out infinite" }}
+          />
+        </div>
+      )}
       {showSpinner && (
         <div className="absolute inset-0 flex items-center justify-center bg-[#f4f1ec]/95 text-[#975428] dark:bg-[#1b1c20]/95 dark:text-white/80" aria-hidden="true">
           <div className="h-8 w-8 rounded-full border-2 border-current/25 border-t-current animate-spin" />

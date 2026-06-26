@@ -195,4 +195,56 @@ describe("PreviewImage", () => {
     unmount();
     expect(revoke).toHaveBeenCalledTimes(1);
   });
+
+  it("shows a light top bar while the full resolution loads over the blurry thumbnail, then hides it", async () => {
+    vi.useFakeTimers();
+    const { container } = render(
+      <PreviewImage
+        src={`/api/drive/stream?id=${FILE_ID}&token=signed`}
+        mimeType="image/heic"
+        fileName="IMG_3748.HEIC"
+        alt="IMG_3748.HEIC"
+        className="w-full h-full object-contain"
+      />,
+    );
+
+    // Center-spinner phase (the blurry thumbnail has not loaded yet): no top full-res bar.
+    expect(container.querySelector('[role="progressbar"]')).toBeNull();
+
+    const thumb = Array.from(container.querySelectorAll("img"))[0];
+    await act(async () => {
+      fireEvent.load(thumb);
+    });
+
+    // Blurry thumbnail standing in, full resolution still loading -> the light top bar shows.
+    const bar = container.querySelector('[role="progressbar"]');
+    expect(bar).not.toBeNull();
+    expect(bar).toHaveAttribute("aria-label", "Loading full resolution");
+    const full = Array.from(container.querySelectorAll("img"))[1];
+    expect(full).toHaveAttribute("src", `/api/media/image-preview?id=${FILE_ID}&size=full`);
+
+    await act(async () => {
+      fireEvent.load(full);
+    });
+
+    // Full resolution loaded -> the bar is gone.
+    expect(container.querySelector('[role="progressbar"]')).toBeNull();
+  });
+
+  it("never shows the full-res bar on grid thumbnails (object-cover)", async () => {
+    const { container } = render(
+      <PreviewImage
+        src={`/api/drive/stream?id=${FILE_ID}&token=signed`}
+        mimeType="image/jpeg"
+        fileName="photo.jpg"
+        alt="photo.jpg"
+        className="w-full h-full object-cover"
+      />,
+    );
+    const thumb = container.querySelector("img")!;
+    await act(async () => {
+      fireEvent.load(thumb);
+    });
+    expect(container.querySelector('[role="progressbar"]')).toBeNull();
+  });
 });

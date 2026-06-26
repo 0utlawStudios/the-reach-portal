@@ -960,6 +960,12 @@ html:not(.dark) .group:hover .reach-copy-icon {
   50% { opacity: 0.5; transform: scale(1.5); }
 }
 
+/* Indeterminate top loading bar (full-resolution media load indicator) */
+@keyframes loadingbar {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(420%); }
+}
+
 /* Scrollbar — subtle for white theme */
 ::-webkit-scrollbar {
   width: 5px;
