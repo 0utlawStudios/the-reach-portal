@@ -22,16 +22,17 @@ describe("Drive upload policy", () => {
 
   it("enforces one 500MB cap and a chunk rate limit that never self-throttles a max upload", () => {
     expect(MAX_DRIVE_MEDIA_FILE_SIZE).toBe(500 * 1024 * 1024);
-    // Chunk size must stay 256KB-aligned (Google rejects non-256KB non-final chunks)
-    // and below Vercel's ~4.5MB body limit (the proxy ceiling).
+    // Chunk size must stay 256KB-aligned (Google rejects non-256KB non-final chunks).
+    // A resumable chunk is a RAW request body (no multipart overhead), so it may exceed the
+    // multipart proxy threshold while staying under Vercel's ~4.5MB request-body limit.
     expect(DRIVE_RESUMABLE_CHUNK_SIZE % (256 * 1024)).toBe(0);
     expect(MAX_DRIVE_PROXY_FILE_SIZE).toBeLessThan(4.5 * 1024 * 1024);
-    expect(DRIVE_RESUMABLE_CHUNK_SIZE).toBeLessThan(MAX_DRIVE_PROXY_FILE_SIZE);
+    expect(DRIVE_RESUMABLE_CHUNK_SIZE).toBeLessThan(4.5 * 1024 * 1024);
 
     // Lockstep invariant: the chunk limit must cover a full concurrent batch of
     // max-size uploads, or large files self-throttle into a 429.
     const chunksPerMaxFile = Math.ceil(MAX_DRIVE_MEDIA_FILE_SIZE / DRIVE_RESUMABLE_CHUNK_SIZE);
-    expect(chunksPerMaxFile).toBe(250);
+    expect(chunksPerMaxFile).toBe(125);
     expect(DRIVE_UPLOAD_CHUNK_RATE_LIMIT).toBeGreaterThanOrEqual(chunksPerMaxFile * DRIVE_BATCH_CONCURRENCY);
   });
 

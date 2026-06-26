@@ -758,14 +758,16 @@ describe("uploadManyToDrive", () => {
       stalledOnce: false,
     };
     installStallingChunkUploadMocks(run);
-    const largeVideo = new Uint8Array(4 * 1024 * 1024);
+    // 8 MB at a 4 MB chunk size = 2 chunks, so the test still exercises a NON-final chunk 1
+    // stalling + retrying in place and chunk 2 continuing on the SAME session.
+    const largeVideo = new Uint8Array(8 * 1024 * 1024);
 
     const pending = uploadManyToDrive([
       new File([largeVideo], "stalled.mp4", { type: "video/mp4" }),
     ], "raw-files");
 
     await waitForChunkSends(run, 1);
-    expect(run.chunkRanges).toEqual(["bytes 0-2097151/4194304"]);
+    expect(run.chunkRanges).toEqual(["bytes 0-4194303/8388608"]);
 
     await vi.advanceTimersByTimeAsync(30_000);
     await flushPromises();
@@ -782,8 +784,8 @@ describe("uploadManyToDrive", () => {
     expect(results[0].result?.fileId).toBe("drive-stalled.mp4");
     expect(run.sessionRequests).toEqual(["stalled.mp4"]);
     expect(run.chunkRanges.slice(0, 2)).toEqual([
-      "bytes 0-2097151/4194304",
-      "bytes 0-2097151/4194304",
+      "bytes 0-4194303/8388608",
+      "bytes 0-4194303/8388608",
     ]);
     expect(new Set(run.chunkUploadUris.slice(0, 2)).size).toBe(1);
     expect(run.finalizeRequests).toEqual(["drive-stalled.mp4:raw-files"]);

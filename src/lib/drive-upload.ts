@@ -670,17 +670,24 @@ async function putToGoogle(
   workspaceId: string | undefined,
   onProgress: ProgressCallback | undefined
 ): Promise<string> {
+  // Read the session JWT ONCE, then re-read it only every TOKEN_REFRESH_INTERVAL_MS. supabase-js
+  // auto-refreshes the token in the background, so a periodic re-read keeps even a multi-hour upload
+  // alive WITHOUT paying a getSession() round trip (and its auth-lock contention under concurrent
+  // batch uploads) on every single chunk — which on a 125-chunk 500 MB file dropped up to 124
+  // redundant auth reads per file. The interval is far inside the ~1 h JWT lifetime, so the token
+  // can never go stale mid-stream.
+  const TOKEN_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
   let accessToken = await getAccessTokenFromCurrentSession();
+  let tokenReadAtMs = Date.now();
   for (let start = 0; start < file.size; start += DRIVE_RESUMABLE_CHUNK_SIZE) {
-    // Refresh the Bearer before each chunk so a long upload (a 500 MB file on a slow uplink
-    // can run >1 h, past the ~1 h Supabase JWT) never dies on an expired token mid-stream.
-    // getSession() auto-refreshes; keep the last good token if a refresh read momentarily
-    // hiccups, so a transient getSession blip can't fail an otherwise-healthy upload.
-    try {
-      const refreshed = await getAccessTokenFromCurrentSession();
-      if (refreshed) accessToken = refreshed;
-    } catch {
-      /* keep the last good token */
+    if (Date.now() - tokenReadAtMs > TOKEN_REFRESH_INTERVAL_MS) {
+      try {
+        const refreshed = await getAccessTokenFromCurrentSession();
+        if (refreshed) accessToken = refreshed;
+        tokenReadAtMs = Date.now();
+      } catch {
+        /* keep the last good token; the session refresh hiccupped, not the upload */
+      }
     }
     const end = Math.min(start + DRIVE_RESUMABLE_CHUNK_SIZE, file.size) - 1;
 	    const result = await putResumableChunkWithRetry(file, session, folder, accessToken, workspaceId, start, end, onProgress);

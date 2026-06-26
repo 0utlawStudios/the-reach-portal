@@ -67,18 +67,26 @@ export const MAX_DRIVE_MEDIA_FILE_SIZE = 500 * 1024 * 1024;
 // Vercel rejects the body with an opaque 413 before the route's own size check
 // can run (which the client cannot map to a friendly errorReason).
 export const MAX_DRIVE_PROXY_FILE_SIZE = 4 * 1024 * 1024;
-export const DRIVE_RESUMABLE_CHUNK_SIZE = 2 * 1024 * 1024;
+// 4 MB raw chunk = 16 × 256KB. Google requires non-final resumable chunks to be 256KB-aligned,
+// and the chunk is sent as a RAW request body (no multipart overhead), so it can be larger than
+// the multipart proxy threshold while staying a safe ~512KB under Vercel's ~4.5MB body limit.
+// Doubled from 2MB so a 500MB file is 125 chunks instead of 250 — HALVING the per-chunk server
+// round-trips (bearer auth verify + rate-limit read + HMAC verify + Google PUT setup) that
+// dominate wall-clock. Large uploads here are latency-bound (sequential chunks through a proxy),
+// not bandwidth-bound, so fewer, bigger chunks is the biggest in-place speedup. The true fix is a
+// direct-to-storage path with no proxy (see PLAN-thereach-performance.md, Phase B / GCS).
+export const DRIVE_RESUMABLE_CHUNK_SIZE = 4 * 1024 * 1024;
 
 // Bounded-concurrency batch uploads run at most this many files at once
 // (uploadManyToDrive default). Kept here so the chunk rate limit can be derived
 // from it and never drift below what a real batch needs.
 export const DRIVE_BATCH_CONCURRENCY = 3;
 
-// A 500MB file is 250 sequential 2MB chunks, each a separate /api/drive/upload-chunk
+// A 500MB file is 125 sequential 4MB chunks, each a separate /api/drive/upload-chunk
 // request. The chunk-route rate limit MUST stay above what a legitimate batch can emit
 // in one window, or a large upload self-throttles into a 429 that the client (now)
 // reports as a session/storage failure. Sized as: one max-size file's chunks ×
-// (batch concurrency + 1 for in-place retry headroom) = 250 × 4 = 1000/min/user.
+// (batch concurrency + 1 for in-place retry headroom) = 125 × 4 = 500/min/user.
 export const DRIVE_UPLOAD_CHUNK_RATE_LIMIT =
   Math.ceil(MAX_DRIVE_MEDIA_FILE_SIZE / DRIVE_RESUMABLE_CHUNK_SIZE) * (DRIVE_BATCH_CONCURRENCY + 1);
 
