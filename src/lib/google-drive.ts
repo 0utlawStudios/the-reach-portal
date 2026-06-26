@@ -23,6 +23,13 @@ function getCredentials() {
   return JSON.parse(json);
 }
 
+// NOTE on impersonation: GOOGLE_DRIVE_ROOT_FOLDER_ID is a SHARED DRIVE ("The Reach
+// Portal Media"), so the service account owns files there directly without consuming
+// any personal Drive quota — domain-wide delegation is NOT needed and is NOT used.
+// The GOOGLE_DRIVE_IMPERSONATE_EMAIL env var is a deprecated no-op: nothing reads it,
+// and the SA is not configured for delegation (a `subject` mint fails). Do not wire it
+// up. It should be removed from Vercel / .env.local. Every Drive call below passes
+// supportsAllDrives=true because the target is a Shared Drive.
 function getAuth(): GoogleAuth {
   if (!_auth) {
     _auth = new GoogleAuth({
@@ -229,6 +236,51 @@ export async function setPublicPermission(fileId: string): Promise<void> {
   if (!res.ok) {
     const err = await res.text();
     throw new Error(`Failed to set permission: ${sanitizedDriveErrorDetail(sanitizeGoogleDriveError(res.status, err), res.status)}`);
+  }
+}
+
+// ─── Deletion (TRASH only — the SA has canTrash:true, canDelete:false on the Shared
+// Drive, so a permanent DELETE 404s). These back the fail-closed delete-media route. ───
+
+// Removes every public `anyone` permission from a file (so a trashed asset stops being
+// publicly reachable). Returns how many were removed. Idempotent: no `anyone` grant -> 0.
+export async function removePublicPermissions(fileId: string): Promise<number> {
+  const listRes = await driveFetch(
+    `${DRIVE_API}/files/${fileId}/permissions?fields=permissions(id,type)&supportsAllDrives=true`,
+  );
+  if (!listRes.ok) {
+    const err = await listRes.text();
+    throw new Error(`Failed to list permissions: ${sanitizedDriveErrorDetail(sanitizeGoogleDriveError(listRes.status, err), listRes.status)}`);
+  }
+  const data = await listRes.json();
+  const permissions: Array<{ id?: string; type?: string }> = Array.isArray(data.permissions) ? data.permissions : [];
+  const anyonePerms = permissions.filter((p) => p.type === "anyone" && typeof p.id === "string");
+  let removed = 0;
+  for (const perm of anyonePerms) {
+    const delRes = await driveFetch(`${DRIVE_API}/files/${fileId}/permissions/${perm.id}?supportsAllDrives=true`, {
+      method: "DELETE",
+    });
+    if (!delRes.ok) {
+      const err = await delRes.text();
+      throw new Error(`Failed to remove public permission: ${sanitizedDriveErrorDetail(sanitizeGoogleDriveError(delRes.status, err), delRes.status)}`);
+    }
+    removed += 1;
+  }
+  return removed;
+}
+
+// Moves a Shared-Drive file to trash. Uses PATCH { trashed:true } (canTrash:true),
+// never a permanent DELETE (canDelete:false on the Shared Drive -> 404). The file
+// leaves active Drive visibility but is recoverable, matching the delete-sync policy.
+export async function trashDriveFile(fileId: string): Promise<void> {
+  const res = await driveFetch(`${DRIVE_API}/files/${fileId}?supportsAllDrives=true`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ trashed: true }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Failed to trash file: ${sanitizedDriveErrorDetail(sanitizeGoogleDriveError(res.status, err), res.status)}`);
   }
 }
 
