@@ -2,8 +2,10 @@
 
 updated-at: 2026-06-26T18:40:00+08:00
 
-phase: Session 3 IN PROGRESS — upload speed + thumbnail load performance. Phase A core
-shipped: 4MB chunks + per-chunk auth hoist (this commit). Plan: PLAN-thereach-performance.md.
+phase: Session 3 IN PROGRESS — FREE-stack performance (Drive 60TB + Supabase free tier; GCS
+cancelled). Shipped: 4MB chunks + per-chunk auth hoist (44fe5f0); media-playback 700MB LRU cap
+(stay-free guarantee). Next: thumbnail efficiency (stable URL + edge cache + batch sign +
+virtualize grid). Plan: PLAN-thereach-performance.md.
 
 phase (prior): Session 2 COMPLETE. staleClient root cause fixed + 31-agent QA swarm (1 P1 + 12 P3)
 + P1 data-loss fix + every-upload notifications. All shipped to main + live-verified.

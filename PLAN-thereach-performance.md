@@ -156,7 +156,7 @@ Result: large uploads at the free ceiling (~30-45 min for a 4GB batch), grid sto
 ### Phase B — instant grid for free (the durable win, replaces the GCS migration)
 8. **T1** — stable thumbnail URL (kill the per-request token).
 9. **T3** — edge-cache the thumbnail response (`s-maxage`), needs T1.
-10. **Cap `media-playback`** at a 700 MB budget with least-recently-played eviction and Drive-stream fallback.
+10. **Cap `media-playback`** at a 700 MB budget with least-recently-played eviction and Drive-stream fallback. — **SHIPPED** (`src/lib/media-playback-budget.ts`, enforced in `playback-upload/route.ts`). Fail-open; an evicted copy clears `playback_url` so the asset resolves to its Drive stream.
 
 Result: repeat and new-device thumbnail loads served from the edge, the grid feels instant like the comparison portal, and Supabase storage and egress stay safely inside the free tier forever. No migration, no new bill.
 

@@ -4,6 +4,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { requireBearerTeamRole } from "@/lib/auth/require";
 import { ALLOWED_DRIVE_UPLOAD_ROLES, normalizeDriveMimeType } from "@/lib/drive-policy";
 import { MAX_PLAYBACK_VIDEO_FILE_SIZE, PLAYBACK_VIDEO_MIME_TYPES } from "@/lib/media-playback-policy";
+import { enforcePlaybackBudget } from "@/lib/media-playback-budget";
 import { consume, getClientIp } from "@/lib/rate-limit";
 import {
   appRateLimitError,
@@ -143,6 +144,18 @@ export async function POST(request: NextRequest) {
 
     const admin = createAdminClient();
     await ensurePlaybackBucket(admin);
+
+    // Keep the shared 1 GB free-tier Storage pool from overflowing: evict the oldest
+    // (least-recently-played) playback copies before reserving room for this one. Best-
+    // effort and fail-open — a budget hiccup must never block the upload itself.
+    try {
+      const budget = await enforcePlaybackBudget(admin, fileSize);
+      if (budget.evicted > 0) {
+        console.log(`[media/playback-upload] evicted ${budget.evicted} playback copies (${(budget.freedBytes / (1024 * 1024)).toFixed(0)}MB freed) to stay under the free-tier budget`);
+      }
+    } catch (budgetErr) {
+      console.error("[media/playback-upload] budget enforcement skipped:", budgetErr instanceof Error ? budgetErr.message : budgetErr);
+    }
 
     const ext = extensionFor(mimeType);
     const baseName = safeSegment(fileName.replace(/\.[^.]+$/, ""));
