@@ -846,7 +846,7 @@ export function MediaPage() {
             ) : (
               <div className="overflow-x-auto -mx-4 px-4">
                 <div className="bg-white dark:bg-[#151518] rounded-xl border border-gray-100 dark:border-white/[0.06] overflow-hidden shadow-sm min-w-[760px]">
-                  <div className="grid grid-cols-[1fr_80px_100px_130px_80px_140px] gap-2 px-4 py-2.5 border-b border-gray-100 dark:border-white/[0.06] text-[9px] font-bold text-gray-400 uppercase tracking-wider">
+                  <div className="grid grid-cols-[minmax(0,1fr)_80px_100px_130px_80px_140px] items-center gap-2 px-4 py-2.5 border-b border-gray-100 dark:border-white/[0.06] text-[9px] font-bold text-gray-400 uppercase tracking-wider">
                     <div>File</div><div>Type</div><div>Folder</div><div>Status</div><div>Added By</div><div>Timestamp</div>
                   </div>
                   {filteredMedia.map((asset) => {
@@ -854,8 +854,8 @@ export function MediaPage() {
                     const selected = selectedIds.has(asset.id);
                     return (
                       <div key={asset.id}
-                        className={`grid grid-cols-[1fr_80px_100px_130px_80px_140px] gap-2 px-4 py-2.5 border-b border-gray-50 dark:border-white/[0.03] last:border-0 hover:bg-slate-50 dark:hover:bg-white/[0.02] cursor-pointer transition-all duration-150 ${selected ? "bg-blue-50/50 dark:bg-blue-500/5" : ""}`}>
-                        <div className="flex items-center gap-2.5" onClick={() => setLightboxAsset(asset)}>
+                        className={`grid grid-cols-[minmax(0,1fr)_80px_100px_130px_80px_140px] items-center gap-2 px-4 py-2.5 border-b border-gray-50 dark:border-white/[0.03] last:border-0 hover:bg-slate-50 dark:hover:bg-white/[0.02] cursor-pointer transition-all duration-150 ${selected ? "bg-blue-50/50 dark:bg-blue-500/5" : ""}`}>
+                        <div className="flex items-center gap-2.5 min-w-0" onClick={() => setLightboxAsset(asset)}>
                           <button onClick={(e) => { e.stopPropagation(); toggleSelect(asset.id); }}
                             className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all duration-200 ${selected ? "bg-blue-500 border-blue-500" : "border-gray-300 dark:border-gray-600 hover:border-blue-400"}`}>
                             {selected && <CheckCircle className="w-3 h-3 text-white" />}
@@ -874,7 +874,7 @@ export function MediaPage() {
                               />
                             )}
                           </div>
-                          <p className="text-[11px] font-medium text-gray-700 dark:text-gray-300 truncate">{asset.name}</p>
+                          <p className="text-[11px] font-medium text-gray-700 dark:text-gray-300 min-w-0 break-words">{asset.name}</p>
                         </div>
                         <div className="flex items-center">
                           <Badge variant="outline" className={`text-[9px] h-[18px] px-1.5 ${asset.type === "video" ? "text-purple-600 border-purple-200 bg-purple-50 dark:bg-purple-500/10 dark:text-purple-400 dark:border-purple-500/20" : "text-blue-600 border-blue-200 bg-blue-50 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20"}`}>
