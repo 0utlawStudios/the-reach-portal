@@ -49,7 +49,10 @@ describe("Drive route security contracts", () => {
     expect(DRIVE_FINALIZE_SRC).not.toContain("VALID_DRIVE_FOLDERS.map");
     expect(DRIVE_FINALIZE_SRC).toContain("isAllowedDriveMediaMime(mimeType)");
     expect(DRIVE_FINALIZE_SRC).toContain("meta.size > MAX_DRIVE_MEDIA_FILE_SIZE");
-    expect(GOOGLE_DRIVE_SRC).toContain("fields=id,name,mimeType,size,parents,appProperties");
+    // The metadata field set (shared by getFileMetadata + getFileMetadataOrNull via
+    // fields=${FILE_METADATA_FIELDS}) MUST include parents + appProperties — the finalize
+    // and delete routes verify the file's folder and workspace from exactly those fields.
+    expect(GOOGLE_DRIVE_SRC).toContain('FILE_METADATA_FIELDS = "id,name,mimeType,size,parents,appProperties,thumbnailLink"');
     expect(DRIVE_FINALIZE_SRC).toContain("meta.appProperties?.workspaceId");
     expect(DRIVE_FINALIZE_SRC).toContain("getStreamUrl(fileId, authContext.workspaceId)");
   });

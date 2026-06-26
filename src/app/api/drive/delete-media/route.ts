@@ -3,9 +3,9 @@ import { createClient } from "@supabase/supabase-js";
 import { requireBearerTeamRole } from "@/lib/auth/require";
 import { consume, getClientIp } from "@/lib/rate-limit";
 import {
-  ensureSubfolder,
-  getFileMetadata,
+  getFileMetadataOrNull,
   getRootFolderId,
+  getSubfolderId,
   removePublicPermissions,
   trashDriveFile,
 } from "@/lib/google-drive";
@@ -16,6 +16,12 @@ import { isValidUuid } from "@/lib/utils";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
+
+// Each asset costs up to 3 sequential Drive calls (metadata + strip-public + trash). Cap
+// the per-request batch so a single (authenticated) call cannot exhaust the 60s function
+// budget or trip Drive rate limits. Overflow ids are returned as explicit "failed"
+// results (NOT silently dropped) so the UI restores them and the user retries in batches.
+const MAX_DELETE_BATCH = 25;
 
 type DeleteStatus = "deleted" | "failed";
 interface DeleteResult {
@@ -71,12 +77,15 @@ export async function POST(request: NextRequest) {
     }
 
     const rawIds = Array.isArray(body.mediaAssetIds) ? body.mediaAssetIds : [];
-    const requestedIds = Array.from(
+    const validIds = Array.from(
       new Set(rawIds.filter((id): id is string => typeof id === "string" && isValidUuid(id))),
     );
-    if (requestedIds.length === 0) {
+    if (validIds.length === 0) {
       return NextResponse.json({ error: "No valid media asset IDs provided" }, { status: 400 });
     }
+    // Process at most MAX_DELETE_BATCH this call; overflow is reported as failed below.
+    const requestedIds = validIds.slice(0, MAX_DELETE_BATCH);
+    const overflowIds = validIds.slice(MAX_DELETE_BATCH);
 
     const admin = getAdminClient();
     // Workspace-scoped load: a caller can only ever act on their own workspace's rows.
@@ -99,13 +108,20 @@ export async function POST(request: NextRequest) {
     const allowedParentIds = new Set<string>();
     for (const folder of VALID_DRIVE_FOLDERS) {
       try {
-        allowedParentIds.add(await ensureSubfolder(folder, rootId));
+        // Read-only: never CREATE a folder from inside a delete path.
+        const folderId = await getSubfolderId(folder, rootId);
+        if (folderId) allowedParentIds.add(folderId);
       } catch (err) {
         console.error(`[drive/delete-media] could not resolve folder ${folder}:`, err instanceof Error ? err.message : err);
       }
     }
 
     const results: DeleteResult[] = [];
+
+    // Overflow beyond MAX_DELETE_BATCH -> failed (explicit, not dropped) so the UI restores.
+    for (const id of overflowIds) {
+      results.push({ mediaAssetId: id, driveFileId: null, status: "failed", error: `Too many items selected; delete in batches of ${MAX_DELETE_BATCH}` });
+    }
 
     // Requested-but-not-found (wrong workspace / already gone) -> failed so the UI restores.
     for (const id of requestedIds) {
@@ -121,21 +137,25 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      // Fail-closed: keep the DB row unless EVERY Drive step succeeds.
+      // Fail-closed: keep the DB row unless EVERY Drive step succeeds — EXCEPT when the
+      // file is already gone from Drive (metadata null = HTTP 404), in which case there is
+      // nothing to trash and we fall through to delete the stale row (no eternal orphan).
       try {
-        const meta = await getFileMetadata(fileId);
-        const inAppFolder = meta.parents.some((p) => allowedParentIds.has(p));
-        if (!inAppFolder) {
-          results.push({ mediaAssetId: row.id, driveFileId: fileId, status: "failed", error: "File is not in an app-managed Drive folder" });
-          continue;
-        }
-        if (meta.appProperties?.workspaceId && meta.appProperties.workspaceId !== workspaceId) {
-          results.push({ mediaAssetId: row.id, driveFileId: fileId, status: "failed", error: "File does not belong to this workspace" });
-          continue;
-        }
+        const meta = await getFileMetadataOrNull(fileId);
+        if (meta) {
+          const inAppFolder = meta.parents.some((p) => allowedParentIds.has(p));
+          if (!inAppFolder) {
+            results.push({ mediaAssetId: row.id, driveFileId: fileId, status: "failed", error: "File is not in an app-managed Drive folder" });
+            continue;
+          }
+          if (meta.appProperties?.workspaceId && meta.appProperties.workspaceId !== workspaceId) {
+            results.push({ mediaAssetId: row.id, driveFileId: fileId, status: "failed", error: "File does not belong to this workspace" });
+            continue;
+          }
 
-        await removePublicPermissions(fileId);
-        await trashDriveFile(fileId);
+          await removePublicPermissions(fileId);
+          await trashDriveFile(fileId);
+        }
       } catch (err) {
         console.error("[drive/delete-media] Drive cleanup failed:", err instanceof Error ? err.message : err);
         results.push({ mediaAssetId: row.id, driveFileId: fileId, status: "failed", error: "Drive cleanup failed; asset kept" });

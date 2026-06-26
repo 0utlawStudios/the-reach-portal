@@ -9,7 +9,12 @@ vi.mock("google-auth-library", () => ({
   },
 }));
 
-import { removePublicPermissions, trashDriveFile } from "@/lib/google-drive";
+import {
+  getFileMetadataOrNull,
+  getSubfolderId,
+  removePublicPermissions,
+  trashDriveFile,
+} from "@/lib/google-drive";
 import { extractDriveFileIdFromAppUrl } from "@/lib/drive-url-utils";
 
 const FILE_ID = "abcdefghijklmnopqrstuvwx"; // 24 chars, valid shape
@@ -58,6 +63,50 @@ describe("trashDriveFile", () => {
     expect(String(calls[0].body)).toContain('"trashed":true');
     // The SA cannot permanently delete on the Shared Drive — never issue DELETE on the file.
     expect(calls.some((c) => c.method === "DELETE")).toBe(false);
+  });
+});
+
+describe("getFileMetadataOrNull", () => {
+  it("returns null when Drive confirms the file is gone (404) so the row can be cleaned up", async () => {
+    global.fetch = vi.fn(async () => new Response("not found", { status: 404 })) as typeof fetch;
+    expect(await getFileMetadataOrNull(FILE_ID)).toBeNull();
+  });
+
+  it("still throws on a non-404 Drive error (stays fail-closed, keeps the row)", async () => {
+    global.fetch = vi.fn(async () => new Response("server boom", { status: 500 })) as typeof fetch;
+    await expect(getFileMetadataOrNull(FILE_ID)).rejects.toThrow();
+  });
+
+  it("maps the metadata on success", async () => {
+    global.fetch = vi.fn(async () => new Response(JSON.stringify({
+      id: FILE_ID, name: "clip.mov", mimeType: "video/quicktime", size: "120", parents: ["p1"], appProperties: { workspaceId: "w1" },
+    }), { status: 200 })) as typeof fetch;
+    const meta = await getFileMetadataOrNull(FILE_ID);
+    expect(meta).toMatchObject({ id: FILE_ID, parents: ["p1"], appProperties: { workspaceId: "w1" } });
+  });
+});
+
+describe("getSubfolderId (read-only)", () => {
+  it("returns the existing folder id and never issues a create (POST)", async () => {
+    const methods: string[] = [];
+    global.fetch = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+      methods.push(init?.method || "GET");
+      return new Response(JSON.stringify({ files: [{ id: "folder-1" }] }), { status: 200 });
+    }) as typeof fetch;
+
+    expect(await getSubfolderId("raw-files", "root-read-A")).toBe("folder-1");
+    expect(methods.some((m) => m === "POST")).toBe(false);
+  });
+
+  it("returns null when the folder does not exist (no folder is created)", async () => {
+    const methods: string[] = [];
+    global.fetch = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+      methods.push(init?.method || "GET");
+      return new Response(JSON.stringify({ files: [] }), { status: 200 });
+    }) as typeof fetch;
+
+    expect(await getSubfolderId("missing-folder", "root-read-B")).toBeNull();
+    expect(methods.some((m) => m === "POST")).toBe(false);
   });
 });
 

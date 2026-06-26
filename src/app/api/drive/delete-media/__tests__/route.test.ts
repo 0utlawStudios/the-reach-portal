@@ -5,8 +5,8 @@ const authMocks = vi.hoisted(() => ({ requireBearerTeamRole: vi.fn() }));
 const rateLimitMocks = vi.hoisted(() => ({ consume: vi.fn(), getClientIp: vi.fn() }));
 const driveMocks = vi.hoisted(() => ({
   getRootFolderId: vi.fn(),
-  ensureSubfolder: vi.fn(),
-  getFileMetadata: vi.fn(),
+  getSubfolderId: vi.fn(),
+  getFileMetadataOrNull: vi.fn(),
   removePublicPermissions: vi.fn(),
   trashDriveFile: vi.fn(),
 }));
@@ -22,8 +22,8 @@ vi.mock("@/lib/auth/require", () => ({ requireBearerTeamRole: authMocks.requireB
 vi.mock("@/lib/rate-limit", () => ({ consume: rateLimitMocks.consume, getClientIp: rateLimitMocks.getClientIp }));
 vi.mock("@/lib/google-drive", () => ({
   getRootFolderId: driveMocks.getRootFolderId,
-  ensureSubfolder: driveMocks.ensureSubfolder,
-  getFileMetadata: driveMocks.getFileMetadata,
+  getSubfolderId: driveMocks.getSubfolderId,
+  getFileMetadataOrNull: driveMocks.getFileMetadataOrNull,
   removePublicPermissions: driveMocks.removePublicPermissions,
   trashDriveFile: driveMocks.trashDriveFile,
 }));
@@ -78,8 +78,8 @@ beforeEach(() => {
   rateLimitMocks.getClientIp.mockReturnValue("1.2.3.4");
   rateLimitMocks.consume.mockResolvedValue({ allowed: true, remaining: 60, resetAt: new Date() });
   driveMocks.getRootFolderId.mockReturnValue("root");
-  driveMocks.ensureSubfolder.mockImplementation(async (folder: string) => `parent-${folder}`);
-  driveMocks.getFileMetadata.mockResolvedValue({ parents: ["parent-media-library"], appProperties: { workspaceId: WORKSPACE }, size: 10, name: "x", mimeType: "image/jpeg" });
+  driveMocks.getSubfolderId.mockImplementation(async (folder: string) => `parent-${folder}`);
+  driveMocks.getFileMetadataOrNull.mockResolvedValue({ parents: ["parent-media-library"], appProperties: { workspaceId: WORKSPACE }, size: 10, name: "x", mimeType: "image/jpeg" });
   driveMocks.removePublicPermissions.mockImplementation(async () => { order.push("removePerms"); return 1; });
   driveMocks.trashDriveFile.mockImplementation(async () => { order.push("trash"); });
   supabaseMocks.createClient.mockReturnValue({ from: () => makeBuilder() });
@@ -117,7 +117,7 @@ describe("POST /api/drive/delete-media", () => {
   });
 
   it("keeps the row when the Drive file is not in an app-managed folder", async () => {
-    driveMocks.getFileMetadata.mockResolvedValueOnce({ parents: ["some-other-folder"], appProperties: { workspaceId: WORKSPACE }, size: 10, name: "x", mimeType: "image/jpeg" });
+    driveMocks.getFileMetadataOrNull.mockResolvedValueOnce({ parents: ["some-other-folder"], appProperties: { workspaceId: WORKSPACE }, size: 10, name: "x", mimeType: "image/jpeg" });
     supabaseMocks.rows = [{ id: ASSET_A, url: `/api/drive/stream?id=${FILE_ID}`, drive_proxy_url: null, playback_url: null, folder: "media-library" }];
 
     const res = await POST(makeRequest([ASSET_A]));
@@ -126,6 +126,35 @@ describe("POST /api/drive/delete-media", () => {
     expect(data.results[0]).toMatchObject({ status: "failed" });
     expect(driveMocks.trashDriveFile).not.toHaveBeenCalled();
     expect(supabaseMocks.deletedIds).toEqual([]); // row kept (fail-closed)
+  });
+
+  it("deletes the stale DB row when the Drive file is already gone (404), instead of orphaning it forever", async () => {
+    // getFileMetadataOrNull returns null only on a confirmed Drive 404. Nothing to trash —
+    // the row must still be removed so the asset stops reappearing as an undeletable orphan.
+    driveMocks.getFileMetadataOrNull.mockResolvedValueOnce(null);
+    supabaseMocks.rows = [{ id: ASSET_A, url: `/api/drive/stream?id=${FILE_ID}`, drive_proxy_url: null, playback_url: null, folder: "media-library" }];
+
+    const res = await POST(makeRequest([ASSET_A]));
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.results).toEqual([{ mediaAssetId: ASSET_A, driveFileId: FILE_ID, status: "deleted" }]);
+    expect(driveMocks.trashDriveFile).not.toHaveBeenCalled();
+    expect(driveMocks.removePublicPermissions).not.toHaveBeenCalled();
+    expect(supabaseMocks.deletedIds).toEqual([ASSET_A]); // stale row cleaned up
+  });
+
+  it("caps the batch at MAX_DELETE_BATCH and reports overflow as failed (not silently dropped)", async () => {
+    const manyIds = Array.from({ length: 26 }, (_, i) => `000000${i.toString(16).padStart(2, "0")}-0000-4000-8000-000000000000`);
+    supabaseMocks.rows = []; // none loaded; focus is on the overflow accounting
+    const res = await POST(makeRequest(manyIds));
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    // Every id is accounted for: 25 processed (not-found here) + 1 overflow, none dropped.
+    expect(data.results).toHaveLength(26);
+    const overflow = data.results.filter((r: { error?: string }) => /batches of 25/.test(r.error || ""));
+    expect(overflow).toHaveLength(1);
   });
 
   it("keeps the row and does not lie when Drive trash fails", async () => {

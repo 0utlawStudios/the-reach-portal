@@ -207,8 +207,11 @@ export async function notifyUploadFailure(alert: UploadFailureAlert): Promise<{ 
       mimeType: alert.mimeType,
       fileSize: alert.fileSize,
       errorStatus: alert.errorStatus,
-      errorDetail: alert.errorDetail,
-      errorMessage: alert.errorMessage,
+      // Persist the REDACTED values (parity with email/Telegram). The detail strings are
+      // already structured/sanitized today, but routing the audit write through the same
+      // redact() keeps secrets out of audit_log_v2 even if a future caller passes raw text.
+      errorDetail: normalized.errorDetail,
+      errorMessage: normalized.errorMessage,
       userId: alert.userId,
     });
   }

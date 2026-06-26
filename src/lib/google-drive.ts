@@ -184,6 +184,32 @@ export async function ensureSubfolder(name: string, parentId: string): Promise<s
   }
 }
 
+// Read-only sibling of ensureSubfolder: looks the folder up but NEVER creates one.
+// Used by the delete path, which must not have the authority to mint Drive folders just
+// to resolve parent ids for a verification check. Returns null when the folder does not
+// exist; shares ensureSubfolder's cache. Throws only on a real Drive list error.
+export async function getSubfolderId(name: string, parentId: string): Promise<string | null> {
+  const cacheKey = `${parentId}/${name}`;
+  const cached = folderCache.get(cacheKey);
+  if (cached && Date.now() - cached.at < CACHE_TTL) return cached.id;
+
+  const q = encodeURIComponent(
+    `name='${name}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
+  );
+  const listRes = await driveFetch(`${DRIVE_API}/files?q=${q}&fields=files(id)&spaces=drive&supportsAllDrives=true&includeItemsFromAllDrives=true`);
+  if (!listRes.ok) {
+    const err = await listRes.text();
+    throw new Error(`Failed to list folders: ${sanitizedDriveErrorDetail(sanitizeGoogleDriveError(listRes.status, err), listRes.status)}`);
+  }
+  const listData = await listRes.json();
+  if (listData.files && listData.files.length > 0) {
+    const id = listData.files[0].id as string;
+    folderCache.set(cacheKey, { id, at: Date.now() });
+    return id;
+  }
+  return null;
+}
+
 // ─── Resumable upload session ───
 
 export async function createResumableUploadSession(
@@ -399,13 +425,9 @@ export function getPublishStreamUrl(fileId: string, workspaceId: string): string
 
 // ─── File metadata ───
 
-export async function getFileMetadata(fileId: string) {
-  const res = await driveFetch(`${DRIVE_API}/files/${fileId}?fields=id,name,mimeType,size,parents,appProperties,thumbnailLink&supportsAllDrives=true`);
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Failed to get file metadata: ${sanitizedDriveErrorDetail(sanitizeGoogleDriveError(res.status, err), res.status)}`);
-  }
-  const data = await res.json();
+const FILE_METADATA_FIELDS = "id,name,mimeType,size,parents,appProperties,thumbnailLink";
+
+function mapFileMetadata(data: Record<string, unknown>) {
   return {
     id: data.id as string,
     name: data.name as string,
@@ -417,4 +439,29 @@ export async function getFileMetadata(fileId: string) {
       : {},
     thumbnailLink: typeof data.thumbnailLink === "string" ? data.thumbnailLink : "",
   };
+}
+
+export async function getFileMetadata(fileId: string) {
+  const res = await driveFetch(`${DRIVE_API}/files/${fileId}?fields=${FILE_METADATA_FIELDS}&supportsAllDrives=true`);
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Failed to get file metadata: ${sanitizedDriveErrorDetail(sanitizeGoogleDriveError(res.status, err), res.status)}`);
+  }
+  return mapFileMetadata(await res.json());
+}
+
+// Cleanup-path variant: returns null when Drive confirms the file is GONE (HTTP 404),
+// and still throws on every other error so callers stay fail-closed. A file purged from
+// Drive outside the app (admin cleanup, storage suspension, a corrupted stored id) must
+// not leave its DB row permanently undeletable — getFileMetadata() throws on 404, which
+// would keep the row forever and re-404 on every retry. delete-media uses this so an
+// already-gone file resolves to "remove the stale record", not an eternal orphan.
+export async function getFileMetadataOrNull(fileId: string) {
+  const res = await driveFetch(`${DRIVE_API}/files/${fileId}?fields=${FILE_METADATA_FIELDS}&supportsAllDrives=true`);
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Failed to get file metadata: ${sanitizedDriveErrorDetail(sanitizeGoogleDriveError(res.status, err), res.status)}`);
+  }
+  return mapFileMetadata(await res.json());
 }

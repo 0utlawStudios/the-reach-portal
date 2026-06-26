@@ -22,11 +22,16 @@ const AUDIT_PERSIST_TIMEOUT_MS = 5_000;
 // baseline while still rejecting non-UUID garbage; record_audit_event casts to uuid.
 const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// Module-level cache: createClient() spins up internal GoTrue/Realtime state that we'd
+// otherwise throw away on every upload success and failure. Reuse one admin client.
+let cachedAdmin: SupabaseClient | null = null;
 function adminClient(): SupabaseClient | null {
+  if (cachedAdmin) return cachedAdmin;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return null;
-  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+  cachedAdmin = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+  return cachedAdmin;
 }
 
 async function recordAudit(
@@ -38,6 +43,7 @@ async function recordAudit(
   if (!workspaceId || !UUID_SHAPE.test(workspaceId)) return false;
   const admin = adminClient();
   if (!admin) return false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const rpc = admin.rpc("record_audit_event", {
       p_entity_type: "upload",
@@ -48,9 +54,9 @@ async function recordAudit(
     });
     const result = (await Promise.race([
       rpc,
-      new Promise<{ error: { message: string } }>((resolve) =>
-        setTimeout(() => resolve({ error: { message: "audit persist timed out" } }), AUDIT_PERSIST_TIMEOUT_MS),
-      ),
+      new Promise<{ error: { message: string } }>((resolve) => {
+        timer = setTimeout(() => resolve({ error: { message: "audit persist timed out" } }), AUDIT_PERSIST_TIMEOUT_MS);
+      }),
     ])) as { error: unknown };
     if (result?.error) {
       console.error("[upload-audit] persist failed:", JSON.stringify(result.error));
@@ -60,6 +66,8 @@ async function recordAudit(
   } catch (err) {
     console.error("[upload-audit] persist threw:", err instanceof Error ? err.message : err);
     return false;
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 

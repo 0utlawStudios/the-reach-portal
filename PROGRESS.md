@@ -1,8 +1,8 @@
 # The Reach — Drive resumable upload hardening (true root cause)
 
-updated-at: 2026-06-26T00:00:00+08:00
+updated-at: 2026-06-26T15:05:00+08:00
 
-phase: Slices A-E DONE; Slice F (docs + QA swarm + live verification) — NEXT
+phase: Slices A-E DONE; Slice F (QA swarm + live verification + hardening pass) DONE; AUDIT doc — NEXT
 
 ## Root cause (live-proven, do not re-derive)
 - `GOOGLE_DRIVE_ROOT_FOLDER_ID=0ADZtEpKEV-CTUk9PVA` is a **Shared Drive** ("The Reach Portal
@@ -13,25 +13,39 @@ phase: Slices A-E DONE; Slice F (docs + QA swarm + live verification) — NEXT
   alignment are NOT the cause.
 - Therefore the prod `403 → "Storage rejected the upload."` is a **Vercel-layer mislabel**:
   `sanitizeGoogleDriveError` collapses any unmapped 4xx into `storageRejected`, and the only
-  such 403 is the chunk route's `verifyDriveUploadSessionToken()` failure
-  (`upload-chunk/route.ts:99-109`), which has no errorReason and is never logged.
-- Adjacent: zero-byte orphan via proxy (no 0-byte guard); broken/unused
-  `GOOGLE_DRIVE_IMPERSONATE_EMAIL`; SA `canDelete=false, canTrash=true` on the Shared Drive.
+  such 403 is the chunk route's `verifyDriveUploadSessionToken()` failure, which had no
+  errorReason and was never logged. Fixed: it now returns a truthful `sessionInvalid` 403,
+  logged + persisted. Triggers: 60-min TTL expiring mid-stream + fileName/mimeType in the HMAC.
 
-## Decisions (user-confirmed)
-- One enforced cap = **500 MB**. Widest scope: core 403/telemetry + impersonation + delete-sync.
-- 500 MB = 250 chunks > the 240/min chunk rate limit → raise the limit in lockstep.
+## Live verification (done)
+- Direct-to-Google 93.89 MB video/quicktime commit: 17 s (proven, file trashed).
+- **Authenticated e2e smoke through the real deployed Vercel routes: PASS (2/2, 1.2m)** —
+  `media library upload renders images and video` + `create post upload persists Drive
+  metadata without post loss`. Isolated per-run workspace, full teardown. `npm run e2e:prod`.
+
+## QA swarm (3 independent reviewers) — all reported, 0 P0/P1
+- Security (LOW risk): 0 P0/P1/P2. 2× P3 — audit persisted pre-redact values; no delete batch cap.
+- Correctness: 0 P0/P1. 1× P2 (delete-media 404 → undeletable orphan). 3× P3.
+- Completeness/verification: PASS / APPROVE. Gap: no isolated expired-token regression test.
 
 ## Slices (each: implement → test → build → commit → push to main)
-- [x] A. Truthful error taxonomy: `sessionInvalid` reason; chunk route returns it (logged+alerted); 403 no longer auto-"storageRejected". Tests: drive-errors.test.ts (new), drive-upload.test.ts regression, upload-chunk route.test.ts, upload-surfaces-static.test.ts. 514/514 pass, build OK.
-- [x] B. Session-token robustness: TTL 60min→12h (covers 500MB on a slow uplink); dropped fragile fileName/mimeType from the HMAC (non-ASCII filename header mangling can no longer cause a self-inflicted 403); workspace/user/uploadUri/folder/fileSize binding preserved + tested. 515/515 pass, build OK.
-- [x] C. 500 MB cap (single constant); chunk rate limit now DERIVED from cap (DRIVE_UPLOAD_CHUNK_RATE_LIMIT=1000/min, was fixed 240 → a 500MB/250-chunk file would self-throttle); proxy zero-byte guard. Lockstep invariants tested. 518/518 pass, build OK.
-- [x] D. New src/lib/upload-audit.ts persists server failures (real status=…reason=… detail) + success parity events to audit_log_v2; wired via notifyUploadFailure (server-source only, no client double-log) + scheduleUploadSuccess in finalize & proxy. Caught+fixed a baseline-UUID guard bug (isValidUuid rejects the all-zeros workspace → would've dropped ALL telemetry). 524/524 pass, build OK.
-- [x] E. E1: documented impersonation no-op + safe trashDriveFile/removePublicPermissions/extractDriveFileIdFromAppUrl helpers (canTrash:true, never DELETE). E2: new fail-closed POST /api/drive/delete-media route (workspace-scoped, server-loaded IDs only, verify parent → strip public → trash → delete row); media-page.tsx now routes deletes through it (no more orphaned Drive files). 536/536 pass, build OK.
-- [ ] F. AUDIT-thereach-upload.md + CHANGES-thereach-upload.md + final QA swarm.
+- [x] A. Truthful error taxonomy: `sessionInvalid` reason; chunk route returns it (logged+alerted).
+- [x] B. Session-token robustness: TTL 60min→12h; dropped fragile fileName/mimeType from the HMAC.
+- [x] C. 500 MB cap (single constant); chunk rate limit DERIVED from cap (1000/min); proxy zero-byte guard.
+- [x] D. upload-audit.ts persists real status/reason + success parity to audit_log_v2.
+- [x] E. impersonation no-op documented + safe trash/removePublicPermissions; fail-closed delete-media route.
+- [x] F. QA swarm + live e2e + HARDENING PASS (all 6 findings fixed):
+  - P2 delete-media 404-orphan: new read-only `getFileMetadataOrNull` (null on confirmed 404)
+    → stale row cleaned up instead of permanently undeletable.
+  - P3-sec batch cap: `MAX_DELETE_BATCH=25`, overflow returned as explicit `failed` (no silent drop).
+  - P3-sec redaction: audit persistence now writes the `normalized` (redacted) values.
+  - P3 upload-audit: module-cached admin client + `clearTimeout` in `finally`.
+  - P3 read-only folder lookup: new `getSubfolderId` replaces folder-creating `ensureSubfolder` in delete path.
+  - Gap: added expired-token regression test (signs past expiry → verify false). 544/544 pass, build OK.
+- [ ] AUDIT-thereach-upload.md (read-only adversarial gate, P0-P3, file+line). Final commit = audit + PROGRESS only.
 
 ## Deliverables
-- PLAN-thereach-upload.md, CHANGES-thereach-upload.md, AUDIT-thereach-upload.md.
+- PLAN-thereach-upload.md, CHANGES-thereach-upload.md (committed), AUDIT-thereach-upload.md (next).
 
 ## Hard invariants
 - Posts never disappear; empty DB result is valid; every insert has workspace_id;
@@ -39,7 +53,7 @@ phase: Slices A-E DONE; Slice F (docs + QA swarm + live verification) — NEXT
 - `npm run build` is the load-bearing gate (Next.js route-export checks) before every push.
 
 ## last commit SHA
-- baseline: 4583762 (before this task)
+- baseline: 4583762 (before this task); A-E + docs: e3c8b24
 
 ## next step
-- Implement Slice A (drive-errors.ts + upload-chunk route + tests).
+- Commit + push the hardening pass (code + tests + this PROGRESS). Then write AUDIT-thereach-upload.md.

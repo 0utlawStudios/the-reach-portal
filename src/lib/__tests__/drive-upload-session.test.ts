@@ -46,6 +46,22 @@ describe("Drive upload session tokens", () => {
     expect(verifyDriveUploadSessionToken(token, parts)).toBe(true);
   });
 
+  it("rejects an expired token (the original incident: TTL expiring mid large upload)", () => {
+    process.env.DRIVE_UPLOAD_SESSION_SECRET = "upload-session-secret";
+    // Sign with an expiry 1s in the PAST — an otherwise perfectly-signed, field-matching
+    // token must still fail verify on expiry. This is the exact production failure mode:
+    // a slow large upload crossing the old 60-min TTL, surfaced (pre-fix) as a mislabeled
+    // "Storage rejected the upload." It must now return false -> sessionInvalid, not a
+    // signature error and not a false pass.
+    const expired = signDriveUploadSession(parts, Date.now() - 1000);
+    expect(verifyDriveUploadSessionToken(expired, parts)).toBe(false);
+
+    // A freshly-signed token with all the same fields still verifies, proving the only
+    // difference above is the expiry, not a field mismatch.
+    const live = signDriveUploadSession(parts, Date.now() + 60_000);
+    expect(verifyDriveUploadSessionToken(live, parts)).toBe(true);
+  });
+
   it("fails closed in production without a dedicated upload-session secret", () => {
     setNodeEnv("production");
     delete process.env.DRIVE_UPLOAD_SESSION_SECRET;
