@@ -3,6 +3,27 @@
 updated-at: 2026-06-27T03:00:00+08:00
 
 ## ▶ RESUME HERE (exact return point — read this first)
+**THUMBNAIL "GO BIG" #2 — stable workspace-bound token + edge cache — SHIPPED + LIVE (`50b7b4d`),
+adversarially verified clean.** Plus the video-playback quick wins below. Nothing in either lane
+is in-progress or uncommitted.
+
+### Thumbnail stable-token + edge cache (`50b7b4d`) — the cross-device cache half of "Go big"
+Old: every thumbnail sign embedded `Date.now()` → unique URL → browser/CDN never reused it; image
+served `private`. Fix: a `thumb` token purpose (30-day **bucketed** expiry → byte-identical URL
+for a month, then rotates) minted ONLY for `image-preview size=thumb`; served `Cache-Control:
+public, max-age=86400` (edge-cacheable, shared across devices + workspace members). A thumb token
+403s on full-res and is never honored by the video stream → it's a one-thumbnail capability that
+can't escalate or cross workspaces. Files: `google-drive.ts` (signStableThumbToken /
+stableThumbTokenExpiry / verify accepts thumb), `view-url` + `view-url/batch` (thumb branch),
+`image-preview` (accept thumb, 403 full-res, public cache), `stream` (comment). 8 new tests.
+**Adversarial workflow `wf_37167f32-751`: 6 attack lenses (cross-file replay, cross-workspace
+leak, full-res + stream escalation, forgery/lifetime, completeness) + independent refutation →
+ZERO findings survived.** Plan: `PLAN-thereach-thumbnail-stable-token.md`. Verify: Aldridge
+eyeballs the live grid (fresh device should paint thumbnails from edge cache, no re-fetch).
+Increment 1 (batch-sign, `e44d0d5`) + increment 2 (`50b7b4d`) = "Go big" COMPLETE. Optional later
+lever: grid virtualization + a per-device localStorage memo of stable thumb URLs (skips even the
+sign POST on warm loads) — not built, low marginal value.
+
 **"Quick wins now, decide transcode after" — ALL THREE QUICK WINS SHIPPED + LIVE.** The video
 playback complaint's cheap fixes are done. Nothing in this lane is in-progress or uncommitted.
 
@@ -23,7 +44,8 @@ If the user brings something NEW, start fresh from their message — this lane i
 
 **This session's shipped SHAs (media/perf):** e44d0d5 batch-sign · 9a583ee column align+wrap ·
 08d6d35 file size + real avatars · 78231ad video poster thumbnails · edd0200 lightbox poster
-click-to-play · cf8be01 honest unavailable-action fallback · 129e075 Most-Compatible upload hint.
+click-to-play · cf8be01 honest unavailable-action fallback · 129e075 Most-Compatible upload hint ·
+50b7b4d stable workspace-bound thumb token + edge cache (adversarially verified).
 
 phase: Session 3 IN PROGRESS — FREE-stack performance (Drive 60TB + Supabase free tier; GCS
 cancelled). Shipped: 4MB chunks + per-chunk auth hoist (44fe5f0); media-playback 700MB LRU cap
