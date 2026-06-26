@@ -516,7 +516,10 @@ describe("Drive upload surfaces", () => {
     const chunk = source("src/app/api/drive/upload-chunk/route.ts");
     expect(chunk).toContain('request.headers.get("x-upload-token")');
     expect(chunk).toContain("verifyDriveUploadSessionToken");
-    expect(chunk).toContain("Upload session does not belong to this workspace");
+    // The workspace-bound session check still gates every chunk, but a failure now
+    // returns the truthful `sessionInvalid` reason (logged + alerted) instead of a bare
+    // 403 that the client mislabeled as "Storage rejected the upload."
+    expect(chunk).toContain("sessionInvalidError");
 
     const client = source("src/lib/drive-upload.ts");
     expect(client).toContain("uploadToken");

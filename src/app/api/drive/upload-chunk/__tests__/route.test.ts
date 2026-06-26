@@ -121,19 +121,33 @@ describe("POST /api/drive/upload-chunk", () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it("rejects chunks with a missing upload session token", async () => {
+  it("rejects a missing upload session token as sessionInvalid, not a fake storage error", async () => {
     const res = await POST(makeRequest());
+    const data = await res.json();
 
     expect(res.status).toBe(403);
+    // ROOT-CAUSE REGRESSION: this 403 must NOT collapse into the generic
+    // "Storage rejected the upload." It is a session/token failure and must say so.
+    expect(data).toMatchObject({ errorReason: "sessionInvalid", retryable: false });
+    expect(JSON.stringify(data)).not.toContain("Storage rejected");
     expect(global.fetch).not.toHaveBeenCalled();
+    // Previously this 403 path was silent. It must now be observable.
+    expect(alertMocks.notifyUploadFailure).toHaveBeenCalledWith(expect.objectContaining({
+      route: "/api/drive/upload-chunk",
+      phase: "resumable_chunk_session_invalid",
+      errorStatus: 403,
+      errorDetail: expect.stringContaining("reason=sessionInvalid"),
+    }));
   });
 
-  it("rejects chunks when the upload session token belongs to another workspace", async () => {
+  it("rejects a cross-workspace upload session token as sessionInvalid", async () => {
     const res = await POST(makeRequest({
       headers: { "x-upload-token": uploadToken({ workspaceId: "11111111-1111-4111-8111-111111111111" }) },
     }));
+    const data = await res.json();
 
     expect(res.status).toBe(403);
+    expect(data).toMatchObject({ errorReason: "sessionInvalid", retryable: false });
     expect(global.fetch).not.toHaveBeenCalled();
   });
 

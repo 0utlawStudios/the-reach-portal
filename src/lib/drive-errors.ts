@@ -2,6 +2,7 @@ export type DriveErrorReason =
   | "driveRateLimited"
   | "appRateLimited"
   | "auth"
+  | "sessionInvalid"
   | "validation"
   | "notFound"
   | "unsupportedType"
@@ -23,16 +24,27 @@ const MESSAGE_BY_REASON: Record<DriveErrorReason, string> = {
   driveRateLimited: "Storage is busy. Retrying automatically.",
   appRateLimited: "Too many uploads. Please wait a moment before trying again.",
   auth: "Upload authorization failed. Please sign in again.",
+  sessionInvalid: "Your upload session expired or could not be verified. Please retry the upload.",
   validation: "The upload request is invalid.",
   notFound: "The uploaded file could not be found.",
   unsupportedType: "Unsupported file type for this upload location.",
   tooLarge: "The file is too large for this upload location.",
-  storageRejected: "Storage rejected the upload.",
+  storageRejected: "The storage service rejected the upload. Please retry, and contact support if it continues.",
   serverError: "Upload service failed. Please try again.",
   network: "Network error during upload.",
   timeout: "Upload timed out.",
   unknown: "Upload failed. Please try again.",
 };
+
+// The upload-session HMAC failed (missing/expired/tampered token, or sign and verify
+// disagreed on a signed field). This is an auth/session condition — NOT a storage
+// failure — so it MUST carry its own reason. Historically the chunk route returned a
+// bare `{ error: "..." }` 403, which the client's sanitizer collapsed into the generic
+// `storageRejected` ("Storage rejected the upload."), masking every real cause and
+// sending months of fixes to the wrong (Google/storage) layer.
+export function sessionInvalidError(): SanitizedDriveError {
+  return { error: MESSAGE_BY_REASON.sessionInvalid, errorReason: "sessionInvalid", retryable: false };
+}
 
 function cleanText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -139,6 +151,8 @@ export function statusForSanitizedDriveError(error: SanitizedDriveError, fallbac
       return 429;
     case "auth":
       return 401;
+    case "sessionInvalid":
+      return 403;
     case "validation":
       return 400;
     case "notFound":

@@ -16,6 +16,7 @@ import {
   sanitizeGoogleDriveError,
   sanitizedDriveErrorDetail,
   sanitizeUnknownUploadError,
+  sessionInvalidError,
   statusForSanitizedDriveError,
 } from "@/lib/drive-errors";
 import { verifyDriveUploadSessionToken } from "@/lib/drive-upload-session";
@@ -105,7 +106,36 @@ export async function POST(request: NextRequest) {
       mimeType,
       fileSize,
     })) {
-      return jsonResponse({ error: "Upload session does not belong to this workspace" }, 403);
+      // ROOT-CAUSE FIX: this is the 403 that production has been mislabeling as
+      // "Storage rejected the upload." It is a session/token failure (missing,
+      // expired, or signed-field mismatch), NOT a Google storage rejection.
+      // Return an explicit `sessionInvalid` reason so the client shows the truth,
+      // and LOG + ALERT it (this path was previously silent, so the real cause was
+      // invisible in every prior investigation).
+      const sanitized = sessionInvalidError();
+      const detail = sanitizedDriveErrorDetail(sanitized, 403);
+      console.error("[drive/upload-chunk] session token verify failed:", detail);
+      scheduleUploadFailureAlert("drive/upload-chunk", {
+        source: "server",
+        phase: "resumable_chunk_session_invalid",
+        route: "/api/drive/upload-chunk",
+        uploadPath: "resumable",
+        workspaceId: authContext.workspaceId,
+        userId: user.id,
+        userEmail: authContext.email,
+        userRole: authContext.role,
+        folder,
+        fileName,
+        mimeType,
+        fileSize,
+        errorStatus: 403,
+        errorMessage: sanitized.error,
+        errorDetail: detail,
+        userAgent: request.headers.get("user-agent"),
+        ip: getClientIp(request),
+        requestUrl: request.url,
+      });
+      return jsonResponse(sanitized, 403);
     }
     const chunk = Buffer.from(await request.arrayBuffer());
     const expectedLength = contentRange.end - contentRange.start + 1;

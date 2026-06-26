@@ -660,6 +660,51 @@ describe("uploadManyToDrive", () => {
     await expect(uploadManyToDrive([], "raw-files")).resolves.toEqual([]);
   });
 
+  // ROOT-CAUSE REGRESSION: a resumable chunk that fails the server-side upload-session
+  // token check returns 403 `sessionInvalid`. The user must see the TRUTHFUL session
+  // message — never the old fake "Storage rejected the upload." that hid the real cause
+  // and sent every prior fix chasing Google/storage instead of the session token.
+  it("surfaces a session-token 403 as a truthful session error, not a fake storage rejection", async () => {
+    const run: MixedUploadRun = {
+      proxySends: [],
+      directSends: [],
+      sessionRequests: [],
+      finalizeRequests: [],
+      active: 0,
+      maxActive: 0,
+      failDirectNames: new Set(),
+      directFinalResponsesByName: new Map([[
+        "session-expired.mp4",
+        [
+          {
+            status: 403,
+            body: {
+              error: "Your upload session expired or could not be verified. Please retry the upload.",
+              errorReason: "sessionInvalid",
+              retryable: false,
+            },
+          },
+        ],
+      ]]),
+    };
+    installMixedUploadMocks(run);
+    const largeVideo = new Uint8Array(4 * 1024 * 1024 + 1);
+
+    const results = await uploadManyToDrive([
+      new File([largeVideo], "session-expired.mp4", { type: "video/mp4" }),
+    ], "raw-files");
+
+    expect(results).toHaveLength(1);
+    expect(results[0].result).toBeUndefined();
+    expect(results[0].error?.message).toBe(
+      "Your upload session expired or could not be verified. Please retry the upload.",
+    );
+    expect(results[0].error?.message).not.toContain("Storage rejected");
+    // A non-retryable session failure must not silently restart the whole upload.
+    expect(run.sessionRequests).toEqual(["session-expired.mp4"]);
+    expect(run.finalizeRequests).toEqual([]);
+  });
+
   // Regression: 2026-06-24 production incident. A 5.55 MB JPEG on the resumable
   // path failed with "Upload timed out." (client xhr.ontimeout) even though the
   // server never errored — a slow-but-still-progressing uplink hit a fixed
