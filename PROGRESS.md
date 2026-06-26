@@ -4,8 +4,13 @@ updated-at: 2026-06-26T18:40:00+08:00
 
 phase: Session 3 IN PROGRESS — FREE-stack performance (Drive 60TB + Supabase free tier; GCS
 cancelled). Shipped: 4MB chunks + per-chunk auth hoist (44fe5f0); media-playback 700MB LRU cap
-(stay-free guarantee). Next: thumbnail efficiency (stable URL + edge cache + batch sign +
-virtualize grid). Plan: PLAN-thereach-performance.md.
+(stay-free guarantee); full-res loading bar (9886604); THUMBNAIL BATCH SIGN — coalesce the
+~300 per-cell view-url sign calls on a fresh device into a handful of batched POSTs to a new
+/api/media/view-url/batch, with a one-query batch known-check (filterKnownAppDriveFiles /
+filterKnownPlaybackObjects) replacing the per-file 7-query fan-out. Authorization stays exactly
+equivalent (per-file fallback for index misses); serving path + per-user 15-min token untouched.
+Next: stable-token + edge-cache layer (the cross-device cache half of "go big"); grid virtualize.
+Plan: PLAN-thereach-performance.md.
 
 phase (prior): Session 2 COMPLETE. staleClient root cause fixed + 31-agent QA swarm (1 P1 + 12 P3)
 + P1 data-loss fix + every-upload notifications. All shipped to main + live-verified.

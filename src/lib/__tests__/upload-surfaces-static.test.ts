@@ -626,7 +626,8 @@ describe("Drive upload surfaces", () => {
     const mediaViewUrl = source("src/lib/media-view-url.ts");
     expect(mediaViewUrl).toContain("signedMediaViewUrl");
     expect(mediaViewUrl).toContain("supabase.auth.getSession()");
-    expect(mediaViewUrl).toContain("/api/media/view-url?");
+    // Sign requests coalesce into one batched POST per fresh-device mount burst.
+    expect(mediaViewUrl).toContain("/api/media/view-url/batch");
     expect(mediaViewUrl).toContain("Authorization: `Bearer ${token}`");
 
     const previewImage = source("src/components/preview-image.tsx");

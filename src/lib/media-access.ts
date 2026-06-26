@@ -2,6 +2,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 export const DRIVE_FILE_ID_RE = /^[a-zA-Z0-9_-]{20,80}$/;
 const WORKSPACE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// One indexed scan of a workspace's media rows backs the batch known-checks. Anything past
+// this falls through to the per-file path, so a large workspace stays correct (just slower).
+const MEDIA_ASSET_SCAN_LIMIT = 5000;
 
 function sourceReferencesValue(value: unknown, needle: string): boolean {
   if (typeof value === "string") return value.includes(needle);
@@ -100,4 +103,88 @@ export async function isKnownPlaybackObject(
   ]);
 
   return checks.some(Boolean);
+}
+
+// Batch equivalent of isKnownAppDriveFile: one workspace scan resolves the common case
+// (the file id is the asset's file_id or appears in a url column) in memory, and only the
+// leftovers fall back to the full per-file check. The returned set is exactly the file ids
+// the single-file check would authorize, so batching never widens access.
+export async function filterKnownAppDriveFiles(
+  admin: SupabaseClient | null,
+  fileIds: string[],
+  workspaceId?: string,
+): Promise<Set<string>> {
+  const known = new Set<string>();
+  if (!admin) return known;
+  const valid = Array.from(new Set(fileIds.filter((id) => DRIVE_FILE_ID_RE.test(id))));
+  if (valid.length === 0) return known;
+
+  let query = admin
+    .from("media_assets")
+    .select("file_id, url, drive_proxy_url, publish_url, playback_url")
+    .limit(MEDIA_ASSET_SCAN_LIMIT);
+  if (workspaceId) query = query.eq("workspace_id", workspaceId);
+  const { data, error } = await query;
+
+  const unresolved: string[] = [];
+  if (!error && data) {
+    for (const id of valid) {
+      const hit = data.some((row) =>
+        row.file_id === id ||
+        sourceReferencesValue(row.url, id) ||
+        sourceReferencesValue(row.drive_proxy_url, id) ||
+        sourceReferencesValue(row.publish_url, id) ||
+        sourceReferencesValue(row.playback_url, id));
+      if (hit) known.add(id);
+      else unresolved.push(id);
+    }
+  } else {
+    unresolved.push(...valid);
+  }
+
+  if (unresolved.length > 0) {
+    const checks = await Promise.all(unresolved.map((id) => isKnownAppDriveFile(admin, id, workspaceId)));
+    unresolved.forEach((id, index) => { if (checks[index]) known.add(id); });
+  }
+  return known;
+}
+
+// Batch equivalent of isKnownPlaybackObject, same one-scan-then-fallback contract.
+export async function filterKnownPlaybackObjects(
+  admin: SupabaseClient | null,
+  storageKeys: string[],
+  workspaceId: string,
+): Promise<Set<string>> {
+  const known = new Set<string>();
+  if (!admin) return known;
+  const valid = Array.from(new Set(storageKeys.filter((key) => {
+    const parsed = parsePlaybackStorageKey(key);
+    return Boolean(parsed) && parsed!.workspaceId === workspaceId;
+  })));
+  if (valid.length === 0) return known;
+
+  const { data, error } = await admin
+    .from("media_assets")
+    .select("playback_storage_key, playback_url")
+    .eq("workspace_id", workspaceId)
+    .limit(MEDIA_ASSET_SCAN_LIMIT);
+
+  const unresolved: string[] = [];
+  if (!error && data) {
+    for (const key of valid) {
+      const hit = data.some((row) =>
+        row.playback_storage_key === key ||
+        sourceReferencesValue(row.playback_url, key));
+      if (hit) known.add(key);
+      else unresolved.push(key);
+    }
+  } else {
+    unresolved.push(...valid);
+  }
+
+  if (unresolved.length > 0) {
+    const checks = await Promise.all(unresolved.map((key) => isKnownPlaybackObject(admin, key, workspaceId)));
+    unresolved.forEach((key, index) => { if (checks[index]) known.add(key); });
+  }
+  return known;
 }

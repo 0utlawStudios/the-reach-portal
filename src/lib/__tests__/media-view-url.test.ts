@@ -32,7 +32,10 @@ describe("signedMediaViewUrl", () => {
 
   it("returns a short-lived signed URL for private media routes", async () => {
     globalThis.fetch = vi.fn(async () => Response.json({
-      url: "/api/drive/stream?id=abcdefghijklmnopqrst&token=signed",
+      results: [{
+        input: "/api/drive/stream?id=abcdefghijklmnopqrst",
+        url: "/api/drive/stream?id=abcdefghijklmnopqrst&token=signed",
+      }],
     })) as unknown as typeof fetch;
 
     await expect(signedMediaViewUrl("/api/drive/stream?id=abcdefghijklmnopqrst"))
@@ -41,11 +44,35 @@ describe("signedMediaViewUrl", () => {
 
   it("returns a short-lived signed URL for playback media routes", async () => {
     globalThis.fetch = vi.fn(async () => Response.json({
-      url: "/api/media/playback?key=00000000-0000-0000-0000-000000000001%2Fvideos%2Fclip.mp4&token=signed",
+      results: [{
+        input: "/api/media/playback?key=00000000-0000-0000-0000-000000000001/videos/clip.mp4",
+        url: "/api/media/playback?key=00000000-0000-0000-0000-000000000001%2Fvideos%2Fclip.mp4&token=signed",
+      }],
     })) as unknown as typeof fetch;
 
     await expect(resolveViewableMediaUrl("/api/media/playback?key=00000000-0000-0000-0000-000000000001/videos/clip.mp4"))
       .resolves.toBe("/api/media/playback?key=00000000-0000-0000-0000-000000000001%2Fvideos%2Fclip.mp4&token=signed");
+  });
+
+  it("coalesces concurrent sign requests into a single batch POST", async () => {
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      const requested = JSON.parse((init?.body as string) || "{}") as { urls: string[] };
+      return Response.json({ results: requested.urls.map((url) => ({ input: url, url: `${url}&token=signed` })) });
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const [a, b, c] = await Promise.all([
+      signedMediaViewUrl("/api/media/image-preview?id=aaaaaaaaaaaaaaaaaaaa&size=thumb"),
+      signedMediaViewUrl("/api/media/image-preview?id=bbbbbbbbbbbbbbbbbbbb&size=thumb"),
+      signedMediaViewUrl("/api/media/image-preview?id=cccccccccccccccccccc&size=thumb"),
+    ]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/media/view-url/batch");
+    expect(fetchMock.mock.calls[0][1]?.method).toBe("POST");
+    expect(a).toBe("/api/media/image-preview?id=aaaaaaaaaaaaaaaaaaaa&size=thumb&token=signed");
+    expect(b).toBe("/api/media/image-preview?id=bbbbbbbbbbbbbbbbbbbb&size=thumb&token=signed");
+    expect(c).toBe("/api/media/image-preview?id=cccccccccccccccccccc&size=thumb&token=signed");
   });
 
   it("throws for private copy/open URLs when signing is unavailable", async () => {
