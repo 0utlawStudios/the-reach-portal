@@ -496,33 +496,59 @@ export function MediaPage() {
     setMedia((prev) => prev.filter((m) => !selectedIds.has(m.id)));
     setSelectedIds(new Set());
     setConfirmingDelete(false);
-    // Delete from Supabase
+    // Delete via the server route, which owns BOTH Drive cleanup (trash + strip public
+    // access) and the DB row removal. The browser no longer deletes media_assets
+    // directly, so a deleted asset's Drive file no longer orphans forever. Fail-closed:
+    // any id the server did not confirm "deleted" is restored to the board.
     if (useDb && idsToDelete.length > 0) {
       const wsId = workspaceId || BASELINE_WORKSPACE_ID;
-      supabase.from("media_assets").delete().in("id", idsToDelete).eq("workspace_id", wsId).select("id").then(({ data, error }) => {
-        if (error) {
-          console.error("[media] deleteSelected sync failed:", error.message);
-          // Restore the removed assets so they do not vanish on a failed delete.
-          setMedia((prev) => {
-            const present = new Set(prev.map((m) => m.id));
-            const toRestore = removedAssets.filter((a) => !present.has(a.id));
-            return toRestore.length > 0 ? [...toRestore, ...prev] : prev;
+      const restore = (ids: string[]) => {
+        const restoreSet = new Set(ids);
+        const toRestore = removedAssets.filter((a) => restoreSet.has(a.id));
+        if (toRestore.length === 0) return;
+        setMedia((prev) => {
+          const present = new Set(prev.map((m) => m.id));
+          const missing = toRestore.filter((a) => !present.has(a.id));
+          return missing.length > 0 ? [...missing, ...prev] : prev;
+        });
+      };
+      void (async () => {
+        try {
+          const { data: sessionData } = await supabase.auth.getSession();
+          const token = sessionData.session?.access_token;
+          const res = await fetch("/api/drive/delete-media", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+              "X-Workspace-Id": wsId,
+            },
+            body: JSON.stringify({ mediaAssetIds: idsToDelete }),
           });
-          addToast(`Delete failed: ${error.message}. Files were restored.`, "error");
-          return;
+          if (!res.ok) {
+            restore(idsToDelete);
+            addToast("Delete failed. Files were restored.", "error");
+            return;
+          }
+          const data = await res.json();
+          const results: Array<{ mediaAssetId: string; status: string }> = Array.isArray(data.results) ? data.results : [];
+          const deletedIds = new Set(results.filter((r) => r.status === "deleted").map((r) => r.mediaAssetId));
+          const notDeleted = idsToDelete.filter((id) => !deletedIds.has(id));
+          if (notDeleted.length > 0) {
+            restore(notDeleted);
+            addToast(
+              deletedIds.size > 0
+                ? "Some files couldn't be deleted and were restored."
+                : "Delete failed. Files were restored.",
+              "error",
+            );
+          }
+        } catch (err) {
+          console.error("[media] deleteSelected route failed:", err instanceof Error ? err.message : err);
+          restore(idsToDelete);
+          addToast("Delete failed. Files were restored.", "error");
         }
-        const deletedIds = new Set((data || []).map((row) => row.id as string));
-        const missed = removedAssets.filter((asset) => !deletedIds.has(asset.id));
-        if (missed.length > 0) {
-          console.error("[media] deleteSelected sync failed: some rows were not deleted");
-          setMedia((prev) => {
-            const present = new Set(prev.map((m) => m.id));
-            const toRestore = missed.filter((a) => !present.has(a.id));
-            return toRestore.length > 0 ? [...toRestore, ...prev] : prev;
-          });
-          addToast("Delete failed for some files. They were restored.", "error");
-        }
-      });
+      })();
     }
   };
 

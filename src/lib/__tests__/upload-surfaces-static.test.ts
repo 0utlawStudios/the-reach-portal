@@ -526,6 +526,22 @@ describe("Drive upload surfaces", () => {
     expect(client).toContain('xhr.setRequestHeader("X-Upload-Token", session.uploadToken)');
   });
 
+  it("routes Media Library deletes through the server delete-media route, never a direct DB delete", () => {
+    const mediaPage = source("src/components/pages/media-page.tsx");
+    expect(mediaPage).toContain('fetch("/api/drive/delete-media"');
+    // The browser must not delete media_assets rows directly anymore (that orphaned the
+    // Drive file forever).
+    expect(mediaPage).not.toMatch(/supabase\.from\("media_assets"\)\.delete\(\)/);
+
+    const route = source("src/app/api/drive/delete-media/route.ts");
+    // Server owns the cleanup: verify the Drive parent, strip public access, then TRASH
+    // (never a permanent DELETE the service account can't perform).
+    expect(route).toContain("getFileMetadata");
+    expect(route).toContain("removePublicPermissions");
+    expect(route).toContain("trashDriveFile");
+    expect(route).not.toContain('method: "DELETE"');
+  });
+
   it("does not expose private Drive stream tokens through app media copy or preview helpers", () => {
     const googleDrive = source("src/lib/google-drive.ts");
     expect(googleDrive).toContain("const params = new URLSearchParams({ id: fileId })");
