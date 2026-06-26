@@ -2,13 +2,16 @@
 
 import type { SyntheticEvent, VideoHTMLAttributes } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Film, RotateCcw } from "lucide-react";
+import { ExternalLink, Film, RotateCcw } from "lucide-react";
 import { isPrivateMediaRouteUrl, signedMediaViewUrl } from "@/lib/media-view-url";
 
 type MediaVideoProps = Omit<VideoHTMLAttributes<HTMLVideoElement>, "src"> & {
   sources: Array<string | null | undefined>;
   label?: string;
   loadTimeoutMs?: number;
+  // Honest escape hatch shown when the video can't preview (e.g. an HEVC .mov a browser can't
+  // decode): an explicit action to view/download it elsewhere, next to Retry.
+  unavailableAction?: { label: string; onClick: () => void };
 };
 
 const DEFAULT_VIDEO_LOAD_TIMEOUT_MS = 45_000;
@@ -36,6 +39,7 @@ export function MediaVideo({
   label = "Video preview",
   className,
   loadTimeoutMs = DEFAULT_VIDEO_LOAD_TIMEOUT_MS,
+  unavailableAction,
   onError,
   onLoadStart,
   onLoadedData,
@@ -214,16 +218,28 @@ export function MediaVideo({
       <div className={`${className || ""} flex min-h-24 min-w-32 flex-col items-center justify-center gap-2 bg-[#111] text-white/65`}>
         <Film className="h-6 w-6" aria-hidden="true" />
         <span className="px-3 text-center text-[11px] font-medium">Video preview unavailable</span>
-        {usableSources.length > 0 && (
-          <button
-            type="button"
-            onClick={retrySources}
-            className="inline-flex items-center gap-1 rounded-md border border-white/15 px-2 py-1 text-[10px] font-medium text-white/80 transition-colors hover:bg-white/10"
-          >
-            <RotateCcw className="h-3 w-3" aria-hidden="true" />
-            Retry
-          </button>
-        )}
+        <div className="flex items-center gap-1.5">
+          {usableSources.length > 0 && (
+            <button
+              type="button"
+              onClick={retrySources}
+              className="inline-flex items-center gap-1 rounded-md border border-white/15 px-2 py-1 text-[10px] font-medium text-white/80 transition-colors hover:bg-white/10"
+            >
+              <RotateCcw className="h-3 w-3" aria-hidden="true" />
+              Retry
+            </button>
+          )}
+          {unavailableAction && (
+            <button
+              type="button"
+              onClick={unavailableAction.onClick}
+              className="inline-flex items-center gap-1 rounded-md border border-white/15 px-2 py-1 text-[10px] font-medium text-white/80 transition-colors hover:bg-white/10"
+            >
+              <ExternalLink className="h-3 w-3" aria-hidden="true" />
+              {unavailableAction.label}
+            </button>
+          )}
+        </div>
       </div>
     );
   }

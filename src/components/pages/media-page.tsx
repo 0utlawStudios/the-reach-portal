@@ -1019,7 +1019,7 @@ export function MediaPage() {
                 {lightboxAsset.type === "image" ? (
                   <PreviewImage src={mediaDisplayUrl(lightboxAsset)} alt={lightboxAsset.name} mimeType={lightboxAsset.mimeType} fileName={lightboxAsset.name} className="w-full h-[60vh] max-w-full max-h-[60vh] object-contain rounded-lg select-none" draggable={false} />
                 ) : lightboxVideoPlaying ? (
-                  <MediaVideo sources={mediaVideoSources(lightboxAsset)} controls autoPlay playsInline preload="auto" loadTimeoutMs={15000} className="max-w-full max-h-[60vh] object-contain rounded-lg bg-black" label={`${lightboxAsset.name} video preview`} />
+                  <MediaVideo sources={mediaVideoSources(lightboxAsset)} controls autoPlay playsInline preload="auto" loadTimeoutMs={15000} unavailableAction={{ label: "Open in new tab", onClick: () => void openInNewTab(lightboxAsset) }} className="max-w-full max-h-[60vh] object-contain rounded-lg bg-black" label={`${lightboxAsset.name} video preview`} />
                 ) : (
                   <button
                     type="button"

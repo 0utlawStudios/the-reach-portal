@@ -132,6 +132,28 @@ describe("MediaVideo", () => {
     });
   });
 
+  it("offers the unavailable action (view elsewhere) when a video cannot preview", async () => {
+    mockSignedMediaViewUrl.mockResolvedValue(null);
+    const onOpen = vi.fn();
+
+    render(
+      <MediaVideo
+        sources={["/api/drive/stream?id=only"]}
+        preload="metadata"
+        label="Unplayable clip"
+        loadTimeoutMs={1}
+        unavailableAction={{ label: "Open in new tab", onClick: onOpen }}
+      />,
+    );
+
+    fireEvent.error(screen.getByLabelText("Unplayable clip"));
+
+    const action = await screen.findByRole("button", { name: "Open in new tab" });
+    expect(screen.getByText("Video preview unavailable")).toBeInTheDocument();
+    fireEvent.click(action);
+    expect(onOpen).toHaveBeenCalledTimes(1);
+  });
+
   it("stops the fallback watchdog once a frame is decoded", async () => {
     vi.useFakeTimers();
     render(
