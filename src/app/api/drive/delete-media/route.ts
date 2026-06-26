@@ -9,10 +9,12 @@ import {
   removePublicPermissions,
   trashDriveFile,
 } from "@/lib/google-drive";
-import { extractDriveFileIdFromAppUrl } from "@/lib/drive-url-utils";
+import { DRIVE_FILE_ID_RE, extractDriveFileIdFromAppUrl } from "@/lib/drive-url-utils";
 import { ALLOWED_DRIVE_UPLOAD_ROLES, VALID_DRIVE_FOLDERS } from "@/lib/drive-policy";
 import { appRateLimitError } from "@/lib/drive-errors";
 import { isValidUuid } from "@/lib/utils";
+
+const PLAYBACK_BUCKET = "media-playback";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -40,21 +42,53 @@ function getAdminClient() {
 
 interface MediaRow {
   id: string;
+  file_id: string | null;
   url: string | null;
   drive_proxy_url: string | null;
   playback_url: string | null;
+  playback_storage_key: string | null;
   folder: string | null;
 }
 
 function resolveFileId(row: MediaRow): string | null {
-  // Try every stored app URL; all encode the Drive id as ?id=<fileId>. SERVER-side
-  // values only — the browser never supplies the Drive id, so deletion can't be
-  // pointed at an arbitrary file.
+  // Prefer the authoritative file_id column (migration 0052, populated by ensureMediaAsset).
+  // Fall back to parsing the stored app URLs (all encode ?id=<fileId>) for pre-0052 rows
+  // that have a null file_id. Both are SERVER-side values only — the browser never supplies
+  // the Drive id, so deletion can't be pointed at an arbitrary file. URL-first parsing alone
+  // was fragile: playback-optimized videos store url/playback_url as /api/media/playback?key=
+  // (no ?id=), so resolution rode solely on drive_proxy_url's format.
+  if (typeof row.file_id === "string" && DRIVE_FILE_ID_RE.test(row.file_id)) return row.file_id;
   return (
     extractDriveFileIdFromAppUrl(row.url) ||
     extractDriveFileIdFromAppUrl(row.drive_proxy_url) ||
     extractDriveFileIdFromAppUrl(row.playback_url)
   );
+}
+
+// Does any post in the workspace still reference this Drive file (by its file id) or this
+// media_assets row (by its UUID)? Cards and library assets share the SAME underlying Drive
+// file, so trashing an in-use asset would break the post that streams it AND revoke the row
+// that authorizes that stream — a silent media-loss bug. A Drive file id (20-80 unique
+// base64url chars) and a v4 UUID are both unique enough that a substring scan over the
+// reference-bearing columns is a reliable "is referenced" signal.
+function postReferenceBlobs(
+  posts: Array<{ thumbnail_url: string | null; source_vault: unknown; media_ids: unknown; asset_urls: unknown }>,
+): string[] {
+  return posts.map((p) => {
+    const mediaIds = Array.isArray(p.media_ids) ? p.media_ids.join("") : "";
+    const assetUrls = Array.isArray(p.asset_urls) ? p.asset_urls.join("") : "";
+    let vault = "";
+    try { vault = p.source_vault ? JSON.stringify(p.source_vault) : ""; } catch { vault = ""; }
+    return [p.thumbnail_url || "", vault, mediaIds, assetUrls].join("");
+  });
+}
+
+function countReferencingPosts(blobs: string[], fileId: string, assetId: string): number {
+  let n = 0;
+  for (const blob of blobs) {
+    if (blob.includes(fileId) || blob.includes(assetId)) n++;
+  }
+  return n;
 }
 
 export async function POST(request: NextRequest) {
@@ -91,7 +125,7 @@ export async function POST(request: NextRequest) {
     // Workspace-scoped load: a caller can only ever act on their own workspace's rows.
     const { data: rows, error: loadError } = await admin
       .from("media_assets")
-      .select("id, url, drive_proxy_url, playback_url, folder")
+      .select("id, file_id, url, drive_proxy_url, playback_url, playback_storage_key, folder")
       .in("id", requestedIds)
       .eq("workspace_id", workspaceId);
     if (loadError) {
@@ -101,6 +135,22 @@ export async function POST(request: NextRequest) {
 
     const loaded = (rows || []) as MediaRow[];
     const loadedIds = new Set(loaded.map((r) => r.id));
+
+    // Load every post's reference-bearing columns ONCE so we can block trashing a file that
+    // a live post still uses. Fail CLOSED: if usage can't be determined, keep the asset
+    // rather than risk breaking a post (Iron Law — media must never silently vanish).
+    let usageBlobs: string[] | null = null;
+    {
+      const { data: postRows, error: postErr } = await admin
+        .from("posts")
+        .select("thumbnail_url, source_vault, media_ids, asset_urls")
+        .eq("workspace_id", workspaceId);
+      if (postErr) {
+        console.error("[drive/delete-media] usage check load failed:", postErr.message);
+      } else {
+        usageBlobs = postReferenceBlobs(postRows || []);
+      }
+    }
 
     // Resolve the app-managed folder parent IDs ONCE so every asset's Drive parent can
     // be verified against them. A trash only happens if the file truly lives in one.
@@ -137,9 +187,23 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
+      // In-use guard: never trash a file a post still references. The post would lose its
+      // media (the Drive original is purged ~30 days after trash) AND its stream auth (the
+      // media_assets row is the access gate). Fail-closed if usage is unknown.
+      if (usageBlobs === null) {
+        results.push({ mediaAssetId: row.id, driveFileId: fileId, status: "failed", error: "Could not verify whether this file is in use. Please try again." });
+        continue;
+      }
+      const refCount = countReferencingPosts(usageBlobs, fileId, row.id);
+      if (refCount > 0) {
+        results.push({ mediaAssetId: row.id, driveFileId: fileId, status: "failed", error: `This file is still used by ${refCount} post${refCount === 1 ? "" : "s"}. Remove it from the post${refCount === 1 ? "" : "s"} first.` });
+        continue;
+      }
+
       // Fail-closed: keep the DB row unless EVERY Drive step succeeds — EXCEPT when the
       // file is already gone from Drive (metadata null = HTTP 404), in which case there is
       // nothing to trash and we fall through to delete the stale row (no eternal orphan).
+      let driveTrashed = false;
       try {
         const meta = await getFileMetadataOrNull(fileId);
         if (meta) {
@@ -155,6 +219,7 @@ export async function POST(request: NextRequest) {
 
           await removePublicPermissions(fileId);
           await trashDriveFile(fileId);
+          driveTrashed = true;
         }
       } catch (err) {
         console.error("[drive/delete-media] Drive cleanup failed:", err instanceof Error ? err.message : err);
@@ -172,6 +237,29 @@ export async function POST(request: NextRequest) {
         console.error("[drive/delete-media] DB delete failed after Drive trash:", delError.message);
         results.push({ mediaAssetId: row.id, driveFileId: fileId, status: "failed", error: "File was trashed but the record could not be deleted; contact support" });
         continue;
+      }
+
+      // Best-effort, never fails the delete: (1) write an audit row so a trashed file can be
+      // matched back from Drive trash if a delete was a mistake (the DB id is gone after this);
+      // (2) remove the private Supabase playback derivative, which the access gate orphans
+      // once the row is gone. The playback key is unique per asset, so no other row needs it.
+      try {
+        await admin.rpc("record_audit_event", {
+          p_entity_type: "media_asset",
+          p_action: driveTrashed ? "media_trashed" : "media_orphan_cleanup",
+          p_entity_id: isValidUuid(row.id) ? row.id : null,
+          p_workspace_id: workspaceId,
+          p_metadata: { drive_file_id: fileId, folder: row.folder, drive_trashed: driveTrashed, user_id: user.id },
+        });
+      } catch (err) {
+        console.error("[drive/delete-media] audit write failed (non-fatal):", err instanceof Error ? err.message : err);
+      }
+      if (row.playback_storage_key) {
+        try {
+          await admin.storage.from(PLAYBACK_BUCKET).remove([row.playback_storage_key]);
+        } catch (err) {
+          console.error("[drive/delete-media] playback object cleanup failed (non-fatal):", err instanceof Error ? err.message : err);
+        }
       }
 
       results.push({ mediaAssetId: row.id, driveFileId: fileId, status: "deleted" });

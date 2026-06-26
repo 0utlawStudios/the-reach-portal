@@ -531,17 +531,20 @@ export function MediaPage() {
             return;
           }
           const data = await res.json();
-          const results: Array<{ mediaAssetId: string; status: string }> = Array.isArray(data.results) ? data.results : [];
+          const results: Array<{ mediaAssetId: string; status: string; error?: string }> = Array.isArray(data.results) ? data.results : [];
           const deletedIds = new Set(results.filter((r) => r.status === "deleted").map((r) => r.mediaAssetId));
           const notDeleted = idsToDelete.filter((id) => !deletedIds.has(id));
           if (notDeleted.length > 0) {
             restore(notDeleted);
-            addToast(
-              deletedIds.size > 0
+            // Surface the server's specific reason when it's the "still in use" guard, since
+            // that is actionable (remove from the post first) rather than a transient error.
+            const inUse = results.filter((r) => r.status === "failed" && /still used by/i.test(r.error || ""));
+            const message = inUse.length > 0
+              ? `${inUse.length} ${inUse.length === 1 ? "file is" : "files are"} still used by a post and ${inUse.length === 1 ? "was" : "were"} kept. Remove ${inUse.length === 1 ? "it" : "them"} from the post first.`
+              : deletedIds.size > 0
                 ? "Some files couldn't be deleted and were restored."
-                : "Delete failed. Files were restored.",
-              "error",
-            );
+                : "Delete failed. Files were restored.";
+            addToast(message, "error");
           }
         } catch (err) {
           console.error("[media] deleteSelected route failed:", err instanceof Error ? err.message : err);
@@ -553,6 +556,14 @@ export function MediaPage() {
   };
 
   const getUsageInfo = (asset: MediaAsset) => usageByAssetId.get(asset.id) || null;
+
+  // Selected assets that a post automatically uses. Deleting these is now refused by the
+  // server (it would trash the shared Drive file the post streams), so warn before the user
+  // confirms — the In-use badge alone was easy to miss in a multi-select.
+  const selectedInUseByPosts = useMemo(
+    () => media.filter((m) => selectedIds.has(m.id) && (usageByAssetId.get(m.id)?.automaticCards.length || 0) > 0),
+    [media, selectedIds, usageByAssetId],
+  );
 
   const toggleManualUsed = useCallback((asset: MediaAsset) => {
     const current = asset.usedIn || [];
@@ -980,10 +991,15 @@ export function MediaPage() {
                   <X className="w-4 h-4" aria-hidden="true" />
                 </button>
               </div>
-              <div className="px-5 py-4">
+              <div className="px-5 py-4 space-y-2.5">
                 <p id="delete-media-desc" className="text-[13px] text-gray-700 dark:text-gray-300 leading-relaxed">
                   This removes {selectedIds.size === 1 ? "this file" : `these ${selectedIds.size} files`} from the media library. This cannot be undone.
                 </p>
+                {selectedInUseByPosts.length > 0 && (
+                  <p className="text-[12.5px] text-amber-700 dark:text-amber-400 leading-relaxed bg-amber-500/10 dark:bg-amber-500/[0.08] border border-amber-500/20 rounded-lg px-3 py-2">
+                    {selectedInUseByPosts.length === 1 ? "1 file is" : `${selectedInUseByPosts.length} files are`} still used by a post and will be kept. Remove {selectedInUseByPosts.length === 1 ? "it" : "them"} from the post first to delete.
+                  </p>
+                )}
               </div>
               <div className="px-5 py-4 border-t border-gray-200/40 dark:border-white/[0.08] flex gap-2">
                 <button onClick={() => setConfirmingDelete(false)} className="flex-1 h-10 rounded-xl border border-gray-200 dark:border-white/[0.1] text-[13px] font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/[0.04] cursor-pointer transition-colors">

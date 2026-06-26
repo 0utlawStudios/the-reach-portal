@@ -33,6 +33,7 @@ export interface UploadFailureAlert {
   errorMessage: string;
   errorStatus?: number | null;
   errorDetail?: string | null;
+  googleReason?: string | null;
   userAgent?: string | null;
   ip?: string | null;
   requestUrl?: string | null;
@@ -47,7 +48,7 @@ function truncate(value: unknown, max = MAX_FIELD): string {
   return text.length > max ? `${text.slice(0, max)}...` : text;
 }
 
-function redact(value: unknown): string {
+export function redact(value: unknown): string {
   return truncate(value, MAX_DETAIL)
     .replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]+/gi, "$1[redacted]")
     .replace(/(authorization["']?\s*[:=]\s*["']?)[^"',\s}]+/gi, "$1[redacted]")

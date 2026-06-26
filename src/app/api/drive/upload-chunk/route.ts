@@ -14,6 +14,7 @@ import {
 import { scheduleUploadFailureAlert } from "../upload-alert-scheduler";
 import {
   appRateLimitError,
+  extractGoogleDriveReason,
   sanitizeGoogleDriveError,
   sanitizedDriveErrorDetail,
   sanitizeUnknownUploadError,
@@ -183,9 +184,12 @@ export async function POST(request: NextRequest) {
 
     if (!uploadRes.ok) {
       const rawErr = await uploadRes.text();
+      const googleReason = extractGoogleDriveReason(rawErr).slice(0, 120);
       const sanitized = sanitizeGoogleDriveError(uploadRes.status, rawErr);
       const detail = sanitizedDriveErrorDetail(sanitized, uploadRes.status);
-      console.error("[drive/upload-chunk] Google Drive error:", detail);
+      console.error(
+        `[drive/upload-chunk] Google Drive error: ${detail} googleReason=${googleReason || "(none)"}`,
+      );
       const auth = authContext;
       scheduleUploadFailureAlert("drive/upload-chunk", {
         source: "server",
@@ -203,6 +207,7 @@ export async function POST(request: NextRequest) {
         errorStatus: uploadRes.status,
         errorMessage: sanitized.error,
         errorDetail: detail,
+        googleReason: googleReason || undefined,
         userAgent: request.headers.get("user-agent"),
         ip: getClientIp(request),
         requestUrl: request.url,
@@ -212,7 +217,34 @@ export async function POST(request: NextRequest) {
 
     const driveFile = await uploadRes.json();
     if (!driveFile?.id) {
-      return jsonResponse({ error: "Upload succeeded but Google did not return a file ID" }, 500);
+      const sanitized = sanitizeUnknownUploadError(new Error("Upload succeeded but Google did not return a file ID"));
+      const detail = sanitizedDriveErrorDetail(sanitized, 500);
+      console.error(
+        `[drive/upload-chunk] Google Drive did not return a file ID after successful upload: ${detail} ` +
+        `ws=${authContext!.workspaceId} user=${authContext!.user.id} folder=${folder} fileSize=${fileSize}`,
+      );
+      const auth = authContext!;
+      scheduleUploadFailureAlert("drive/upload-chunk", {
+        source: "server",
+        phase: "resumable_chunk_no_file_id",
+        route: "/api/drive/upload-chunk",
+        uploadPath: "resumable",
+        workspaceId: auth.workspaceId,
+        userId: auth.user.id,
+        userEmail: auth.email,
+        userRole: auth.role,
+        folder,
+        fileName,
+        mimeType,
+        fileSize,
+        errorStatus: 500,
+        errorMessage: sanitized.error,
+        errorDetail: detail,
+        userAgent: request.headers.get("user-agent"),
+        ip: getClientIp(request),
+        requestUrl: request.url,
+      });
+      return jsonResponse(sanitized, statusForSanitizedDriveError(sanitized, 500));
     }
 
     return jsonResponse({

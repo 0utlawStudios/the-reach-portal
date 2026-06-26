@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { consume, getClientIp } from "@/lib/rate-limit";
 import { isValidUuid } from "@/lib/utils";
-import { notifyUploadFailure, type UploadAlertPath } from "@/lib/upload-alerts";
+import { notifyUploadFailure, redact, type UploadAlertPath } from "@/lib/upload-alerts";
 import { loadCallerProfile, requireNotificationContext } from "@/app/api/notifications/_shared";
 
 export const runtime = "nodejs";
@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
         folder: text(body.folder) || null,
         phase: text(body.phase, "client_upload"),
         upload_path: uploadPath(body.uploadPath),
-        error: errorMessage.slice(0, 500),
+        error: redact(errorMessage).slice(0, 500),
         email_sent: result.emailSent,
         telegram_sent: result.telegramSent,
       },

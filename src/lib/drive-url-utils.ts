@@ -5,7 +5,7 @@ export function getPublicDriveDownloadUrl(fileId: string): string {
 
 // Drive file IDs are base64-url-ish, ~20-80 chars. Same shape guard the finalize route
 // uses before handing an ID to the Drive API.
-const DRIVE_FILE_ID_RE = /^[a-zA-Z0-9_-]{20,80}$/;
+export const DRIVE_FILE_ID_RE = /^[a-zA-Z0-9_-]{20,80}$/;
 
 // Resolves the Drive file ID embedded in an app media URL (e.g.
 // "/api/drive/stream?id=<fileId>" or an absolute publish URL "...stream?id=<fileId>&token=..").

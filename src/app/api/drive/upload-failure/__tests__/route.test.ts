@@ -25,9 +25,13 @@ vi.mock("@/app/api/notifications/_shared", () => ({
   loadCallerProfile: sharedMocks.loadCallerProfile,
 }));
 
-vi.mock("@/lib/upload-alerts", () => ({
-  notifyUploadFailure: alertMocks.notifyUploadFailure,
-}));
+vi.mock("@/lib/upload-alerts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/upload-alerts")>();
+  return {
+    ...actual,
+    notifyUploadFailure: alertMocks.notifyUploadFailure,
+  };
+});
 
 vi.mock("@/lib/rate-limit", () => ({
   consume: rateLimitMocks.consume,
@@ -97,6 +101,23 @@ describe("POST /api/drive/upload-failure", () => {
       p_entity_id: "11111111-1111-4111-8111-111111111111",
       p_workspace_id: "00000000-0000-0000-0000-000000000001",
     }));
+  });
+
+  it("redacts Bearer tokens and secrets from the persisted audit error field", async () => {
+    const res = await POST(makeRequest({
+      phase: "resumable_chunk",
+      errorMessage: "Authorization failed: Bearer sk-secret-abc123",
+      errorDetail: "token=supersecret&password=hunter2",
+    }));
+
+    expect(res.status).toBe(200);
+    const auditCall = adminMocks.rpc.mock.calls.find(
+      ([name]: [string]) => name === "record_audit_event",
+    );
+    expect(auditCall).toBeDefined();
+    const metadata = auditCall![1].p_metadata as Record<string, unknown>;
+    expect(metadata.error).not.toMatch(/sk-secret-abc123/);
+    expect(metadata.error).toContain("[redacted]");
   });
 
   it("rejects unauthenticated failure reports", async () => {
