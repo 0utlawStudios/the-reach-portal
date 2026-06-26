@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { ALLOWED_DRIVE_ROLES } from "@/lib/drive-policy";
-import { signDriveStreamToken } from "@/lib/google-drive";
+import { signDriveStreamToken, signStableThumbToken } from "@/lib/google-drive";
 import { requireBearerTeamRole, requireRole, type WorkspaceRole } from "@/lib/auth/require";
 import { DRIVE_FILE_ID_RE, isKnownAppDriveFile, isKnownPlaybackObject, parsePlaybackStorageKey } from "@/lib/media-access";
 import { signPlaybackViewToken } from "@/lib/media-playback-token";
@@ -80,9 +80,15 @@ export async function GET(request: NextRequest) {
   }
 
   if (target.kind === "drive") {
+    // A thumbnail is a low-sensitivity poster: mint a STABLE workspace-bound token so the URL is
+    // byte-identical across signs and edge-cacheable. Full-res + streams keep the per-request
+    // 15-min private token (per-user gating). See signStableThumbToken / PLAN-thereach-thumbnail-stable-token.md.
+    const isThumb = target.path === "/api/media/image-preview" && target.params.get("size") === "thumb";
     target.params.set(
       "token",
-      signDriveStreamToken(target.fileId, auth.workspaceId, Date.now() + PRIVATE_VIEW_TOKEN_TTL_MS, "private"),
+      isThumb
+        ? signStableThumbToken(target.fileId, auth.workspaceId)
+        : signDriveStreamToken(target.fileId, auth.workspaceId, Date.now() + PRIVATE_VIEW_TOKEN_TTL_MS, "private"),
     );
   } else {
     target.params.set(

@@ -130,6 +130,8 @@ async function checkAuth(req: NextRequest, fileId: string): Promise<{
 }> {
   const signedToken = req.nextUrl.searchParams.get("token");
   const signedClaims = verifyDriveStreamToken(fileId, signedToken);
+  // Only stream-grade tokens are honored here. A "thumb" capability is deliberately NOT accepted
+  // — it falls through to session auth, so a thumbnail token can never stream original video.
   if (signedClaims?.purpose === "publish" || signedClaims?.purpose === "private") {
     return { ok: true, authed: true, signed: true, signedPurpose: signedClaims.purpose, workspaceId: signedClaims.workspaceId };
   }

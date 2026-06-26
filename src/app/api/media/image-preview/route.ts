@@ -459,7 +459,7 @@ async function workspaceAuth(req: NextRequest): Promise<{ workspaceId?: string; 
 async function checkAuth(req: NextRequest, fileId: string): Promise<{
   ok: boolean;
   signed: boolean;
-  signedPurpose?: "private" | "publish";
+  signedPurpose?: "private" | "publish" | "thumb";
   workspaceId?: string;
   userId?: string;
   knownInWorkspace?: boolean;
@@ -467,7 +467,9 @@ async function checkAuth(req: NextRequest, fileId: string): Promise<{
 }> {
   const signedToken = req.nextUrl.searchParams.get("token");
   const signedClaims = verifyDriveStreamToken(fileId, signedToken);
-  if (signedClaims?.purpose === "publish" || signedClaims?.purpose === "private") {
+  // "thumb" is a stable, edge-cacheable capability scoped to the small poster only; the GET
+  // handler rejects it for size=full. "private"/"publish" keep their existing reach.
+  if (signedClaims?.purpose === "publish" || signedClaims?.purpose === "private" || signedClaims?.purpose === "thumb") {
     return { ok: true, signed: true, signedPurpose: signedClaims.purpose, workspaceId: signedClaims.workspaceId };
   }
 
@@ -539,6 +541,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "File does not belong to this workspace" }, { status: 403 });
     }
     const previewSize = previewSizeFromRequest(request);
+    // A stable thumb capability is scoped to the small poster ONLY. It must never be replayed
+    // against the full-resolution path (which proxies the original image bytes).
+    if (auth.signedPurpose === "thumb" && previewSize !== "thumb") {
+      return NextResponse.json({ error: "Thumbnail token cannot access full-resolution media" }, { status: 403 });
+    }
     const mimeType = normalizeDriveMimeType(meta.mimeType, meta.name);
     const extensionMimeType = normalizeDriveMimeType("", meta.name);
     const heicPreview = isHeicPreviewMime(mimeType, extensionMimeType);
@@ -581,7 +588,7 @@ export async function GET(request: NextRequest) {
       );
       if (fastThumbnail) {
         if (fastThumbnail.writeCacheKey) schedulePreviewCacheWrite(admin, fastThumbnail.writeCacheKey, fastThumbnail.preview);
-        return browserSafeJpegResponse(fastThumbnail.preview, auth.signedPurpose === "publish" ? "publish" : "private", previewSize, fastThumbnail.cacheState);
+        return browserSafeJpegResponse(fastThumbnail.preview, auth.signedPurpose === "publish" || auth.signedPurpose === "thumb" ? "publish" : "private", previewSize, fastThumbnail.cacheState);
       }
       if (videoPoster) {
         // No Drive poster yet (still processing) — never download/rasterize the video itself.
@@ -593,7 +600,7 @@ export async function GET(request: NextRequest) {
         readCachedPreview(admin, legacyPreviewCacheKey(fileId, cacheWorkspaceId))
           .then((preview) => preview ? { preview, cacheState: "HIT" } : null),
       ]);
-      if (cachedFull) return browserSafeJpegResponse(cachedFull.preview, auth.signedPurpose === "publish" ? "publish" : "private", previewSize, cachedFull.cacheState);
+      if (cachedFull) return browserSafeJpegResponse(cachedFull.preview, auth.signedPurpose === "publish" || auth.signedPurpose === "thumb" ? "publish" : "private", previewSize, cachedFull.cacheState);
     }
 
     const preview = await buildPreviewOnce(cacheKey, async () => {
@@ -608,7 +615,7 @@ export async function GET(request: NextRequest) {
       schedulePreviewCacheWrite(admin, cacheKey, converted);
       return converted;
     });
-    return browserSafeJpegResponse(preview, auth.signedPurpose === "publish" ? "publish" : "private", previewSize, "MISS");
+    return browserSafeJpegResponse(preview, auth.signedPurpose === "publish" || auth.signedPurpose === "thumb" ? "publish" : "private", previewSize, "MISS");
   } catch (err) {
     if (err instanceof ImagePreviewHttpError) {
       return NextResponse.json({ error: err.message }, { status: err.status });

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { ALLOWED_DRIVE_ROLES } from "@/lib/drive-policy";
-import { signDriveStreamToken } from "@/lib/google-drive";
+import { signDriveStreamToken, signStableThumbToken } from "@/lib/google-drive";
 import { requireBearerTeamRole, requireRole, type WorkspaceRole } from "@/lib/auth/require";
 import {
   DRIVE_FILE_ID_RE,
@@ -106,9 +106,14 @@ export async function POST(request: NextRequest) {
     if (!target) return { input: raw, url: null };
     if (target.kind === "drive") {
       if (!knownDriveIds.has(target.fileId)) return { input: raw, url: null };
+      // Thumbnails get a STABLE workspace-bound token (edge-cacheable, byte-identical URL);
+      // full-res + streams keep the per-request 15-min private token. See view-url/route.ts.
+      const isThumb = target.path === "/api/media/image-preview" && target.params.get("size") === "thumb";
       target.params.set(
         "token",
-        signDriveStreamToken(target.fileId, auth.workspaceId, Date.now() + PRIVATE_VIEW_TOKEN_TTL_MS, "private"),
+        isThumb
+          ? signStableThumbToken(target.fileId, auth.workspaceId)
+          : signDriveStreamToken(target.fileId, auth.workspaceId, Date.now() + PRIVATE_VIEW_TOKEN_TTL_MS, "private"),
       );
     } else {
       if (target.workspaceId !== auth.workspaceId || !knownPlaybackKeys.has(target.storageKey)) {

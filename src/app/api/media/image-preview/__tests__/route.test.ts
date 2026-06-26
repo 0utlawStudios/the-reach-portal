@@ -652,6 +652,55 @@ describe("GET /api/media/image-preview", () => {
     expect(sharpMocks.sharp).not.toHaveBeenCalled();
   });
 
+  it("serves a stable thumb-token poster with public (edge-cacheable) headers", async () => {
+    driveMocks.verifyDriveStreamToken.mockReturnValue({
+      workspaceId: "00000000-0000-0000-0000-000000000001",
+      expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+      purpose: "thumb",
+    });
+    driveMocks.getFileMetadata.mockResolvedValueOnce({
+      id: FILE_ID,
+      name: "cover.jpg",
+      mimeType: "image/jpeg",
+      size: 1000,
+      parents: ["raw-files-folder"],
+      appProperties: { workspaceId: "00000000-0000-0000-0000-000000000001" },
+    });
+
+    const res = await GET(makeRequest(`/api/media/image-preview?id=${FILE_ID}&token=thumb&size=thumb`));
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/jpeg");
+    // public = shared edge/CDN cache, the whole point of the stable token.
+    expect(res.headers.get("cache-control")).toBe("public, max-age=86400, immutable");
+    expect(res.headers.get("x-preview-size")).toBe("thumb");
+  });
+
+  it("rejects a thumb token replayed against the full-resolution path", async () => {
+    driveMocks.verifyDriveStreamToken.mockReturnValue({
+      workspaceId: "00000000-0000-0000-0000-000000000001",
+      expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+      purpose: "thumb",
+    });
+    driveMocks.getFileMetadata.mockResolvedValueOnce({
+      id: FILE_ID,
+      name: "source.heic",
+      mimeType: "image/heic",
+      size: 2 * 1024 * 1024,
+      parents: ["raw-files-folder"],
+      appProperties: { workspaceId: "00000000-0000-0000-0000-000000000001" },
+    });
+
+    // No size param → full-res. A thumb capability must NOT reach the original bytes.
+    const res = await GET(makeRequest(`/api/media/image-preview?id=${FILE_ID}&token=thumb`));
+    const body = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(body.error).toMatch(/full-resolution/i);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(sharpMocks.sharp).not.toHaveBeenCalled();
+  });
+
   it("rejects a full-size video preview (a poster is thumb-only)", async () => {
     driveMocks.getFileMetadata.mockResolvedValueOnce({
       id: FILE_ID,

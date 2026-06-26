@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getPublishStreamUrl, getStreamUrl, signDriveStreamToken, verifyDriveStreamToken } from "@/lib/google-drive";
+import { getPublishStreamUrl, getStreamUrl, signDriveStreamToken, signStableThumbToken, stableThumbTokenExpiry, verifyDriveStreamToken } from "@/lib/google-drive";
 
 const OLD_ENV = { ...process.env };
 const FILE_ID = "abcdefghijklmnopqrst";
@@ -63,6 +63,47 @@ describe("Drive stream tokens", () => {
       .toEqual({ workspaceId: WORKSPACE_ID, expiresAt: privateExpiry, purpose: "private" });
     expect(verifyDriveStreamToken(FILE_ID, `v1.${publishExpiry}.${WORKSPACE_ID}.${publishSig}`))
       .toEqual({ workspaceId: WORKSPACE_ID, expiresAt: publishExpiry, purpose: "publish" });
+  });
+
+  it("signs a stable, workspace-bound thumbnail capability that verifies as purpose thumb", () => {
+    const token = signStableThumbToken(FILE_ID, WORKSPACE_ID);
+    const claims = verifyDriveStreamToken(FILE_ID, token);
+    expect(claims).toEqual({ workspaceId: WORKSPACE_ID, expiresAt: stableThumbTokenExpiry(), purpose: "thumb" });
+    // Bound to this exact file — a thumb token cannot be moved to another file id.
+    expect(verifyDriveStreamToken("other-file-id-abcdefghijkl", token)).toBeNull();
+  });
+
+  it("produces a BYTE-IDENTICAL thumbnail token across signs (so the URL is edge-cacheable)", () => {
+    const first = signStableThumbToken(FILE_ID, WORKSPACE_ID);
+    // Advance time within the same 30-day bucket — the token must not drift.
+    vi.advanceTimersByTime(6 * 24 * 60 * 60 * 1000);
+    const second = signStableThumbToken(FILE_ID, WORKSPACE_ID);
+    expect(second).toBe(first);
+    // A different workspace gets a different token (no cross-workspace URL collision).
+    expect(signStableThumbToken(FILE_ID, "00000000-0000-0000-0000-0000000000ff")).not.toBe(first);
+  });
+
+  it("keeps the thumbnail expiry bounded — future, never permanent, bucket-aligned", () => {
+    const BUCKET = 30 * 24 * 60 * 60 * 1000;
+    const expiry = stableThumbTokenExpiry();
+    expect(expiry % BUCKET).toBe(0);
+    expect(expiry - Date.now()).toBeGreaterThan(BUCKET); // at least ~30 days out
+    expect(expiry - Date.now()).toBeLessThanOrEqual(2 * BUCKET); // never more than ~60 days
+    // Next bucket rolls the token forward (monthly rotation), not frozen forever.
+    expect(stableThumbTokenExpiry(Date.now() + 2 * BUCKET)).toBeGreaterThan(expiry);
+  });
+
+  it("rejects a thumbnail token whose signature was tampered", () => {
+    const token = signStableThumbToken(FILE_ID, WORKSPACE_ID);
+    const tampered = `${token.slice(0, -2)}xy`;
+    expect(verifyDriveStreamToken(FILE_ID, tampered)).toBeNull();
+  });
+
+  it("rejects an expired thumbnail token", () => {
+    const token = signStableThumbToken(FILE_ID, WORKSPACE_ID);
+    // Jump past the bucketed expiry (~2 months) — verify must fail closed.
+    vi.advanceTimersByTime(70 * 24 * 60 * 60 * 1000);
+    expect(verifyDriveStreamToken(FILE_ID, token)).toBeNull();
   });
 
   it("returns same-origin tokenless private app URLs and signed publish URLs", () => {

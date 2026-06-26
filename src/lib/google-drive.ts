@@ -331,7 +331,11 @@ const DRIVE_STREAM_TOKEN_VERSION = "v1";
 const DRIVE_STREAM_TOKEN_VERSION_WITH_PURPOSE = "v2";
 const DRIVE_STREAM_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 const DRIVE_PUBLISH_STREAM_TOKEN_TTL_MS = 365 * 24 * 60 * 60 * 1000;
-type DriveStreamTokenPurpose = "private" | "publish";
+// Thumbnail tokens are bucketed to a 30-day grid so the SAME (fileId, workspaceId) yields the
+// SAME token (and therefore a byte-identical, edge-cacheable URL) for a whole month, then
+// rotates. Never per-request, never permanent. See signStableThumbToken.
+const DRIVE_THUMB_TOKEN_BUCKET_MS = 30 * 24 * 60 * 60 * 1000;
+type DriveStreamTokenPurpose = "private" | "publish" | "thumb";
 
 function appUrlOrigin(): string {
   const configured = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL || "http://localhost:3000";
@@ -365,6 +369,20 @@ export function signDriveStreamToken(
   return `${DRIVE_STREAM_TOKEN_VERSION_WITH_PURPOSE}.${expiresAt}.${workspaceId}.${purpose}.${signature}`;
 }
 
+// A STABLE thumbnail capability: deterministic for a given (fileId, workspaceId) across the
+// current 30-day bucket, so the resulting image-preview URL is byte-identical between signs,
+// sessions, devices, and workspace members — letting the browser + Vercel edge cache it once.
+// The expiry sits ~30–60 days out and rolls forward each month; it is never per-request and
+// never permanent. It grants ONLY the small thumbnail (image-preview rejects size=full for it,
+// and the video stream / playback routes never honor it).
+export function stableThumbTokenExpiry(now = Date.now()): number {
+  return (Math.floor(now / DRIVE_THUMB_TOKEN_BUCKET_MS) + 2) * DRIVE_THUMB_TOKEN_BUCKET_MS;
+}
+
+export function signStableThumbToken(fileId: string, workspaceId: string): string {
+  return signDriveStreamToken(fileId, workspaceId, stableThumbTokenExpiry(), "thumb");
+}
+
 export function verifyDriveStreamToken(
   fileId: string,
   token: string | null | undefined,
@@ -378,7 +396,7 @@ export function verifyDriveStreamToken(
     if (version === DRIVE_STREAM_TOKEN_VERSION_WITH_PURPOSE) {
       const purpose = maybePurpose as DriveStreamTokenPurpose;
       const signature = maybeSignature;
-      if ((purpose !== "private" && purpose !== "publish") || !signature) return null;
+      if ((purpose !== "private" && purpose !== "publish" && purpose !== "thumb") || !signature) return null;
       const expectedV2 = signDriveStreamPayloadV2(fileId, workspaceId, expiresAt, purpose);
       const aV2 = Buffer.from(expectedV2);
       const bV2 = Buffer.from(signature);

@@ -9,6 +9,7 @@ vi.mock("@/lib/auth/require", () => ({
 }));
 vi.mock("@/lib/google-drive", () => ({
   signDriveStreamToken: vi.fn(() => "drive-token"),
+  signStableThumbToken: vi.fn(() => "thumb-token"),
 }));
 vi.mock("@/lib/media-playback-token", () => ({
   signPlaybackViewToken: vi.fn(() => "playback-token"),
@@ -58,9 +59,25 @@ describe("POST /api/media/view-url/batch", () => {
       ],
     }));
     const body = await res.json() as { results: Array<{ input: string; url: string | null }> };
-    expect(body.results[0].url).toContain("token=drive-token");
+    // A thumbnail target gets the STABLE workspace-bound token (edge-cacheable URL).
+    expect(body.results[0].url).toContain("token=thumb-token");
     expect(body.results[0].url).toContain(`id=${ID_A}`);
     expect(body.results[1].url).toBeNull();
+  });
+
+  it("uses the per-request private token for non-thumbnail targets (full-res + stream)", async () => {
+    knownState.drive = new Set([ID_A]);
+    const res = await POST(makeRequest({
+      urls: [
+        `/api/media/image-preview?id=${ID_A}&size=full`,
+        `/api/drive/stream?id=${ID_A}`,
+      ],
+    }));
+    const body = await res.json() as { results: Array<{ url: string | null }> };
+    // Full-res image and video stream keep per-user gating — NOT the stable thumb capability.
+    expect(body.results[0].url).toContain("token=drive-token");
+    expect(body.results[1].url).toContain("token=drive-token");
+    expect(body.results.every((r) => !r.url?.includes("thumb-token"))).toBe(true);
   });
 
   it("returns null for urls outside the allowed media routes", async () => {

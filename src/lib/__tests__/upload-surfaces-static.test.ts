@@ -647,8 +647,11 @@ describe("Drive upload surfaces", () => {
     expect(driveStream).toContain('"private, max-age=86400');
 
     const imagePreview = source("src/app/api/media/image-preview/route.ts");
-    expect(imagePreview).toContain('signedPurpose === "publish" ? "publish" : "private"');
+    // Thumb + publish are served public (edge-cacheable); private stays private.
+    expect(imagePreview).toContain('auth.signedPurpose === "publish" || auth.signedPurpose === "thumb" ? "publish" : "private"');
     expect(imagePreview).toContain('cacheScope === "publish"');
+    // A thumb capability must never reach the full-resolution path.
+    expect(imagePreview).toContain('Thumbnail token cannot access full-resolution media');
   });
 
   it("does not authorize Drive media or HEIC previews from Referer alone", () => {
