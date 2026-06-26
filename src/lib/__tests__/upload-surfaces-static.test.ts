@@ -123,7 +123,11 @@ describe("Drive upload surfaces", () => {
     expect(mediaPage).toContain("syncedUsedInValue(asset.usedIn, usage?.automaticCards || [])");
     expect(mediaPage).toContain("MEDIA_MANUAL_USED_TAG");
     expect(mediaPage).toContain("toggleManualUsed");
-    expect(mediaPage).toContain('label={`${asset.name} video preview`}');
+    expect(mediaPage).toContain('label={`${lightboxAsset.name} video preview`}');
+    // Grid/list video cells render Drive's cached poster frame (an image) instead of a live
+    // video element that re-fetches every refresh; the live player stays in the lightbox.
+    expect(mediaPage).toContain("videoPosterUrl(asset)");
+    expect(mediaPage).toContain('fallbackIcon="video"');
     expect(mediaPage).toContain('className="max-w-full max-h-[60vh] object-contain rounded-lg bg-black"');
     expect(mediaPage).toContain('className="w-full h-[60vh] max-w-full max-h-[60vh] object-contain rounded-lg select-none"');
 

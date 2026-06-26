@@ -542,13 +542,18 @@ export async function GET(request: NextRequest) {
     const mimeType = normalizeDriveMimeType(meta.mimeType, meta.name);
     const extensionMimeType = normalizeDriveMimeType("", meta.name);
     const heicPreview = isHeicPreviewMime(mimeType, extensionMimeType);
+    // Videos get a poster ONLY from Drive's pre-generated thumbnailLink (thumb size). We never
+    // rasterize video bytes here, so the size guard and image-conversion fallback are skipped
+    // for video; if Drive has no poster yet (still processing) we 404 and the client shows the
+    // film-icon fallback instead of mounting a live <video> per cell.
+    const videoPoster = previewSize === "thumb" && (mimeType.startsWith("video/") || extensionMimeType.startsWith("video/"));
     if (!heicPreview && previewSize !== "thumb") {
       return NextResponse.json({ error: "Preview conversion is only supported for HEIC/HEIF images" }, { status: 415 });
     }
-    if (!heicPreview && !isBrowserSafeThumbnailMime(mimeType, extensionMimeType)) {
+    if (!heicPreview && !videoPoster && !isBrowserSafeThumbnailMime(mimeType, extensionMimeType)) {
       return NextResponse.json({ error: "Thumbnail preview is only supported for images" }, { status: 415 });
     }
-    if (!Number.isFinite(meta.size) || meta.size <= 0 || meta.size > MAX_PREVIEW_SOURCE_BYTES) {
+    if (!videoPoster && (!Number.isFinite(meta.size) || meta.size <= 0 || meta.size > MAX_PREVIEW_SOURCE_BYTES)) {
       return NextResponse.json({ error: "Image is too large for preview conversion" }, { status: 413 });
     }
 
@@ -577,6 +582,10 @@ export async function GET(request: NextRequest) {
       if (fastThumbnail) {
         if (fastThumbnail.writeCacheKey) schedulePreviewCacheWrite(admin, fastThumbnail.writeCacheKey, fastThumbnail.preview);
         return browserSafeJpegResponse(fastThumbnail.preview, auth.signedPurpose === "publish" ? "publish" : "private", previewSize, fastThumbnail.cacheState);
+      }
+      if (videoPoster) {
+        // No Drive poster yet (still processing) — never download/rasterize the video itself.
+        return NextResponse.json({ error: "Video poster not available yet" }, { status: 404 });
       }
     } else {
       const cachedFull = await firstAvailablePreview([

@@ -604,4 +604,69 @@ describe("GET /api/media/image-preview", () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
     expect(sharpMocks.sharp).not.toHaveBeenCalled();
   });
+
+  it("serves Drive's poster frame for a large video thumbnail without rasterizing the video", async () => {
+    driveMocks.getFileMetadata.mockResolvedValueOnce({
+      id: FILE_ID,
+      name: "IMG_3714.MOV",
+      mimeType: "video/quicktime",
+      // far over the image size cap — the cap must be bypassed for a thumbnailLink poster.
+      size: 200 * 1024 * 1024,
+      parents: ["media-library-folder"],
+      appProperties: { workspaceId: "00000000-0000-0000-0000-000000000001" },
+      thumbnailLink: "https://drive.example/video-poster",
+    });
+    globalThis.fetch = vi.fn(async () => new Response(new Uint8Array([0xff, 0xd8, 0x55]), {
+      status: 200,
+      headers: { "content-type": "image/jpeg" },
+    })) as unknown as typeof fetch;
+
+    const res = await GET(makeRequest(`/api/media/image-preview?id=${FILE_ID}&token=signed&size=thumb`));
+    const body = new Uint8Array(await res.arrayBuffer());
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/jpeg");
+    expect(Array.from(body)).toEqual([0xff, 0xd8, 0x55]);
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "https://drive.example/video-poster",
+      expect.objectContaining({ headers: { Authorization: "Bearer drive-token" } }),
+    );
+    expect(sharpMocks.sharp).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 for a video with no Drive poster yet instead of downloading the video", async () => {
+    driveMocks.getFileMetadata.mockResolvedValueOnce({
+      id: FILE_ID,
+      name: "IMG_3714.MOV",
+      mimeType: "video/quicktime",
+      size: 200 * 1024 * 1024,
+      parents: ["media-library-folder"],
+      appProperties: { workspaceId: "00000000-0000-0000-0000-000000000001" },
+      // no thumbnailLink — Drive is still processing the video
+    });
+
+    const res = await GET(makeRequest(`/api/media/image-preview?id=${FILE_ID}&token=signed&size=thumb`));
+
+    expect(res.status).toBe(404);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(sharpMocks.sharp).not.toHaveBeenCalled();
+  });
+
+  it("rejects a full-size video preview (a poster is thumb-only)", async () => {
+    driveMocks.getFileMetadata.mockResolvedValueOnce({
+      id: FILE_ID,
+      name: "IMG_3714.MOV",
+      mimeType: "video/quicktime",
+      size: 200 * 1024 * 1024,
+      parents: ["media-library-folder"],
+      appProperties: { workspaceId: "00000000-0000-0000-0000-000000000001" },
+      thumbnailLink: "https://drive.example/video-poster",
+    });
+
+    const res = await GET(makeRequest());
+
+    expect(res.status).toBe(415);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(sharpMocks.sharp).not.toHaveBeenCalled();
+  });
 });

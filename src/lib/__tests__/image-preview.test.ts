@@ -114,6 +114,21 @@ describe("image preview routing", () => {
       .toBe(`/api/drive/stream?id=${FILE_ID}`);
   });
 
+  it("routes Drive videos to a cached poster thumbnail instead of a live stream", () => {
+    // A video cell asks for a thumb -> the image-preview poster (Drive's generated frame),
+    // so the grid renders a cached image, not a <video> that re-fetches every refresh.
+    expect(browserImagePreviewUrl(`/api/drive/stream?id=${FILE_ID}`, { mimeType: "video/quicktime", size: "thumb" }))
+      .toBe(`/api/media/image-preview?id=${FILE_ID}&size=thumb`);
+    expect(browserImagePreviewUrl(`/api/drive/stream?id=${FILE_ID}`, { mimeType: "video/mp4", fileName: "clip.mp4", size: "thumb" }))
+      .toBe(`/api/media/image-preview?id=${FILE_ID}&size=thumb`);
+    // A bare .MOV filename (no explicit mime) still resolves to a poster.
+    expect(browserImagePreviewUrl(`/api/drive/stream?id=${FILE_ID}`, { fileName: "IMG_3714.MOV", size: "thumb" }))
+      .toBe(`/api/media/image-preview?id=${FILE_ID}&size=thumb`);
+    // There is no full-size image for a video, so the full path leaves the raw URL untouched.
+    expect(browserImagePreviewUrl(`/api/drive/stream?id=${FILE_ID}`, { mimeType: "video/quicktime", size: "full" }))
+      .toBe(`/api/drive/stream?id=${FILE_ID}`);
+  });
+
   it("leaves local blobs untouched", () => {
     expect(browserImagePreviewUrl("blob:local-image", { mimeType: "image/heic", fileName: "source.heic" }))
       .toBe("blob:local-image");

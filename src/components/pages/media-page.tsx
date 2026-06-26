@@ -30,7 +30,7 @@ import { Input } from "@/components/ui/input";
 import {
   FolderOpen, Upload, Film, Image as ImageIcon, Search, Grid3X3, List,
   CheckCircle, Clock, X, Trash2, Eye, Link2, ExternalLink,
-  ChevronLeft, ChevronRight, Tag,
+  ChevronLeft, ChevronRight, Tag, Play,
 } from "lucide-react";
 
 type StatusFilter = "all" | "unused" | "inuse";
@@ -111,6 +111,13 @@ function uploadPathForSize(file: File): "proxy" | "resumable" {
 
 function mediaDisplayUrl(asset: Pick<MediaAsset, "url" | "driveProxyUrl" | "playbackUrl">): string {
   return stripPrivateMediaToken(asset.playbackUrl || asset.driveProxyUrl || asset.url);
+}
+
+// For a video cell we show Drive's generated poster frame (a cached image) instead of a live
+// video element that re-fetches every refresh. Use the Drive stream URL (it carries the file
+// id) so the poster route can resolve it; skip playbackUrl (a Supabase key with no Drive id).
+function videoPosterUrl(asset: Pick<MediaAsset, "url" | "driveProxyUrl">): string {
+  return stripPrivateMediaToken(asset.driveProxyUrl || asset.url);
 }
 
 // Human-readable file size. Returns null for missing/zero so legacy rows render nothing
@@ -820,14 +827,21 @@ export function MediaPage() {
                         {asset.type === "image" ? (
                           <PreviewImage src={mediaDisplayUrl(asset)} alt={asset.name} mimeType={asset.mimeType} fileName={asset.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                         ) : (
-                          <MediaVideo
-                            sources={mediaVideoSources(asset, true)}
-                            muted
-                            playsInline
-                            preload="metadata"
-                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 bg-black"
-                            label={`${asset.name} video preview`}
-                          />
+                          <>
+                            <PreviewImage
+                              src={videoPosterUrl(asset)}
+                              alt={asset.name}
+                              mimeType={asset.mimeType}
+                              fileName={asset.name}
+                              fallbackIcon="video"
+                              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            />
+                            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black/45 backdrop-blur-sm">
+                                <Play className="h-4 w-4 text-white fill-white translate-x-px" />
+                              </span>
+                            </div>
+                          </>
                         )}
                         <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded-md bg-black/50 backdrop-blur-sm text-[8px] text-white font-medium uppercase">{asset.type}</div>
                         {usage?.used ? (
@@ -902,13 +916,13 @@ export function MediaPage() {
                             {asset.type === "image" ? (
                               <PreviewImage src={mediaDisplayUrl(asset)} alt="" mimeType={asset.mimeType} fileName={asset.name} className="w-full h-full object-cover" />
                             ) : (
-                              <MediaVideo
-                                sources={mediaVideoSources(asset, true)}
-                                muted
-                                playsInline
-                                preload="metadata"
-                                className="w-full h-full object-cover bg-black"
-                                label={`${asset.name} video preview`}
+                              <PreviewImage
+                                src={videoPosterUrl(asset)}
+                                alt={asset.name}
+                                mimeType={asset.mimeType}
+                                fileName={asset.name}
+                                fallbackIcon="video"
+                                className="w-full h-full object-cover"
                               />
                             )}
                           </div>

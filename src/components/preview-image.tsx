@@ -2,7 +2,7 @@
 
 import type { ImgHTMLAttributes, SyntheticEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ImageOff } from "lucide-react";
+import { Film, ImageOff } from "lucide-react";
 import { RawImage } from "@/components/raw-image";
 import { browserImagePreviewUrl, isHeicLikeImage } from "@/lib/image-preview";
 import { isPrivateMediaRouteUrl, signedMediaViewUrl } from "@/lib/media-view-url";
@@ -15,6 +15,9 @@ import {
 type PreviewImageProps = ImgHTMLAttributes<HTMLImageElement> & {
   mimeType?: unknown;
   fileName?: unknown;
+  // Glyph shown when nothing can be rendered. Video posters use "video" so a missing poster
+  // (Drive still processing) reads as a video, not a broken image.
+  fallbackIcon?: "image" | "video";
 };
 
 const IMAGE_PREVIEW_LOAD_TIMEOUT_MS = 60_000;
@@ -29,6 +32,7 @@ export function PreviewImage({
   loading,
   onLoad,
   onError,
+  fallbackIcon = "image",
   ...props
 }: PreviewImageProps) {
   const wantsFullPreview = typeof className === "string" && className.includes("object-contain");
@@ -221,9 +225,10 @@ export function PreviewImage({
   }, [primarySrc, isLoaded, missingOrFailed, canShowFallback, shouldLoadPrimary, onError]);
 
   if (missingOrFailed || localHeicUnsupported) {
+    const FallbackGlyph = fallbackIcon === "video" ? Film : ImageOff;
     return (
       <div className={`${className || ""} flex items-center justify-center bg-[#6C655A]/15 text-[#6C655A]/55 dark:bg-white/[0.04] dark:text-gray-500`}>
-        <ImageOff className="h-[45%] max-h-5 min-h-3 w-[45%] max-w-5 min-w-3" aria-hidden="true" />
+        <FallbackGlyph className="h-[45%] max-h-5 min-h-3 w-[45%] max-w-5 min-w-3" aria-hidden="true" />
       </div>
     );
   }

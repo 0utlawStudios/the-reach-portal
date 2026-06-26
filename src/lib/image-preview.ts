@@ -42,9 +42,12 @@ export function imageThumbnailPreviewUrl(
 ): string | null {
   if (!url) return null;
   const normalized = normalizeDriveMimeType(opts.mimeType, opts.fileName || url);
+  // Videos get a cached poster from Drive's generated thumbnailLink (server side), so the
+  // grid shows a still frame like an image instead of mounting a live <video> per cell.
   const isSupportedThumbnail =
     HEIC_IMAGE_MIME_TYPES.has(normalized) ||
-    THUMBNAIL_IMAGE_MIME_TYPES.has(normalized);
+    THUMBNAIL_IMAGE_MIME_TYPES.has(normalized) ||
+    normalized.startsWith("video/");
   if (!isSupportedThumbnail) return null;
 
   const fileId = driveFileIdFromUrl(url);

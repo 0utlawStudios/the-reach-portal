@@ -247,4 +247,42 @@ describe("PreviewImage", () => {
     });
     expect(container.querySelector('[role="progressbar"]')).toBeNull();
   });
+
+  it("renders a Drive video as a cached poster image, not a live <video>", () => {
+    const { container } = render(
+      <PreviewImage
+        src={`/api/drive/stream?id=${FILE_ID}`}
+        mimeType="video/quicktime"
+        fileName="IMG_3714.MOV"
+        alt="IMG_3714.MOV"
+        fallbackIcon="video"
+        className="w-full h-full object-cover"
+      />,
+    );
+    expect(container.querySelector("video")).toBeNull();
+    expect(container.querySelector("img")).toHaveAttribute("src", `/api/media/image-preview?id=${FILE_ID}&size=thumb`);
+  });
+
+  it("shows the video fallback glyph (not a broken image) when a video has no poster yet", async () => {
+    mockSignedMediaViewUrl.mockResolvedValue(null);
+    const { container } = render(
+      <PreviewImage
+        src={`/api/drive/stream?id=${FILE_ID}`}
+        mimeType="video/quicktime"
+        fileName="IMG_3714.MOV"
+        alt="IMG_3714.MOV"
+        fallbackIcon="video"
+        className="w-full h-full object-cover"
+      />,
+    );
+    const img = container.querySelector("img");
+    await act(async () => {
+      fireEvent.error(img!);
+    });
+    await waitFor(() => {
+      const svg = container.querySelector("svg");
+      expect(svg).not.toBeNull();
+      expect(svg?.getAttribute("class") || "").toContain("film");
+    });
+  });
 });
