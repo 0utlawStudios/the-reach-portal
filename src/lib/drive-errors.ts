@@ -3,6 +3,7 @@ export type DriveErrorReason =
   | "appRateLimited"
   | "auth"
   | "sessionInvalid"
+  | "staleClient"
   | "validation"
   | "notFound"
   | "unsupportedType"
@@ -25,6 +26,7 @@ const MESSAGE_BY_REASON: Record<DriveErrorReason, string> = {
   appRateLimited: "Too many uploads. Please wait a moment before trying again.",
   auth: "Upload authorization failed. Please sign in again.",
   sessionInvalid: "Your upload session expired or could not be verified. Please retry the upload.",
+  staleClient: "This page is running an older version. Please refresh the page (fully reload), then upload again.",
   validation: "The upload request is invalid.",
   notFound: "The uploaded file could not be found.",
   unsupportedType: "Unsupported file type for this upload location.",
@@ -44,6 +46,15 @@ const MESSAGE_BY_REASON: Record<DriveErrorReason, string> = {
 // sending months of fixes to the wrong (Google/storage) layer.
 export function sessionInvalidError(): SanitizedDriveError {
   return { error: MESSAGE_BY_REASON.sessionInvalid, errorReason: "sessionInvalid", retryable: false };
+}
+
+// A chunk arrived with NO upload-session token or a malformed/old-format one. The signed
+// X-Upload-Token was added 2026-06-25 (commit 95f3d4a); a browser still running a client
+// bundle cached from before that update sends no token, so verify can never pass no matter
+// how many times the user retries. The honest, actionable answer is "refresh the page",
+// not "retry" — distinguishing this from a genuine expired/tampered token (sessionInvalid).
+export function staleClientError(): SanitizedDriveError {
+  return { error: MESSAGE_BY_REASON.staleClient, errorReason: "staleClient", retryable: false };
 }
 
 function cleanText(value: unknown): string {
@@ -153,6 +164,8 @@ export function statusForSanitizedDriveError(error: SanitizedDriveError, fallbac
       return 401;
     case "sessionInvalid":
       return 403;
+    case "staleClient":
+      return 409;
     case "validation":
       return 400;
     case "notFound":

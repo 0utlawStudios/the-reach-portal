@@ -614,15 +614,23 @@ async function uploadResumableChunk(
 // file restarted from byte 0 and then failed the entire upload.
 const CHUNK_RETRY_DELAYS = process.env.NODE_ENV === "test" ? [1, 3] : [2000, 5000];
 
-// Only CONNECTION-phase failures are retried in place: Google never returned an
-// HTTP status, so the resumable session offset is intact and re-PUTting just
-// this byte range is safe (the protocol dedups by offset). A server-RETURNED
-// error (a 403 "storage busy", a 5xx) is NOT retried here — it bubbles to the
-// session-level retry in uploadViaResumable, which re-mints the session, the
-// correct recovery for a poisoned/expired session.
+// Retry IN PLACE against the SAME resumable session for any TRANSIENT chunk failure:
+// connection-phase drops (network/timeout — Google never returned a status, the offset is
+// intact) AND server-returned transient 5xx/429 (serverError/driveRateLimited). The
+// resumable protocol dedups by byte offset, so re-PUTting this exact range resumes from
+// where the upload was — NOT a restart. Previously a single Google 503/429 on chunk 240 of
+// a 250-chunk (500 MB) upload bubbled to the session-level retry, which re-minted the
+// session and re-uploaded the WHOLE file from byte 0; a second blip then hard-failed it.
+// auth / sessionInvalid / notFound / validation are deliberately NOT retried here — those
+// mean the session or request is bad, so they bubble up to re-mint a fresh session.
 function isResumableChunkRetryableInPlace(error: Error): boolean {
   if (error instanceof DriveUploadError) {
-    return error.retryable && (error.reason === "network" || error.reason === "timeout");
+    return error.retryable && (
+      error.reason === "network" ||
+      error.reason === "timeout" ||
+      error.reason === "serverError" ||
+      error.reason === "driveRateLimited"
+    );
   }
   // Generic client-side stall/no-response conditions from the xhr watchdog/timers.
   return /no progress for 30s|did not respond/i.test(error.message);
@@ -662,8 +670,18 @@ async function putToGoogle(
   workspaceId: string | undefined,
   onProgress: ProgressCallback | undefined
 ): Promise<string> {
-  const accessToken = await getAccessTokenFromCurrentSession();
+  let accessToken = await getAccessTokenFromCurrentSession();
   for (let start = 0; start < file.size; start += DRIVE_RESUMABLE_CHUNK_SIZE) {
+    // Refresh the Bearer before each chunk so a long upload (a 500 MB file on a slow uplink
+    // can run >1 h, past the ~1 h Supabase JWT) never dies on an expired token mid-stream.
+    // getSession() auto-refreshes; keep the last good token if a refresh read momentarily
+    // hiccups, so a transient getSession blip can't fail an otherwise-healthy upload.
+    try {
+      const refreshed = await getAccessTokenFromCurrentSession();
+      if (refreshed) accessToken = refreshed;
+    } catch {
+      /* keep the last good token */
+    }
     const end = Math.min(start + DRIVE_RESUMABLE_CHUNK_SIZE, file.size) - 1;
 	    const result = await putResumableChunkWithRetry(file, session, folder, accessToken, workspaceId, start, end, onProgress);
     if (result.done) {

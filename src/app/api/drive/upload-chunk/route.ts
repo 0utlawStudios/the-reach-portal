@@ -18,6 +18,7 @@ import {
   sanitizedDriveErrorDetail,
   sanitizeUnknownUploadError,
   sessionInvalidError,
+  staleClientError,
   statusForSanitizedDriveError,
 } from "@/lib/drive-errors";
 import { verifyDriveUploadSessionToken } from "@/lib/drive-upload-session";
@@ -107,18 +108,26 @@ export async function POST(request: NextRequest) {
       folder,
       fileSize,
     })) {
-      // ROOT-CAUSE FIX: this is the 403 that production has been mislabeling as
-      // "Storage rejected the upload." It is a session/token failure (missing,
-      // expired, or signed-field mismatch), NOT a Google storage rejection.
-      // Return an explicit `sessionInvalid` reason so the client shows the truth,
-      // and LOG + ALERT it (this path was previously silent, so the real cause was
-      // invisible in every prior investigation).
-      const sanitized = sessionInvalidError();
-      const detail = sanitizedDriveErrorDetail(sanitized, 403);
-      console.error("[drive/upload-chunk] session token verify failed:", detail);
+      // This is the 403 production long mislabeled as "Storage rejected the upload." It is
+      // a session/token failure, NOT a Google storage rejection. Distinguish the two real
+      // sub-causes so the user gets an ACTIONABLE message:
+      //   • token missing/old-format  -> the page predates the 95f3d4a (2026-06-25) signed-
+      //     token update -> a cached/stale bundle that can NEVER pass verify -> "refresh".
+      //   • token present + well-formed -> genuine expired/tampered/field-mismatch -> "retry".
+      // The diagnostic line (no secret) pinpoints which on the next real failure.
+      const tokenPresent = typeof uploadToken === "string" && uploadToken.length > 0;
+      const tokenWellFormed = tokenPresent && /^v1\.\d+\.[A-Za-z0-9_-]+$/.test(uploadToken as string);
+      const sanitized = tokenWellFormed ? sessionInvalidError() : staleClientError();
+      const status = statusForSanitizedDriveError(sanitized, 403);
+      const detail = sanitizedDriveErrorDetail(sanitized, status);
+      console.error(
+        `[drive/upload-chunk] session token verify failed: ${detail} ` +
+        `tokenPresent=${tokenPresent} tokenLen=${tokenPresent ? (uploadToken as string).length : 0} ` +
+        `wellFormed=${tokenWellFormed} ws=${authContext.workspaceId} user=${user.id} folder=${folder} fileSize=${fileSize}`,
+      );
       scheduleUploadFailureAlert("drive/upload-chunk", {
         source: "server",
-        phase: "resumable_chunk_session_invalid",
+        phase: tokenWellFormed ? "resumable_chunk_session_invalid" : "resumable_chunk_stale_client",
         route: "/api/drive/upload-chunk",
         uploadPath: "resumable",
         workspaceId: authContext.workspaceId,
@@ -129,14 +138,14 @@ export async function POST(request: NextRequest) {
         fileName,
         mimeType,
         fileSize,
-        errorStatus: 403,
+        errorStatus: status,
         errorMessage: sanitized.error,
         errorDetail: detail,
         userAgent: request.headers.get("user-agent"),
         ip: getClientIp(request),
         requestUrl: request.url,
       });
-      return jsonResponse(sanitized, 403);
+      return jsonResponse(sanitized, status);
     }
     const chunk = Buffer.from(await request.arrayBuffer());
     const expectedLength = contentRange.end - contentRange.start + 1;

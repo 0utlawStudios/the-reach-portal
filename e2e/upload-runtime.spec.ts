@@ -662,9 +662,14 @@ async function deleteDriveFiles(fileIds: string[]) {
   const failures: string[] = [];
   await Promise.all([...new Set(fileIds)].map(async (fileId) => {
     try {
+      // TRASH, never permanent DELETE: the service account is a Content Manager on the
+      // Shared Drive (canTrash:true, canDelete:false), so a DELETE 403s and the test file
+      // leaks into the client's production Drive. PATCH { trashed:true } is the only path
+      // that actually removes it — mirrors src/lib/google-drive.ts trashDriveFile().
       const res = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?supportsAllDrives=true`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ trashed: true }),
       });
       if (!res.ok && res.status !== 404) failures.push(`${fileId}:${res.status}`);
     } catch (err) {

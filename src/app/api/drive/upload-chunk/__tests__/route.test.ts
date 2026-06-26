@@ -119,23 +119,32 @@ describe("POST /api/drive/upload-chunk", () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it("rejects a missing upload session token as sessionInvalid, not a fake storage error", async () => {
+  it("treats a MISSING upload token as a stale client (refresh), not a fake storage error", async () => {
     const res = await POST(makeRequest());
     const data = await res.json();
 
-    expect(res.status).toBe(403);
-    // ROOT-CAUSE REGRESSION: this 403 must NOT collapse into the generic
-    // "Storage rejected the upload." It is a session/token failure and must say so.
-    expect(data).toMatchObject({ errorReason: "sessionInvalid", retryable: false });
+    // A missing token means the page predates the signed-token update (95f3d4a): a cached
+    // bundle that can never pass verify, so the honest answer is "refresh", not "retry".
+    expect(res.status).toBe(409);
+    expect(data).toMatchObject({ errorReason: "staleClient", retryable: false });
     expect(JSON.stringify(data)).not.toContain("Storage rejected");
     expect(global.fetch).not.toHaveBeenCalled();
-    // Previously this 403 path was silent. It must now be observable.
+    // Previously this path was silent. It must now be observable + classified.
     expect(alertMocks.notifyUploadFailure).toHaveBeenCalledWith(expect.objectContaining({
       route: "/api/drive/upload-chunk",
-      phase: "resumable_chunk_session_invalid",
-      errorStatus: 403,
-      errorDetail: expect.stringContaining("reason=sessionInvalid"),
+      phase: "resumable_chunk_stale_client",
+      errorStatus: 409,
+      errorDetail: expect.stringContaining("reason=staleClient"),
     }));
+  });
+
+  it("treats a malformed (non-v1) upload token as a stale client", async () => {
+    const res = await POST(makeRequest({ headers: { "x-upload-token": "garbage-not-a-v1-token" } }));
+    const data = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(data).toMatchObject({ errorReason: "staleClient", retryable: false });
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 
   it("rejects a cross-workspace upload session token as sessionInvalid", async () => {

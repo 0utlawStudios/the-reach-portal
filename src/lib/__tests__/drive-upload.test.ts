@@ -612,7 +612,13 @@ describe("uploadManyToDrive", () => {
     expect(failed?.error?.message).toBe("Storage is busy. Retrying automatically.");
     expect(failed?.error?.message).not.toContain("raw Google");
     expect(run.proxySends.sort()).toEqual(["photo-1.jpg", "photo-2.jpg"]);
-    expect(run.directSends.filter((name) => name === "video-fail.mp4")).toHaveLength(2);
+    // A 403 userRateLimitExceeded sanitizes to driveRateLimited, which is a TRANSIENT
+    // condition Google asks us to retry with backoff. The chunk is now retried IN PLACE
+    // (CHUNK_RETRY_DELAYS = 3 attempts) against the same session before bubbling, and the
+    // session-level retry (PUT_RETRY_DELAYS = 2 sessions) re-mints once more: 3 × 2 = 6
+    // direct sends. The point of this test stands — the batch keeps going and the
+    // rate-limited video is reported failed, never restarting from byte 0 on each blip.
+    expect(run.directSends.filter((name) => name === "video-fail.mp4")).toHaveLength(6);
     expect(run.directSends).toContain("video-ok.mp4");
     expect(run.sessionRequests.filter((name) => name === "video-fail.mp4")).toHaveLength(2);
     expect(run.finalizeRequests).toEqual(["drive-video-ok.mp4:raw-files"]);
