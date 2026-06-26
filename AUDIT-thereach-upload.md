@@ -94,3 +94,89 @@ mislabeled "Storage rejected the upload."
   `https://www.googleapis.com/upload/drive/v3/files?...uploadType=resumable&upload_id=...`.
 - Honest per-file status: a session/token failure surfaces as `sessionInvalid` (403), never
   the generic "Storage rejected the upload."
+
+---
+
+# Session 2 — staleClient root cause, 31-agent QA swarm, P1 fix, every-upload notifications
+
+After the first gate passed, a real user (Shahannie) still hit "uploaded but got the error"
+and "saw the video, now it's gone." Live investigation + a fresh adversarial swarm found two
+*new* real causes the first pass missed.
+
+## 2A — The real shape of the "uploaded but errored" report (FIXED, live-verified)
+
+The video NEVER persisted (0 Drive files, 0 `upload_succeeded` events — only `sessionInvalid`
+failures in `audit_log_v2`). Server verify WORKS for a current client (reproduced live: chunk
+1 → 200). Cause = a **stale browser bundle**: a tab running client JS cached from before the
+signed `X-Upload-Token` (commit `95f3d4a`, 2026-06-25) sends NO token, so verify can never
+pass no matter how many retries — and the old code mislabeled that as `sessionInvalid`/storage.
+
+- New `staleClient` reason (`drive-errors.ts`): a MISSING/malformed token → **409** with an
+  actionable "This page is running an older version. Please refresh the page" message; a
+  well-formed-but-rejected token stays `sessionInvalid` (403, retry). Both now logged + alerted
+  (the stale path was previously silent). Commit `a536bed`.
+- `drive-upload.ts`: transient server 5xx/429 now retry IN PLACE on the same resumable session
+  (resume by byte offset, never restart from 0); per-chunk Bearer refresh so a multi-hour large
+  upload can't die on an expired JWT.
+- **Live-verified on deployed code**: full 5 MB `.mov` e2e = PASS; missing-token = 409
+  staleClient; garbage-token = 409 staleClient. No fake "storage rejected" wording.
+
+## 2B — 31-agent adversarial QA swarm (7 dimensions, each finding refuted by a skeptic)
+
+13 confirmed after refutation (11 dismissed). Severity after independent verification:
+**1 P1, 12 P3** (0 P0/P2). The two dismissed P2s (RR-01 resumable-offset, ET-01 unmapped-4xx)
+were refuted at the code level (256 KiB chunk alignment + 308-only-on-full-receipt; and the
+only remaining unmapped 4xx is a genuine reason-less 403 → correct `storageRejected`).
+
+### P1 — Deleting an in-use Media Library asset destroyed the post's media — FIXED (`13f07bf`)
+`delete-media/route.ts`. Library assets and post cards share ONE underlying Drive file
+(`ensureMediaAsset` dedups to one `media_assets` row per `file_id`). Deleting a library asset
+that a live post used **trashed the shared Drive file AND removed the row that authorizes the
+post's stream** — no guard at any layer. This is the most likely cause of "I think I mistakenly
+deleted it." Fix: before trashing, load every workspace post's reference columns once and
+**refuse** to trash a file any post references (by Drive file id OR the asset's UUID); **fail
+CLOSED** if usage can't be loaded. Client warns in the delete dialog + surfaces the "still used
+by N posts" reason. 7 new route tests (block-by-fileid, block-by-uuid, fail-closed, allow +
+audit + playback cleanup, file_id-first resolve).
+
+### P3s FIXED in this session
+- **delete-sync-4** — resolve the Drive id from the authoritative `file_id` column first, URL
+  parsing only as fallback (playback-optimized videos store no `?id=` URL).
+- **delete-sync-2** — every trash + 404 stale-row cleanup now writes a `media_trashed` /
+  `media_orphan_cleanup` audit row, so a mistaken delete can be matched back from Drive trash.
+- **delete-sync-3** — the private Supabase `media-playback` derivative is removed on delete
+  instead of orphaned.
+- **TEL-02** — the client `upload-failure` audit write now routes through `redact()` (parity
+  with the server path; no Bearer/token/secret can land in `audit_log_v2`).
+- **ET-02 / ET-03** — log the real Google reason on a chunk PUT failure; log + alert the
+  previously-silent "no file id" terminal branch.
+
+### P3s DEFERRED — accepted residuals (low-severity, self-healing or need a background job)
+- **CS-1** — `asset-review-drawer` cover-replace persists a `blob:` thumbnail to
+  `posts.thumbnail_url`; a tab-close mid-upload leaves a broken cover (single field,
+  self-heals on next cover replace). Fix = local preview state, do not route through updateCard.
+- **CS-4** — `staleClient` is shown via the 4 s auto-dismiss toast, same weight as a transient
+  error; the message is correct + re-appears each retry. Fix = a sticky reload banner (needs
+  `toast-context` persistent/action support + 4-surface wiring).
+- **CS-2 / CS-3** — a Drive upload whose DB row insert fails (rare 8 s timeout) or an abandoned
+  partial create-post batch leaves an orphaned Drive file with no row. NOT data loss (the
+  opposite — a file persists that should be trashed). The correct remedy is a background
+  reconciliation sweeper; naive trash-on-failure would risk a WORSE data-loss race (the insert
+  may have committed while the client timed out). Tracked for a sweeper.
+- **TEL-01** — a terminal server failure is alerted by both the server route and the client
+  re-report (2 pings, 2 audit rows under distinct actions). Notification hygiene only; single-
+  tenant low volume. Fix = suppress the client re-report when the server already alerted.
+- **TEL-03** — `playback-upload` records failures but no success parity (no server completion
+  route for the client-direct playback copy); accepted.
+
+## 2C — Every-upload notifications (`1ec601f`)
+Per owner request, a SUCCESSFUL upload now also pings the owner email + Telegram (not just
+failures), so all upload activity is visible. `notifyUploadSuccess` fires from the same success
+point as the audit (finalize + proxy-upload), off the request critical path. Opt-out via
+`UPLOAD_SUCCESS_NOTIFY=false`. Volume note: one ping per completed file.
+
+## 2D — App data hygiene
+Census of the live baseline workspace: **105 media_assets + 4 posts, ALL real user content,
+ZERO test artifacts.** Every test this session used an isolated temp user + full teardown
+(temp user, memberships, Drive files trashed, fixture rows removed). No test data persists in
+the app or the production DB.
