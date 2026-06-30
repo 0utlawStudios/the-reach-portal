@@ -160,6 +160,13 @@ describe("media resolver", () => {
     expect(driveFileIdFromUrl("https://drive.google.com/file/d/abc123/view?usp=sharing")).toBe("abc123");
   });
 
+  it("extracts Drive file ids from legacy media playback copy URLs", () => {
+    expect(driveFileIdFromUrl("https://example.supabase.co/storage/v1/object/public/media-playback/posts/post-1/1KKLjH3H9suJqGcd5dCbBPT5oYvWbAz8t-2ndd.mov"))
+      .toBe("1KKLjH3H9suJqGcd5dCbBPT5oYvWbAz8t");
+    expect(driveFileIdFromUrl("/api/media/playback?key=media-playback%2Fposts%2Fpost-1%2F1D3iXnP6Wz57JP39WwJ8wlMHRcfYuzlXw-THE-REACH.mov"))
+      .toBe("1D3iXnP6Wz57JP39WwJ8wlMHRcfYuzlXw");
+  });
+
   it("routes card thumbnails through the shared video-aware renderer across app surfaces", () => {
     const files = [
       "src/components/content-card.tsx",

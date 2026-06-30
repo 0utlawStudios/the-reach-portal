@@ -12,8 +12,21 @@ export function driveFileIdFromUrl(url: string | null | undefined): string | nul
   if (!url) return null;
   const queryMatch = url.match(/[?&]id=([^&]+)/);
   if (queryMatch?.[1]) return decodeURIComponent(queryMatch[1]);
+  const playbackKeyMatch = url.match(/[?&]key=([^&]+)/);
+  const playbackKeyFileId = legacyPlaybackDriveFileId(playbackKeyMatch?.[1]);
+  if (playbackKeyFileId) return playbackKeyFileId;
   const filePathMatch = url.match(/\/file\/d\/([^/]+)/);
-  return filePathMatch?.[1] ? decodeURIComponent(filePathMatch[1]) : null;
+  if (filePathMatch?.[1]) return decodeURIComponent(filePathMatch[1]);
+  return legacyPlaybackDriveFileId(url);
+}
+
+function legacyPlaybackDriveFileId(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const decoded = decodeURIComponent(value);
+  if (!decoded.includes("media-playback") && !decoded.includes("/posts/")) return null;
+  const fileName = decoded.split(/[?#]/)[0]?.split("/").pop() || "";
+  const match = fileName.match(/^([a-zA-Z0-9_]{20,80})-/);
+  return match?.[1] || null;
 }
 
 function isLikelyDriveFileId(value: string | null | undefined): value is string {

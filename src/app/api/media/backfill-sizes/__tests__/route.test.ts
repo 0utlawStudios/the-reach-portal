@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMocks = vi.hoisted(() => ({ requireBearerTeamRole: vi.fn() }));
-const driveMocks = vi.hoisted(() => ({ getFileMetadata: vi.fn() }));
+const driveMocks = vi.hoisted(() => ({ getFileMetadata: vi.fn(), getRootFolderId: vi.fn(), getSubfolderId: vi.fn() }));
 const supabaseMocks = vi.hoisted(() => ({
   rows: [] as Array<Record<string, unknown>>,
   selectError: null as { message: string } | null,
@@ -11,12 +11,17 @@ const supabaseMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/auth/require", () => ({ requireBearerTeamRole: authMocks.requireBearerTeamRole }));
-vi.mock("@/lib/google-drive", () => ({ getFileMetadata: driveMocks.getFileMetadata }));
+vi.mock("@/lib/google-drive", () => ({
+  getFileMetadata: driveMocks.getFileMetadata,
+  getRootFolderId: driveMocks.getRootFolderId,
+  getSubfolderId: driveMocks.getSubfolderId,
+}));
 vi.mock("@/lib/supabase/server", () => ({ createServiceRoleClient: () => makeAdmin() }));
 
 import { POST } from "../route";
 
 const WORKSPACE = "00000000-0000-4000-8000-000000000001";
+const BASELINE_WORKSPACE = "00000000-0000-0000-0000-000000000001";
 const ASSET_ID = "11111111-1111-4111-8111-111111111111";
 const FILE_ID = "abcdefghijklmnopqrstuvwx";
 
@@ -80,6 +85,8 @@ beforeEach(() => {
   supabaseMocks.updateError = null;
   supabaseMocks.updates = [];
   authMocks.requireBearerTeamRole.mockResolvedValue({ user: { id: "user-1" }, email: "a@example.com", role: "editor", workspaceId: WORKSPACE });
+  driveMocks.getRootFolderId.mockReturnValue("root-folder");
+  driveMocks.getSubfolderId.mockImplementation(async (folder: string) => `parent-${folder}`);
   driveMocks.getFileMetadata.mockResolvedValue({
     id: FILE_ID,
     name: "hero.jpg",
@@ -127,6 +134,73 @@ describe("POST /api/media/backfill-sizes", () => {
     });
   });
 
+  it("repairs baseline legacy files when the Drive parent is app-managed", async () => {
+    authMocks.requireBearerTeamRole.mockResolvedValueOnce({ user: { id: "user-1" }, email: "a@example.com", role: "editor", workspaceId: BASELINE_WORKSPACE });
+    driveMocks.getFileMetadata.mockResolvedValueOnce({
+      id: FILE_ID,
+      name: "legacy.jpg",
+      mimeType: "image/jpeg",
+      size: 345678,
+      parents: ["parent-media-library"],
+      appProperties: {},
+      thumbnailLink: "",
+    });
+
+    const res = await POST(makeRequest());
+    const body = await res.json() as { updated: number; results: Array<{ sizeBytes?: number; name?: string }> };
+
+    expect(res.status).toBe(200);
+    expect(body.updated).toBe(1);
+    expect(body.results[0]).toMatchObject({ sizeBytes: 345678, name: "legacy.jpg" });
+    expect(supabaseMocks.updates[0]).toMatchObject({
+      size_bytes: 345678,
+      name: "legacy.jpg",
+    });
+  });
+
+  it("does not trust untagged files outside the baseline workspace", async () => {
+    driveMocks.getFileMetadata.mockResolvedValueOnce({
+      id: FILE_ID,
+      name: "untagged.jpg",
+      mimeType: "image/jpeg",
+      size: 999,
+      parents: ["parent-media-library"],
+      appProperties: {},
+      thumbnailLink: "",
+    });
+
+    const res = await POST(makeRequest());
+    const body = await res.json() as { skipped: number; results: Array<{ status: string; reason?: string }> };
+
+    expect(res.status).toBe(200);
+    expect(body.skipped).toBe(1);
+    expect(body.results[0].status).toBe("skipped");
+    expect(body.results[0].reason).toContain("not trusted");
+    expect(supabaseMocks.updates).toEqual([]);
+  });
+
+  it("does not trust baseline legacy files outside app-managed Drive folders", async () => {
+    authMocks.requireBearerTeamRole.mockResolvedValueOnce({ user: { id: "user-1" }, email: "a@example.com", role: "editor", workspaceId: BASELINE_WORKSPACE });
+    driveMocks.getFileMetadata.mockResolvedValueOnce({
+      id: FILE_ID,
+      name: "outside.jpg",
+      mimeType: "image/jpeg",
+      size: 999,
+      parents: ["outside-parent"],
+      appProperties: {},
+      thumbnailLink: "",
+    });
+
+    const res = await POST(makeRequest());
+    const body = await res.json() as { skipped: number; results: Array<{ status: string; reason?: string }> };
+
+    expect(res.status).toBe(200);
+    expect(body.skipped).toBe(1);
+    expect(body.results[0].status).toBe("skipped");
+    expect(body.results[0].reason).toContain("not trusted");
+    expect(supabaseMocks.updates).toEqual([]);
+  });
+
   it("does not copy metadata from a Drive file tagged to another workspace", async () => {
     driveMocks.getFileMetadata.mockResolvedValueOnce({
       id: FILE_ID,
@@ -144,7 +218,7 @@ describe("POST /api/media/backfill-sizes", () => {
     expect(res.status).toBe(200);
     expect(body.skipped).toBe(1);
     expect(body.results[0].status).toBe("skipped");
-    expect(body.results[0].reason).toContain("not tagged to this workspace");
+    expect(body.results[0].reason).toContain("not trusted");
     expect(supabaseMocks.updates).toEqual([]);
   });
 

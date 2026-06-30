@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { ALLOWED_DRIVE_ROLES } from "@/lib/drive-policy";
 import { getFileMetadata } from "@/lib/google-drive";
 import { requireBearerTeamRole } from "@/lib/auth/require";
+import { buildMediaSizeMetadataUpdate, driveFileIdForSizeBackfillRow, type MediaSizeBackfillRow } from "@/lib/media-size-backfill";
 import { createServiceRoleClient } from "@/lib/supabase/server";
-import { driveFileIdFromUrl } from "@/lib/media-resolver";
 import { isValidUuid } from "@/lib/utils";
 
 export const runtime = "nodejs";
@@ -11,18 +11,6 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const MAX_ROWS = 75;
-
-type MediaAssetSizeRow = {
-  id: string;
-  name?: string | null;
-  url?: string | null;
-  file_id?: string | null;
-  publish_url?: string | null;
-  drive_proxy_url?: string | null;
-  playback_url?: string | null;
-  mime_type?: string | null;
-  size_bytes?: number | null;
-};
 
 type BackfillResult = {
   id: string;
@@ -32,25 +20,6 @@ type BackfillResult = {
   name?: string;
   reason?: string;
 };
-
-function metadataUpdateFromDrive(
-  row: MediaAssetSizeRow,
-  meta: Awaited<ReturnType<typeof getFileMetadata>>,
-  workspaceId: string,
-  fileId: string,
-): Record<string, unknown> | null {
-  if (meta.appProperties?.workspaceId !== workspaceId) return null;
-  const metadataUpdate: Record<string, unknown> = {};
-  if (!row.file_id) metadataUpdate.file_id = fileId;
-  if (meta.size > 0) metadataUpdate.size_bytes = meta.size;
-  if (!row.mime_type && meta.mimeType) metadataUpdate.mime_type = meta.mimeType;
-  if ((!row.name || row.name === "Untitled asset") && meta.name) metadataUpdate.name = meta.name;
-  return Object.keys(metadataUpdate).length > 0 ? metadataUpdate : null;
-}
-
-function driveFileIdForRow(row: MediaAssetSizeRow): string | null {
-  return row.file_id || driveFileIdFromUrl(row.drive_proxy_url || row.url || row.publish_url || row.playback_url);
-}
 
 function validRequestedIds(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
@@ -87,17 +56,17 @@ export async function POST(request: NextRequest) {
   }
 
   const results: BackfillResult[] = [];
-  for (const row of (data || []) as MediaAssetSizeRow[]) {
-    const fileId = driveFileIdForRow(row);
+  for (const row of (data || []) as MediaSizeBackfillRow[]) {
+    const fileId = driveFileIdForSizeBackfillRow(row);
     if (!fileId) {
       results.push({ id: row.id, status: "skipped", reason: "Missing Drive file ID" });
       continue;
     }
     try {
       const meta = await getFileMetadata(fileId);
-      const metadataUpdate = metadataUpdateFromDrive(row, meta, auth.workspaceId, fileId);
+      const metadataUpdate = await buildMediaSizeMetadataUpdate(row, meta, auth.workspaceId, fileId);
       if (!metadataUpdate) {
-        results.push({ id: row.id, status: "skipped", reason: "Drive file is not tagged to this workspace" });
+        results.push({ id: row.id, status: "skipped", reason: "Drive file is not trusted for this workspace" });
         continue;
       }
       const { data: updated, error: updateError } = await admin

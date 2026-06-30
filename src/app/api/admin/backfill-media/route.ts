@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireBearerTeamRole } from "@/lib/auth/require";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { getFileMetadata } from "@/lib/google-drive";
-import { driveFileIdFromUrl } from "@/lib/media-resolver";
+import { buildMediaSizeMetadataUpdate, driveFileIdForSizeBackfillRow, type MediaSizeBackfillRow } from "@/lib/media-size-backfill";
 import { mediaUrlAliases } from "@/lib/media-usage";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -40,18 +40,6 @@ type BackfillEntry = {
   size?: number;
 };
 
-type SizeBackfillRow = {
-  id: string;
-  name?: string | null;
-  url?: string | null;
-  file_id?: string | null;
-  publish_url?: string | null;
-  drive_proxy_url?: string | null;
-  playback_url?: string | null;
-  mime_type?: string | null;
-  size_bytes?: number | null;
-};
-
 function compactMetadata(entry: BackfillEntry) {
   const update: Record<string, unknown> = {
     name: entry.name,
@@ -67,25 +55,6 @@ function compactMetadata(entry: BackfillEntry) {
   if (entry.mimeType) update.mime_type = entry.mimeType;
   if (typeof entry.size === "number" && Number.isFinite(entry.size)) update.size_bytes = entry.size;
   return update;
-}
-
-function metadataUpdateFromDrive(
-  row: SizeBackfillRow,
-  meta: Awaited<ReturnType<typeof getFileMetadata>>,
-  workspaceId: string,
-  fileId: string,
-): Record<string, unknown> | null {
-  if (meta.appProperties?.workspaceId !== workspaceId) return null;
-  const metadataUpdate: Record<string, unknown> = {};
-  if (!row.file_id) metadataUpdate.file_id = fileId;
-  if (meta.size > 0) metadataUpdate.size_bytes = meta.size;
-  if (!row.mime_type && meta.mimeType) metadataUpdate.mime_type = meta.mimeType;
-  if ((!row.name || row.name === "Untitled asset") && meta.name) metadataUpdate.name = meta.name;
-  return Object.keys(metadataUpdate).length > 0 ? metadataUpdate : null;
-}
-
-function driveFileIdForRow(row: SizeBackfillRow): string | null {
-  return row.file_id || driveFileIdFromUrl(row.drive_proxy_url || row.url || row.publish_url || row.playback_url);
 }
 
 export async function POST(request: NextRequest) {
@@ -236,12 +205,12 @@ export async function POST(request: NextRequest) {
     console.error("[backfill] media size lookup failed:", missingSizeErr.message);
   }
 
-  for (const asset of (missingSizeAssets || []) as SizeBackfillRow[]) {
-    const fileId = driveFileIdForRow(asset);
+  for (const asset of (missingSizeAssets || []) as MediaSizeBackfillRow[]) {
+    const fileId = driveFileIdForSizeBackfillRow(asset);
     if (!fileId) continue;
     try {
       const meta = await getFileMetadata(fileId);
-      const metadataUpdate = metadataUpdateFromDrive(asset, meta, workspaceId, fileId);
+      const metadataUpdate = await buildMediaSizeMetadataUpdate(asset, meta, workspaceId, fileId);
       if (!metadataUpdate) {
         sizeBackfillSkipped++;
         continue;
