@@ -80,6 +80,29 @@ describe("POST /api/media/view-url/batch", () => {
     expect(body.results.every((r) => !r.url?.includes("thumb-token"))).toBe(true);
   });
 
+  it("preserves explicit download mode and filenames while signing stream targets", async () => {
+    const playbackKey = `${WS}/videos/clip.mp4`;
+    knownState.drive = new Set([ID_A]);
+    knownState.playback = new Set([playbackKey]);
+    const res = await POST(makeRequest({
+      urls: [
+        `/api/drive/stream?id=${ID_A}&download=1&name=Raw%20Product.mov`,
+        `/api/media/playback?key=${encodeURIComponent(playbackKey)}&download=1&name=Final%20Clip.mp4`,
+      ],
+    }));
+    const body = await res.json() as { results: Array<{ url: string | null }> };
+
+    const driveUrl = new URL(body.results[0].url || "", "https://thereach.ten80ten.com");
+    expect(driveUrl.searchParams.get("token")).toBe("drive-token");
+    expect(driveUrl.searchParams.get("download")).toBe("1");
+    expect(driveUrl.searchParams.get("name")).toBe("Raw Product.mov");
+
+    const playbackUrl = new URL(body.results[1].url || "", "https://thereach.ten80ten.com");
+    expect(playbackUrl.searchParams.get("token")).toBe("playback-token");
+    expect(playbackUrl.searchParams.get("download")).toBe("1");
+    expect(playbackUrl.searchParams.get("name")).toBe("Final Clip.mp4");
+  });
+
   it("returns null for urls outside the allowed media routes", async () => {
     knownState.drive = new Set([ID_A]);
     const res = await POST(makeRequest({ urls: ["/api/secret?id=" + ID_A, "https://evil.example/x"] }));

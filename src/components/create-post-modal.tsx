@@ -186,12 +186,6 @@ export function CreatePostModal({ open, onClose }: Props) {
     e.preventDefault();
     const missing: string[] = [];
     if (!title.trim()) missing.push("title");
-    if (files.length === 0) missing.push("content file");
-    if (platforms.length === 0) missing.push("platform");
-    if (!scheduledDate) missing.push("date");
-    if (!scheduledTime) missing.push("time");
-    if (!caption.trim()) missing.push("caption");
-    if (!assetSource.trim()) missing.push("asset source");
     if (missing.length > 0) { setValidationErrors(missing); return; }
 
     setSubmitting(true);
@@ -626,7 +620,7 @@ export function CreatePostModal({ open, onClose }: Props) {
 
                 {/* Platforms */}
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Platforms <span className="text-red-400">*</span></label>
+                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Platforms</label>
                   <div className="flex flex-wrap gap-1.5">
                     {ALL_PLATFORMS.map((p) => {
                       const isCompat = compatiblePlatforms.includes(p.id);
@@ -649,7 +643,7 @@ export function CreatePostModal({ open, onClose }: Props) {
 
                 {/* Content type */}
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Content Type <span className="text-red-400">*</span></label>
+                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Content Type</label>
                   <div className="flex flex-wrap gap-1.5">
                     {contentTypes.map((ct) => {
                       const isCompat = compatibleContentTypes.has(ct.id);
@@ -672,24 +666,24 @@ export function CreatePostModal({ open, onClose }: Props) {
 
                 {/* Caption */}
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Caption <span className="text-red-400">*</span> <span className="text-emerald-500 dark:text-emerald-400 text-[8px] normal-case font-medium">Posted to platforms</span></label>
+                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Caption <span className="text-emerald-500 dark:text-emerald-400 text-[8px] normal-case font-medium">Posted to platforms</span></label>
                   <p className="text-[9px] text-gray-400 dark:text-gray-500 leading-relaxed -mt-0.5">The full text published with this post. Include hashtags, mentions, and CTAs. This is what n8n sends to each platform.</p>
                   <MentionTextarea value={caption} onChange={setCaption} placeholder="Write your caption... Type @ to mention team members" className="min-h-[120px] w-full bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-lg text-[12px] text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-600 resize-y p-3 outline-none focus:ring-2 focus:ring-orange-100 dark:focus:ring-orange-500/10 focus:border-orange-400 transition-all" rows={6} />
                 </div>
 
                 {/* Post Date & Time */}
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Post Date & Time <span className="text-red-400">*</span></label>
+                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Post Date & Time</label>
                   <p className="text-[9px] text-gray-400 dark:text-gray-500 leading-relaxed -mt-0.5">When this post goes live on social media. n8n publishes automatically at this exact date and time.</p>
                   <div className="flex gap-2">
-                    <input type="date" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} min={new Date().toISOString().slice(0, 10)} className={`${inputClass} flex-[3]`} required />
-                    <input type="time" value={scheduledTime} onChange={(e) => setScheduledTime(e.target.value)} className={`${inputClass} flex-[2]`} required />
+                    <input type="date" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} min={new Date().toISOString().slice(0, 10)} className={`${inputClass} flex-[3]`} />
+                    <input type="time" value={scheduledTime} onChange={(e) => setScheduledTime(e.target.value)} className={`${inputClass} flex-[2]`} />
                   </div>
                 </div>
 
                 {/* Asset Source */}
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Asset Source <span className="text-red-400">*</span></label>
+                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.08em]">Asset Source</label>
                   <select
                     value={assetSourceOther ? "__other__" : assetSource}
                     onChange={(e) => {
@@ -845,7 +839,7 @@ export function CreatePostModal({ open, onClose }: Props) {
             <div className="flex gap-2 pt-2">
               <Button type="button" variant="outline" onClick={onClose} disabled={submitting} className="flex-1 h-10 rounded-lg text-[12px]">Cancel</Button>
               <Button type="submit" disabled={submitting} className="reach-action-button flex-1 h-10 rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white text-[12px] disabled:opacity-40 shadow-sm">
-                {submitting ? "Uploading..." : "Create Post"}
+                {submitting ? "Uploading..." : "Create Idea"}
               </Button>
             </div>
           </form>

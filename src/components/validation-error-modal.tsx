@@ -2,19 +2,33 @@
 
 import { X, AlertTriangle } from "lucide-react";
 import { useEffect, useRef } from "react";
+import type { PostReadinessIssue } from "@/lib/post-readiness";
 
 const FIELD_GUIDANCE: Record<string, string> = {
   "title": "Enter a descriptive title at the top of the form.",
   "content file": "Upload at least one image or video, or browse the Media Library.",
   "platform": "Select one or more target platforms (Facebook, Instagram, etc.).",
+  "platforms": "Select at least one platform before moving this post to Awaiting Approval.",
   "date": "Set the date this post goes live. Found in the Post Date & Time section.",
   "time": "Set the exact time this post gets published, next to the date field.",
   "scheduled date": "Set the date this post goes live. Click the schedule area in the drawer.",
   "scheduled time": "Set the exact time this post gets published, next to the date picker.",
+  "post date and time": "Set both the date and time in the schedule area before this post moves forward.",
   "caption": "Write the full caption text that gets published to social media platforms. Include hashtags and CTAs.",
-  "asset source": "Select where the media came from (Envato, Pexels, Shot by Team, etc.).",
+  "asset source": "Choose where the media came from on the Content tab, Asset Source.",
   "thumbnail": "Upload or select a cover image for the post card.",
-  "content for publishing": "Upload at least one file that n8n will post to social platforms.",
+  "content for publishing": "Add the final image or video in Source Vault, Raw Project Files, or choose it from the Media Library.",
+  "checklist": "Complete the checklist before submitting for approval. In Create New Post, it is on the Checklist tab.",
+};
+
+const FIELD_LABELS: Record<string, string> = {
+  "title": "Title",
+  "content file": "Content file",
+  "platform": "Platform",
+  "date": "Date",
+  "time": "Time",
+  "caption": "Caption",
+  "asset source": "Asset source",
 };
 
 function getGuidance(field: string): string {
@@ -23,8 +37,18 @@ function getGuidance(field: string): string {
   return "This field is required before the post can move forward.";
 }
 
+function normalizeError(error: string | PostReadinessIssue): PostReadinessIssue {
+  if (typeof error !== "string") return error;
+  const key = error.toLowerCase();
+  return {
+    id: "title",
+    label: FIELD_LABELS[key] || error,
+    guidance: getGuidance(key),
+  };
+}
+
 interface Props {
-  errors: string[];
+  errors: Array<string | PostReadinessIssue>;
   onClose: () => void;
 }
 
@@ -48,6 +72,7 @@ export function ValidationErrorModal({ errors, onClose }: Props) {
   }, [errors.length, onClose]);
 
   if (errors.length === 0) return null;
+  const normalizedErrors = errors.map(normalizeError);
 
   return (
     <>
@@ -85,14 +110,14 @@ export function ValidationErrorModal({ errors, onClose }: Props) {
 
           {/* Error list */}
           <div className="flex-1 overflow-y-auto px-4 sm:px-5 py-3 sm:py-4 space-y-2">
-            {errors.map((field, i) => (
+            {normalizedErrors.map((field, i) => (
               <div key={i} className="flex gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl bg-red-50/60 dark:bg-red-500/[0.06] border border-red-200/40 dark:border-red-500/[0.1]">
                 <div className="w-5 h-5 rounded-full bg-red-500/15 dark:bg-red-500/20 flex items-center justify-center shrink-0 mt-0.5">
                   <span className="text-[10px] font-bold text-red-500">{i + 1}</span>
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[12px] sm:text-[13px] font-bold text-red-700 dark:text-red-400 capitalize">{field}</p>
-                  <p className="text-[10px] sm:text-[11px] text-red-600/70 dark:text-red-300/60 mt-0.5 leading-relaxed">{getGuidance(field)}</p>
+                  <p className="text-[12px] sm:text-[13px] font-bold text-red-700 dark:text-red-400">{field.label}</p>
+                  <p className="text-[10px] sm:text-[11px] text-red-600/70 dark:text-red-300/60 mt-0.5 leading-relaxed">{field.guidance}</p>
                 </div>
               </div>
             ))}

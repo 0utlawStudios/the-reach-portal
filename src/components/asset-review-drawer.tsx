@@ -19,6 +19,7 @@ import {
   ArrowRightLeft, Pencil, Save, ExternalLink, Type, Trash2, Send,
   Upload, FolderOpen, Link2, FileText, History, Image as ImageIcon,
   FileVideo, Paperclip, AlertCircle, Maximize2, Sparkles, Star, Lock,
+  Download,
 } from "lucide-react";
 import { PlatformIcon } from "./platform-icons";
 import { MentionTextarea } from "./mention-textarea";
@@ -33,12 +34,14 @@ import { ensureMediaAsset } from "@/lib/media-assets";
 import { isDrivePublishableMediaMime, normalizeDriveMimeType } from "@/lib/drive-policy";
 import { getPublicDriveDownloadUrl } from "@/lib/drive-url-utils";
 import { browserImagePreviewUrl, warmBrowserImagePreview } from "@/lib/image-preview";
+import { stripPrivateMediaToken } from "@/lib/media-usage";
 import { resolveViewableMediaUrl } from "@/lib/media-view-url";
 import { driveFileIdFromUrl, isVideoContentType, resolveCardVideoUrl, thumbnailIsDefinitelyImage } from "@/lib/media-resolver";
+import { hasPublishingMedia } from "@/lib/publishing-media";
 import { formatDate, formatDateTime, formatDateShort, formatDateTimeCompact } from "@/lib/utils";
 import { useFocusTrap } from "./use-focus-trap";
 import { canDeletePostRole, isPipelineApproverRole } from "@/lib/roles";
-import { hasPublishingMedia } from "@/lib/publishing-media";
+import { getPostReadinessIssues, stageRequiresPostReadiness, type PostReadinessIssue } from "@/lib/post-readiness";
 
 const MediaPicker = dynamic(() => import("./media-picker").then((mod) => mod.MediaPicker));
 
@@ -63,6 +66,27 @@ type PlaybackOptimizationResult = {
   playbackStorageKey: string;
 };
 
+function safeDownloadName(name: string): string {
+  const cleaned = name.replace(/[\\/:*?"<>|]+/g, "-").trim();
+  return cleaned.slice(0, 180) || "download";
+}
+
+function withDownloadParams(url: string, fileName: string): string {
+  const siteUrl = typeof window !== "undefined" ? window.location.origin : "http://localhost";
+  try {
+    const parsed = new URL(url, siteUrl);
+    parsed.searchParams.set("download", "1");
+    parsed.searchParams.set("name", safeDownloadName(fileName));
+    if (typeof window !== "undefined" && parsed.origin === window.location.origin) {
+      return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    }
+    return parsed.toString();
+  } catch {
+    const separator = url.includes("?") ? "&" : "?";
+    return `${url}${separator}download=1&name=${encodeURIComponent(safeDownloadName(fileName))}`;
+  }
+}
+
 export function AssetReviewDrawer() {
   const { selectedCard, isDrawerOpen, isEditingOnOpen, closeDrawer, moveCard, requestReapproval, submitKickback, updateCard, deleteCard, workspaceId } = usePipeline();
   const { addToast } = useToast();
@@ -82,6 +106,27 @@ export function AssetReviewDrawer() {
     } catch {
       if (popup) popup.close();
       addToast(`Could not open ${label}.`, "error");
+    }
+  };
+  const downloadViewableUrl = async (url: string, label = "file") => {
+    const sourceUrl = stripPrivateMediaToken(url);
+    if (!sourceUrl) {
+      addToast(`No downloadable source found for ${label}.`, "error");
+      return;
+    }
+    try {
+      const resolved = await resolveViewableMediaUrl(withDownloadParams(sourceUrl, label));
+      const absolute = resolved.startsWith("/") ? `${window.location.origin}${resolved}` : resolved;
+      const link = document.createElement("a");
+      link.href = absolute;
+      link.download = safeDownloadName(label);
+      link.rel = "noopener";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      addToast(`Download started for ${label}.`, "success");
+    } catch {
+      addToast(`Could not download ${label}.`, "error");
     }
   };
   const currentMember = useMemo(
@@ -123,7 +168,10 @@ export function AssetReviewDrawer() {
     if (!selectedCard || !selectedCard.thumbnailUrl) return undefined;
     return thumbnailIsDefinitelyImage(selectedCard) ? selectedCard.thumbnailUrl : undefined;
   }, [selectedCard]);
-  const selectedCardHasPublishingMedia = useMemo(() => hasPublishingMedia(selectedCard), [selectedCard]);
+  const selectedCardHasPublishingMedia = useMemo(() => {
+    if (!selectedCard) return false;
+    return hasPublishingMedia(selectedCard);
+  }, [selectedCard]);
 
   // Source Vault state
   const [designLink, setDesignLink] = useState("");
@@ -141,7 +189,7 @@ export function AssetReviewDrawer() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadingFileName, setUploadingFileName] = useState("");
   const [showLightbox, setShowLightbox] = useState(false);
-  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [validationErrors, setValidationErrors] = useState<PostReadinessIssue[]>([]);
   const [pendingDelete, setPendingDelete] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
 
@@ -1023,6 +1071,7 @@ export function AssetReviewDrawer() {
                   const openUrl = isImage
                     ? browserImagePreviewUrl(file.driveProxyUrl || file.url, { mimeType: file.mimeType, fileName: file.name, size: "full" })
                     : displayUrl;
+                  const downloadUrl = file.driveProxyUrl || file.url || file.playbackUrl || openUrl;
                   return (
                     <div key={i} className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-white dark:bg-white/[0.02] border border-gray-100 dark:border-white/[0.05] hover:border-orange-200 dark:hover:border-orange-500/20 transition-colors group">
                       {isImage ? (
@@ -1038,6 +1087,9 @@ export function AssetReviewDrawer() {
                       </div>
                       <button type="button" onClick={() => void openViewableUrl(openUrl, file.name)} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-300 hover:text-blue-500 transition-colors cursor-pointer" title="Open file">
                         <ExternalLink className="w-3 h-3" />
+                      </button>
+                      <button type="button" onClick={() => void downloadViewableUrl(downloadUrl, file.name)} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-300 hover:text-orange-500 transition-colors cursor-pointer" title="Download file">
+                        <Download className="w-3 h-3" />
                       </button>
                       <button
                         onClick={() => {
@@ -1335,6 +1387,7 @@ export function AssetReviewDrawer() {
                         const openUrl = isImage
                           ? browserImagePreviewUrl(file.driveProxyUrl || file.url, { mimeType: file.mimeType, fileName: file.name, size: "full" })
                           : file.playbackUrl || file.driveProxyUrl || file.url;
+                        const downloadUrl = file.driveProxyUrl || file.url || file.playbackUrl || openUrl;
                         return (
                           <div key={i} className="flex items-center gap-3 px-3 py-2.5 bg-gray-50 dark:bg-white/[0.03] rounded-xl border border-gray-200 dark:border-white/[0.06]">
                             <FileText className="w-4 h-4 text-violet-500 shrink-0" />
@@ -1342,7 +1395,8 @@ export function AssetReviewDrawer() {
                               <p className="text-[12px] font-medium text-gray-700 dark:text-gray-300 truncate">{file.name}</p>
                               <p className="text-[9px] text-gray-400">{formatDateTimeCompact(file.uploadedAt)}</p>
                             </div>
-                            <button type="button" onClick={() => void openViewableUrl(openUrl, file.name)} className="p-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-500/10 text-gray-400 hover:text-blue-500 transition-colors"><ExternalLink className="w-3.5 h-3.5" /></button>
+                            <button type="button" onClick={() => void downloadViewableUrl(downloadUrl, file.name)} className="p-1.5 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-500/10 text-gray-400 hover:text-orange-500 transition-colors" title="Download file"><Download className="w-3.5 h-3.5" /></button>
+                            <button type="button" onClick={() => void openViewableUrl(openUrl, file.name)} className="p-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-500/10 text-gray-400 hover:text-blue-500 transition-colors" title="Open file"><ExternalLink className="w-3.5 h-3.5" /></button>
                           </div>
                         );
                       })}
@@ -1449,15 +1503,7 @@ export function AssetReviewDrawer() {
                   <ArrowRightLeft className="w-3.5 h-3.5 mr-1.5" />Request Revision
                 </Button>
                 <Button size="sm" onClick={() => {
-                  const missing: string[] = [];
-                  if (!selectedCard.scheduledDate) missing.push("scheduled date");
-                  if (!selectedCard.scheduledTime) missing.push("scheduled time");
-                  if (!selectedCard.thumbnailUrl) missing.push("thumbnail");
-                  if (!selectedCardHasPublishingMedia) missing.push("content for publishing");
-                  if (!selectedCard.caption?.trim()) missing.push("caption");
-                  if (!selectedCard.assetSource?.trim()) missing.push("asset source");
-                  const unchk = checklist.filter((c) => !c.checked).length;
-                  if (unchk > 0) missing.push(`${unchk} checklist item${unchk > 1 ? "s" : ""}`);
+                  const missing = getPostReadinessIssues(selectedCard);
                   if (missing.length > 0) { setValidationErrors(missing); return; }
                   moveCard(selectedCard.id, "approved_scheduled");
                 }}
@@ -1475,15 +1521,7 @@ export function AssetReviewDrawer() {
           {!revisionMode && selectedCard.stage === "revision_needed" && (
             <div className="flex gap-2">
               <Button size="sm" onClick={() => {
-                const missing: string[] = [];
-                if (!selectedCard.scheduledDate) missing.push("scheduled date");
-                if (!selectedCard.scheduledTime) missing.push("scheduled time");
-                if (!selectedCard.thumbnailUrl) missing.push("thumbnail");
-                if (!selectedCardHasPublishingMedia) missing.push("content for publishing");
-                if (!selectedCard.caption?.trim()) missing.push("caption");
-                if (!selectedCard.assetSource?.trim()) missing.push("asset source");
-                const unchk = checklist.filter((c) => !c.checked).length;
-                if (unchk > 0) missing.push(`${unchk} checklist item${unchk > 1 ? "s" : ""}`);
+                const missing = getPostReadinessIssues(selectedCard);
                 if (missing.length > 0) { setValidationErrors(missing); return; }
                 requestReapproval(selectedCard.id);
               }} className="flex-1 h-9 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-[12px] shadow-sm shadow-violet-500/20 transition-all duration-150">
@@ -1506,20 +1544,9 @@ export function AssetReviewDrawer() {
                   </div>
                 ) : (
                   <Button size="sm" onClick={() => {
-                    if (selectedCard.stage === "ideas" || nextStage === "awaiting_approval" || nextStage === "approved_scheduled") {
-                      const missing: string[] = [];
-                      if (!selectedCard.scheduledDate) missing.push("scheduled date");
-                      if (!selectedCard.scheduledTime) missing.push("scheduled time");
-                      if (!selectedCard.thumbnailUrl) missing.push("thumbnail");
-                      if (!selectedCardHasPublishingMedia) missing.push("content for publishing");
-                      if (!selectedCard.caption?.trim()) missing.push("caption");
-                      if (!selectedCard.assetSource?.trim()) missing.push("asset source");
-                      const unchecked = checklist.filter((c) => !c.checked).length;
-                      if (unchecked > 0) missing.push(`${unchecked} checklist item${unchecked > 1 ? "s" : ""}`);
-                      if (missing.length > 0) {
-                        setValidationErrors(missing);
-                        return;
-                      }
+                    if (stageRequiresPostReadiness(nextStage)) {
+                      const missing = getPostReadinessIssues(selectedCard);
+                      if (missing.length > 0) { setValidationErrors(missing); return; }
                     }
                     moveCard(selectedCard.id, nextStage);
                     addToast("Saving stage move...", "info");

@@ -112,7 +112,7 @@ describe("POST /api/drive/upload-failure", () => {
 
     expect(res.status).toBe(200);
     const auditCall = adminMocks.rpc.mock.calls.find(
-      ([name]: [string]) => name === "record_audit_event",
+      ([name]) => name === "record_audit_event",
     );
     expect(auditCall).toBeDefined();
     const metadata = auditCall![1].p_metadata as Record<string, unknown>;

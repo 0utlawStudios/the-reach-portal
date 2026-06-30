@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireBearerTeamRole } from "@/lib/auth/require";
 import { createServiceRoleClient } from "@/lib/supabase/server";
+import { getFileMetadata } from "@/lib/google-drive";
+import { driveFileIdFromUrl } from "@/lib/media-resolver";
 import { mediaUrlAliases } from "@/lib/media-usage";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -38,6 +40,18 @@ type BackfillEntry = {
   size?: number;
 };
 
+type SizeBackfillRow = {
+  id: string;
+  name?: string | null;
+  url?: string | null;
+  file_id?: string | null;
+  publish_url?: string | null;
+  drive_proxy_url?: string | null;
+  playback_url?: string | null;
+  mime_type?: string | null;
+  size_bytes?: number | null;
+};
+
 function compactMetadata(entry: BackfillEntry) {
   const update: Record<string, unknown> = {
     name: entry.name,
@@ -53,6 +67,25 @@ function compactMetadata(entry: BackfillEntry) {
   if (entry.mimeType) update.mime_type = entry.mimeType;
   if (typeof entry.size === "number" && Number.isFinite(entry.size)) update.size_bytes = entry.size;
   return update;
+}
+
+function metadataUpdateFromDrive(
+  row: SizeBackfillRow,
+  meta: Awaited<ReturnType<typeof getFileMetadata>>,
+  workspaceId: string,
+  fileId: string,
+): Record<string, unknown> | null {
+  if (meta.appProperties?.workspaceId !== workspaceId) return null;
+  const metadataUpdate: Record<string, unknown> = {};
+  if (!row.file_id) metadataUpdate.file_id = fileId;
+  if (meta.size > 0) metadataUpdate.size_bytes = meta.size;
+  if (!row.mime_type && meta.mimeType) metadataUpdate.mime_type = meta.mimeType;
+  if ((!row.name || row.name === "Untitled asset") && meta.name) metadataUpdate.name = meta.name;
+  return Object.keys(metadataUpdate).length > 0 ? metadataUpdate : null;
+}
+
+function driveFileIdForRow(row: SizeBackfillRow): string | null {
+  return row.file_id || driveFileIdFromUrl(row.drive_proxy_url || row.url || row.publish_url || row.playback_url);
 }
 
 export async function POST(request: NextRequest) {
@@ -76,17 +109,20 @@ export async function POST(request: NextRequest) {
   // can appear in another workspace without affecting this backfill.
   const { data: existingAssets } = await admin
     .from("media_assets")
-    .select("id, url, file_id, publish_url, drive_proxy_url, playback_url, used_in")
+    .select("id, name, url, file_id, publish_url, drive_proxy_url, playback_url, mime_type, size_bytes, used_in")
     .eq("workspace_id", workspaceId);
   const existingByAlias = new Map<string, { id: string; used_in: string[] }>();
   for (const asset of existingAssets || []) {
     const typed = asset as {
       id: string;
+      name?: string | null;
       url?: string | null;
       file_id?: string | null;
       publish_url?: string | null;
       drive_proxy_url?: string | null;
       playback_url?: string | null;
+      mime_type?: string | null;
+      size_bytes?: number | null;
       used_in?: string[] | null;
     };
     const record = { id: typed.id, used_in: typed.used_in || [] };
@@ -102,6 +138,9 @@ export async function POST(request: NextRequest) {
   let inserted = 0;
   let skipped = 0;
   let updated = 0;
+  let sizeBackfilled = 0;
+  let sizeBackfillFailed = 0;
+  let sizeBackfillSkipped = 0;
 
   for (const post of posts || []) {
     const wsId = post.workspace_id || workspaceId;
@@ -186,11 +225,52 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  const { data: missingSizeAssets, error: missingSizeErr } = await admin
+    .from("media_assets")
+    .select("id, name, url, file_id, publish_url, drive_proxy_url, playback_url, mime_type, size_bytes")
+    .eq("workspace_id", workspaceId)
+    .or("size_bytes.is.null,size_bytes.lte.0")
+    .limit(250);
+  if (missingSizeErr) {
+    sizeBackfillFailed++;
+    console.error("[backfill] media size lookup failed:", missingSizeErr.message);
+  }
+
+  for (const asset of (missingSizeAssets || []) as SizeBackfillRow[]) {
+    const fileId = driveFileIdForRow(asset);
+    if (!fileId) continue;
+    try {
+      const meta = await getFileMetadata(fileId);
+      const metadataUpdate = metadataUpdateFromDrive(asset, meta, workspaceId, fileId);
+      if (!metadataUpdate) {
+        sizeBackfillSkipped++;
+        continue;
+      }
+      const { error } = await admin
+        .from("media_assets")
+        .update(metadataUpdate)
+        .eq("id", asset.id)
+        .eq("workspace_id", workspaceId);
+      if (error) {
+        sizeBackfillFailed++;
+        console.error("[backfill] size metadata update failed for media asset", asset.id, error.message);
+      } else {
+        sizeBackfilled++;
+      }
+    } catch (err) {
+      sizeBackfillFailed++;
+      console.error("[backfill] Drive metadata lookup failed for media asset", asset.id, err instanceof Error ? err.message : err);
+    }
+  }
+
   return NextResponse.json({
     inserted,
     skipped,
     updated,
+    sizeBackfilled,
+    sizeBackfillFailed,
+    sizeBackfillSkipped,
     total: (posts || []).length,
-    message: `Backfill complete. ${inserted} new, ${skipped} already existed (${updated} had used_in updated), ${(posts || []).length} posts scanned.`,
+    message: `Backfill complete. ${inserted} new, ${skipped} already existed (${updated} had used_in updated), ${sizeBackfilled} media size rows repaired, ${(posts || []).length} posts scanned.`,
   });
 }

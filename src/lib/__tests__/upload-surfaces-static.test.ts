@@ -44,6 +44,22 @@ describe("Drive upload surfaces", () => {
     expect(mediaPage).toContain('uploadManyToDrive(fileList, "media-library"');
   });
 
+  it("keeps Create New Post lightweight for Ideas drafts", () => {
+    const createPost = source("src/components/create-post-modal.tsx");
+    const submitValidation = createPost.slice(
+      createPost.indexOf("const handleSubmit"),
+      createPost.indexOf("setSubmitting(true);"),
+    );
+    expect(submitValidation).toContain('if (!title.trim()) missing.push("title")');
+    expect(submitValidation).not.toContain("files.length === 0");
+    expect(submitValidation).not.toContain("platforms.length === 0");
+    expect(submitValidation).not.toContain("!scheduledDate");
+    expect(submitValidation).not.toContain("!scheduledTime");
+    expect(submitValidation).not.toContain("!caption.trim()");
+    expect(submitValidation).not.toContain("!assetSource.trim()");
+    expect(createPost).toContain('submitting ? "Uploading..." : "Create Idea"');
+  });
+
   // Regression guard for the "stuck on Preparing…" production incident: an
   // upload handler whose dynamic import (or any pre-send await) threw — e.g. a
   // stale code-split chunk after a deploy — left `uploading`/`submitting` true

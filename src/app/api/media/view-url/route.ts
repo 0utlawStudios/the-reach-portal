@@ -26,6 +26,13 @@ function serviceRoleClient() {
   });
 }
 
+function preserveDownloadParams(parsed: URL, params: URLSearchParams) {
+  if (parsed.searchParams.get("download") !== "1") return;
+  params.set("download", "1");
+  const name = parsed.searchParams.get("name") || parsed.searchParams.get("filename");
+  if (name) params.set("name", name.slice(0, 180));
+}
+
 function parseMediaUrl(value: string | null, origin: string): ParsedMediaUrl | null {
   if (!value) return null;
   try {
@@ -37,7 +44,11 @@ function parseMediaUrl(value: string | null, origin: string): ParsedMediaUrl | n
       return {
         kind: "playback",
         path: parsed.pathname,
-        params: new URLSearchParams({ key: playback.key }),
+        params: (() => {
+          const params = new URLSearchParams({ key: playback.key });
+          preserveDownloadParams(parsed, params);
+          return params;
+        })(),
         storageKey: playback.key,
         workspaceId: playback.workspaceId,
       };
@@ -45,6 +56,7 @@ function parseMediaUrl(value: string | null, origin: string): ParsedMediaUrl | n
     const fileId = parsed.searchParams.get("id") || "";
     if (!DRIVE_FILE_ID_RE.test(fileId)) return null;
     const params = new URLSearchParams({ id: fileId });
+    if (parsed.pathname === "/api/drive/stream") preserveDownloadParams(parsed, params);
     if (parsed.pathname === "/api/media/image-preview") {
       const size = parsed.searchParams.get("size");
       if (size === "thumb" || size === "full") params.set("size", size);

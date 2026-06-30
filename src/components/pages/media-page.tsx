@@ -24,13 +24,14 @@ import {
 import { isDrivePublishableMediaMime, normalizeDriveMimeType } from "@/lib/drive-policy";
 import { browserImagePreviewUrl, warmBrowserImagePreview } from "@/lib/image-preview";
 import { resolveViewableMediaUrl } from "@/lib/media-view-url";
+import { driveFileIdFromUrl } from "@/lib/media-resolver";
 import { formatDateShort, formatDateTimeCompact } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   FolderOpen, Upload, Film, Image as ImageIcon, Search, Grid3X3, List,
   CheckCircle, Clock, X, Trash2, Eye, Link2, ExternalLink,
-  ChevronLeft, ChevronRight, Tag, Play,
+  ChevronLeft, ChevronRight, Tag, Play, Download,
 } from "lucide-react";
 
 type StatusFilter = "all" | "unused" | "inuse";
@@ -66,11 +67,12 @@ function isSupabaseConfigured(): boolean {
 }
 
 function dbToAsset(row: MediaAssetRow): MediaAsset {
+  const fileId = row.file_id || driveFileIdFromUrl(row.drive_proxy_url || row.url || row.publish_url || row.playback_url);
   return {
     id: row.id || crypto.randomUUID(),
     name: row.name || "Untitled asset",
     url: row.url || "",
-    fileId: row.file_id || undefined,
+    fileId: fileId || undefined,
     publishUrl: row.publish_url || undefined,
     driveProxyUrl: row.drive_proxy_url || undefined,
     playbackUrl: row.playback_url || undefined,
@@ -111,6 +113,31 @@ function uploadPathForSize(file: File): "proxy" | "resumable" {
 
 function mediaDisplayUrl(asset: Pick<MediaAsset, "url" | "driveProxyUrl" | "playbackUrl">): string {
   return stripPrivateMediaToken(asset.playbackUrl || asset.driveProxyUrl || asset.url);
+}
+
+function mediaDownloadUrl(asset: Pick<MediaAsset, "url" | "driveProxyUrl" | "playbackUrl">): string {
+  return stripPrivateMediaToken(asset.driveProxyUrl || asset.url || asset.playbackUrl || "");
+}
+
+function safeDownloadName(name: string): string {
+  const cleaned = name.replace(/[\\/:*?"<>|]+/g, "-").trim();
+  return cleaned.slice(0, 180) || "download";
+}
+
+function withDownloadParams(url: string, fileName: string): string {
+  const siteUrl = typeof window !== "undefined" ? window.location.origin : "http://localhost";
+  try {
+    const parsed = new URL(url, siteUrl);
+    parsed.searchParams.set("download", "1");
+    parsed.searchParams.set("name", safeDownloadName(fileName));
+    if (typeof window !== "undefined" && parsed.origin === window.location.origin) {
+      return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    }
+    return parsed.toString();
+  } catch {
+    const separator = url.includes("?") ? "&" : "?";
+    return `${url}${separator}download=1&name=${encodeURIComponent(safeDownloadName(fileName))}`;
+  }
 }
 
 // For a video cell we show Drive's generated poster frame (a cached image) instead of a live
@@ -184,6 +211,8 @@ export function MediaPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const warmedPreviewKeysRef = useRef<Set<string>>(new Set());
+  const sizeBackfillRequestedRef = useRef<Set<string>>(new Set());
+  const sizeBackfillToastShownRef = useRef(false);
   const useDb = isSupabaseConfigured();
 
   // ─── Load media from Supabase ───
@@ -206,6 +235,86 @@ export function MediaPage() {
         setMedia((data || []).map(dbToAsset));
       });
   }, [addToast, mediaReloadNonce, useDb, workspaceId]);
+
+  const missingSizeAssetIds = useMemo(
+    () => media
+      .filter((asset) => asset.fileId && (!asset.size || asset.size <= 0))
+      .slice(0, 75)
+      .map((asset) => asset.id),
+    [media],
+  );
+  const missingSizeAssetKey = missingSizeAssetIds.join(",");
+
+  useEffect(() => {
+    if (!useDb || !missingSizeAssetKey) return;
+    const ids = missingSizeAssetKey
+      .split(",")
+      .filter((id) => id && !sizeBackfillRequestedRef.current.has(id));
+    if (ids.length === 0) return;
+    ids.forEach((id) => sizeBackfillRequestedRef.current.add(id));
+    const wsId = workspaceId || BASELINE_WORKSPACE_ID;
+
+    void (async () => {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData.session?.access_token;
+        const res = await fetch("/api/media/backfill-sizes", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            "X-Workspace-Id": wsId,
+          },
+          body: JSON.stringify({ mediaAssetIds: ids }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const body = await res.json() as {
+          results?: Array<{
+            id?: unknown;
+            status?: unknown;
+            sizeBytes?: unknown;
+            mimeType?: unknown;
+            name?: unknown;
+          }>;
+        };
+        const updates = new Map<string, { size?: number; mimeType?: string; name?: string }>();
+        for (const result of body.results || []) {
+          if (
+            typeof result.id === "string" &&
+            result.status === "updated" &&
+            typeof result.sizeBytes === "number" &&
+            Number.isFinite(result.sizeBytes) &&
+            result.sizeBytes > 0
+          ) {
+            updates.set(result.id, {
+              size: result.sizeBytes,
+              mimeType: typeof result.mimeType === "string" ? result.mimeType : undefined,
+              name: typeof result.name === "string" ? result.name : undefined,
+            });
+          }
+        }
+        if (updates.size > 0) {
+          setMedia((prev) => prev.map((asset) => {
+            const update = updates.get(asset.id);
+            return update
+              ? {
+                ...asset,
+                size: update.size,
+                mimeType: update.mimeType || asset.mimeType,
+                name: update.name || asset.name,
+              }
+              : asset;
+          }));
+        }
+      } catch (err) {
+        console.error("[media] size metadata repair failed:", err instanceof Error ? err.message : err);
+        if (!sizeBackfillToastShownRef.current) {
+          sizeBackfillToastShownRef.current = true;
+          addToast("Media sizes couldn't be repaired automatically. Try refreshing later.", "error");
+        }
+      }
+    })();
+  }, [addToast, missingSizeAssetKey, useDb, workspaceId]);
 
   // Realtime subscription — keeps media library in sync with DB inserts/updates/deletes
   useEffect(() => {
@@ -669,6 +778,27 @@ export function MediaPage() {
     }
   };
 
+  const downloadAsset = async (asset: MediaAsset) => {
+    const sourceUrl = mediaDownloadUrl(asset);
+    if (!sourceUrl) {
+      addToast(`No downloadable source found for "${asset.name}".`, "error");
+      return;
+    }
+    try {
+      const downloadUrl = absoluteAppUrl(await resolveViewableMediaUrl(withDownloadParams(sourceUrl, asset.name)));
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = safeDownloadName(asset.name);
+      link.rel = "noopener";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      addToast(`Download started for "${asset.name}"`, "success");
+    } catch {
+      addToast(`Could not download "${asset.name}". Try opening it first.`, "error");
+    }
+  };
+
   // ─── Lightbox navigation ───
   const lightboxIndex = lightboxAsset ? filteredMedia.findIndex((m) => m.id === lightboxAsset.id) : -1;
   const hasPrev = lightboxIndex > 0;
@@ -865,6 +995,7 @@ export function MediaPage() {
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-200 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
                           <button onClick={(e) => { e.stopPropagation(); void copyShareLink(asset); }} className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow-lg hover:bg-white transition-colors" title="Copy link"><Link2 className="w-3.5 h-3.5 text-gray-700" /></button>
                           <div className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow-lg"><Eye className="w-3.5 h-3.5 text-gray-700" /></div>
+                          <button onClick={(e) => { e.stopPropagation(); void downloadAsset(asset); }} className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow-lg hover:bg-white transition-colors" title="Download"><Download className="w-3.5 h-3.5 text-gray-700" /></button>
                           {(!usage?.used || usage.source === "manual") && (
                             <button
                               onClick={(e) => { e.stopPropagation(); toggleManualUsed(asset); }}
@@ -908,16 +1039,16 @@ export function MediaPage() {
               </div>
             ) : (
               <div className="overflow-x-auto -mx-4 px-4">
-                <div className="bg-white dark:bg-[#151518] rounded-xl border border-gray-100 dark:border-white/[0.06] overflow-hidden shadow-sm min-w-[760px]">
-                  <div className="grid grid-cols-[minmax(0,1fr)_80px_100px_130px_80px_140px] items-center gap-2 px-4 py-2.5 border-b border-gray-100 dark:border-white/[0.06] text-[9px] font-bold text-gray-400 uppercase tracking-wider">
-                    <div>File</div><div>Type</div><div>Folder</div><div>Status</div><div>Added By</div><div>Timestamp</div>
+                <div className="bg-white dark:bg-[#151518] rounded-xl border border-gray-100 dark:border-white/[0.06] overflow-hidden shadow-sm min-w-[900px]">
+                  <div className="grid grid-cols-[minmax(0,1fr)_80px_72px_110px_126px_96px_132px_72px] items-center gap-2 px-4 py-2.5 border-b border-gray-100 dark:border-white/[0.06] text-[9px] font-bold text-gray-400 uppercase tracking-wider">
+                    <div>File</div><div>Type</div><div>Size</div><div>Folder</div><div>Status</div><div>Added By</div><div>Timestamp</div><div>Actions</div>
                   </div>
                   {filteredMedia.map((asset) => {
                     const usage = getUsageInfo(asset);
                     const selected = selectedIds.has(asset.id);
                     return (
                       <div key={asset.id}
-                        className={`grid grid-cols-[minmax(0,1fr)_80px_100px_130px_80px_140px] items-center gap-2 px-4 py-2.5 border-b border-gray-50 dark:border-white/[0.03] last:border-0 hover:bg-slate-50 dark:hover:bg-white/[0.02] cursor-pointer transition-all duration-150 ${selected ? "bg-blue-50/50 dark:bg-blue-500/5" : ""}`}>
+                        className={`grid grid-cols-[minmax(0,1fr)_80px_72px_110px_126px_96px_132px_72px] items-center gap-2 px-4 py-2.5 border-b border-gray-50 dark:border-white/[0.03] last:border-0 hover:bg-slate-50 dark:hover:bg-white/[0.02] cursor-pointer transition-all duration-150 ${selected ? "bg-blue-50/50 dark:bg-blue-500/5" : ""}`}>
                         <div className="flex items-center gap-2.5 min-w-0" onClick={() => setLightboxAsset(asset)}>
                           <button onClick={(e) => { e.stopPropagation(); toggleSelect(asset.id); }}
                             className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all duration-200 ${selected ? "bg-blue-500 border-blue-500" : "border-gray-300 dark:border-gray-600 hover:border-blue-400"}`}>
@@ -939,9 +1070,6 @@ export function MediaPage() {
                           </div>
                           <div className="min-w-0">
                             <p className="text-[11px] font-medium text-gray-700 dark:text-gray-300 break-words">{asset.name}</p>
-                            {formatFileSize(asset.size) && (
-                              <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5 tabular-nums">{formatFileSize(asset.size)}</p>
-                            )}
                           </div>
                         </div>
                         <div className="flex items-center">
@@ -949,6 +1077,7 @@ export function MediaPage() {
                             {asset.type === "video" ? <Film className="w-2.5 h-2.5 mr-0.5" /> : <ImageIcon className="w-2.5 h-2.5 mr-0.5" />}{asset.type}
                           </Badge>
                         </div>
+                        <div className="text-[10px] text-gray-500 dark:text-gray-400 tabular-nums">{formatFileSize(asset.size) || "Not set"}</div>
                         <div className="flex items-center text-[10px] text-gray-500 dark:text-gray-400">{asset.folder}</div>
                         <div className="flex items-center gap-1.5">
                           {usage?.used ? (
@@ -984,6 +1113,24 @@ export function MediaPage() {
                           )}
                         </div>
                         <div className="flex items-center text-[10px] text-gray-400 tabular-nums">{formatDateTimeCompact(asset.uploadedAt)}</div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); void downloadAsset(asset); }}
+                            className="p-1.5 rounded-md text-gray-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-500/10 transition-colors"
+                            title="Download"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); void openInNewTab(asset); }}
+                            className="p-1.5 rounded-md text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors"
+                            title="Open"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
@@ -1014,6 +1161,7 @@ export function MediaPage() {
                 </div>
                 <div className="flex items-center gap-1">
                   <button onClick={() => void copyShareLink(lightboxAsset)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-400 hover:text-orange-500 cursor-pointer transition-colors" title="Copy shareable link"><Link2 className="w-4 h-4" /></button>
+                  <button onClick={() => void downloadAsset(lightboxAsset)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-400 hover:text-orange-500 cursor-pointer transition-colors" title="Download"><Download className="w-4 h-4" /></button>
                   <button onClick={() => void openInNewTab(lightboxAsset)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-400 hover:text-blue-500 cursor-pointer transition-colors" title="Open in new tab"><ExternalLink className="w-4 h-4" /></button>
                   <button onClick={() => setLightboxAsset(null)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-400 cursor-pointer transition-colors"><X className="w-5 h-5" /></button>
                 </div>

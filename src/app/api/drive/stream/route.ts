@@ -34,7 +34,7 @@ function corsHeadersFor(req: NextRequest): Record<string, string> {
     "Access-Control-Allow-Methods": "GET, OPTIONS",
     "Access-Control-Allow-Headers": "Range, Authorization",
     "Access-Control-Allow-Credentials": "true",
-    "Access-Control-Expose-Headers": "Content-Range, Content-Length, Accept-Ranges",
+    "Access-Control-Expose-Headers": "Content-Range, Content-Length, Accept-Ranges, Content-Disposition",
   };
 }
 
@@ -50,6 +50,20 @@ function serviceRoleClient() {
   return createClient(url, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
+}
+
+function sanitizeAttachmentFilename(value: string | null | undefined, fallback = "download"): string {
+  const cleaned = (value || fallback)
+    .replace(/[\\/\r\n]+/g, "-")
+    .replace(/"/g, "'")
+    .trim()
+    .slice(0, 180);
+  return cleaned || fallback;
+}
+
+function attachmentDisposition(filename: string): string {
+  const ascii = filename.replace(/[^\x20-\x7E]/g, "_").replace(/["\\]/g, "_");
+  return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
 }
 
 async function isInAppManagedDriveFolder(fileId: string): Promise<boolean> {
@@ -259,6 +273,11 @@ export async function GET(request: NextRequest) {
     const contentLength = driveRes.headers.get("content-length");
     if (contentRange) responseHeaders["Content-Range"] = contentRange;
     if (contentLength) responseHeaders["Content-Length"] = contentLength;
+    if (request.nextUrl.searchParams.get("download") === "1") {
+      responseHeaders["Content-Disposition"] = attachmentDisposition(
+        sanitizeAttachmentFilename(request.nextUrl.searchParams.get("name"), meta.name),
+      );
+    }
 
     // Stream the response body — never buffer.
     return new Response(

@@ -30,6 +30,20 @@ function copyHeader(source: Headers, target: Headers, name: string) {
   if (value) target.set(name, value);
 }
 
+function sanitizeAttachmentFilename(value: string | null | undefined, fallback = "download"): string {
+  const cleaned = (value || fallback)
+    .replace(/[\\/\r\n]+/g, "-")
+    .replace(/"/g, "'")
+    .trim()
+    .slice(0, 180);
+  return cleaned || fallback;
+}
+
+function attachmentDisposition(filename: string): string {
+  const ascii = filename.replace(/[^\x20-\x7E]/g, "_").replace(/["\\]/g, "_");
+  return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
+}
+
 async function userCanReadPlaybackWorkspace(userId: string, workspaceId: string): Promise<boolean> {
   const admin = createClient(assertEnv("NEXT_PUBLIC_SUPABASE_URL"), assertEnv("SUPABASE_SERVICE_ROLE_KEY"), {
     auth: { autoRefreshToken: false, persistSession: false },
@@ -104,6 +118,13 @@ export async function GET(request: NextRequest) {
   copyHeader(storageRes.headers, responseHeaders, "accept-ranges");
   if (!responseHeaders.has("content-type")) responseHeaders.set("Content-Type", "video/mp4");
   if (!responseHeaders.has("accept-ranges")) responseHeaders.set("Accept-Ranges", "bytes");
+  if (request.nextUrl.searchParams.get("download") === "1") {
+    const fallbackName = parsed.key.split("/").pop() || "download";
+    responseHeaders.set(
+      "Content-Disposition",
+      attachmentDisposition(sanitizeAttachmentFilename(request.nextUrl.searchParams.get("name"), fallbackName)),
+    );
+  }
 
   return new Response(
     streamWithInactivityTimeout(

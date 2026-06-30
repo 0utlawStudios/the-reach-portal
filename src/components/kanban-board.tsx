@@ -23,7 +23,7 @@ import { ValidationErrorModal } from "./validation-error-modal";
 import { useNavigation } from "@/lib/navigation-context";
 import { useManualPostedMovesEnabled } from "@/lib/manual-posted-settings";
 import { isArchivedPostedCard, isCurrentPostedCard, resolvePostedArchiveDate } from "@/lib/post-archive";
-import { hasPublishingMedia } from "@/lib/publishing-media";
+import { getPostReadinessIssues, stageRequiresPostReadiness, type PostReadinessIssue } from "@/lib/post-readiness";
 
 // ─── Context-aware comparators per column ───
 // PERF-012: comparators only — no array clone here. The single-pass useMemo
@@ -91,7 +91,7 @@ export function KanbanBoard() {
     return sessionStorage.getItem("t10_open_archive") === "true" ? "archive" : "pipeline";
   });
   const [repurposingCard, setRepurposingCard] = useState<ContentCardType | null>(null);
-  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [validationErrors, setValidationErrors] = useState<PostReadinessIssue[]>([]);
 
   // UX-007: per-column refs + mobile tab strip. Lets users jump to columns 3-5
   // that would otherwise be undiscoverable in the horizontal scroll on mobile.
@@ -295,17 +295,9 @@ export function KanbanBoard() {
       }
     }
 
-    // ── Completeness gate: required fields must be filled before entering Awaiting Approval or Approved ──
-    if (sourceCard.stage === "ideas" || targetStage === "awaiting_approval" || targetStage === "approved_scheduled") {
-      const missing: string[] = [];
-      if (!sourceCard.scheduledDate) missing.push("scheduled date");
-      if (!sourceCard.scheduledTime) missing.push("scheduled time");
-      if (!sourceCard.thumbnailUrl) missing.push("thumbnail");
-      if (!hasPublishingMedia(sourceCard)) missing.push("content for publishing");
-      if (!sourceCard.caption?.trim()) missing.push("caption");
-      if (!sourceCard.assetSource?.trim()) missing.push("asset source");
-      const unchecked = (sourceCard.checklist || []).filter((c) => !c.checked).length;
-      if (unchecked > 0) missing.push(`${unchecked} checklist item${unchecked > 1 ? "s" : ""}`);
+    // ── Readiness gate: Ideas can be rough, but approval/scheduling requires a complete post. ──
+    if (stageRequiresPostReadiness(targetStage)) {
+      const missing = getPostReadinessIssues(sourceCard);
       if (missing.length > 0) {
         emitDragTelemetry("end", {
           activeId: cardId,
@@ -313,7 +305,7 @@ export function KanbanBoard() {
           fromStage: sourceCard.stage,
           targetStage,
           outcome: "blocked_missing_required_fields",
-          missing,
+          missing: missing.map((item) => item.label),
         });
         setValidationErrors(missing);
         return;
